@@ -7,13 +7,18 @@ import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.network.ApiClient
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.Lane
+import fr.roadly.core.model.LaneDirection
 import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.RouteCosting
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.double
@@ -27,6 +32,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -122,5 +128,67 @@ class ValhallaRoutingProviderTest {
             assertEquals(n - 1 + original, route.maneuvers[m + i].beginShapeIndex)
         }
         assertTrue(route.maneuvers.all { it.beginShapeIndex in route.geometry.indices })
+    }
+
+    private fun rawManeuvers() = json.parseToJsonElement(fixture()).jsonObject["trip"]!!.jsonObject["legs"]!!.jsonArray[0].jsonObject["maneuvers"]!!.jsonArray
+
+    @Test fun `verbal instructions come from the fixture in french`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        val r = (provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST)) as Outcome.Success).value.single()
+        val raw = rawManeuvers()
+        assertEquals(raw[0].jsonObject["verbal_pre_transition_instruction"]!!.jsonPrimitive.content, r.maneuvers[0].verbalPre)
+        assertEquals("Conduisez vers l'est.", r.maneuvers[0].verbalPre)
+        assertNull("pas d'alerte pour le départ dans la fixture", r.maneuvers[0].verbalAlert)
+        raw.forEachIndexed { i, m ->
+            assertEquals(m.jsonObject["verbal_pre_transition_instruction"]?.jsonPrimitive?.content, r.maneuvers[i].verbalPre)
+            assertEquals(m.jsonObject["verbal_transition_alert_instruction"]?.jsonPrimitive?.content, r.maneuvers[i].verbalAlert)
+        }
+        assertEquals(2, r.maneuvers[10].roundaboutExit)
+        assertTrue("la fixture FOSSGIS ne contient ni voies ni panneaux", r.maneuvers.all { it.lanes.isEmpty() && it.exitNumber == null })
+    }
+
+    @Test fun `lanes and exit number are mapped when present`() = runTest {
+        val root = json.parseToJsonElement(fixture()).jsonObject
+        val trip = root["trip"]!!.jsonObject
+        val leg = trip["legs"]!!.jsonArray[0].jsonObject
+        val maneuvers = leg["maneuvers"]!!.jsonArray
+        val enriched = JsonObject(maneuvers[1].jsonObject + mapOf(
+            "lanes" to json.parseToJsonElement("""[{"directions":8,"valid":8},{"directions":2},{"directions":66,"active":64}]"""),
+            "sign" to json.parseToJsonElement("""{"exit_number_elements":[{"text":"12"}],"exit_toward_elements":[{"text":"Lyon"}]}"""),
+        ))
+        val newLeg = JsonObject(leg + ("maneuvers" to JsonArray(maneuvers.toMutableList().also { it[1] = enriched })))
+        val body = JsonObject(root + ("trip" to JsonObject(trip + ("legs" to JsonArray(listOf(newLeg))))))
+        server.enqueue(MockResponse().setBody(body.toString()))
+        val m = (provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST)) as Outcome.Success).value.single().maneuvers[1]
+        assertEquals(
+            listOf(Lane(setOf(LaneDirection.LEFT), true), Lane(setOf(LaneDirection.STRAIGHT), false), Lane(setOf(LaneDirection.STRAIGHT, LaneDirection.RIGHT), true)),
+            m.lanes,
+        )
+        assertEquals("12", m.exitNumber)
+    }
+
+    @Test fun `route preferences map to valhalla use flags`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, preferences = RoutePreferences(avoidTolls = true, avoidHighways = true, avoidFerries = true)))
+        val auto = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertEquals("0", auto["use_tolls"]!!.jsonPrimitive.content)
+        assertEquals("0", auto["use_highways"]!!.jsonPrimitive.content)
+        assertEquals("0", auto["use_ferry"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `default preferences add no use flags`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST))
+        val auto = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertNull(auto["use_tolls"]); assertNull(auto["use_highways"]); assertNull(auto["use_ferry"])
+    }
+
+    @Test fun `shortest variant keeps the avoid preferences`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.SHORTEST, preferences = RoutePreferences(avoidFerries = true)))
+        val auto = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertEquals("true", auto["shortest"]!!.jsonPrimitive.content)
+        assertEquals("0", auto["use_ferry"]!!.jsonPrimitive.content)
+        assertNull(auto["use_tolls"])
     }
 }

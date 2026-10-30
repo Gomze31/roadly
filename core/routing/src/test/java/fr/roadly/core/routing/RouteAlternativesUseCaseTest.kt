@@ -5,6 +5,7 @@ import fr.roadly.core.common.Outcome
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -65,5 +66,20 @@ class RouteAlternativesUseCaseTest {
         )))
         val r = (uc(o, d, null, 0L) as Outcome.Success).value
         assertEquals(listOf(RouteCosting.FASTEST, RouteCosting.NO_TOLL), r.map { it.route.costing })
+    }
+
+    @Test fun `preferences are sent with every variant`() = runTest {
+        val seen = mutableListOf<RouteRequest>()
+        val routing = object : RoutingProvider {
+            override val id = "fake"
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
+                synchronized(seen) { seen += request }
+                return Outcome.Success(listOf(route(request.costing, 100.0, 60.0, g1)))
+            }
+        }
+        val prefs = RoutePreferences(avoidHighways = true)
+        RouteAlternativesUseCase(routing)(o, d, null, 0L, prefs)
+        assertEquals(3, seen.size)
+        assertTrue(seen.all { it.preferences == prefs })
     }
 }

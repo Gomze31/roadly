@@ -50,11 +50,12 @@ class ValhallaRoutingProvider @Inject constructor(
             put("costing", "auto")
             putJsonObject("costing_options") {
                 putJsonObject("auto") {
-                    when (request.costing) {
-                        RouteCosting.FASTEST -> Unit
-                        RouteCosting.SHORTEST -> put("shortest", true)
-                        RouteCosting.NO_TOLL -> put("use_tolls", 0)
-                    }
+                    val prefs = request.preferences
+                    if (request.costing == RouteCosting.SHORTEST) put("shortest", true)
+                    // 0 = éviter autant que possible (sémantique Valhalla) ; appliqué aux 3 variantes et au recalcul.
+                    if (request.costing == RouteCosting.NO_TOLL || prefs.avoidTolls) put("use_tolls", 0)
+                    if (prefs.avoidHighways) put("use_highways", 0)
+                    if (prefs.avoidFerries) put("use_ferry", 0)
                 }
             }
             put("units", "kilometers")
@@ -92,6 +93,10 @@ class ValhallaRoutingProvider @Inject constructor(
                     durationSeconds = m.time,
                     beginShapeIndex = offset + m.beginShapeIndex,
                     roundaboutExit = m.roundaboutExitCount,
+                    verbalPre = m.verbalPre?.takeIf { it.isNotBlank() },
+                    verbalAlert = m.verbalAlert?.takeIf { it.isNotBlank() },
+                    lanes = ValhallaLanes.parse(m.lanes),
+                    exitNumber = m.sign?.exitNumberElements?.firstOrNull { it.text.isNotBlank() }?.text,
                 )
             }
         }

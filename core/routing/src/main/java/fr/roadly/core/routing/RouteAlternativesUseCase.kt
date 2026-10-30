@@ -6,6 +6,7 @@ import fr.roadly.core.model.CostEstimate
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
 import kotlinx.coroutines.async
@@ -25,9 +26,17 @@ data class RouteOption(
 class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingProvider) {
     private val order = listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST, RouteCosting.NO_TOLL)
 
-    suspend operator fun invoke(origin: GeoPoint, destination: GeoPoint, vehicle: VehicleProfile?, departAtEpochMs: Long): Outcome<List<RouteOption>> {
+    suspend operator fun invoke(
+        origin: GeoPoint,
+        destination: GeoPoint,
+        vehicle: VehicleProfile?,
+        departAtEpochMs: Long,
+        preferences: RoutePreferences = RoutePreferences(),
+    ): Outcome<List<RouteOption>> {
         val results = coroutineScope {
-            order.map { c -> async { c to safely { routing.route(RouteRequest(origin, destination, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs)) } } }.map { it.await() }
+            order.map { c ->
+                async { c to safely { routing.route(RouteRequest(origin, destination, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) } }
+            }.map { it.await() }
         }
         val routes = results.mapNotNull { (c, r) -> (r as? Outcome.Success)?.value?.firstOrNull()?.copy(costing = c) }
         if (routes.isEmpty()) {

@@ -2,6 +2,7 @@ package fr.roadly.core.routing
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable internal data class ValhallaResponse(val trip: ValhallaTrip)
 @Serializable internal data class ValhallaTrip(val legs: List<ValhallaLeg> = emptyList(), val summary: ValhallaSummary = ValhallaSummary())
@@ -16,5 +17,12 @@ import kotlinx.serialization.Serializable
     @SerialName("street_names") val streetNames: List<String> = emptyList(),
     @SerialName("roundabout_exit_count") val roundaboutExitCount: Int? = null,
     val toll: Boolean = false,
+    @SerialName("verbal_pre_transition_instruction") val verbalPre: String? = null,
+    @SerialName("verbal_transition_alert_instruction") val verbalAlert: String? = null,
+    /** Brut : le format varie selon les versions de Valhalla ; décodé de façon tolérante par [ValhallaLanes]. */
+    val lanes: List<JsonElement> = emptyList(),
+    val sign: ValhallaSign? = null,
 )
+@Serializable internal data class ValhallaSign(@SerialName("exit_number_elements") val exitNumberElements: List<ValhallaSignElement> = emptyList())
+@Serializable internal data class ValhallaSignElement(val text: String = "")
 @Serializable internal data class ValhallaError(@SerialName("error_code") val errorCode: Int = 0, val error: String = "")
