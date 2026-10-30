@@ -1,0 +1,18 @@
+<resources>
+    <string name="route_title">Itinéraires vers %1$s</string>
+    <string name="route_back">Retour</string>
+    <string name="route_start">Démarrer</string>
+    <string name="route_start_phase2">Guidage : Phase 2</string>
+    <string name="route_no_origin_title">Position inconnue</string>
+    <string name="route_no_origin_body">Appuyez longuement sur la carte pour choisir un point de départ.</string>
+    <string name="route_toll_yes">Avec péage (montant : Phase 3)</string>
+    <string name="route_toll_no">Sans péage</string>
+    <string name="route_same_as_fastest">Identique au plus rapide</string>
+    <string name="route_depart_now">Départ maintenant</string>
+    <string name="route_depart_at">Départ à %1$s</string>
+    <string name="route_vehicle_cta">Renseigner le véhicule</string>
+    <string name="route_cost_line">Carburant ≈ %1$s · %2$s/km</string>
+    <string name="route_loading">Calcul des itinéraires…</string>
+    <string name="route_time_confirm">Valider</string>
+    <string name="route_time_now">Maintenant</string>
+</resources>

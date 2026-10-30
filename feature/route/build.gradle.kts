@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.serialization.json)
+    testImplementation(project(":core:location"))
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
