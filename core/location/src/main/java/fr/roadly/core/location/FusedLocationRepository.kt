@@ -42,6 +42,7 @@ class FusedLocationRepository @Inject constructor(
 ) : LocationRepository {
     private val fused = LocationServices.getFusedLocationProviderClient(ctx)
     private val mode = MutableStateFlow(LocationMode.OFF)
+    private val guidance = MutableStateFlow(false)
     // Doit être déclaré AVANT _permission : les initialiseurs s'exécutent dans l'ordre de déclaration.
     private var _permissionInitialized = false
     private val _permission = MutableStateFlow(readPermission())
@@ -59,7 +60,7 @@ class FusedLocationRepository @Inject constructor(
     @Volatile override var lastKnown: LocationFix? = null
         private set
 
-    override val fixes: Flow<LocationFix> = combine(mode, _permission) { m, p -> if (p == LocationPermissionState.GRANTED) m else LocationMode.OFF }
+    override val fixes: Flow<LocationFix> = combine(mode, guidance, _permission) { m, g, p -> effectiveMode(m, g, p) }
         .flatMapLatest { m -> if (m == LocationMode.OFF) emptyFlow() else updates(m) }
         .onEach { lastKnown = it }
         .shareIn(scope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), replay = 1)
@@ -79,6 +80,8 @@ class FusedLocationRepository @Inject constructor(
     }
 
     override fun setMode(mode: LocationMode) { this.mode.value = mode }
+
+    override fun setGuidanceActive(active: Boolean) { guidance.value = active }
 
     override fun refreshPermission() {
         val fresh = readPermission()
@@ -108,6 +111,13 @@ class FusedLocationRepository @Inject constructor(
         accuracyM = if (hasAccuracy()) accuracy else 50f,
         timestampMs = time,
     )
+}
+
+/** Mode réellement demandé au GPS : rien sans permission ; le guidage l'emporte sur l'écran. */
+internal fun effectiveMode(requested: LocationMode, guidanceActive: Boolean, permission: LocationPermissionState): LocationMode = when {
+    permission != LocationPermissionState.GRANTED -> LocationMode.OFF
+    guidanceActive -> LocationMode.GUIDANCE
+    else -> requested
 }
 
 /** DENIED_FOREVER ne se dégrade jamais, sauf vers GRANTED (l'utilisateur a accordé la permission dans les réglages). */

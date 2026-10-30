@@ -18,6 +18,9 @@ class FakeLocationRepository(initial: LocationPermissionState = LocationPermissi
         private set
     suspend fun emit(fix: LocationFix) { lastKnown = fix; _fixes.emit(fix) }
     override fun setMode(mode: LocationMode) { this.mode = mode }
+    var guidanceActive: Boolean = false
+        private set
+    override fun setGuidanceActive(active: Boolean) { guidanceActive = active }
     override fun refreshPermission() = Unit
     override fun markDeniedForever() { permission.value = LocationPermissionState.DENIED_FOREVER }
 }
