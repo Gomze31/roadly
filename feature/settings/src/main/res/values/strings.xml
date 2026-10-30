@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Réglages</string>
+    <string name="settings_back">Retour</string>
+
+    <string name="settings_vehicle">Véhicule</string>
+    <string name="settings_vehicle_type">Type de véhicule</string>
+    <string name="settings_fuel">Carburant</string>
+    <string name="settings_consumption">Consommation moyenne (L/100 km ou kWh/100 km)</string>
+    <string name="settings_price">Prix du carburant (€/L ou €/kWh) — saisi par vous</string>
+    <string name="settings_save">Enregistrer</string>
+    <string name="settings_clear_vehicle">Effacer le véhicule</string>
+
+    <string name="settings_theme">Thème</string>
+    <string name="settings_theme_system">Système</string>
+    <string name="settings_theme_light">Clair</string>
+    <string name="settings_theme_dark">Sombre</string>
+    <string name="settings_theme_auto">Auto (jour/nuit solaire)</string>
+
+    <string name="settings_data">Données</string>
+    <string name="settings_clear_history">Effacer l\'historique de recherche</string>
+    <string name="settings_clear_favorites">Effacer les favoris</string>
+    <string name="settings_confirm_history_title">Effacer l\'historique ?</string>
+    <string name="settings_confirm_history_body">Toutes vos recherches récentes seront supprimées de cet appareil.</string>
+    <string name="settings_confirm_favorites_title">Effacer les favoris ?</string>
+    <string name="settings_confirm_favorites_body">Vos favoris, ainsi que votre domicile et votre travail, seront supprimés de cet appareil.</string>
+    <string name="settings_confirm_action">Effacer</string>
+    <string name="settings_cancel">Annuler</string>
+
+    <string name="settings_privacy">Confidentialité</string>
+    <string name="settings_privacy_body">Vos positions ne quittent l\'appareil que vers les services listés ci-dessous (géocodage, routage, tuiles). Aucune donnée n\'est vendue ni stockée sur un serveur Roadly en v1.</string>
+
+    <string name="settings_providers">Fournisseurs (avancé)</string>
+    <string name="settings_provider_ban">Adresses (BAN)</string>
+    <string name="settings_provider_photon">Lieux et POI (Photon)</string>
+    <string name="settings_provider_valhalla">Itinéraires (Valhalla)</string>
+    <string name="settings_provider_style_light">Style de carte clair</string>
+    <string name="settings_provider_style_dark">Style de carte sombre</string>
+    <string name="settings_reset">Réinitialiser</string>
+
+    <string name="settings_about">À propos</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_licenses">Cartes © OpenFreeMap &amp; contributeurs OpenStreetMap (ODbL) · Rendu MapLibre (BSD) · Adresses BAN (Licence Ouverte 2.0) · POI Photon/OSM · Itinéraires Valhalla (FOSSGIS)\nPolice Inter (SIL Open Font License 1.1)</string>
+
+    <string name="settings_vehicle_city">Citadine</string>
+    <string name="settings_vehicle_sedan">Berline</string>
+    <string name="settings_vehicle_suv">SUV</string>
+    <string name="settings_vehicle_van">Utilitaire</string>
+
+    <string name="settings_fuel_sp95">SP95</string>
+    <string name="settings_fuel_sp98">SP98</string>
+    <string name="settings_fuel_e10">E10</string>
+    <string name="settings_fuel_e85">E85</string>
+    <string name="settings_fuel_diesel">Gazole</string>
+    <string name="settings_fuel_lpg">GPL</string>
+    <string name="settings_fuel_electric">Électrique</string>
+</resources>
