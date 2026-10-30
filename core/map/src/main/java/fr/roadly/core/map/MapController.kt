@@ -53,6 +53,7 @@ class MapController(internal val context: Context) {
     private var lastRoutes: List<Route> = emptyList()
     private var lastActiveRouteId: String? = null
     private var lastMarkers: List<Place> = emptyList()
+    private var lastTraversed: String = TraversedFeatureBuilder.EMPTY
     private var routeColorActive = "#4FD1E0"
     private var routeColorInactive = "#5B6774"
 
@@ -104,6 +105,7 @@ class MapController(internal val context: Context) {
         style.addImage(MapIds.IMG_ARROW, drawableToBitmap(R.drawable.ic_user_arrow))
         style.addImage(MapIds.IMG_PIN, drawableToBitmap(R.drawable.ic_place_pin))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
+        style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
         style.addSource(GeoJsonSource(MapIds.SRC_MARKERS))
         style.addSource(GeoJsonSource(MapIds.SRC_USER))
 
@@ -116,6 +118,10 @@ class MapController(internal val context: Context) {
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_ACTIVE, MapIds.SRC_ROUTES).withProperties(
             lineColor(routeColorActive), lineWidth(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("active"), literal(true))))
+        // Tronçon déjà parcouru, dessiné par-dessus le tracé actif (spec §5 : « tracé parcouru atténué »).
+        style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED, MapIds.SRC_TRAVERSED).withProperties(
+            lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+        ))
         style.addLayer(SymbolLayer(MapIds.LYR_MARKERS, MapIds.SRC_MARKERS).withProperties(
             iconImage(MapIds.IMG_PIN), iconAnchor(Property.ICON_ANCHOR_BOTTOM), iconAllowOverlap(true), iconSize(1f),
         ))
@@ -131,9 +137,11 @@ class MapController(internal val context: Context) {
         val style = map?.style ?: return
         lastFix?.let { style.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(it)) }
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ROUTES)?.setGeoJson(RouteFeatureBuilder.build(lastRoutes, lastActiveRouteId))
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
         (style.getLayer(MapIds.LYR_ROUTE_ACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorActive))
         (style.getLayer(MapIds.LYR_ROUTE_INACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
+        (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
@@ -153,6 +161,14 @@ class MapController(internal val context: Context) {
         lastMarkers = places
         if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(places))
     }
+
+    /** Atténue la portion parcourue de l'itinéraire actif (écran de guidage). */
+    fun setTraversed(geometry: List<GeoPoint>, segmentIndex: Int, snapped: GeoPoint?) {
+        lastTraversed = TraversedFeatureBuilder.build(geometry, segmentIndex, snapped)
+        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
+    }
+
+    fun clearTraversed() = setTraversed(emptyList(), -1, null)
 
     fun moveTo(point: GeoPoint, zoom: Double, bearing: Double = 0.0, animate: Boolean = true) {
         val action: (MapLibreMap) -> Unit = { m ->

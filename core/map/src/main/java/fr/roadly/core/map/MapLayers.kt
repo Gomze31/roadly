@@ -1,5 +1,6 @@
 package fr.roadly.core.map
 
+import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.Route
@@ -15,11 +16,13 @@ internal object MapIds {
     const val SRC_USER = "roadly-user"
     const val SRC_ROUTES = "roadly-routes"
     const val SRC_MARKERS = "roadly-markers"
+    const val SRC_TRAVERSED = "roadly-traversed"
     const val LYR_ACCURACY = "roadly-accuracy"
     const val LYR_USER = "roadly-user-arrow"
     const val LYR_ROUTE_CASING = "roadly-route-casing"
     const val LYR_ROUTE_INACTIVE = "roadly-route-inactive"
     const val LYR_ROUTE_ACTIVE = "roadly-route-active"
+    const val LYR_ROUTE_TRAVERSED = "roadly-route-traversed"
     const val LYR_MARKERS = "roadly-markers"
     const val IMG_ARROW = "roadly-img-arrow"
     const val IMG_PIN = "roadly-img-pin"
@@ -67,4 +70,23 @@ internal object PointFeatureBuilder {
             }
         }
     }.toString()
+}
+
+/** Portion déjà parcourue de l'itinéraire actif (écran de guidage) : p_0 … p_segmentIndex puis la position projetée. */
+object TraversedFeatureBuilder {
+    const val EMPTY = """{"type":"FeatureCollection","features":[]}"""
+
+    fun build(geometry: List<GeoPoint>, segmentIndex: Int, snapped: GeoPoint?): String {
+        if (geometry.isEmpty() || segmentIndex < 0) return EMPTY
+        val pts = geometry.subList(0, (segmentIndex + 1).coerceAtMost(geometry.size)) + listOfNotNull(snapped)
+        if (pts.size < 2) return EMPTY
+        return buildJsonObject {
+            put("type", "Feature")
+            putJsonObject("properties") {}
+            putJsonObject("geometry") {
+                put("type", "LineString")
+                put("coordinates", JsonArray(pts.map { p -> JsonArray(listOf(JsonPrimitive(p.lon), JsonPrimitive(p.lat))) }))
+            }
+        }.toString()
+    }
 }

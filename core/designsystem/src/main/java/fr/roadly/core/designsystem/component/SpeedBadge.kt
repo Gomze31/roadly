@@ -22,11 +22,11 @@ import fr.roadly.core.designsystem.theme.NavDigits
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import kotlin.math.roundToInt
 
-/** [speedKmh] null = pas de fix GPS. [limitKmh] null = limitation inconnue (affiche « — »). */
+/** [speedKmh] null = pas de fix GPS. [limitKmh] null = limitation inconnue (affiche « — »). Rouge au-delà de limite + [toleranceKmh]. */
 @Composable
-fun SpeedBadge(speedKmh: Double?, limitKmh: Int?, modifier: Modifier = Modifier) {
+fun SpeedBadge(speedKmh: Double?, limitKmh: Int?, modifier: Modifier = Modifier, toleranceKmh: Int = 5) {
     val c = LocalRoadlyColors.current
-    val over = speedKmh != null && limitKmh != null && speedKmh > limitKmh + 5
+    val over = speedKmh != null && limitKmh != null && speedKmh > limitKmh + toleranceKmh
     GlassPanel(modifier, contentPadding = 12.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
