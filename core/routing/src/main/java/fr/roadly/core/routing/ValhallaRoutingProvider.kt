@@ -10,6 +10,7 @@ import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RouteRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.addJsonObject
@@ -32,7 +33,14 @@ class ValhallaRoutingProvider @Inject constructor(
     override val id = "valhalla"
 
     override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
-        val base = config.config.first().valhallaBaseUrl
+        // Lecture de la configuration (DataStore) : une IOException/CorruptionException ne doit jamais s'échapper.
+        val base = try {
+            config.config.first().valhallaBaseUrl
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return Outcome.Failure(AppError.ProviderUnavailable(id))
+        }
         // URL de base surchargeable par l'utilisateur : ne jamais lever d'exception si elle est invalide.
         val url = "$base/route".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable(id))
         val body = buildJsonObject {

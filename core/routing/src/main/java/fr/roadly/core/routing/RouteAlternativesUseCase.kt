@@ -27,7 +27,7 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
 
     suspend operator fun invoke(origin: GeoPoint, destination: GeoPoint, vehicle: VehicleProfile?, departAtEpochMs: Long): Outcome<List<RouteOption>> {
         val results = coroutineScope {
-            order.map { c -> async { c to routing.route(RouteRequest(origin, destination, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs)) } }.map { it.await() }
+            order.map { c -> async { c to safely { routing.route(RouteRequest(origin, destination, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs)) } } }.map { it.await() }
         }
         val routes = results.mapNotNull { (c, r) -> (r as? Outcome.Success)?.value?.firstOrNull()?.copy(costing = c) }
         if (routes.isEmpty()) {
@@ -45,6 +45,16 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
             )
         })
     }
+
+    /** Une exception d'un fournisseur devient un échec : elle ne doit pas annuler les autres variantes. */
+    private suspend inline fun safely(block: () -> Outcome<List<Route>>): Outcome<List<Route>> =
+        try {
+            block()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Outcome.Failure(AppError.Unknown(e.message))
+        }
 
     private fun RouteCosting.label() = when (this) {
         RouteCosting.FASTEST -> "Le plus rapide"

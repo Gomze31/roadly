@@ -14,8 +14,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -82,5 +88,39 @@ class ValhallaRoutingProviderTest {
     @Test fun `valhalla 400 no path maps to NoResult`() = runTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error_code":442,"error":"No path could be found for input","status_code":400}"""))
         assertEquals(AppError.NoResult, (provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST)) as Outcome.Failure).error)
+    }
+
+    @Test fun `waypoints are sent between origin and destination in order`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        val waypoint = GeoPoint(48.86, 2.33)
+        provider.route(RouteRequest(origin, dest, waypoints = listOf(waypoint), costing = RouteCosting.FASTEST))
+        val locations = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["locations"]!!.jsonArray
+        assertEquals(3, locations.size)
+        val pts = locations.map { it.jsonObject["lat"]!!.jsonPrimitive.double to it.jsonObject["lon"]!!.jsonPrimitive.double }
+        assertEquals(listOf(origin.lat to origin.lon, waypoint.lat to waypoint.lon, dest.lat to dest.lon), pts)
+    }
+
+    @Test fun `two legs are concatenated without duplicate junction point`() = runTest {
+        val trip = json.parseToJsonElement(fixture()).jsonObject["trip"]!!.jsonObject
+        val leg = trip["legs"]!!.jsonArray[0].jsonObject
+        val n = Polyline6.decode(leg["shape"]!!.jsonPrimitive.content).size
+        val legManeuvers = leg["maneuvers"]!!.jsonArray
+        val twoLegs = buildJsonObject {
+            put("trip", buildJsonObject {
+                put("summary", trip["summary"]!!)
+                put("legs", buildJsonArray { add(leg); add(leg) })
+            })
+        }
+        server.enqueue(MockResponse().setBody(twoLegs.toString()))
+        val route = (provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST)) as Outcome.Success).value.single()
+        assertEquals(2 * n - 1, route.geometry.size)
+        assertEquals(2 * legManeuvers.size, route.maneuvers.size)
+        val m = legManeuvers.size
+        // Premier et dernier jalons de la 2e étape : décalés de n - 1 (le point de jonction n'est pas dupliqué).
+        listOf(0, 1, m - 1).forEach { i ->
+            val original = legManeuvers[i].jsonObject["begin_shape_index"]!!.jsonPrimitive.int
+            assertEquals(n - 1 + original, route.maneuvers[m + i].beginShapeIndex)
+        }
+        assertTrue(route.maneuvers.all { it.beginShapeIndex in route.geometry.indices })
     }
 }

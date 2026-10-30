@@ -19,6 +19,14 @@ private class FakeRouting(val byCosting: Map<RouteCosting, Outcome<List<Route>>>
     override suspend fun route(request: RouteRequest) = byCosting[request.costing] ?: Outcome.Failure(AppError.NoResult)
 }
 
+private class ThrowingForShortestRouting(val ok: Map<RouteCosting, Route>) : RoutingProvider {
+    override val id = "fake"
+    override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
+        if (request.costing == RouteCosting.SHORTEST) throw IllegalStateException("boom")
+        return Outcome.Success(listOf(ok.getValue(request.costing)))
+    }
+}
+
 class RouteAlternativesUseCaseTest {
     private val o = GeoPoint(48.0, 2.0); private val d = GeoPoint(49.0, 3.0)
     private val g1 = listOf(o, GeoPoint(48.5, 2.5), d)
@@ -48,5 +56,14 @@ class RouteAlternativesUseCaseTest {
     @Test fun `all failures propagate first error`() = runTest {
         val uc = RouteAlternativesUseCase(FakeRouting(mapOf(RouteCosting.FASTEST to Outcome.Failure(AppError.Timeout))))
         assertEquals(AppError.Timeout, (uc(o, d, null, 0L) as Outcome.Failure).error)
+    }
+
+    @Test fun `throwing costing does not cancel the others`() = runTest {
+        val uc = RouteAlternativesUseCase(ThrowingForShortestRouting(mapOf(
+            RouteCosting.FASTEST to route(RouteCosting.FASTEST, 100.0, 60.0, g1),
+            RouteCosting.NO_TOLL to route(RouteCosting.NO_TOLL, 120.0, 90.0, g2),
+        )))
+        val r = (uc(o, d, null, 0L) as Outcome.Success).value
+        assertEquals(listOf(RouteCosting.FASTEST, RouteCosting.NO_TOLL), r.map { it.route.costing })
     }
 }
