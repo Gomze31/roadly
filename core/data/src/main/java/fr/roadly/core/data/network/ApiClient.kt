@@ -52,7 +52,7 @@ class ApiClient @Inject constructor(
 
 private suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
     enqueue(object : Callback {
-        override fun onResponse(call: Call, response: Response) { cont.resume(response) }
+        override fun onResponse(call: Call, response: Response) { cont.resume(response) { _, _, _ -> response.close() } }
         override fun onFailure(call: Call, e: IOException) { if (!cont.isCancelled) cont.resumeWithException(e) }
     })
     cont.invokeOnCancellation { cancel() }

@@ -15,6 +15,7 @@ interface FavoritesRepository {
     fun observeHome(): Flow<Place?>
     fun observeWork(): Flow<Place?>
     suspend fun isFavorite(id: String): Boolean
+    /** Retirer un favori qui est aussi domicile/travail supprime également ce raccourci. */
     suspend fun toggle(place: Place)
     suspend fun setHome(place: Place)
     suspend fun setWork(place: Place)
@@ -28,12 +29,8 @@ class RoomFavoritesRepository @Inject constructor(private val dao: FavoriteDao) 
     override fun observeWork() = dao.observeWork().map { it?.toPlace() }
     override suspend fun isFavorite(id: String) = dao.byId(id) != null
     override suspend fun toggle(place: Place) {
-        val existing = dao.byId(place.id)
-        when {
-            existing == null -> dao.upsert(place.toEntity())
-            !existing.isHome && !existing.isWork -> dao.delete(place.id)
-            else -> Unit // domicile/travail : on ne retire pas via le favori
-        }
+        // Un favori existant est toujours retiré, y compris s'il est domicile/travail (raccourci effacé).
+        if (dao.byId(place.id) == null) dao.upsert(place.toEntity()) else dao.delete(place.id)
     }
     override suspend fun setHome(place: Place) = dao.setHome(dao.byId(place.id) ?: place.toEntity())
     override suspend fun setWork(place: Place) = dao.setWork(dao.byId(place.id) ?: place.toEntity())
