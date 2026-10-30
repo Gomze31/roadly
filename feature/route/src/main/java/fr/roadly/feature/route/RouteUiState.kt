@@ -15,6 +15,11 @@ sealed interface RouteUiState {
         val activeId: String,
         val hasVehicleProfile: Boolean,
         val departAtEpochMs: Long,
-        val styleUrl: String,
     ) : RouteUiState
 }
+
+/** État exposé à l'écran : la carte est affichée dès que [styleUrl] est connu, quelle que soit la [phase]. */
+data class RouteScreenState(
+    val styleUrl: String = "",
+    val phase: RouteUiState = RouteUiState.Loading,
+)

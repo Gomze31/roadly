@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -47,13 +46,12 @@ class RouteViewModel @Inject constructor(
             combine(origin, departAt, vehicleRepo.profile, reload) { o, d, v, _ -> Triple(o, d, v) }.collect { (o, d, v) ->
                 if (o == null) { computed.value = RouteUiState.NoOrigin(destName); return@collect }
                 computed.value = RouteUiState.Loading
-                val cfg = config.config.first()
                 when (val r = alternatives(o, destination, v, d)) {
                     is Outcome.Success -> {
                         val options = r.value
                         // L'option active doit toujours exister dans la liste affichée.
                         if (activeId.value == null || options.none { it.route.id == activeId.value }) activeId.value = options.first().route.id
-                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, d, if (isDark.value) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl)
+                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, d)
                     }
                     is Outcome.Failure -> computed.value = RouteUiState.Error(r.error)
                 }
@@ -61,9 +59,10 @@ class RouteViewModel @Inject constructor(
         }
     }
 
-    val uiState: StateFlow<RouteUiState> = combine(computed, activeId, isDark, config.config) { s, id, dark, cfg ->
-        if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl) else s
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteUiState.Loading)
+    val uiState: StateFlow<RouteScreenState> = combine(computed, activeId, isDark, config.config) { s, id, dark, cfg ->
+        val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId) else s
+        RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
     fun selectRoute(id: String) { activeId.value = id }

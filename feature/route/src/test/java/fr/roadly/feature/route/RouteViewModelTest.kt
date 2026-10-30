@@ -60,14 +60,19 @@ class RouteViewModelTest {
     private fun vm() = RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config)
 
     @Test fun `without known position state is NoOrigin`() = runTest {
-        vm().uiState.test { advanceUntilIdle(); assertTrue(expectMostRecentItem() is RouteUiState.NoOrigin) }
+        vm().uiState.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertTrue(s.phase is RouteUiState.NoOrigin)
+            assertTrue("la carte doit rester affichable sans position", s.styleUrl.isNotEmpty())
+        }
     }
 
     @Test fun `with position computes three options and selects fastest`() = runTest {
         location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
         vm().uiState.test {
             advanceUntilIdle()
-            val s = expectMostRecentItem() as RouteUiState.Content
+            val s = expectMostRecentItem().phase as RouteUiState.Content
             assertEquals(3, s.options.size)
             assertEquals(RouteCosting.FASTEST, s.options.first { it.route.id == s.activeId }.route.costing)
             assertTrue(s.options.all { it.cost == null })
@@ -79,7 +84,7 @@ class RouteViewModelTest {
         vehicle.p.value = VehicleProfile(fr.roadly.core.model.VehicleType.SEDAN, fr.roadly.core.model.FuelType.DIESEL, 5.0, 1.70)
         vm().uiState.test {
             advanceUntilIdle()
-            val s = expectMostRecentItem() as RouteUiState.Content
+            val s = expectMostRecentItem().phase as RouteUiState.Content
             assertEquals(0.85, s.options.first().cost!!.fuelEur, 0.001)
         }
     }
@@ -90,7 +95,20 @@ class RouteViewModelTest {
         val vm = vm()
         vm.uiState.test {
             advanceUntilIdle()
-            assertEquals(AppError.Timeout, (expectMostRecentItem() as RouteUiState.Error).error)
+            assertEquals(AppError.Timeout, (expectMostRecentItem().phase as RouteUiState.Error).error)
+        }
+    }
+
+    @Test fun `setOrigin from NoOrigin triggers computation`() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            advanceUntilIdle()
+            assertTrue(expectMostRecentItem().phase is RouteUiState.NoOrigin)
+            vm.setOrigin(GeoPoint(48.8, 2.3))
+            advanceUntilIdle()
+            val s = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals(3, s.options.size)
+            assertEquals(GeoPoint(48.8, 2.3), s.origin)
         }
     }
 }
