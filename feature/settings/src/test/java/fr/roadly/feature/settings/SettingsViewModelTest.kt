@@ -6,8 +6,8 @@ import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.data.repository.ThemeMode
-import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
+import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.model.FuelType
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.VehicleProfile
@@ -36,15 +36,7 @@ class SettingsViewModelTest {
         override suspend fun save(profile: VehicleProfile) { p.value = profile }
         override suspend fun clear() { p.value = null }
     }
-    private val prefs = object : UserPreferencesRepository {
-        val t = MutableStateFlow(ThemeMode.AUTO_SOLAR)
-        override val themeMode = t
-        override suspend fun setThemeMode(mode: ThemeMode) { t.value = mode }
-        override val locationRationaleSeen = flowOf(false)
-        override suspend fun setLocationRationaleSeen() = Unit
-        override val locationDeniedForever = flowOf(false)
-        override suspend fun setLocationDeniedForever(value: Boolean) = Unit
-    }
+    private val prefs = FakeUserPreferencesRepository()
     private var overrideCalls = 0
     private val config = object : ProviderConfigRepository {
         val c = MutableStateFlow(ProviderConfig.DEFAULT)
