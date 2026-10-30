@@ -57,4 +57,6 @@ data class RouteRequest(
     val vehicle: VehicleProfile? = null,
     val departAtEpochMs: Long? = null,
     val preferences: RoutePreferences = RoutePreferences(),
+    /** Cap de l'utilisateur en degrés (0..360) : utilisé au recalcul pour éviter un demi-tour imposé ; null = inconnu. */
+    val originHeadingDeg: Float? = null,
 )

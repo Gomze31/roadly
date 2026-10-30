@@ -15,4 +15,5 @@
     <string name="home_permission_allow">Autoriser la localisation</string>
     <string name="home_permission_settings">Ouvrir les réglages système</string>
     <string name="home_picked_route">Itinéraire vers ce point</string>
+    <string name="home_resume_guidance">Reprendre le guidage</string>
 </resources>

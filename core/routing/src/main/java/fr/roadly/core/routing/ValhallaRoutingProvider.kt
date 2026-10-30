@@ -43,9 +43,19 @@ class ValhallaRoutingProvider @Inject constructor(
         }
         // URL de base surchargeable par l'utilisateur : ne jamais lever d'exception si elle est invalide.
         val url = "$base/route".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable(id))
+        val heading = request.originHeadingDeg
         val body = buildJsonObject {
             putJsonArray("locations") {
-                (listOf(request.origin) + request.waypoints + request.destination).forEach { p -> addJsonObject { put("lat", p.lat); put("lon", p.lon) } }
+                (listOf(request.origin) + request.waypoints + request.destination).forEachIndexed { i, p ->
+                    addJsonObject {
+                        put("lat", p.lat); put("lon", p.lon)
+                        // Recalcul en mouvement : le cap du premier point (tolérance 45°) évite un demi-tour imposé.
+                        if (i == 0 && heading != null) {
+                            put("heading", Math.floorMod(heading.toInt(), 360))
+                            put("heading_tolerance", 45)
+                        }
+                    }
+                }
             }
             put("costing", "auto")
             putJsonObject("costing_options") {

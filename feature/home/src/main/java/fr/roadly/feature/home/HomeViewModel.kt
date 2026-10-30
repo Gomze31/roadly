@@ -19,11 +19,15 @@ import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
+import fr.roadly.core.navigation.NavigationSession
+import fr.roadly.core.navigation.NavigationState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -42,6 +46,7 @@ class HomeViewModel @Inject constructor(
     connectivity: ConnectivityObserver,
     config: ProviderConfigRepository,
     permissionEvents: PermissionEvents,
+    navigationSession: NavigationSession,
 ) : ViewModel() {
 
     private val cameraMode = MutableStateFlow(CameraMode.CENTERED)
@@ -82,6 +87,12 @@ class HomeViewModel @Inject constructor(
             pickedPlace = values[8] as Place?,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+
+    /** Un guidage est en cours : l'accueil propose alors « Reprendre le guidage » (retour possible depuis « Changer de destination »). */
+    val isGuiding: StateFlow<Boolean> = navigationSession.state
+        .map { it is NavigationState.Guiding }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** Relance le géocodage inverse seulement si l'on s'est déplacé de plus de 50 m. */
     private fun maybeReverse(fix: LocationFix) {

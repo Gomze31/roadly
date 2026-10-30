@@ -84,6 +84,24 @@ class ValhallaRoutingProviderTest {
         assertEquals(2, body["locations"]!!.let { it as kotlinx.serialization.json.JsonArray }.size)
     }
 
+    @Test fun `origin heading is sent on the first location only`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, originHeadingDeg = 90.4f))
+        val locations = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["locations"]!!.jsonArray
+        val first = locations[0].jsonObject
+        assertEquals(90, first["heading"]!!.jsonPrimitive.int)
+        assertEquals(45, first["heading_tolerance"]!!.jsonPrimitive.int)
+        assertNull(locations[1].jsonObject["heading"])
+        assertNull(locations[1].jsonObject["heading_tolerance"])
+    }
+
+    @Test fun `no heading is sent when the origin heading is null`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST))
+        val first = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["locations"]!!.jsonArray[0].jsonObject
+        assertNull(first["heading"])
+        assertNull(first["heading_tolerance"])
+    }
     @Test fun `shortest sets shortest flag`() = runTest {
         server.enqueue(MockResponse().setBody(fixture()))
         provider.route(RouteRequest(origin, dest, costing = RouteCosting.SHORTEST))

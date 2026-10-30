@@ -1,11 +1,14 @@
 package fr.roadly.feature.home
 
 import app.cash.turbine.test
+import fr.roadly.core.common.AppError
+import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.connectivity.ConnectivityObserver
 import fr.roadly.core.data.repository.FavoritesRepository
+import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.geocoding.GeocodingProvider
 import fr.roadly.core.location.LocationMode
 import fr.roadly.core.location.PermissionEvents
@@ -15,13 +18,26 @@ import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
+import fr.roadly.core.model.Route
+import fr.roadly.core.model.RoutePreferences
+import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.navigation.NavigationSession
+import fr.roadly.core.navigation.NoopSpeedLimitProvider
+import fr.roadly.core.navigation.testing.FakeNavigationServiceController
+import fr.roadly.core.navigation.testing.FakeSpeechService
+import fr.roadly.core.navigation.testing.TestRoutes
+import fr.roadly.core.routing.RouteOption
+import fr.roadly.core.routing.RoutingProvider
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -60,7 +76,25 @@ class HomeViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     private fun fix(lat: Double, lon: Double) = LocationFix(GeoPoint(lat, lon), 90f, 13.9f, 5f, 0L)
-    private fun vm() = HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents())
+    private val routing = object : RoutingProvider {
+        override val id = "fake"
+        override suspend fun route(request: RouteRequest): Outcome<List<Route>> = Outcome.Failure(AppError.Network)
+    }
+
+    /** Vraie session de guidage câblée sur des doubles (comme `NavigationViewModelTest`). */
+    private fun TestScope.session(): NavigationSession {
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        return NavigationSession(
+            location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), FakeUserPreferencesRepository(),
+            FakeNavigationServiceController(), { testScheduler.currentTime }, dispatchers, backgroundScope,
+        )
+    }
+
+    private fun TestScope.vm(session: NavigationSession = session()) =
+        HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents(), session)
 
     @Test fun `collecting state switches location to MAP mode and exposes speed in km per h`() = runTest {
         val vm = vm()
@@ -94,6 +128,19 @@ class HomeViewModelTest {
             vm.onRecenter(); advanceUntilIdle()
             assertEquals(CameraMode.FOLLOW, expectMostRecentItem().cameraMode)
             assertEquals(LocationMode.FOLLOW, location.mode)
+        }
+    }
+
+    @Test fun `isGuiding reflects the session state`() = runTest {
+        val session = session()
+        val vm = vm(session)
+        val route = TestRoutes.straight()
+        vm.isGuiding.test {
+            assertEquals(false, awaitItem())
+            session.start(RouteOption(route, "Le plus rapide", 0L, null, sameAsFastest = false), RoutePreferences()); runCurrent()
+            assertEquals(true, awaitItem())
+            session.stop(); runCurrent()
+            assertEquals(false, awaitItem())
         }
     }
 }

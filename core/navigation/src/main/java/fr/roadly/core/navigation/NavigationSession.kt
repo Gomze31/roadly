@@ -134,7 +134,10 @@ class NavigationSession @Inject constructor(
         private val announced = mutableSetOf<Pair<Int, Tier>>()
         private val smoother = SpeedSmoother()
         private val recent = ArrayDeque<LocationFix>()
+        /** Vitesse lissée : référence des paliers d'annonce et de l'alerte de dépassement. */
         private var speedKmh: Double? = null
+        /** Vitesse GPS brute du dernier fix : c'est elle qu'affiche le badge (le lissage ne sert qu'à la politique d'annonce). */
+        private var rawSpeedKmh: Double? = null
         private var speedLimitKmh: Int? = null
         val startedAtMs = clock.nowMs()
         private var lastFixAtMs = startedAtMs
@@ -142,6 +145,8 @@ class NavigationSession @Inject constructor(
         private var hadFix = false
         private var lastRerouteAtMs: Long? = null
         private var rerouting = false
+        /** « Recalcul de l'itinéraire. » n'est dit qu'une fois par épisode hors itinéraire. */
+        private var rerouteAnnounced = false
         private var overSpeedAlerted = false
         private var limitJob: Job? = null
         private lateinit var runScope: CoroutineScope
@@ -188,21 +193,24 @@ class NavigationSession @Inject constructor(
             lastAdvanceAtMs = now
             recent.addLast(fix)
             while (recent.size > GuidanceConstants.RECENT_FIXES) recent.removeFirst()
-            speedKmh = smoother.update(fix.speedMps?.let { it * 3.6 })
+            rawSpeedKmh = fix.speedMps?.let { it * 3.6 }
+            speedKmh = smoother.update(rawSpeedKmh)
             val progress = tracker.update(fix)
             if (tracker.hasArrived) { arrive(); return }
+            if (!tracker.isOffRoute) rerouteAnnounced = false
             if (tracker.isOffRoute && !afterLongGap) maybeReroute(fix, now)
             announce(progress)
             refreshSpeedLimit()
             checkOverSpeed()
-            publish(guiding(progress, now, gpsLost = false))
+            // Un recalcul a pu aboutir pendant une suspension : ne jamais associer l'ancienne progression au nouveau tracé.
+            if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = false))
         }
 
         private suspend fun announce(progress: RouteProgress) {
-            if (rerouting) return
+            if (rerouting || progress.routeId != route.id) return
             val a = AnnouncementPolicy.next(progress, route.maneuvers, speedKmh, announced) ?: return
             announced += a.maneuverIndex to a.tier
-            say(a.text)
+            say(a.text, routeId = progress.routeId)
         }
 
         private suspend fun arrive() {
@@ -232,11 +240,22 @@ class NavigationSession @Inject constructor(
             if (last != null && now - last < GuidanceConstants.REROUTE_MIN_INTERVAL_MS) return
             lastRerouteAtMs = now
             rerouting = true
-            say(SpokenPhrases.REROUTING)
+            if (!rerouteAnnounced) {
+                rerouteAnnounced = true
+                say(SpokenPhrases.REROUTING)
+            }
+            // Cap transmis seulement en mouvement : à l'arrêt le cap GPS est bruité et imposerait un sens à tort.
+            val speed = fix.speedMps
+            val heading = if (speed != null && speed >= GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS) fix.bearingDeg else null
             runScope.launch {
                 val result = try {
                     withTimeout(GuidanceConstants.REROUTE_TIMEOUT_MS) {
-                        routing.route(RouteRequest(origin = fix.point, destination = destination, costing = costing, preferences = routePreferences))
+                        routing.route(
+                            RouteRequest(
+                                origin = fix.point, destination = destination, costing = costing,
+                                preferences = routePreferences, originHeadingDeg = heading,
+                            ),
+                        )
                     }
                 } catch (e: TimeoutCancellationException) {
                     // Sans réponse : traité comme un échec (ancien tracé conservé, nouvel essai après l'intervalle).
@@ -254,6 +273,7 @@ class NavigationSession @Inject constructor(
                     announced.clear()
                     announced += 0 to Tier.NOW
                     freshTracker.update(fix)
+                    rerouteAnnounced = false
                 }
                 // Échec : on continue sur l'ancien tracé ; un nouveau recalcul sera tenté après 10 s.
                 rerouting = false
@@ -272,7 +292,8 @@ class NavigationSession @Inject constructor(
                 val progress = tracker.extrapolate(mps * (now - lastAdvanceAtMs) / 1000.0, silentMs)
                 lastAdvanceAtMs = now
                 announce(progress)
-                publish(guiding(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
+                // Un recalcul a pu aboutir pendant la suspension de l'annonce : on abandonne la progression périmée.
+                if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
             }
         }
 
@@ -306,10 +327,12 @@ class NavigationSession @Inject constructor(
             }
         }
 
-        private suspend fun say(text: String) {
+        private suspend fun say(text: String, routeId: String? = null) {
             if (text.isBlank() || _muted.value || !prefs.voiceEnabled.first()) return
             // Revérifié après la suspension : un arrêt ou un nouveau départ a pu survenir entre-temps.
             if (gen != generation) return
+            // Idem pour un recalcul abouti entre-temps : une annonce issue de l'ancien tracé serait fausse.
+            if (routeId != null && routeId != route.id) return
             speech.speak(text)
         }
 
@@ -323,7 +346,7 @@ class NavigationSession @Inject constructor(
             return NavigationState.Guiding(
                 route = route,
                 progress = progress,
-                speedKmh = speedKmh,
+                speedKmh = rawSpeedKmh,
                 speedLimitKmh = speedLimitKmh,
                 upcoming = ms.subList(min(next + 1, ms.size), min(next + 1 + GuidanceConstants.UPCOMING_COUNT, ms.size)),
                 lanes = ms[next].lanes,

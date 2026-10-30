@@ -17,6 +17,7 @@ import fr.roadly.core.navigation.testing.FakeSpeechService
 import fr.roadly.core.navigation.testing.TestRoutes
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -380,5 +381,76 @@ class NavigationSessionTest {
         advanceTimeBy(1_000); runCurrent()
         location.emit(fixAt(300.0, northM = 60.0, timestampMs = 11_001L)); runCurrent()
         assertEquals(2, requests.size)
+    }
+
+    @Test fun `a reroute finishing during a suspended fix does not announce from the old route`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var armed = false
+        val gated = object : UserPreferencesRepository by prefs {
+            // Une seule lecture est bloquée (celle de l'annonce du tic de surveillance) ; les suivantes passent.
+            override val voiceEnabled: Flow<Boolean> = flow {
+                if (armed) { armed = false; gate.await() }
+                emit(true)
+            }
+        }
+        val s = session(gated)
+        s.start(option, RoutePreferences()); runCurrent()
+        val turnAt = tracker.maneuverStartM[1]
+        location.emit(fixAt(turnAt - 320.0)); runCurrent() // 320 m : au-delà du palier « far » (300 m), rien à annoncer
+        assertEquals(listOf("Conduisez vers l'est."), speech.spoken)
+        armed = true
+        advanceTimeBy(4_000); runCurrent() // position extrapolée à 280 m du virage : annonce « far » suspendue sur voiceEnabled
+        assertFalse(armed)
+        location.emit(fixAt(turnAt - 280.0, northM = 150.0, timestampMs = 4_000L)); runCurrent() // le recalcul aboutit pendant la suspension
+        assertEquals("rerouted", guiding(s).route.id)
+        gate.complete(Unit); runCurrent()
+        assertEquals(listOf("Conduisez vers l'est.", SpokenPhrases.REROUTING), speech.spoken)
+        assertEquals("rerouted", guiding(s).progress.routeId)
+    }
+
+    @Test fun `a reroute on a moving fix passes the GPS heading`() = runTest {
+        val s = session()
+        s.start(option, RoutePreferences()); runCurrent()
+        repeat(5) { location.emit(fixAt(300.0 + it * 5, northM = 60.0)); runCurrent() }
+        assertEquals(90f, requests.single().originHeadingDeg)
+    }
+
+    @Test fun `a reroute on a slow fix sends no heading`() = runTest {
+        val s = session()
+        s.start(option, RoutePreferences()); runCurrent()
+        repeat(5) { location.emit(fixAt(300.0, speedMps = 1f, northM = 60.0)); runCurrent() }
+        assertEquals(null, requests.single().originHeadingDeg)
+    }
+
+    @Test fun `the rerouting phrase is spoken once per off-route episode`() = runTest {
+        routingResult = Outcome.Failure(AppError.Network)
+        val s = session()
+        s.start(option, RoutePreferences()); runCurrent()
+        repeat(35) {
+            advanceTimeBy(1_000)
+            location.emit(fixAt(300.0, northM = 60.0, timestampMs = testScheduler.currentTime)); runCurrent()
+        }
+        assertTrue(requests.size >= 3)
+        assertEquals(1, speech.spoken.count { it == SpokenPhrases.REROUTING })
+        // Retour sur l'itinéraire puis nouvelle sortie : nouvel épisode, la phrase est redite.
+        repeat(3) {
+            advanceTimeBy(1_000)
+            location.emit(fixAt(300.0, timestampMs = testScheduler.currentTime)); runCurrent()
+        }
+        repeat(12) { // laisse écouler l'intervalle minimal de 10 s depuis le dernier recalcul
+            advanceTimeBy(1_000)
+            location.emit(fixAt(300.0, northM = 60.0, timestampMs = testScheduler.currentTime)); runCurrent()
+        }
+        assertEquals(2, speech.spoken.count { it == SpokenPhrases.REROUTING })
+    }
+
+    @Test fun `the badge shows the raw GPS speed while announcements use the smoothed one`() = runTest {
+        val s = session()
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(100.0, speedMps = 10f)); runCurrent()
+        location.emit(fixAt(120.0, speedMps = 20f)); runCurrent()
+        assertEquals(72.0, guiding(s).speedKmh!!, 1e-6) // brute (lissée : 46,8)
+        location.emit(fixAt(140.0, speedMps = null)); runCurrent()
+        assertEquals(null, guiding(s).speedKmh)
     }
 }

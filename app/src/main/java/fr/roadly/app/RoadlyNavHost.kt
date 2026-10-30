@@ -2,6 +2,7 @@ package fr.roadly.app
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import fr.roadly.feature.home.HomeRoute
@@ -34,11 +35,18 @@ fun RoadlyNavHost(
             onNavigateToRoute = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) },
             onRequestLocationPermission = onRequestLocationPermission,
             onOpenAppSettings = onOpenAppSettings,
+            onResumeGuidance = { nav.navigate(NavigationRoute) { launchSingleTop = true } },
         )
         searchScreen(
             onBack = { nav.popBackStack() },
-            // popUpTo(HomeRoute) : Retour depuis l'itinéraire revient à l'accueil (y compris en changement de destination pendant le guidage).
-            onNavigateToRoute = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) { popUpTo(HomeRoute) } },
+            // Changement de destination pendant un guidage : on garde l'écran de guidage sous l'itinéraire (Retour y revient),
+            // sinon popUpTo(HomeRoute) : Retour depuis l'itinéraire revient à l'accueil.
+            onNavigateToRoute = { p ->
+                val guidanceInStack = nav.currentBackStack.value.any { it.destination.hasRoute(NavigationRoute::class) }
+                nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) {
+                    if (guidanceInStack) popUpTo(NavigationRoute) { inclusive = false } else popUpTo(HomeRoute)
+                }
+            },
         )
         routeScreen(
             isDark = isDark,

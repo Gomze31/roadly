@@ -15,8 +15,9 @@ fun NavGraphBuilder.homeScreen(
     onNavigateToRoute: (Place) -> Unit,
     onRequestLocationPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onResumeGuidance: () -> Unit,
 ) {
     composable<HomeRoute> {
-        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings)
+        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance)
     }
 }

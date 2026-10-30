@@ -73,9 +73,11 @@ fun HomeScreen(
     onNavigateToRoute: (Place) -> Unit,
     onRequestLocationPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onResumeGuidance: () -> Unit,
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val isGuiding by vm.isGuiding.collectAsStateWithLifecycle()
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
 
@@ -144,7 +146,7 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(RoadlySpacing.m))
             when (state.permission) {
-                LocationPermissionState.GRANTED -> BottomPanel(state, onNavigateToRoute, onDefine = onSearch)
+                LocationPermissionState.GRANTED -> BottomPanel(state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance)
                 else -> PermissionPanel(state.permission, onRequestLocationPermission, onOpenAppSettings)
             }
         }
@@ -168,10 +170,20 @@ fun HomeScreen(
 }
 
 @Composable
-private fun BottomPanel(state: HomeUiState, onNavigateToRoute: (Place) -> Unit, onDefine: () -> Unit) {
+private fun BottomPanel(
+    state: HomeUiState,
+    isGuiding: Boolean,
+    onNavigateToRoute: (Place) -> Unit,
+    onDefine: () -> Unit,
+    onResumeGuidance: () -> Unit,
+) {
     val c = LocalRoadlyColors.current
     GlassPanel(Modifier.fillMaxWidth()) {
         Column {
+            if (isGuiding) {
+                GlassChip(stringResource(R.string.home_resume_guidance), onClick = onResumeGuidance, icon = Icons.Default.Navigation)
+                Spacer(Modifier.height(RoadlySpacing.s))
+            }
             Text(
                 state.address ?: stringResource(R.string.home_locating),
                 style = MaterialTheme.typography.bodyMedium,
