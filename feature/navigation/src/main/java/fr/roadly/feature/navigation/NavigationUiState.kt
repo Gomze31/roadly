@@ -3,9 +3,11 @@ package fr.roadly.feature.navigation
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Formatters
 import fr.roadly.core.data.repository.GuidanceDefaults
+import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.Lane
 import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
+import fr.roadly.core.model.RouteHazard
 import fr.roadly.core.model.RouteProgress
 import fr.roadly.core.navigation.NavigationState
 import java.time.ZoneId
@@ -27,6 +29,9 @@ data class BannerUi(
 /** Manœuvre à venir ; [distanceM] sert au ruban Horizon (échelle), [distanceText] à l'affichage. */
 data class UpcomingUi(val type: ManeuverType, val distanceText: String, val street: String?, val distanceM: Double = 0.0)
 
+/** Virage ou zone de vigilance devant soi : [distanceM] jusqu'au début, [limitKmh] si connue, [angleDeg] pour un virage. */
+data class HazardUi(val kind: HazardKind, val distanceM: Double, val distanceText: String, val limitKmh: Int?, val angleDeg: Double?)
+
 /** Valeur et unité séparées pour la barre d'information (« 6 » + « min », « 2,1 » + « km »). */
 data class SplitValue(val value: String, val unit: String)
 
@@ -38,6 +43,11 @@ data class NavigationUiState(
     val banner: BannerUi? = null,
     val lanes: List<Lane> = emptyList(),
     val upcoming: List<UpcomingUi> = emptyList(),
+    /** Virages et zones devant soi (≤ 5 km), triés par distance. */
+    val hazards: List<HazardUi> = emptyList(),
+    val activeZone: RouteHazard? = null,
+    val raining: Boolean? = null,
+    val limitLoweredByRain: Boolean = false,
     val etaClock: String = "",
     val remainingDuration: String = "",
     val remainingDistance: String = "",
@@ -66,6 +76,18 @@ internal fun splitDistance(meters: Double): SplitValue = when {
     else -> SplitValue((meters / 1000).roundToInt().toString(), "km")
 }
 
+/** Portée de l'Horizon (m) : au-delà, les événements ne sont pas listés. */
+internal const val HORIZON_RANGE_M = 5_000.0
+
+/** Événements dont le début est devant la position (ou en cours), à moins de [HORIZON_RANGE_M]. */
+internal fun hazardsAhead(hazards: List<RouteHazard>, alongM: Double): List<HazardUi> =
+    hazards.filter { it.endAlongM >= alongM && it.startAlongM - alongM <= HORIZON_RANGE_M }
+        .map { h ->
+            val d = (h.startAlongM - alongM).coerceAtLeast(0.0)
+            HazardUi(h.kind, d, Formatters.distance(d), h.speedLimitKmh, h.angleDeg)
+        }
+        .sortedBy { it.distanceM }
+
 /** Formatage pur (testé via le ViewModel) : distances et durées par `Formatters`, comme la v1. */
 internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean, toleranceKmh: Int, styleUrl: String, zone: ZoneId): NavigationUiState {
     val base = NavigationUiState(styleUrl = styleUrl, muted = muted, following = following, toleranceKmh = toleranceKmh)
@@ -91,6 +113,10 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 banner = BannerUi(m.type, Formatters.distance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit),
                 lanes = s.lanes,
                 upcoming = upcoming,
+                hazards = hazardsAhead(s.hazards, p.distanceAlongM),
+                activeZone = s.activeZone,
+                raining = s.raining,
+                limitLoweredByRain = s.limitLoweredByRain,
                 etaClock = Formatters.clockTime(s.etaEpochMs, zone),
                 remainingDuration = Formatters.duration(p.remainingDurationS),
                 remainingDistance = Formatters.distance(p.remainingDistanceM),

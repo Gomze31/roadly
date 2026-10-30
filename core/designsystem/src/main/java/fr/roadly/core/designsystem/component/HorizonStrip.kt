@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Traffic
 import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material.icons.filled.Warning
@@ -29,8 +31,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.Overline
 import fr.roadly.core.designsystem.theme.RoadlyShapes
@@ -60,8 +64,10 @@ object HorizonScale {
 
 @Composable
 fun HorizonKind.icon(): ImageVector = when (this) {
-    HorizonKind.MANEUVER, HorizonKind.CURVE -> Icons.Default.TurnRight
-    HorizonKind.SLOWDOWN, HorizonKind.INCIDENT, HorizonKind.ROADWORK, HorizonKind.CLOSURE, HorizonKind.VIGILANCE, HorizonKind.SPEED_BUMP -> Icons.Default.Warning
+    HorizonKind.MANEUVER -> Icons.Default.TurnRight
+    HorizonKind.CURVE -> Icons.Default.Timeline
+    HorizonKind.VIGILANCE -> Icons.Default.Shield
+    HorizonKind.SLOWDOWN, HorizonKind.INCIDENT, HorizonKind.ROADWORK, HorizonKind.CLOSURE, HorizonKind.SPEED_BUMP -> Icons.Default.Warning
     HorizonKind.SERVICE -> Icons.Default.LocalGasStation
     HorizonKind.TRAFFIC_LIGHT -> Icons.Default.Traffic
     HorizonKind.ARRIVAL -> Icons.Default.Flag
@@ -133,10 +139,10 @@ fun HorizonStrip(
                 Row(Modifier.fillMaxWidth()) {
                     items.take(3).forEachIndexed { i, item ->
                         if (i > 0) Spacer(Modifier.width(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.weight(1f, fill = false), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(6.dp).background(item.kind.color(), RoadlyShapes.Pill))
                             Spacer(Modifier.width(5.dp))
-                            Text(item.label, style = Overline, color = c.textSecondary, maxLines = 1)
+                            Text(item.label, style = Overline.copy(letterSpacing = 0.4.sp), color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }

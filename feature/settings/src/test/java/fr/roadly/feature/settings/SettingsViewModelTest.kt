@@ -1,5 +1,9 @@
 package fr.roadly.feature.settings
 
+import fr.roadly.core.common.Outcome
+import fr.roadly.core.data.db.VigilanceZoneEntity
+import fr.roadly.core.data.vigilance.VigilanceRepository
+import fr.roadly.core.model.BoundingBox
 import app.cash.turbine.test
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
@@ -61,7 +65,15 @@ class SettingsViewModelTest {
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
-    private fun vm() = SettingsViewModel(vehicle, prefs, config, recents, favorites, speech)
+    private val vigilance = object : VigilanceRepository {
+        override val count = MutableStateFlow(0)
+        override val updatedAtMs = MutableStateFlow<Long?>(null)
+        override suspend fun zonesIn(box: BoundingBox) = emptyList<VigilanceZoneEntity>()
+        override suspend fun refresh(): Outcome<Int> { count.value = 3; updatedAtMs.value = 1L; return Outcome.Success(3) }
+        override suspend fun refreshIfStale(nowMs: Long): Outcome<Int>? = null
+    }
+
+    private fun vm() = SettingsViewModel(vehicle, prefs, config, recents, favorites, speech, vigilance)
 
     @Test fun `saving vehicle parses french decimals and rejects invalid price`() = runTest {
         val vm = vm()

@@ -29,7 +29,9 @@ import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -64,6 +66,7 @@ import fr.roadly.core.designsystem.component.RoundButtonStyle
 import fr.roadly.core.designsystem.component.ReportSheet
 import fr.roadly.core.designsystem.component.RoundIconButton
 import fr.roadly.core.designsystem.component.SpeedBadge
+import fr.roadly.core.designsystem.component.SpeedLimitSign
 import fr.roadly.core.designsystem.component.userMessage
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
@@ -73,6 +76,7 @@ import fr.roadly.core.map.CameraMode
 import fr.roadly.core.map.RoadlyMap
 import fr.roadly.core.map.rememberMapController
 import fr.roadly.core.model.LocationFix
+import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.ManeuverType
 import java.util.Locale
 
@@ -190,7 +194,11 @@ private fun PortraitOverlay(
         ) {
             Row(verticalAlignment = Alignment.Bottom) {
                 SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
-                if (state.gpsLost) { Spacer(Modifier.width(RoadlySpacing.s)); GpsLostPill() }
+                Spacer(Modifier.width(RoadlySpacing.s))
+                Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
+                    if (state.gpsLost) GpsLostPill()
+                    StatusPills(state)
+                }
             }
             BottomBlock(state, vm, onChangeDestination)
         }
@@ -240,7 +248,11 @@ private fun LandscapeOverlay(
         }
         // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges).
         Row(Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm), verticalAlignment = Alignment.Bottom) {
-            if (state.gpsLost) { GpsLostPill(); Spacer(Modifier.width(RoadlySpacing.s)) }
+            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.End) {
+                if (state.gpsLost) GpsLostPill()
+                StatusPills(state)
+            }
+            Spacer(Modifier.width(RoadlySpacing.s))
             SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
         }
     }
@@ -252,7 +264,7 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
     val c = LocalRoadlyColors.current
     when (state.phase) {
         NavigationPhase.GUIDING -> {
-            AnimatedVisibility(state.upcoming.isNotEmpty()) {
+            AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty()) {
                 HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
             }
             NavInfoBar(
@@ -269,12 +281,53 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
     }
 }
 
-/** Manœuvres à venir puis arrivée : seules données réelles disponibles pour l'Horizon tant qu'il n'y a pas de trafic (LOT 4). */
+/** Horizon : manœuvres et arrivée (Valhalla), virages (géométrie) et zones de vigilance (base officielle) ; pas de trafic (⛔ source). */
 @Composable
-private fun horizonItems(state: NavigationUiState): List<HorizonItem> = state.upcoming.map { u ->
-    val kind = if (u.type == ManeuverType.ARRIVE) HorizonKind.ARRIVAL else HorizonKind.MANEUVER
-    val what = u.street ?: stringResource(R.string.nav_horizon_maneuver)
-    HorizonItem(kind, u.distanceM, "${u.distanceText} · $what", "$what dans ${u.distanceText}")
+private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
+    val maneuvers = state.upcoming.map { u ->
+        val kind = if (u.type == ManeuverType.ARRIVE) HorizonKind.ARRIVAL else HorizonKind.MANEUVER
+        val what = u.street ?: stringResource(R.string.nav_horizon_maneuver)
+        HorizonItem(kind, u.distanceM, "${u.distanceText} · $what", "$what dans ${u.distanceText}")
+    }
+    val hazards = state.hazards.map { h ->
+        when (h.kind) {
+            HazardKind.CURVE -> {
+                val what = stringResource(R.string.nav_horizon_curve)
+                HorizonItem(HorizonKind.CURVE, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
+            }
+            HazardKind.VIGILANCE_ZONE -> {
+                val what = if (h.limitKmh != null) stringResource(R.string.nav_horizon_zone_limit, h.limitKmh) else stringResource(R.string.nav_horizon_zone)
+                HorizonItem(HorizonKind.VIGILANCE, h.distanceM, "${h.distanceText} · $what", "${stringResource(R.string.nav_horizon_zone)} dans ${h.distanceText}")
+            }
+        }
+    }
+    return (maneuvers + hazards).sortedBy { it.distanceM }
+}
+
+/** Badge « Zone de vigilance » (avec sa limitation si connue) et badge pluie, à côté du compteur. */
+@Composable
+private fun StatusPills(state: NavigationUiState) {
+    val c = LocalRoadlyColors.current
+    val zone = state.activeZone
+    if (zone != null) {
+        GlassPanel(contentPadding = 8.dp, shape = RoadlyShapes.Chip) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(Icons.Default.Shield, style = IconTileStyle.Warning, size = 28.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.nav_zone_active), style = MaterialTheme.typography.labelLarge, color = c.warning)
+                zone.speedLimitKmh?.let { Spacer(Modifier.width(8.dp)); SpeedLimitSign(it, size = 30.dp) }
+            }
+        }
+    }
+    if (state.raining == true) {
+        GlassPanel(contentPadding = 8.dp, shape = RoadlyShapes.Chip) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.WaterDrop, contentDescription = null, tint = c.brandBright, modifier = Modifier.width(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(if (state.limitLoweredByRain) R.string.nav_rain_lowered else R.string.nav_rain), style = MaterialTheme.typography.labelMedium, color = c.textPrimary)
+            }
+        }
+    }
 }
 
 @Composable

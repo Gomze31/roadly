@@ -22,6 +22,9 @@ object GuidanceDefaults {
     /** L'alerte sonore de dépassement est une option : désactivée par défaut. */
     const val SPEED_ALERT_SOUND = false
     val ALLOWED_TOLERANCES_KMH = listOf(0, 5, 10)
+    const val VIGILANCE_ENABLED = true
+    const val VIGILANCE_SOUND = true
+    const val RAIN_LOWERS_LIMIT = false
 }
 
 interface UserPreferencesRepository {
@@ -45,6 +48,16 @@ interface UserPreferencesRepository {
     suspend fun setSpeedAlertToleranceKmh(value: Int)
     val speedAlertSound: Flow<Boolean>
     suspend fun setSpeedAlertSound(value: Boolean)
+
+    /** Zones de vigilance (France) : annonces et affichage dans Horizon. */
+    val vigilanceEnabled: Flow<Boolean>
+    suspend fun setVigilanceEnabled(value: Boolean)
+    /** Bip à l'entrée d'une zone de vigilance. */
+    val vigilanceSound: Flow<Boolean>
+    suspend fun setVigilanceSound(value: Boolean)
+    /** Limitation abaissée par temps de pluie (R413-2) quand une limitation est connue. */
+    val rainLowersLimit: Flow<Boolean>
+    suspend fun setRainLowersLimit(value: Boolean)
 }
 
 @Singleton
@@ -59,6 +72,9 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kVoiceVolume = intPreferencesKey("voice.volume")
     private val kTolerance = intPreferencesKey("speed.alert.tolerance")
     private val kSpeedSound = booleanPreferencesKey("speed.alert.sound")
+    private val kVigilance = booleanPreferencesKey("vigilance.enabled")
+    private val kVigilanceSound = booleanPreferencesKey("vigilance.sound")
+    private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
 
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
     override suspend fun setThemeMode(mode: ThemeMode) { store.edit { it[kTheme] = mode.name } }
@@ -86,4 +102,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     }
     override val speedAlertSound: Flow<Boolean> = store.data.map { it[kSpeedSound] ?: GuidanceDefaults.SPEED_ALERT_SOUND }
     override suspend fun setSpeedAlertSound(value: Boolean) { store.edit { it[kSpeedSound] = value } }
+    override val vigilanceEnabled: Flow<Boolean> = store.data.map { it[kVigilance] ?: GuidanceDefaults.VIGILANCE_ENABLED }
+    override suspend fun setVigilanceEnabled(value: Boolean) { store.edit { it[kVigilance] = value } }
+    override val vigilanceSound: Flow<Boolean> = store.data.map { it[kVigilanceSound] ?: GuidanceDefaults.VIGILANCE_SOUND }
+    override suspend fun setVigilanceSound(value: Boolean) { store.edit { it[kVigilanceSound] = value } }
+    override val rainLowersLimit: Flow<Boolean> = store.data.map { it[kRainLimit] ?: GuidanceDefaults.RAIN_LOWERS_LIMIT }
+    override suspend fun setRainLowersLimit(value: Boolean) { store.edit { it[kRainLimit] = value } }
 }

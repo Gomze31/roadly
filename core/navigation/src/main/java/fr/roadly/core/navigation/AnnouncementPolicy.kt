@@ -54,6 +54,10 @@ object AnnouncementPolicy {
 internal object SpokenPhrases {
     const val REROUTING = "Recalcul de l'itinéraire."
 
+    /** Entrée en zone de vigilance : jamais de position exacte, seulement la zone et sa limitation si connue. */
+    fun vigilanceZone(limitKmh: Int?): String =
+        if (limitKmh != null) "Zone de vigilance, limitation à $limitKmh." else "Zone de vigilance."
+
     fun inDistance(meters: Double, instruction: String): String =
         "Dans ${distance(meters)}, ${instruction.replaceFirstChar { it.lowercase(Locale.FRANCE) }}"
 

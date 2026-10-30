@@ -4,6 +4,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.model.Lane
 import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.Route
+import fr.roadly.core.model.RouteHazard
 import fr.roadly.core.model.RouteProgress
 
 /** État publié par `NavigationSession` (spec §4 ; dans core:navigation car il porte un AppError). */
@@ -21,6 +22,14 @@ sealed interface NavigationState {
         val etaEpochMs: Long,
         val gpsLost: Boolean,
         val rerouting: Boolean,
+        /** Virages et zones de vigilance sur tout le tracé (abscisses curvilignes) ; l'écran filtre ce qui est devant. */
+        val hazards: List<RouteHazard> = emptyList(),
+        /** Zone de vigilance dans laquelle on se trouve, sinon null. */
+        val activeZone: RouteHazard? = null,
+        /** Pluie détectée (Open-Meteo) ; null = inconnue. */
+        val raining: Boolean? = null,
+        /** `speedLimitKmh` a été abaissé pour la pluie (option). */
+        val limitLoweredByRain: Boolean = false,
     ) : NavigationState
 
     data class Arrived(val route: Route) : NavigationState

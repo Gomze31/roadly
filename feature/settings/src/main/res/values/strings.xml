@@ -39,6 +39,19 @@
     <string name="settings_speed_tolerance_value">+%1$d km/h</string>
     <string name="settings_speed_limit_note">La limitation n\'est connue qu\'avec un serveur Valhalla auto-hébergé (Fournisseurs). Sinon le badge affiche « — » et aucune alerte n\'est émise.</string>
 
+    <string name="settings_group_alerts">Alertes</string>
+    <string name="settings_vigilance">Zones de vigilance</string>
+    <string name="settings_vigilance_subtitle">Annoncées à l\'entrée de la zone, affichées dans Horizon. Jamais un emplacement exact.</string>
+    <string name="settings_vigilance_sound">Bip à l\'entrée d\'une zone</string>
+    <string name="settings_vigilance_refresh">Mettre à jour les zones</string>
+    <string name="settings_vigilance_loading">Téléchargement…</string>
+    <string name="settings_vigilance_failed">Échec du téléchargement, réessayez.</string>
+    <string name="settings_vigilance_empty">Aucune zone chargée : touchez pour télécharger.</string>
+    <string name="settings_vigilance_count">%1$d zones · téléchargé le %2$s</string>
+    <string name="settings_vigilance_footer">Source : « Radars automatiques », Sécurité routière, data.gouv.fr (Licence Ouverte 2.0), millésime octobre 2018. France uniquement ; aucune donnée en Suisse. Les zones font de 300 m à 4 km selon la limitation.</string>
+    <string name="settings_rain_limit">Limitation abaissée par pluie</string>
+    <string name="settings_rain_limit_subtitle">130 → 110, 110 → 100, 90 → 80 quand Open-Meteo signale de la pluie et qu\'une limitation est connue.</string>
+
     <string name="settings_route_prefs">Préférences d\'itinéraire</string>
     <string name="settings_avoid_tolls">Éviter les péages</string>
     <string name="settings_avoid_highways">Éviter les autoroutes</string>

@@ -45,3 +45,16 @@ data class SavedRouteEntity(
     val costing: String,
     val createdAt: Long,
 )
+
+/** Zone de vigilance (France) : point source du jeu officiel ; la zone (jamais le point) est reconstituée au guidage. */
+@Entity(tableName = "vigilance_zones")
+data class VigilanceZoneEntity(
+    @PrimaryKey val id: String,
+    val lat: Double,
+    val lon: Double,
+    val direction: String?,
+    val type: String?,
+    val road: String?,
+    val limitKmh: Int?,
+    val updatedAt: Long,
+)

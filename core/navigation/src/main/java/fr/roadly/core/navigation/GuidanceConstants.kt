@@ -44,4 +44,6 @@ object GuidanceConstants {
     const val REROUTE_TIMEOUT_MS = 10_000L
     /** Un fix plus ancien que le démarrage de la course (moins cette tolérance) est un rejeu périmé : ignoré. */
     const val STALE_FIX_TOLERANCE_MS = 2_000L
+    /** Pluie (Open-Meteo) : au plus une requête toutes les 10 min. */
+    const val RAIN_CHECK_INTERVAL_MS = 600_000L
 }

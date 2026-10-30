@@ -37,11 +37,14 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Toll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -99,6 +102,7 @@ private val RowContentInset = 64.dp
 fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
+    val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
 
     RoadlyScreen {
         RoadlyTopBar(title = stringResource(R.string.settings_title), onBack = onBack, backDescription = stringResource(R.string.settings_back))
@@ -112,6 +116,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
+            AlertsGroup(state.alerts, vigilanceRefresh, onVigilance = vm::setVigilanceEnabled, onSound = vm::setVigilanceSound, onRain = vm::setRainLowersLimit, onRefresh = vm::refreshVigilance)
             RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
             DataGroup(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
             PrivacyGroup()
@@ -291,6 +296,30 @@ private fun SpeedAlertGroup(toleranceKmh: Int, onSelect: (Int) -> Unit) {
             options = options, selected = toleranceKmh, onSelect = onSelect, label = { labels.getValue(it) },
             modifier = Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m),
         )
+    }
+}
+
+// ── Alertes : zones de vigilance, pluie ─────────────────────────────────────
+
+@Composable
+private fun AlertsGroup(alerts: AlertSettings, refresh: RefreshState, onVigilance: (Boolean) -> Unit, onSound: (Boolean) -> Unit, onRain: (Boolean) -> Unit, onRefresh: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    val updated = alerts.zonesUpdatedAtMs?.let { java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, java.util.Locale.FRANCE).format(java.util.Date(it)) }
+    val subtitle = when {
+        refresh == RefreshState.Loading -> stringResource(R.string.settings_vigilance_loading)
+        refresh is RefreshState.Failed -> stringResource(R.string.settings_vigilance_failed)
+        alerts.zoneCount == 0 -> stringResource(R.string.settings_vigilance_empty)
+        else -> stringResource(R.string.settings_vigilance_count, alerts.zoneCount, updated ?: "—")
+    }
+    SettingsGroup(stringResource(R.string.settings_group_alerts), footer = stringResource(R.string.settings_vigilance_footer)) {
+        ToggleRow(stringResource(R.string.settings_vigilance), checked = alerts.vigilanceEnabled, onCheckedChange = onVigilance, icon = Icons.Default.Shield, iconStyle = IconTileStyle.Warning, subtitle = stringResource(R.string.settings_vigilance_subtitle))
+        ToggleRow(stringResource(R.string.settings_vigilance_sound), checked = alerts.vigilanceSound, onCheckedChange = onSound, icon = Icons.AutoMirrored.Filled.VolumeUp, enabled = alerts.vigilanceEnabled)
+        ListRow(
+            stringResource(R.string.settings_vigilance_refresh), subtitle = subtitle, icon = Icons.Default.Dns, iconStyle = IconTileStyle.Neutral,
+            onClick = onRefresh, chevron = false, enabled = refresh != RefreshState.Loading,
+            trailing = { if (refresh == RefreshState.Loading) CircularProgressIndicator(color = c.brand, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(Icons.Default.Refresh, null, tint = c.brandBright, modifier = Modifier.size(20.dp)) },
+        )
+        ToggleRow(stringResource(R.string.settings_rain_limit), checked = alerts.rainLowersLimit, onCheckedChange = onRain, icon = Icons.Default.WaterDrop, subtitle = stringResource(R.string.settings_rain_limit_subtitle), divider = false)
     }
 }
 

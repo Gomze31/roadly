@@ -3,6 +3,8 @@ package fr.roadly.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import fr.roadly.core.common.AppError
+import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.config.normalized
@@ -12,6 +14,7 @@ import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
+import fr.roadly.core.data.vigilance.VigilanceRepository
 import fr.roadly.core.model.FuelType
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
@@ -34,12 +37,29 @@ data class VoiceSettings(
     val overSpeedSound: Boolean = GuidanceDefaults.SPEED_ALERT_SOUND,
 )
 
+/** Réglages des alertes : zones de vigilance (base locale : nombre, date), bip, pluie. */
+data class AlertSettings(
+    val vigilanceEnabled: Boolean = GuidanceDefaults.VIGILANCE_ENABLED,
+    val vigilanceSound: Boolean = GuidanceDefaults.VIGILANCE_SOUND,
+    val rainLowersLimit: Boolean = GuidanceDefaults.RAIN_LOWERS_LIMIT,
+    val zoneCount: Int = 0,
+    val zonesUpdatedAtMs: Long? = null,
+)
+
+sealed interface RefreshState {
+    data object Idle : RefreshState
+    data object Loading : RefreshState
+    data class Done(val count: Int) : RefreshState
+    data class Failed(val error: AppError) : RefreshState
+}
+
 data class SettingsUiState(
     val vehicle: VehicleProfile? = null,
     val themeMode: ThemeMode = ThemeMode.AUTO_SOLAR,
     val providers: ProviderConfig = ProviderConfig.DEFAULT,
     val voice: VoiceSettings = VoiceSettings(),
     val routePreferences: RoutePreferences = RoutePreferences(),
+    val alerts: AlertSettings = AlertSettings(),
 )
 
 @HiltViewModel
@@ -50,12 +70,19 @@ class SettingsViewModel @Inject constructor(
     private val recents: RecentSearchRepository,
     private val favorites: FavoritesRepository,
     private val speech: SpeechService,
+    private val vigilanceRepo: VigilanceRepository,
 ) : ViewModel() {
+
+    private val alerts = combine(prefs.vigilanceEnabled, prefs.vigilanceSound, prefs.rainLowersLimit, vigilanceRepo.count, vigilanceRepo.updatedAtMs) { e, s, r, n, u -> AlertSettings(e, s, r, n, u) }
+    private val _vigilanceRefresh = MutableStateFlow<RefreshState>(RefreshState.Idle)
+    /** État du dernier téléchargement manuel des zones de vigilance. */
+    val vigilanceRefresh: StateFlow<RefreshState> = _vigilanceRefresh.asStateFlow()
 
     private val voice = combine(prefs.voiceEnabled, prefs.voiceVolume, prefs.speedAlertToleranceKmh, prefs.speedAlertSound) { e, v, t, s -> VoiceSettings(e, v, t, s) }
 
-    val uiState: StateFlow<SettingsUiState> = combine(vehicleRepo.profile, prefs.themeMode, config.config, voice, prefs.routePreferences) { v, t, p, vo, r ->
-        SettingsUiState(v, t, p, vo, r)
+    val uiState: StateFlow<SettingsUiState> = combine(vehicleRepo.profile, prefs.themeMode, config.config, voice, prefs.routePreferences, alerts) { values ->
+        @Suppress("UNCHECKED_CAST")
+        SettingsUiState(values[0] as VehicleProfile?, values[1] as ThemeMode, values[2] as ProviderConfig, values[3] as VoiceSettings, values[4] as RoutePreferences, values[5] as AlertSettings)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     /** [consumption] et [price] sont des saisies libres ("7,5", "1.89", ""). Prix vide = inconnu (aucun défaut inventé). */
@@ -84,6 +111,21 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             speech.setVolume(prefs.voiceVolume.first())
             speech.speak(phrase, flush = true)
+        }
+    }
+
+    // ── Alertes (zones de vigilance, pluie) ──
+    fun setVigilanceEnabled(value: Boolean) { viewModelScope.launch { prefs.setVigilanceEnabled(value) } }
+    fun setVigilanceSound(value: Boolean) { viewModelScope.launch { prefs.setVigilanceSound(value) } }
+    fun setRainLowersLimit(value: Boolean) { viewModelScope.launch { prefs.setRainLowersLimit(value) } }
+    fun refreshVigilance() {
+        if (_vigilanceRefresh.value == RefreshState.Loading) return
+        viewModelScope.launch {
+            _vigilanceRefresh.value = RefreshState.Loading
+            _vigilanceRefresh.value = when (val r = vigilanceRepo.refresh()) {
+                is Outcome.Success -> RefreshState.Done(r.value)
+                is Outcome.Failure -> RefreshState.Failed(r.error)
+            }
         }
     }
 

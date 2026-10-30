@@ -53,3 +53,16 @@ interface VehicleProfileDao {
     @Upsert suspend fun upsert(entity: VehicleProfileEntity)
     @Query("DELETE FROM vehicle_profile") suspend fun clear()
 }
+
+@Dao
+interface VigilanceZoneDao {
+    @Query("SELECT * FROM vigilance_zones WHERE lat BETWEEN :south AND :north AND lon BETWEEN :west AND :east")
+    suspend fun inBox(south: Double, west: Double, north: Double, east: Double): List<VigilanceZoneEntity>
+    @Query("SELECT COUNT(*) FROM vigilance_zones") fun observeCount(): Flow<Int>
+    @Query("SELECT MAX(updatedAt) FROM vigilance_zones") fun observeUpdatedAt(): Flow<Long?>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(rows: List<VigilanceZoneEntity>)
+    @Query("DELETE FROM vigilance_zones") suspend fun clear()
+
+    @Transaction
+    suspend fun replaceAll(rows: List<VigilanceZoneEntity>) { clear(); rows.chunked(500).forEach { insertAll(it) } }
+}

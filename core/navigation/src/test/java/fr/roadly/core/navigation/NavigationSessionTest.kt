@@ -65,7 +65,7 @@ class NavigationSessionTest {
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
-        return NavigationSession(location, routing, speedLimits, speech, preferences, service, { testScheduler.currentTime }, dispatchers, backgroundScope)
+        return NavigationSession(location, routing, speedLimits, speech, preferences, service, { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), dispatchers, backgroundScope)
     }
 
     private fun fixAt(along: Double, speedMps: Float? = 10f, northM: Double = 0.0, timestampMs: Long = 0L) =

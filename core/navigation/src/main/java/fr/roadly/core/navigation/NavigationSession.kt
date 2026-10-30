@@ -4,12 +4,15 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.di.ApplicationScope
+import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Route
+import fr.roadly.core.model.RouteHazard
+import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteProgress
 import fr.roadly.core.model.RouteRequest
@@ -49,6 +52,8 @@ class NavigationSession @Inject constructor(
     private val prefs: UserPreferencesRepository,
     private val serviceController: NavigationServiceController,
     private val clock: NavigationClock,
+    private val vigilance: VigilanceZoneProvider,
+    private val rain: RainProvider,
     dispatchers: DispatcherProvider,
     @param:ApplicationScope private val scope: CoroutineScope,
 ) {
@@ -149,6 +154,13 @@ class NavigationSession @Inject constructor(
         private var rerouteAnnounced = false
         private var overSpeedAlerted = false
         private var limitJob: Job? = null
+        /** Virages + zones de vigilance du tracé courant (recalculés après un recalcul d'itinéraire). */
+        private var hazards: List<RouteHazard> = emptyList()
+        private var activeZone: RouteHazard? = null
+        private val zonesAnnounced = mutableSetOf<Double>()
+        private var vigilanceOn = GuidanceDefaults.VIGILANCE_ENABLED
+        private var raining: Boolean? = null
+        private var rainLowersLimit = GuidanceDefaults.RAIN_LOWERS_LIMIT
         private lateinit var runScope: CoroutineScope
 
         /** Garde de dernier recours : une exception inattendue publie `Failed` et relâche le GPS (le service s'arrête alors). */
@@ -176,6 +188,9 @@ class NavigationSession @Inject constructor(
                     .distinctUntilChanged()
                     .collect { speech.setMuted(it) }
             }
+            launch { prefs.rainLowersLimit.collect { rainLowersLimit = it } }
+            launch { prefs.vigilanceEnabled.collect { vigilanceOn = it; loadHazards() } }
+            launch { rainWatch() }
             val depart = route.maneuvers.first()
             announced += 0 to Tier.NOW
             say(depart.verbalPre ?: depart.instruction)
@@ -202,8 +217,53 @@ class NavigationSession @Inject constructor(
             announce(progress)
             refreshSpeedLimit()
             checkOverSpeed()
+            updateZone(progress)
             // Un recalcul a pu aboutir pendant une suspension : ne jamais associer l'ancienne progression au nouveau tracé.
             if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = false))
+        }
+
+        /** Virages (géométrie) et zones de vigilance (base locale) du tracé courant ; vide si l'option est désactivée. */
+        private suspend fun loadHazards() {
+            val r = route
+            val curves = CurveDetector.detect(r)
+            val zones = if (vigilanceOn) {
+                try { vigilance.zonesAlong(r) } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
+            } else emptyList()
+            if (r.id == route.id) hazards = (curves + zones).sortedBy { it.startAlongM }
+        }
+
+        /** Entrée dans une zone de vigilance : annonce (une fois par zone) et bip optionnel ; sortie : badge retiré. */
+        private suspend fun updateZone(progress: RouteProgress) {
+            if (progress.routeId != route.id) return
+            val zone = hazards.firstOrNull { it.kind == HazardKind.VIGILANCE_ZONE && it.contains(progress.distanceAlongM) }
+            activeZone = zone
+            if (zone != null && zonesAnnounced.add(zone.startAlongM)) {
+                say(SpokenPhrases.vigilanceZone(zone.speedLimitKmh), routeId = progress.routeId)
+                if (prefs.vigilanceSound.first() && !_muted.value && prefs.voiceEnabled.first()) speech.beep()
+            }
+        }
+
+        /** Pluie : au plus une requête toutes les 10 min, sur la dernière position connue ; échec = inconnue. */
+        private suspend fun rainWatch() {
+            while (true) {
+                val at = recent.lastOrNull()?.point
+                if (at != null) {
+                    raining = try {
+                        (rain.isRaining(at) as? Outcome.Success)?.value
+                    } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                }
+                delay(GuidanceConstants.RAIN_CHECK_INTERVAL_MS)
+            }
+        }
+
+        /** Limitation affichée et utilisée pour l'alerte : abaissée par temps de pluie si l'option est active. */
+        private fun effectiveLimit(): Pair<Int?, Boolean> {
+            val base = speedLimitKmh ?: return null to false
+            if (raining == true && rainLowersLimit) {
+                val reduced = SpeedLimitRules.rainReduced(base)
+                if (reduced != base) return reduced to true
+            }
+            return base to false
         }
 
         private suspend fun announce(progress: RouteProgress) {
@@ -274,6 +334,9 @@ class NavigationSession @Inject constructor(
                     announced += 0 to Tier.NOW
                     freshTracker.update(fix)
                     rerouteAnnounced = false
+                    // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
+                    hazards = emptyList(); activeZone = null; zonesAnnounced.clear()
+                    loadHazards()
                 }
                 // Échec : on continue sur l'ancien tracé ; un nouveau recalcul sera tenté après 10 s.
                 rerouting = false
@@ -292,6 +355,7 @@ class NavigationSession @Inject constructor(
                 val progress = tracker.extrapolate(mps * (now - lastAdvanceAtMs) / 1000.0, silentMs)
                 lastAdvanceAtMs = now
                 announce(progress)
+                updateZone(progress)
                 // Un recalcul a pu aboutir pendant la suspension de l'annonce : on abandonne la progression périmée.
                 if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
             }
@@ -316,7 +380,7 @@ class NavigationSession @Inject constructor(
         }
 
         private suspend fun checkOverSpeed() {
-            val limit = speedLimitKmh
+            val (limit, _) = effectiveLimit()
             val v = speedKmh
             val over = limit != null && v != null && v > limit + prefs.speedAlertToleranceKmh.first()
             if (over && !overSpeedAlerted) {
@@ -343,11 +407,16 @@ class NavigationSession @Inject constructor(
         fun guiding(progress: RouteProgress, now: Long, gpsLost: Boolean): NavigationState.Guiding {
             val ms = route.maneuvers
             val next = progress.nextManeuverIndex.coerceIn(0, ms.lastIndex)
+            val (limit, lowered) = effectiveLimit()
             return NavigationState.Guiding(
                 route = route,
                 progress = progress,
                 speedKmh = rawSpeedKmh,
-                speedLimitKmh = speedLimitKmh,
+                speedLimitKmh = limit,
+                hazards = hazards,
+                activeZone = activeZone,
+                raining = raining,
+                limitLoweredByRain = lowered,
                 upcoming = ms.subList(min(next + 1, ms.size), min(next + 1 + GuidanceConstants.UPCOMING_COUNT, ms.size)),
                 lanes = ms[next].lanes,
                 etaEpochMs = now + (progress.remainingDurationS * 1000).roundToLong(),

@@ -21,7 +21,9 @@ import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.navigation.NoopRainProvider
 import fr.roadly.core.navigation.NoopSpeedLimitProvider
+import fr.roadly.core.navigation.NoopVigilanceZoneProvider
 import fr.roadly.core.navigation.testing.FakeNavigationServiceController
 import fr.roadly.core.navigation.testing.FakeSpeechService
 import fr.roadly.core.routing.RouteAlternativesUseCase
@@ -84,7 +86,7 @@ class RouteViewModelTest {
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
-        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, dispatchers, backgroundScope)
+        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), dispatchers, backgroundScope)
         return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, session)
     }
 

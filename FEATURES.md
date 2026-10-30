@@ -1,4 +1,4 @@
-# FEATURES.md — statut des fonctionnalités Roadly
+| Tests unitaires | fonctionnelle | 254 tests (JVM) || Alertes visuelles / vocales / sonores anticipées | G/+ | fonctionnelle | 2 | Badge, voix, bip à l'entrée de zone (LOT 4) || Zones de vigilance (France, jamais un point exact) | G | fonctionnelle | 2 | Jeu officiel data.gouv.fr (2018) en cache Room, zones 300 m–4 km, annonce + bip (LOT 4) || Limitation abaissée par pluie (option) | G | fonctionnelle | 2 | Open-Meteo (CC BY 4.0, sans clé) ; effet visible seulement si une limitation est connue (LOT 4) |# FEATURES.md — statut des fonctionnalités Roadly
 
 Référentiel : `docs/SILLAXE-ANALYSE.md` (fonctions vérifiées sur les pages publiques de Sillaxe) et `docs/BENCHMARK-SILLAXE.md` (sources de données et contraintes). Statuts : **non commencée** · **en cours** · **fonctionnelle** · **bloquée** (dépend d'une source externe non configurée). « Palier Sillaxe » = gratuit (G) ou Sillaxe+ (+) chez Sillaxe ; Roadly ne reproduit pas le modèle économique, l'information sert à prioriser.
 

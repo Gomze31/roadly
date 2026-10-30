@@ -34,4 +34,13 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     override suspend fun setSpeedAlertToleranceKmh(value: Int) { if (value in GuidanceDefaults.ALLOWED_TOLERANCES_KMH) tolerance.value = value }
     override val speedAlertSound: Flow<Boolean> = sound
     override suspend fun setSpeedAlertSound(value: Boolean) { sound.value = value }
+    val vigilance = MutableStateFlow(GuidanceDefaults.VIGILANCE_ENABLED)
+    val vigilanceBeep = MutableStateFlow(GuidanceDefaults.VIGILANCE_SOUND)
+    val rainLimit = MutableStateFlow(GuidanceDefaults.RAIN_LOWERS_LIMIT)
+    override val vigilanceEnabled: Flow<Boolean> = vigilance
+    override suspend fun setVigilanceEnabled(value: Boolean) { vigilance.value = value }
+    override val vigilanceSound: Flow<Boolean> = vigilanceBeep
+    override suspend fun setVigilanceSound(value: Boolean) { vigilanceBeep.value = value }
+    override val rainLowersLimit: Flow<Boolean> = rainLimit
+    override suspend fun setRainLowersLimit(value: Boolean) { rainLimit.value = value }
 }

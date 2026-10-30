@@ -19,7 +19,9 @@ import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.navigation.NoopRainProvider
 import fr.roadly.core.navigation.NoopSpeedLimitProvider
+import fr.roadly.core.navigation.NoopVigilanceZoneProvider
 import fr.roadly.core.navigation.RouteTracker
 import fr.roadly.core.navigation.testing.FakeNavigationServiceController
 import fr.roadly.core.navigation.testing.FakeSpeechService
@@ -72,7 +74,7 @@ class NavigationViewModelTest {
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
-        return NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, dispatchers, backgroundScope)
+        return NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), dispatchers, backgroundScope)
     }
 
     private fun fixAt(along: Double) = LocationFix(tracker.pointAt(along), 90f, 10f, 5f, 0L)
