@@ -10,8 +10,10 @@ import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.model.FuelType
 import fr.roadly.core.model.Place
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
+import fr.roadly.core.navigation.testing.FakeSpeechService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +39,7 @@ class SettingsViewModelTest {
         override suspend fun clear() { p.value = null }
     }
     private val prefs = FakeUserPreferencesRepository()
+    private val speech = FakeSpeechService()
     private var overrideCalls = 0
     private val config = object : ProviderConfigRepository {
         val c = MutableStateFlow(ProviderConfig.DEFAULT)
@@ -58,7 +61,7 @@ class SettingsViewModelTest {
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
-    private fun vm() = SettingsViewModel(vehicle, prefs, config, recents, favorites)
+    private fun vm() = SettingsViewModel(vehicle, prefs, config, recents, favorites, speech)
 
     @Test fun `saving vehicle parses french decimals and rejects invalid price`() = runTest {
         val vm = vm()
@@ -92,5 +95,47 @@ class SettingsViewModelTest {
         vm.saveProviders(ProviderConfig.DEFAULT.copy(valhallaBaseUrl = "  https://valhalla.exemple.fr/  ")); advanceUntilIdle()
         assertNull(vm.providerError.value)
         assertEquals("https://valhalla.exemple.fr", config.c.value.valhallaBaseUrl)
+    }
+
+    @Test fun `voice settings are exposed and persisted`() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            vm.setVoiceEnabled(false); vm.setVoiceVolume(140); vm.setOverSpeedSound(true); advanceUntilIdle()
+            val v = expectMostRecentItem().voice
+            assertEquals(false, v.enabled)
+            assertEquals(100, v.volume)
+            assertEquals(true, v.overSpeedSound)
+            assertEquals(false, prefs.voice.value)
+        }
+    }
+
+    @Test fun `speed tolerance accepts only 0 5 10`() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            vm.setSpeedTolerance(10); advanceUntilIdle()
+            assertEquals(10, expectMostRecentItem().voice.toleranceKmh)
+            vm.setSpeedTolerance(7); advanceUntilIdle()
+            assertEquals(10, prefs.tolerance.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `route preference switches are independent`() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            vm.setAvoidTolls(true); advanceUntilIdle()
+            vm.setAvoidFerries(true); advanceUntilIdle()
+            assertEquals(RoutePreferences(avoidTolls = true, avoidHighways = false, avoidFerries = true), expectMostRecentItem().routePreferences)
+            vm.setAvoidTolls(false); vm.setAvoidHighways(true); advanceUntilIdle()
+            assertEquals(RoutePreferences(avoidTolls = false, avoidHighways = true, avoidFerries = true), expectMostRecentItem().routePreferences)
+        }
+    }
+
+    @Test fun `test voice applies the saved volume then speaks at once`() = runTest {
+        prefs.setVoiceVolume(40)
+        val vm = vm()
+        vm.testVoice("Essai de voix."); advanceUntilIdle()
+        assertEquals(40, speech.volume)
+        assertEquals(listOf("Essai de voix."), speech.spoken)
     }
 }

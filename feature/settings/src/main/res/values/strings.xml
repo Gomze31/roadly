@@ -17,6 +17,23 @@
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_theme_auto">Auto (jour/nuit solaire)</string>
 
+    <string name="settings_voice">Voix et sons</string>
+    <string name="settings_voice_enabled">Annonces vocales</string>
+    <string name="settings_voice_volume">Volume des annonces : %1$d %%</string>
+    <string name="settings_speed_sound">Son de dépassement de vitesse</string>
+    <string name="settings_voice_test">Tester la voix</string>
+    <string name="settings_voice_test_phrase">Dans 300 mètres, tournez à droite. Ceci est un test de la voix de guidage Roadly.</string>
+
+    <string name="settings_speed_alerts">Alertes de vitesse</string>
+    <string name="settings_speed_tolerance">Tolérance avant alerte</string>
+    <string name="settings_speed_tolerance_value">+%1$d km/h</string>
+    <string name="settings_speed_limit_note">La limitation n\'est connue qu\'avec un serveur Valhalla auto-hébergé (Fournisseurs). Sinon le badge affiche « — » et aucune alerte n\'est émise.</string>
+
+    <string name="settings_route_prefs">Préférences d\'itinéraire</string>
+    <string name="settings_avoid_tolls">Éviter les péages</string>
+    <string name="settings_avoid_highways">Éviter les autoroutes</string>
+    <string name="settings_avoid_ferries">Éviter les ferries</string>
+
     <string name="settings_data">Données</string>
     <string name="settings_clear_history">Effacer l\'historique de recherche</string>
     <string name="settings_clear_favorites">Effacer les favoris</string>
