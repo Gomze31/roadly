@@ -9,8 +9,10 @@ import java.util.Locale
 
 class AnnouncementPolicyTest {
     private val maneuvers = ParisRoute.route().maneuvers
-    private fun progress(next: Int, dist: Double) = RouteProgress("paris", 0, 0.0, 0.0, next, dist, 1000.0, 100.0, GeoPoint(48.85, 2.35), null)
-    private fun next(k: Int, d: Double, v: Double?, already: Set<Pair<Int, Tier>> = emptySet()) = AnnouncementPolicy.next(progress(k, d), maneuvers, v, already)
+    private fun progress(next: Int, dist: Double, extrapolated: Boolean = false) =
+        RouteProgress("paris", 0, 0.0, 0.0, next, dist, 1000.0, 100.0, GeoPoint(48.85, 2.35), null, extrapolated)
+    private fun next(k: Int, d: Double, v: Double?, already: Set<Pair<Int, Tier>> = emptySet(), extrapolated: Boolean = false) =
+        AnnouncementPolicy.next(progress(k, d, extrapolated), maneuvers, v, already)
     private fun lower(s: String) = s.replaceFirstChar { it.lowercase(Locale.FRANCE) }
 
     @Test fun `city far tier uses the alert text with a spoken distance`() {
@@ -86,6 +88,16 @@ class AnnouncementPolicyTest {
     @Test fun `arrival now uses the fixture sentence`() {
         val last = maneuvers.lastIndex
         assertEquals(maneuvers[last].verbalPre, next(last, 10.0, 30.0)!!.text)
+    }
+
+    @Test fun `now tier is suppressed while the position is extrapolated`() {
+        assertNull(next(1, 30.0, 30.0, extrapolated = true))
+        assertEquals(Tier.NOW, next(1, 30.0, 30.0, extrapolated = false)!!.tier)
+    }
+
+    @Test fun `far and near tiers are still announced while extrapolated`() {
+        assertEquals(Tier.FAR, next(1, 250.0, 30.0, extrapolated = true)!!.tier)
+        assertEquals(Tier.NEAR, next(1, 70.0, 30.0, extrapolated = true)!!.tier)
     }
 
     @Test fun `out of range maneuver index gives nothing`() = assertNull(next(99, 10.0, 30.0))

@@ -5,8 +5,10 @@ import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteProgress
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -38,7 +40,22 @@ class RouteTracker(private val route: Route) {
     private val suffixDurS = DoubleArray(maneuvers.size + 1).also { s -> for (k in lastManeuver downTo 0) s[k] = s[k + 1] + maneuvers[k].durationSeconds }
     private val distScale = if (totalGeometryM > 0.0 && route.distanceMeters > 0.0) route.distanceMeters / totalGeometryM else 1.0
 
+    /** Cap (degrés, 0 = nord) de chaque segment, plan équirectangulaire local ; NaN pour un segment de longueur nulle. */
+    private val segBearingDeg = DoubleArray(segCount) { i ->
+        if (segLenM[i] == 0.0) {
+            Double.NaN
+        } else {
+            val dx = (pts[i + 1].lon - pts[i].lon) * cos(pts[i].lat * PI / 180.0)
+            val dy = pts[i + 1].lat - pts[i].lat
+            (atan2(dx, dy) * 180.0 / PI + 360.0) % 360.0
+        }
+    }
+
     private var consecutiveOff = 0
+    /** `along` du dernier candidat global non confirmé (> 100 m de saut), en attente d'un second fix concordant. */
+    private var pendingGlobal: Double? = null
+    /** `along` du dernier fix réel (point de départ du plafond d'extrapolation). */
+    private var lastRealAlong = 0.0
 
     var isOffRoute: Boolean = false
         private set
@@ -51,32 +68,61 @@ class RouteTracker(private val route: Route) {
 
     fun update(fix: LocationFix): RouteProgress {
         val prev = lastProgress
-        var best = if (prev == null) search(fix.point, 0, segCount - 1) else searchWindow(fix.point, prev.distanceAlongM)
-        if (prev != null && best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M) {
-            val global = search(fix.point, 0, segCount - 1)
-            if (global.offM < best.offM) best = global
+        val lastAlong = prev?.distanceAlongM
+        val gpsHeading = fix.bearingDeg?.takeIf { (fix.speedMps ?: 0f) >= GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS }
+        var best = if (lastAlong == null) {
+            search(fix.point, 0, segCount - 1, gpsHeading, null)
+        } else {
+            searchWindow(fix.point, lastAlong, gpsHeading)
+        }
+        if (lastAlong != null && best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M) {
+            val global = search(fix.point, 0, segCount - 1, gpsHeading, lastAlong)
+            val pending = pendingGlobal
+            best = when {
+                global.offM >= best.offM -> { pendingGlobal = null; best }
+                abs(global.alongM - lastAlong) <= GuidanceConstants.GLOBAL_JUMP_M -> { pendingGlobal = null; global }
+                pending != null && abs(global.alongM - pending) <= GuidanceConstants.GLOBAL_CONFIRM_RADIUS_M -> { pendingGlobal = null; global }
+                else -> { pendingGlobal = global.alongM; hold(fix.point, lastAlong) }
+            }
+        } else {
+            pendingGlobal = null
         }
         when {
-            best.offM > GuidanceConstants.OFF_ROUTE_HARD_M -> { consecutiveOff++; isOffRoute = true }
-            best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M -> { consecutiveOff++; isOffRoute = consecutiveOff >= GuidanceConstants.OFF_ROUTE_SOFT_FIXES }
+            best.offM > GuidanceConstants.OFF_ROUTE_HARD_M && fix.accuracyM <= GuidanceConstants.HARD_RULE_MAX_ACCURACY_M -> {
+                consecutiveOff++; isOffRoute = true
+            }
+            best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M -> {
+                consecutiveOff++; isOffRoute = consecutiveOff >= GuidanceConstants.OFF_ROUTE_SOFT_FIXES
+            }
             else -> { consecutiveOff = 0; isOffRoute = false }
         }
         val moving = (fix.speedMps ?: 0f) >= 1f
         val heading = fix.bearingDeg?.takeIf { moving } ?: bearing(pts[best.segment], pts[best.segment + 1]).toFloat()
         val p = progressAt(best.segment, best.alongM, best.offM, best.snapped, heading)
-        if (!hasArrived && p.nextManeuverIndex == lastManeuver && fix.point.distanceTo(pts[segCount]) < GuidanceConstants.ARRIVAL_RADIUS_M) {
-            hasArrived = true
-        }
+        val onLast = p.nextManeuverIndex == lastManeuver
+        val nearDestination = fix.point.distanceTo(pts[segCount]) < GuidanceConstants.ARRIVAL_RADIUS_M
+        val alongTheEnd = p.distanceAlongM >= totalGeometryM - GuidanceConstants.ARRIVAL_RADIUS_M &&
+            p.offRouteM <= GuidanceConstants.OFF_ROUTE_SOFT_M
+        if (!hasArrived && onLast && (nearDestination || alongTheEnd)) hasArrived = true
+        lastRealAlong = p.distanceAlongM
         lastProgress = p
         return p
     }
 
-    /** Avance de [distanceM] le long du tracé depuis la dernière position (perte GPS) ; ne touche pas aux règles hors itinéraire. */
-    fun extrapolate(distanceM: Double): RouteProgress {
+    /**
+     * Avance de [distanceM] le long du tracé depuis la dernière position (perte GPS) ; ne touche pas aux règles hors itinéraire.
+     * Plafonné à [GuidanceConstants.EXTRAPOLATION_MAX_M] après le dernier fix réel, et inopérant au-delà de
+     * [GuidanceConstants.EXTRAPOLATION_MAX_MS] ([sinceLastFixMs] = temps écoulé depuis ce fix) : la dernière progression est alors rendue telle quelle.
+     */
+    fun extrapolate(distanceM: Double, sinceLastFixMs: Long = 0L): RouteProgress {
         val prev = lastProgress
-        val along = ((prev?.distanceAlongM ?: 0.0) + distanceM.coerceAtLeast(0.0)).coerceAtMost(totalGeometryM)
+        if (sinceLastFixMs > GuidanceConstants.EXTRAPOLATION_MAX_MS) return prev ?: initialProgress()
+        val cap = min(lastRealAlong + GuidanceConstants.EXTRAPOLATION_MAX_M, totalGeometryM)
+        val along = ((prev?.distanceAlongM ?: 0.0) + distanceM.coerceAtLeast(0.0)).coerceAtMost(cap)
+        if (prev != null && prev.extrapolated && along <= prev.distanceAlongM) return prev
         val seg = segmentAt(along)
         val p = progressAt(seg, along, 0.0, pointAt(along), prev?.bearingDeg ?: bearing(pts[seg], pts[seg + 1]).toFloat())
+            .copy(extrapolated = true)
         lastProgress = p
         return p
     }
@@ -123,22 +169,45 @@ class RouteTracker(private val route: Route) {
 
     private class Hit(val segment: Int, val alongM: Double, val offM: Double, val snapped: GeoPoint)
 
-    private fun search(p: GeoPoint, from: Int, to: Int): Hit {
-        var best = project(p, from)
-        for (i in from + 1..to) {
-            val h = project(p, i)
-            if (h.offM < best.offM) best = h
+    /** Garde la position [lastAlong] (candidat global non confirmé) ; l'écart est mesuré à ce point. */
+    private fun hold(p: GeoPoint, lastAlong: Double): Hit {
+        val snapped = pointAt(lastAlong)
+        return Hit(segmentAt(lastAlong), lastAlong.coerceIn(0.0, totalGeometryM), p.distanceTo(snapped), snapped)
+    }
+
+    /** Vrai si le segment [i] est à au plus 90° du cap [headingDeg] (un segment nul est toujours accepté). */
+    private fun headingOk(i: Int, headingDeg: Float): Boolean {
+        val b = segBearingDeg[i]
+        if (b.isNaN()) return true
+        return abs(((b - headingDeg + 540.0) % 360.0) - 180.0) <= GuidanceConstants.HEADING_MAX_DIFF_DEG
+    }
+
+    /**
+     * Meilleur segment de [from]..[to]. Avec un cap GPS [headingDeg], les segments à plus de 90° sont écartés (tous écartés : pas de filtre).
+     * À distance perpendiculaire quasi égale (< 10 m), on préfère, pour un candidat d'un autre tronçon (> 10 m le long du tracé),
+     * celui dont `along` est le plus proche de [lastAlong].
+     */
+    private fun search(p: GeoPoint, from: Int, to: Int, headingDeg: Float?, lastAlong: Double?): Hit {
+        val all = ArrayList<Hit>(to - from + 1)
+        for (i in from..to) all += project(p, i)
+        val pool = if (headingDeg == null) all else all.filter { headingOk(it.segment, headingDeg) }.ifEmpty { all }
+        var best = pool.minBy { it.offM }
+        if (lastAlong != null) {
+            val alt = pool
+                .filter { it.offM < best.offM + GuidanceConstants.SEGMENT_TIE_M && abs(it.alongM - best.alongM) > GuidanceConstants.SEGMENT_TIE_M }
+                .minByOrNull { abs(it.alongM - lastAlong) }
+            if (alt != null && abs(alt.alongM - lastAlong) < abs(best.alongM - lastAlong)) best = alt
         }
         return best
     }
 
-    private fun searchWindow(p: GeoPoint, lastAlong: Double): Hit {
+    private fun searchWindow(p: GeoPoint, lastAlong: Double, headingDeg: Float?): Hit {
         val center = segmentAt(lastAlong)
         var from = center
         while (from > 0 && cumDistM[from] > lastAlong - GuidanceConstants.SEARCH_BACK_M) from--
         var to = center
         while (to < segCount - 1 && cumDistM[to + 1] < lastAlong + GuidanceConstants.SEARCH_AHEAD_M) to++
-        return search(p, from, to)
+        return search(p, from, to, headingDeg, lastAlong)
     }
 
     /** Projection orthogonale dans le plan équirectangulaire local centré sur [p]. */

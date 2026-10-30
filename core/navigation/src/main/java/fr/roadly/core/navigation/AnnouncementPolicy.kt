@@ -38,6 +38,8 @@ object AnnouncementPolicy {
             d <= c.farM -> Tier.FAR
             else -> return null
         }
+        // Position extrapolée (GPS perdu) : jamais d'annonce « maintenant », trop risquée sans fix réel.
+        if (tier == Tier.NOW && progress.extrapolated) return null
         if (already.any { (i, t) -> i == k && t.ordinal >= tier.ordinal }) return null
         val text = when (tier) {
             Tier.NOW -> m.verbalPre ?: m.instruction

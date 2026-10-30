@@ -15,4 +15,6 @@ data class RouteProgress(
     val remainingDurationS: Double,
     val snapped: GeoPoint,
     val bearingDeg: Float?,
+    /** `true` si la position est extrapolée le long du tracé (perte de fix GPS) plutôt que mesurée. */
+    val extrapolated: Boolean = false,
 )

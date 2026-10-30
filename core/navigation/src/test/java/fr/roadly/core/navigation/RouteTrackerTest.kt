@@ -4,6 +4,7 @@ import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,29 +33,26 @@ class RouteTrackerTest {
     }
 
     @Test fun `vertices project onto themselves with the exact along distance`() {
-        val t = RouteTracker(route)
         listOf(10, 50, 100, 150, 200, 250, 300).forEach { k ->
-            val p = t.update(fixAt(pts[k]))
+            val p = RouteTracker(route).update(fixAt(pts[k]))
             assertEquals("off au point $k", 0.0, p.offRouteM, 0.01)
             assertEquals("along au point $k", cum[k], p.distanceAlongM, 0.01)
         }
     }
 
     @Test fun `segment midpoints project at half the segment`() {
-        val t = RouteTracker(route)
         listOf(20, 80, 160, 240, 310).forEach { k ->
-            val p = t.update(fixAt(mid(pts[k], pts[k + 1])))
+            val p = RouteTracker(route).update(fixAt(mid(pts[k], pts[k + 1])))
             assertEquals("along milieu $k", cum[k] + (cum[k + 1] - cum[k]) / 2, p.distanceAlongM, 0.05)
             assertEquals("off milieu $k", 0.0, p.offRouteM, 0.05)
         }
     }
 
     @Test fun `next maneuver index and distance to it`() {
-        val t = RouteTracker(route)
         for (k in 1 until route.maneuvers.size) {
             val begin = route.maneuvers[k].beginShapeIndex
             if (begin - 1 <= route.maneuvers[k - 1].beginShapeIndex) continue // pas de point intermédiaire
-            val p = t.update(fixAt(pts[begin - 1]))
+            val p = RouteTracker(route).update(fixAt(pts[begin - 1]))
             assertEquals("manœuvre suivante depuis le point ${begin - 1}", k, p.nextManeuverIndex)
             assertEquals(cum[begin] - cum[begin - 1], p.distanceToNextManeuverM, 0.05)
         }
@@ -68,9 +66,8 @@ class RouteTrackerTest {
     }
 
     @Test fun `remaining duration at each maneuver start is the sum of the remaining Valhalla durations`() {
-        val t = RouteTracker(route)
         for (k in 1 until route.maneuvers.lastIndex) {
-            val p = t.update(fixAt(pts[route.maneuvers[k].beginShapeIndex]))
+            val p = RouteTracker(route).update(fixAt(pts[route.maneuvers[k].beginShapeIndex]))
             assertEquals("restant au début de la manœuvre $k", route.maneuvers.drop(k).sumOf { it.durationSeconds }, p.remainingDurationS, 0.5)
         }
     }
@@ -95,9 +92,10 @@ class RouteTrackerTest {
         }
     }
 
-    @Test fun `window falls back to a global search after a jump`() {
+    @Test fun `window falls back to a global search after a confirmed jump`() {
         val t = RouteTracker(route)
         t.update(fixAt(pts[20]))
+        t.update(fixAt(pts[280])) // saut > 100 m : en attente de confirmation
         assertEquals(cum[280], t.update(fixAt(pts[280])).distanceAlongM, 0.01)
     }
 
@@ -126,7 +124,39 @@ class RouteTrackerTest {
         assertEquals(cum[100] + 50.0, p.distanceAlongM, 1e-6)
         assertEquals(0.0, p.offRouteM, 0.0)
         assertEquals(t.pointAt(cum[100] + 50.0), p.snapped)
+        assertTrue(p.extrapolated)
+    }
+
+    @Test fun `real progress is not flagged as extrapolated`() {
+        assertFalse(RouteTracker(route).update(fixAt(pts[100])).extrapolated)
+    }
+
+    @Test fun `extrapolation stops at 150 m after the last real fix`() {
+        val t = RouteTracker(route)
+        t.update(fixAt(pts[100]))
+        val capped = t.extrapolate(1e9)
+        assertEquals(cum[100] + GuidanceConstants.EXTRAPOLATION_MAX_M, capped.distanceAlongM, 1e-6)
+        assertSame(capped, t.extrapolate(10.0)) // déjà au plafond : progression rendue telle quelle
+        // un fix réel repart d'un plafond neuf
+        t.update(fixAt(pts[110]))
+        assertEquals(cum[110] + GuidanceConstants.EXTRAPOLATION_MAX_M, t.extrapolate(1e9).distanceAlongM, 1e-6)
+    }
+
+    @Test fun `extrapolation never goes past the end of the route`() {
+        val t = RouteTracker(route)
+        t.update(fixAt(pts[pts.lastIndex - 2]))
         assertEquals(t.totalGeometryM, t.extrapolate(1e9).distanceAlongM, 1e-6)
+    }
+
+    @Test fun `extrapolation stops after 10 s without a real fix`() {
+        val t = RouteTracker(route)
+        t.update(fixAt(pts[100]))
+        val first = t.extrapolate(20.0, sinceLastFixMs = 3_000L)
+        assertEquals(cum[100] + 20.0, first.distanceAlongM, 1e-6)
+        assertEquals(cum[100] + 40.0, t.extrapolate(20.0, sinceLastFixMs = GuidanceConstants.EXTRAPOLATION_MAX_MS).distanceAlongM, 1e-6)
+        val stale = t.lastProgress!!
+        assertSame(stale, t.extrapolate(20.0, sinceLastFixMs = GuidanceConstants.EXTRAPOLATION_MAX_MS + 1))
+        assertEquals(cum[100] + 40.0, t.lastProgress!!.distanceAlongM, 1e-6)
     }
 
     @Test fun `pointAt returns the vertices at their cumulative distance`() {

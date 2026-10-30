@@ -6,6 +6,7 @@ import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
 import kotlin.math.PI
+import kotlin.math.cos
 
 /** Itinéraires synthétiques déterministes pour les tests. */
 object TestRoutes {
@@ -26,6 +27,36 @@ object TestRoutes {
             Maneuver(
                 ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 20, null,
                 verbalPre = "Votre destination est sur la droite.", verbalAlert = "Votre destination sera sur la droite.",
+            ),
+        )
+        return Route(id, costing, total, 120.0, pts, maneuvers, hasToll = false, providerId = "test")
+    }
+
+    /** Écart latéral (m) entre l'aller et le retour de [outAndBack]. */
+    const val OUT_AND_BACK_LANE_M = 10.0
+
+    /**
+     * Aller 600 m plein est, demi-tour, retour 600 m plein ouest sur une chaussée décalée de ~10 m au nord (2x1 voies séparées).
+     * Points 0..12 = aller (pas de 50 m), 13..25 = retour ; le segment 12 est le demi-tour (≈ 10 m).
+     * Manœuvres : DEPART (point 0), UTURN (point 12), ARRIVE (point 25).
+     */
+    fun outAndBack(id: String = "outAndBack", costing: RouteCosting = RouteCosting.FASTEST): Route {
+        val lonPerMeter = 1.0 / (METERS_PER_DEG_LAT * cos(LAT * PI / 180.0))
+        val laneLat = LAT + OUT_AND_BACK_LANE_M / METERS_PER_DEG_LAT
+        val outbound = (0..12).map { GeoPoint(LAT, 2.300 + it * 50.0 * lonPerMeter) }
+        val inbound = (12 downTo 0).map { GeoPoint(laneLat, 2.300 + it * 50.0 * lonPerMeter) }
+        val pts = outbound + inbound
+        val total = (0 until pts.lastIndex).sumOf { pts[it].distanceTo(pts[it + 1]) }
+        val leg = (0 until 12).sumOf { pts[it].distanceTo(pts[it + 1]) }
+        val maneuvers = listOf(
+            Maneuver(ManeuverType.DEPART, "Conduisez vers l'est.", null, leg, 60.0, 0, null, verbalPre = "Conduisez vers l'est."),
+            Maneuver(
+                ManeuverType.UTURN, "Faites demi-tour.", null, total - leg, 60.0, 12, null,
+                verbalPre = "Faites demi-tour.", verbalAlert = "Faites demi-tour.",
+            ),
+            Maneuver(
+                ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 25, null,
+                verbalPre = "Votre destination est sur la gauche.", verbalAlert = "Votre destination sera sur la gauche.",
             ),
         )
         return Route(id, costing, total, 120.0, pts, maneuvers, hasToll = false, providerId = "test")
