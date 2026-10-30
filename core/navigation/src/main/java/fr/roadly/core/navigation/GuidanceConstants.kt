@@ -38,4 +38,6 @@ object GuidanceConstants {
     /** Un saut global de plus de 100 m le long du tracé doit être confirmé par un second fix (à 50 m près). */
     const val GLOBAL_JUMP_M = 100.0
     const val GLOBAL_CONFIRM_RADIUS_M = 50.0
+    /** Après l'arrivée, le moteur de synthèse n'est libéré qu'au bout de ce délai : la dernière annonce doit pouvoir se terminer. */
+    const val SPEECH_RELEASE_DELAY_MS = 20_000L
 }

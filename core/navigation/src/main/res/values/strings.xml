@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_channel_name">Guidage</string>
+    <string name="nav_channel_description">Instruction suivante, distance et heure d\'arrivée pendant le guidage</string>
+    <string name="nav_notif_title_default">Guidage Roadly</string>
+    <string name="nav_notif_rerouting">Recalcul de l\'itinéraire…</string>
+    <string name="nav_notif_text">%1$s · arrivée %2$s</string>
+    <string name="nav_notif_stop">Arrêter</string>
+</resources>
