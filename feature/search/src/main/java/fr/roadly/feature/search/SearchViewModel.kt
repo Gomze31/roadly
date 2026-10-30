@@ -1,5 +1,6 @@
 package fr.roadly.feature.search
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,6 +10,8 @@ import fr.roadly.core.data.connectivity.ConnectivityObserver
 import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.geocoding.GeocodingProvider
+import fr.roadly.core.geocoding.NearbyPoiProvider
+import fr.roadly.core.geocoding.PoiCategory
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.model.Place
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,9 +38,13 @@ class SearchViewModel @Inject constructor(
     private val favorites: FavoritesRepository,
     private val location: LocationRepository,
     connectivity: ConnectivityObserver,
+    private val nearby: NearbyPoiProvider,
+    savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
+    // Catégorie initiale passée par la route (puces de l'accueil) ; valeur inconnue ignorée.
+    private val category = MutableStateFlow(savedStateHandle.get<String>("category")?.let { name -> PoiCategory.entries.firstOrNull { it.name == name } })
     private val selected = MutableStateFlow<Place?>(null)
     // Dérivés : le statut favori suit la base, la distance suit la dernière position connue.
     private val selectedIsFavorite = combine(selected, favorites.observeAll()) { s, favs -> s != null && favs.any { it.id == s.id } }
@@ -47,16 +54,21 @@ class SearchViewModel @Inject constructor(
     // Compteur de relance : permet de rejouer la même requête (le distinctUntilChanged l'ignorerait sinon).
     private val retryTick = MutableStateFlow(0)
 
+    private data class Request(val query: String, val category: PoiCategory?)
+
     // Le debounce n'émet rien avant 300 ms : on démarre sur Idle pour que l'état (récents, favoris…)
-    // soit disponible immédiatement.
-    private val results = combine(query.debounce(300).distinctUntilChanged(), retryTick) { q, _ -> q }
-        .flatMapLatest { q -> searchFlow(q.trim()) }
+    // soit disponible immédiatement. Une catégorie court-circuite le texte et part sans délai.
+    // `combine` attend une première valeur de chaque flux : la requête débounçée démarre vide pour ne pas retarder les catégories.
+    private val results = combine(query.debounce(300).onStart { emit("") }.distinctUntilChanged(), category, retryTick) { q, cat, _ -> Request(q.trim(), cat) }
+        .distinctUntilChanged()
+        .flatMapLatest { r -> if (r.category != null) nearbyFlow(r.category) else searchFlow(r.query) }
         .onStart { emit(SearchResults.Idle) }
 
     val uiState: StateFlow<SearchUiState> = combine(
-        query, results, recents.observe(), favorites.observeAll(), online, selected, selectedIsFavorite, selectedDistance,
+        query, results, recents.observe(), favorites.observeAll(), online, selected, selectedIsFavorite, selectedDistance, category,
     ) { values ->
         @Suppress("UNCHECKED_CAST")
+        val here = location.lastKnown?.point
         SearchUiState(
             query = values[0] as String,
             results = values[1] as SearchResults,
@@ -66,6 +78,9 @@ class SearchViewModel @Inject constructor(
             selected = values[5] as Place?,
             selectedIsFavorite = values[6] as Boolean,
             selectedDistanceMeters = values[7] as Double?,
+            category = values[8] as PoiCategory?,
+            hereLat = here?.lat,
+            hereLon = here?.lon,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchUiState())
 
@@ -80,9 +95,24 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun onQueryChange(value: String) { query.value = value }
+    /** « À proximité » exige une position : sans fix connu, l'erreur `NoResult` invite à attendre le GPS. */
+    private fun nearbyFlow(cat: PoiCategory) = flow {
+        val here = location.lastKnown?.point
+        if (here == null) { emit(SearchResults.Error(AppError.NoResult)); return@flow }
+        if (!online.value) { emit(SearchResults.Error(AppError.Network)); return@flow }
+        emit(SearchResults.Loading)
+        when (val r = nearby.nearby(cat, here)) {
+            is Outcome.Success -> emit(SearchResults.Content(r.value, cat))
+            is Outcome.Failure -> emit(SearchResults.Error(r.error))
+        }
+    }
 
-    fun onClear() { query.value = "" }
+    fun onQueryChange(value: String) { category.value = null; query.value = value }
+
+    fun onClear() { query.value = ""; category.value = null }
+
+    /** Une puce de catégorie : sélection exclusive, nouvelle pression = désélection. */
+    fun onCategory(cat: PoiCategory) { category.value = if (category.value == cat) null else cat }
 
     // Force une nouvelle recherche : le distinctUntilChanged ignorerait sinon la même requête.
     fun retry() { retryTick.value++ }

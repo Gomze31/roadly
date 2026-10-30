@@ -1,4 +1,4 @@
-package fr.roadly.feature.navigation
+package fr.roadly.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,10 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import fr.roadly.core.designsystem.component.ComingSoonTag
-import fr.roadly.core.designsystem.component.GlassBottomSheet
-import fr.roadly.core.designsystem.component.GlassChip
-import fr.roadly.core.designsystem.component.OverlineText
+import fr.roadly.core.designsystem.R
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 

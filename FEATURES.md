@@ -53,7 +53,9 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Récents (50), favoris, domicile, travail | G | fonctionnelle | 1 | Local (Room) |
 | Fiche lieu : distance, itinéraire, favori, domicile/travail | G | fonctionnelle | 1 | Retour visuel après « Définir » à ajouter |
 | Appui long sur la carte → destination | G | fonctionnelle | 1 | |
-| Toucher sa position → adresse copiable/partageable | G | en cours | 1 | Adresse affichée ; copier/partager faits sur la fiche lieu (LOT 1), pas encore sur la position courante |
+| Toucher sa position → adresse copiable/partageable | G | fonctionnelle | 1 | Feuille « Ma position » : adresse, coordonnées, lien OSM, Copier / Partager (LOT 2) |
+| Boussole | G | fonctionnelle | 1 | Apparaît quand la carte est tournée ; remet le nord en haut (LOT 2) |
+| Catégories à proximité (stations, bornes, parkings, aires, restaurants) | G | fonctionnelle | 1 | Photon `reverse` + `osm_tag`, triées par distance ; sans prix ni disponibilité (LOT 2) |
 | Horaires d'ouverture des lieux | G | non commencée | 3 | OSM `opening_hours` via Photon/Overpass |
 | Adresses des contacts, lieux de rendez-vous | G | non commencée | 4 | Permissions contacts/calendrier |
 | Commande vocale (Assistant / App Actions) | G | non commencée | 5 | |
@@ -167,7 +169,7 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Fonction | Statut | Notes |
 |---|---|---|
 | APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
-| Tests unitaires | fonctionnelle | 230 tests (JVM) |
+| Tests unitaires | fonctionnelle | 235 tests (JVM) |
 | Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
 | Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
 | Widgets, Android Auto | non commencée | Phase 5 |

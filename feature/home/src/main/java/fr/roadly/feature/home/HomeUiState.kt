@@ -16,7 +16,11 @@ data class HomeUiState(
     val isOnline: Boolean = true,
     val styleUrl: String = "",
     val pickedPlace: Place? = null,
+    /** Cap de la carte (0 = nord en haut) : la boussole n'apparaît que si la carte est tournée. */
+    val mapBearingDeg: Double = 0.0,
 ) {
+    val isRotated: Boolean get() = kotlin.math.abs(((mapBearingDeg % 360) + 360) % 360).let { it > 2.0 && it < 358.0 }
+
     /** Vitesse en km/h, `null` tant qu'aucune vitesse n'est connue. */
     val speedKmh: Double? get() = fix?.speedMps?.let { it * 3.6 }
 }

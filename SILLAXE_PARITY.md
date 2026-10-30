@@ -45,16 +45,16 @@ Constats de l'audit (écarts avec Sillaxe) :
 
 | # | Écran Sillaxe | Lot | Statut | État Roadly / ce qui manque |
 |---|---|---|---|---|
-| 1 | Accueil avec carte | L2 | 🟡 | Carte, position, recherche, domicile/travail, recentrage. Manque : boussole, bouton de couches (stations/bornes/parkings), bouton signalement, carte de profil, toucher sa position → adresse copiable/partageable, autres conducteurs |
-| 2 | Recherche | L2 | 🟡 | BAN + Photon + coordonnées, récents, favoris. Manque : catégories (stations, parkings, bornes…), tri POI, horaires d'ouverture, contacts/calendrier, dictée |
+| 1 | Accueil avec carte | L2 | 🟡 | Carte, position, recherche, domicile/travail, recentrage, **boussole (L2)**, **bouton Signaler (L2, envoi L8)**, **toucher sa position → copier/partager (L2)**, **puces Stations/Bornes/Parkings/Aires → recherche à proximité (L2)**. Manque : carte de profil (L9), autres conducteurs (L8), couches sur la carte (L5) |
+| 2 | Recherche | L2 | 🟡 | BAN + Photon + coordonnées, récents, favoris, **catégories à proximité (Photon `reverse` + `osm_tag`, triées par distance, distance affichée) (L2)**. Manque : horaires d'ouverture (⛔ non fournis par Photon), contacts/calendrier (L6), dictée (L12) |
 | 3 | Fiche de lieu | L2 | 🟡 | Distance, itinéraire, favori, domicile/travail. Manque : horaires, téléphone, partage, « Enregistrer un repère », parking à proximité, mise en page Sillaxe |
 | 4 | Choix des itinéraires | L3 | 🟡 | 3 variantes, carte, coût carburant, heure de départ. Manque : panneau « Votre choix » (durée grande, arrivée, distance, péage, trafic), alternatives compactes, « Ajouter un arrêt », « Arriver à », puces d'options, feux/ralentisseurs comptés |
 | 5 | Navigation GPS | L3 | 🟡 | Bandeau, voies, « à venir », ETA, vitesse, arrivée, recalcul, GPS perdu, notification, TTS. Manque : barre d'information (ETA · min · km · recentrer · stop), bouton signalement, replier le bandeau, mode paysage, Horizon |
 | 6 | Horizon | L4 | 🟡 | Ruban « route à venir » livré (L1) : manœuvres et arrivée réelles, échelle log 0–5 km. Manque : virages (courbure), ralentissements/travaux/fermetures/zones/services (⛔ sources) |
 | 7 | Signalements | L8 | 🟡 | Bouton « Signaler » en guidage + feuille des 9 types (désactivés, explication). Manque : envoi, confirmation, invalidation, expiration, carte, points, historique, modération (backend Supabase) |
-| 8 | Stations-service | L5 | ⛔ | Source : data.economie.gouv.fr (flux instantané, Licence Ouverte). Prix sur la carte, comparaison, détour, horaires |
-| 9 | Bornes électriques | L5 | ⛔ | Source : IRVE consolidé transport.data.gouv.fr ; disponibilité temps réel non fournie gratuitement |
-| 10 | Parkings | L5 | ⛔ | Source : OSM `amenity=parking` + open data villes (BNLS) |
+| 8 | Stations-service | L5 | 🟡 | Liste à proximité (OSM via Photon, L2). ⛔ prix : data.economie.gouv.fr (flux instantané, Licence Ouverte) ; comparaison, détour, horaires |
+| 9 | Bornes électriques | L5 | 🟡 | Liste à proximité (OSM, L2). ⛔ puissance/connecteurs/prix : IRVE consolidé transport.data.gouv.fr ; disponibilité temps réel non fournie gratuitement |
+| 10 | Parkings | L5 | 🟡 | Liste à proximité (OSM `amenity=parking`, L2). ⛔ tarifs/hauteur/places : open data villes (BNLS) |
 | 11 | Planificateur de trajet | L6 | ⬜ | Jusqu'à 10 arrêts, réorganisation, optimisation, pauses, « arriver à » |
 | 12 | Gestion des arrêts | L6 | ⬜ | Ajout pendant le guidage, réordonner, supprimer, mode tournée |
 | 13 | Profil utilisateur | L9 | ⬜ | Pseudonyme, avatar, bannière, km, trajets, points, public/privé/masqué |
@@ -223,3 +223,4 @@ Constats de l'audit (écarts avec Sillaxe) :
   - Écrans 1, 2, 3, 4, 5, 20 : passent de « générique » à « fidèle » graphiquement ; leur statut fonctionnel reste 🟡 (voir tableau 1).
   - Écran 6 (Horizon) : composant livré et affiché en guidage avec manœuvres + arrivée ; trafic/zones/services restent ⛔ (L4).
   - Écran 7 (Signalements) : interface de saisie livrée, envoi ⛔ (L8).
+- 2026-10-31 — **LOT 2 livré** (accueil, carte, recherche) : `NearbyPoiProvider` / `PhotonNearbyPoiProvider` (Photon `reverse` + `radius` + `osm_tag`, fixture réelle, 2 tests) ; recherche : puces Stations / Bornes / Parkings / Aires / Restaurants réelles (lieux OSM triés par distance, distance par ligne, états « position inconnue » et « aucun lieu », pied de carte rappelant l'absence de prix/disponibilité), route `SearchRoute(category)` ; accueil : boussole animée (apparaît quand la carte est tournée, remet le nord), bouton Signaler (feuille partagée dans `core:designsystem`), position courante → feuille Copier/Partager (adresse + coordonnées + lien OSM), puces de catégories branchées sur la recherche, « Incidents » reste « Bientôt ». 235 tests verts ; vérifié sur HONOR : stations à 630 m, parkings à 730 m, feuille position, bouton Signaler.

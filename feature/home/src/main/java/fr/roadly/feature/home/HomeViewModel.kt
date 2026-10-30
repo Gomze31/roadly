@@ -53,6 +53,7 @@ class HomeViewModel @Inject constructor(
     private val address = MutableStateFlow<String?>(null)
     private val picked = MutableStateFlow<Place?>(null)
     private val isDark = MutableStateFlow(true)
+    private val mapBearing = MutableStateFlow(0.0)
     /** Dernière caméra de l'accueil ; le VM est lié à l'entrée de pile, elle survit donc à la navigation. */
     var lastCamera: CameraSnapshot? = null
         private set
@@ -72,7 +73,7 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = combine(
         fixes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null),
         address, favorites.observeHome(), favorites.observeWork(), cameraMode,
-        location.permissionState, connectivity.isOnline, config.config, picked, isDark,
+        location.permissionState, connectivity.isOnline, config.config, picked, isDark, mapBearing,
     ) { values ->
         val cfg = values[7] as ProviderConfig
         HomeUiState(
@@ -85,6 +86,7 @@ class HomeViewModel @Inject constructor(
             isOnline = values[6] as Boolean,
             styleUrl = if (values[9] as Boolean) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl,
             pickedPlace = values[8] as Place?,
+            mapBearingDeg = values[10] as Double,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -111,6 +113,9 @@ class HomeViewModel @Inject constructor(
     fun rememberCamera(s: CameraSnapshot?) { if (s != null) lastCamera = s }
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
+
+    /** Cap de la carte après chaque mouvement (boussole). */
+    fun onCameraIdle(bearingDeg: Double) { mapBearing.value = bearingDeg }
 
     fun onUserGesture() {
         if (cameraMode.value != CameraMode.FREE) {

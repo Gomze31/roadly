@@ -20,7 +20,7 @@ core:designsystem   tokens (violet marque / orange action, CockpitTint), RoadlyT
 core:data           ApiClient (OkHttp, UA, cache, retry 429), ProviderConfig(+Repository), Room, DataStore, ConnectivityObserver
 core:location       LocationRepository (Fused), LocationMode (+ GUIDANCE 1 Hz prioritaire), LocationPermissionState, PermissionEvents, FakeLocationRepository
 core:map            MapController + RoadlyMap (MapLibre), couches GeoJSON (position, tracés, marqueurs), caméra différée
-core:geocoding      GeocodingProvider : BAN, Photon, CoordinateParser, CompositeGeocoder
+core:geocoding      GeocodingProvider : BAN, Photon, CoordinateParser, CompositeGeocoder ; NearbyPoiProvider (Photon reverse + osm_tag, PoiCategory)
 core:routing        RoutingProvider : Valhalla ; Polyline6 ; RouteAlternativesUseCase ; FuelCostCalculator
 core:navigation     RouteTracker, AnnouncementPolicy, SpeedSmoother, NavigationSession (StateFlow<NavigationState>), SpeechService (TTS fr-FR),
                     SpeedLimitProvider (Valhalla trace_attributes, auto-hébergé), NavigationService (premier plan location + notification)
@@ -68,4 +68,4 @@ Supabase : Auth (pseudonyme d'appareil puis e-mail sans mot de passe), tables `r
 
 ## 8. Qualité
 
-230 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.
+235 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.

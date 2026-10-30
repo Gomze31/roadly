@@ -193,6 +193,13 @@ class MapController(internal val context: Context) {
         action(m)
     }
 
+    /** Boussole : remet le nord en haut sans changer le centre ni le zoom. */
+    fun resetBearing() {
+        val m = map ?: return
+        val pos = m.cameraPosition
+        m.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(pos).bearing(0.0).build()), 400)
+    }
+
     /** Caméra courante, ou le dernier instantané pris au détachement ; null si aucune carte n'a jamais existé. */
     fun cameraPosition(): CameraSnapshot? = liveCamera() ?: lastSnapshot
 

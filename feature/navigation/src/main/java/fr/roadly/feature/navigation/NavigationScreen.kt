@@ -60,6 +60,7 @@ import fr.roadly.core.designsystem.component.IconTileStyle
 import fr.roadly.core.designsystem.component.LoadingRow
 import fr.roadly.core.designsystem.component.NavInfoBar
 import fr.roadly.core.designsystem.component.RoundButtonStyle
+import fr.roadly.core.designsystem.component.ReportSheet
 import fr.roadly.core.designsystem.component.RoundIconButton
 import fr.roadly.core.designsystem.component.SpeedBadge
 import fr.roadly.core.designsystem.component.userMessage

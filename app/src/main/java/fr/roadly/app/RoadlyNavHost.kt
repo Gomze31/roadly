@@ -30,12 +30,13 @@ fun RoadlyNavHost(
     NavHost(navController = nav, startDestination = HomeRoute) {
         homeScreen(
             isDark = isDark,
-            onSearch = { nav.navigate(SearchRoute) },
+            onSearch = { nav.navigate(SearchRoute()) },
             onSettings = { nav.navigate(SettingsRoute) },
             onNavigateToRoute = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) },
             onRequestLocationPermission = onRequestLocationPermission,
             onOpenAppSettings = onOpenAppSettings,
             onResumeGuidance = { nav.navigate(NavigationRoute) { launchSingleTop = true } },
+            onSearchCategory = { cat -> nav.navigate(SearchRoute(category = cat.name)) },
         )
         searchScreen(
             onBack = { nav.popBackStack() },
@@ -63,7 +64,7 @@ fun RoadlyNavHost(
         navigationScreen(
             isDark = isDark,
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
-            onChangeDestination = { nav.navigate(SearchRoute) },
+            onChangeDestination = { nav.navigate(SearchRoute()) },
         )
     }
     // Après NavHost : le graphe est posé avant de traiter une ouverture demandée par la notification.

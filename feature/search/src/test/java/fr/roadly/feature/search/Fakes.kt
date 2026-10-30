@@ -5,6 +5,8 @@ import fr.roadly.core.data.connectivity.ConnectivityObserver
 import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.geocoding.GeocodingProvider
+import fr.roadly.core.geocoding.NearbyPoiProvider
+import fr.roadly.core.geocoding.PoiCategory
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Place
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +18,13 @@ class FakeGeocoder : GeocodingProvider {
     val queries = mutableListOf<String>()
     override suspend fun search(query: String, near: GeoPoint?, limit: Int): Outcome<List<Place>> { queries += query; return next }
     override suspend fun reverse(point: GeoPoint): Outcome<Place?> = Outcome.Success(null)
+}
+
+class FakeNearby : NearbyPoiProvider {
+    override val id = "fake"
+    var next: Outcome<List<Place>> = Outcome.Success(emptyList())
+    val calls = mutableListOf<PoiCategory>()
+    override suspend fun nearby(category: PoiCategory, near: GeoPoint, limit: Int): Outcome<List<Place>> { calls += category; return next }
 }
 
 class FakeRecents : RecentSearchRepository {

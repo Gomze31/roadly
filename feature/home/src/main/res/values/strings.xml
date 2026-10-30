@@ -8,6 +8,7 @@
     <string name="home_stations">Stations</string>
     <string name="home_chargers">Bornes</string>
     <string name="home_parkings">Parkings</string>
+    <string name="home_rest_areas">Aires</string>
     <string name="home_incidents">Incidents</string>
     <string name="home_locating">Recherche de la position…</string>
     <string name="home_permission_title">Roadly a besoin de votre position</string>
@@ -16,4 +17,11 @@
     <string name="home_permission_settings">Ouvrir les réglages système</string>
     <string name="home_picked_route">Itinéraire vers ce point</string>
     <string name="home_resume_guidance">Reprendre le guidage</string>
+    <string name="home_report">Signaler</string>
+    <string name="home_compass">Remettre le nord en haut</string>
+    <string name="home_position_title">Ma position</string>
+    <string name="home_position_no_address">Adresse inconnue</string>
+    <string name="home_position_copy">Copier</string>
+    <string name="home_position_share">Partager</string>
+    <string name="home_position_share_title">Partager ma position</string>
 </resources>

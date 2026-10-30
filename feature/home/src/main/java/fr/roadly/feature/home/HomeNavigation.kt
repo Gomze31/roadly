@@ -2,6 +2,7 @@ package fr.roadly.feature.home
 
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import fr.roadly.core.geocoding.PoiCategory
 import fr.roadly.core.model.Place
 import kotlinx.serialization.Serializable
 
@@ -16,8 +17,9 @@ fun NavGraphBuilder.homeScreen(
     onRequestLocationPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onResumeGuidance: () -> Unit,
+    onSearchCategory: (PoiCategory) -> Unit,
 ) {
     composable<HomeRoute> {
-        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance)
+        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance, onSearchCategory)
     }
 }

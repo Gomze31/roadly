@@ -12,4 +12,5 @@ abstract class GeocodingModule {
     @Binds @BanGeocoder abstract fun ban(impl: BanGeocodingProvider): GeocodingProvider
     @Binds @PhotonGeocoder abstract fun photon(impl: PhotonGeocodingProvider): GeocodingProvider
     @Binds abstract fun composite(impl: CompositeGeocoder): GeocodingProvider
+    @Binds abstract fun nearby(impl: PhotonNearbyPoiProvider): NearbyPoiProvider
 }

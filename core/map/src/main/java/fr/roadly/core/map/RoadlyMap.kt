@@ -31,12 +31,15 @@ fun RoadlyMap(
     onMapLongClick: ((GeoPoint) -> Unit)? = null,
     onUserGesture: () -> Unit = {},
     onRouteClick: ((String) -> Unit)? = null,
+    /** Caméra immobile : cap de la carte en degrés (0 = nord en haut) pour la boussole. */
+    onCameraIdle: ((bearingDeg: Double) -> Unit)? = null,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val mapView = remember { MapView(controllerContext(controller)) }
     val currentOnMapClick = rememberUpdatedState(onMapClick)
     val currentOnMapLongClick = rememberUpdatedState(onMapLongClick)
     val currentOnUserGesture = rememberUpdatedState(onUserGesture)
+    val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
     SideEffect { controller.onRouteClick = onRouteClick }
 
     DisposableEffect(lifecycleOwner, mapView) {
@@ -85,6 +88,7 @@ fun RoadlyMap(
                     map.addOnCameraMoveStartedListener { reason ->
                         if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) currentOnUserGesture.value()
                     }
+                    map.addOnCameraIdleListener { currentOnCameraIdle.value?.invoke(map.cameraPosition.bearing) }
                 }
             }
         },

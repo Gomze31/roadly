@@ -25,17 +25,4 @@
     <string name="nav_finish">Terminer</string>
     <string name="nav_failed_title">Guidage impossible</string>
     <string name="nav_retry">Réessayer</string>
-
-    <string name="report_overline">Communauté</string>
-    <string name="report_title">Signaler</string>
-    <string name="report_unavailable">Les signalements entre conducteurs arrivent avec le service communautaire Roadly (en préparation). Rien n\'est envoyé pour l\'instant.</string>
-    <string name="report_accident">Accident</string>
-    <string name="report_jam">Bouchon</string>
-    <string name="report_obstacle">Obstacle</string>
-    <string name="report_closed">Route fermée</string>
-    <string name="report_roadwork">Travaux</string>
-    <string name="report_weather">Météo</string>
-    <string name="report_pothole">Nid-de-poule</string>
-    <string name="report_work_light">Feu de chantier</string>
-    <string name="report_hazard">Danger</string>
 </resources>

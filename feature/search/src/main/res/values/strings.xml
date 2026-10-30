@@ -12,6 +12,13 @@
     <string name="search_cat_parkings">Parkings</string>
     <string name="search_cat_rest_areas">Aires</string>
     <string name="search_cat_restaurants">Restaurants</string>
+    <string name="search_loading_nearby">Recherche à proximité…</string>
+    <string name="search_nearby_header">%1$s à moins de %2$d km</string>
+    <string name="search_nearby_footer">Lieux OpenStreetMap, du plus proche au plus éloigné. Prix, puissance et disponibilité : pas encore disponibles.</string>
+    <string name="search_nearby_empty_title">Aucun lieu « %1$s »</string>
+    <string name="search_nearby_empty_subtitle">Rien de référencé à moins de %1$d km de votre position.</string>
+    <string name="search_no_position_title">Position inconnue</string>
+    <string name="search_no_position_subtitle">Les catégories cherchent autour de vous : attendez le signal GPS ou tapez une adresse.</string>
     <string name="place_route">Itinéraire</string>
     <string name="place_favorite_add">Favori</string>
     <string name="place_favorite_remove">Retirer</string>

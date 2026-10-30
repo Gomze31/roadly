@@ -1,8 +1,10 @@
 package fr.roadly.feature.search
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.geocoding.PoiCategory
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
@@ -34,7 +36,48 @@ class SearchViewModelTest {
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = SearchViewModel(geocoder, recents, favorites, location, connectivity)
+    private val nearby = FakeNearby()
+
+    private fun vm() = SearchViewModel(geocoder, recents, favorites, location, connectivity, nearby)
+
+    @Test fun `category chip queries nearby provider at once and typing clears it`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(43.6, 1.44), null, null, 5f, 0L)
+        nearby.next = Outcome.Success(listOf(paris))
+        val vm = vm()
+        vm.uiState.test {
+            vm.onCategory(PoiCategory.FUEL); advanceTimeBy(10)
+            val s = expectMostRecentItem()
+            assertEquals(listOf(PoiCategory.FUEL), nearby.calls)
+            assertEquals(PoiCategory.FUEL, s.category)
+            assertEquals(PoiCategory.FUEL, (s.results as SearchResults.Content).category)
+            vm.onCategory(PoiCategory.FUEL); advanceTimeBy(10)
+            assertEquals(null, expectMostRecentItem().category)
+            vm.onCategory(PoiCategory.PARKING); vm.onQueryChange("Paris"); advanceTimeBy(400)
+            assertEquals(null, expectMostRecentItem().category)
+            assertEquals(listOf("Paris"), geocoder.queries)
+        }
+    }
+
+    @Test fun `category from the route starts a nearby search at once`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(43.6, 1.44), null, null, 5f, 0L)
+        nearby.next = Outcome.Success(listOf(paris))
+        val vm = SearchViewModel(geocoder, recents, favorites, location, connectivity, nearby, SavedStateHandle(mapOf("category" to "PARKING")))
+        vm.uiState.test {
+            advanceTimeBy(10)
+            val s = expectMostRecentItem()
+            assertEquals(PoiCategory.PARKING, s.category)
+            assertEquals(listOf(PoiCategory.PARKING), nearby.calls)
+        }
+    }
+
+    @Test fun `category without a known position reports NoResult and does not call the provider`() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            vm.onCategory(PoiCategory.CHARGING); advanceTimeBy(10)
+            assertEquals(AppError.NoResult, (expectMostRecentItem().results as SearchResults.Error).error)
+            assertEquals(0, nearby.calls.size)
+        }
+    }
 
     @Test fun `short query stays idle and does not call geocoder`() = runTest {
         val vm = vm()

@@ -41,7 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.roadly.core.common.AppError
-import fr.roadly.core.designsystem.component.ComingSoonTag
+import fr.roadly.core.common.Formatters
 import fr.roadly.core.designsystem.component.EmptyState
 import fr.roadly.core.designsystem.component.ErrorState
 import fr.roadly.core.designsystem.component.GlassChip
@@ -56,6 +56,8 @@ import fr.roadly.core.designsystem.component.SettingsGroup
 import fr.roadly.core.designsystem.component.SurfaceCard
 import fr.roadly.core.designsystem.component.userMessage
 import fr.roadly.core.designsystem.theme.RoadlySpacing
+import fr.roadly.core.geocoding.PoiCategory
+import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
 
@@ -63,7 +65,8 @@ import fr.roadly.core.model.PlaceKind
 fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: SearchViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    // Ouverture directe sur une catégorie (puce de l'accueil) : pas de clavier.
+    LaunchedEffect(Unit) { if (vm.uiState.value.category == null) focus.requestFocus() }
 
     RoadlyScreen(Modifier.imePadding()) {
         if (!state.isOnline) OfflineBanner()
@@ -75,24 +78,28 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
                 onClear = vm::onClear, focusRequester = focus, modifier = Modifier.weight(1f),
             )
         }
-        CategoryChips()
+        CategoryChips(selected = state.category, onSelect = vm::onCategory)
         Spacer(Modifier.height(RoadlySpacing.xs))
+        val lat = state.hereLat
+        val lon = state.hereLon
+        val here = if (lat != null && lon != null) GeoPoint(lat, lon) else null
         when (val r = state.results) {
             SearchResults.Idle -> SuggestionsList(state, onSelect = vm::onPlaceSelected)
             SearchResults.Loading -> Box(Modifier.fillMaxWidth().padding(RoadlySpacing.xl), contentAlignment = Alignment.Center) {
-                LoadingRow(stringResource(R.string.search_loading), Modifier.width(IntrinsicSize.Min))
+                LoadingRow(stringResource(if (state.category != null) R.string.search_loading_nearby else R.string.search_loading), Modifier.width(IntrinsicSize.Min))
             }
-            is SearchResults.Error ->
-                if (r.error == AppError.Network) {
-                    // Hors ligne : on garde favoris et récents sous le message d'erreur.
-                    SuggestionsList(state, onSelect = vm::onPlaceSelected, header = { ErrorState(r.error.userMessage(), onRetry = vm::retry) })
-                } else {
-                    ErrorState(r.error.userMessage(), onRetry = vm::retry)
-                }
+            is SearchResults.Error -> when {
+                // Hors ligne : on garde favoris et récents sous le message d'erreur.
+                r.error == AppError.Network -> SuggestionsList(state, onSelect = vm::onPlaceSelected, header = { ErrorState(r.error.userMessage(), onRetry = vm::retry) })
+                // Catégorie sans position connue : le GPS n'a pas encore donné de fix.
+                r.error == AppError.NoResult && state.category != null -> EmptyState(Icons.Default.MyLocation, stringResource(R.string.search_no_position_title), stringResource(R.string.search_no_position_subtitle))
+                else -> ErrorState(r.error.userMessage(), onRetry = vm::retry)
+            }
             is SearchResults.Content -> if (r.places.isEmpty()) {
-                EmptyState(Icons.Default.Search, stringResource(R.string.search_empty_title), stringResource(R.string.search_empty_subtitle))
+                if (r.category != null) EmptyState(r.category.icon(), stringResource(R.string.search_nearby_empty_title, stringResource(r.category.labelRes())), stringResource(R.string.search_nearby_empty_subtitle, r.category.radiusKm))
+                else EmptyState(Icons.Default.Search, stringResource(R.string.search_empty_title), stringResource(R.string.search_empty_subtitle))
             } else {
-                ResultsList(r.places, onSelect = vm::onPlaceSelected)
+                ResultsList(r.places, here, onSelect = vm::onPlaceSelected, header = r.category?.let { stringResource(R.string.search_nearby_header, stringResource(it.labelRes()), it.radiusKm) })
             }
         }
     }
@@ -111,22 +118,31 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
     }
 }
 
-/** Catégories de recherche à proximité : aucune source de données pour l'instant, affichées désactivées. */
+internal fun PoiCategory.labelRes(): Int = when (this) {
+    PoiCategory.FUEL -> R.string.search_cat_stations
+    PoiCategory.CHARGING -> R.string.search_cat_charging
+    PoiCategory.PARKING -> R.string.search_cat_parkings
+    PoiCategory.REST_AREA -> R.string.search_cat_rest_areas
+    PoiCategory.RESTAURANT -> R.string.search_cat_restaurants
+}
+
+internal fun PoiCategory.icon(): ImageVector = when (this) {
+    PoiCategory.FUEL -> Icons.Default.LocalGasStation
+    PoiCategory.CHARGING -> Icons.Default.EvStation
+    PoiCategory.PARKING -> Icons.Default.LocalParking
+    PoiCategory.REST_AREA -> Icons.Default.Park
+    PoiCategory.RESTAURANT -> Icons.Default.Restaurant
+}
+
+/** Catégories « à proximité » (OSM via Photon) : lieux et adresses seulement, sans prix ni disponibilité (LOT 5). */
 @Composable
-private fun CategoryChips() {
-    val categories = listOf(
-        R.string.search_cat_stations to Icons.Default.LocalGasStation,
-        R.string.search_cat_charging to Icons.Default.EvStation,
-        R.string.search_cat_parkings to Icons.Default.LocalParking,
-        R.string.search_cat_rest_areas to Icons.Default.Park,
-        R.string.search_cat_restaurants to Icons.Default.Restaurant,
-    )
+private fun CategoryChips(selected: PoiCategory?, onSelect: (PoiCategory) -> Unit) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = RoadlySpacing.m),
         horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
     ) {
-        categories.forEach { (label, icon) ->
-            GlassChip(stringResource(label), onClick = {}, icon = icon, enabled = false, compact = true, trailing = { ComingSoonTag() })
+        PoiCategory.entries.forEach { cat ->
+            GlassChip(stringResource(cat.labelRes()), onClick = { onSelect(cat) }, icon = cat.icon(), selected = selected == cat, compact = true)
         }
     }
 }
@@ -134,12 +150,18 @@ private fun CategoryChips() {
 private val listPadding = PaddingValues(start = RoadlySpacing.m, end = RoadlySpacing.m, top = RoadlySpacing.sm, bottom = RoadlySpacing.l)
 
 @Composable
-private fun ResultsList(places: List<Place>, onSelect: (Place) -> Unit) {
+private fun ResultsList(places: List<Place>, here: GeoPoint?, onSelect: (Place) -> Unit, header: String? = null) {
     LazyColumn(contentPadding = listPadding) {
         item {
-            SurfaceCard(Modifier.fillMaxWidth()) {
-                Column {
-                    places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex) }
+            if (header != null) {
+                SettingsGroup(header, footer = stringResource(R.string.search_nearby_footer)) {
+                    places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = here?.let { Formatters.distance(it.distanceTo(p.point)) }) }
+                }
+            } else {
+                SurfaceCard(Modifier.fillMaxWidth()) {
+                    Column {
+                        places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = here?.let { Formatters.distance(it.distanceTo(p.point)) }) }
+                    }
                 }
             }
         }
@@ -184,11 +206,12 @@ internal fun PlaceRow(
     icon: ImageVector? = null,
     iconStyle: IconTileStyle = IconTileStyle.Brand,
     divider: Boolean = true,
+    distance: String? = null,
 ) {
     val leading = icon ?: when (place.kind) {
         PlaceKind.CITY -> Icons.Default.LocationCity
         PlaceKind.COORDINATES -> Icons.Default.MyLocation
         else -> Icons.Default.Place
     }
-    ListRow(title = place.name, subtitle = place.address, icon = leading, iconStyle = iconStyle, onClick = onClick, chevron = false, divider = divider)
+    ListRow(title = place.name, subtitle = place.address, icon = leading, iconStyle = iconStyle, value = distance, onClick = onClick, chevron = false, divider = divider)
 }
