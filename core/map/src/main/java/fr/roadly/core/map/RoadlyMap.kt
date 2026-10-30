@@ -53,6 +53,7 @@ fun RoadlyMap(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            controller.captureCamera()
             lifecycleOwner.lifecycle.removeObserver(observer)
             if (!destroyed) {
                 // Le composable quitte la composition alors que le propriétaire est encore actif : descendre la vue étape par étape.

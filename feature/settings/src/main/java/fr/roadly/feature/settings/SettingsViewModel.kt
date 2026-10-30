@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
+import fr.roadly.core.data.config.normalized
 import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.data.repository.ThemeMode
@@ -13,8 +14,10 @@ import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.model.FuelType
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -49,8 +52,19 @@ class SettingsViewModel @Inject constructor(
     fun setTheme(mode: ThemeMode) { viewModelScope.launch { prefs.setThemeMode(mode) } }
     fun clearHistory() { viewModelScope.launch { recents.clear() } }
     fun clearFavorites() { viewModelScope.launch { favorites.clear() } }
-    fun saveProviders(cfg: ProviderConfig) { viewModelScope.launch { config.override(cfg) } }
-    fun resetProviders() { viewModelScope.launch { config.reset() } }
+
+    private val _providerError = MutableStateFlow<String?>(null)
+    /** URL fautive du dernier enregistrement refusé (null si tout va bien) ; l'écran la formate en « URL invalide : … ». */
+    val providerError: StateFlow<String?> = _providerError.asStateFlow()
+
+    fun saveProviders(cfg: ProviderConfig) {
+        viewModelScope.launch {
+            val clean = runCatching { cfg.normalized() }.onFailure { _providerError.value = it.message ?: "?" }.getOrNull() ?: return@launch
+            config.override(clean)
+            _providerError.value = null
+        }
+    }
+    fun resetProviders() { viewModelScope.launch { config.reset(); _providerError.value = null } }
 
     private fun String.toFrDouble(): Double? = trim().replace(',', '.').toDoubleOrNull()
 }

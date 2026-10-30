@@ -46,7 +46,7 @@ core:designsystem      Tokens (couleurs, typographie Inter, espacements, formes)
                        composants Glass*, icônes de manœuvre vectorielles, CompositionLocal DrivingMode
 core:data              Room (favoris, récents, profil véhicule, itinéraires sauvegardés), DataStore (préférences),
                        client HTTP OkHttp + kotlinx.serialization, ProviderConfig
-core:location          LocationRepository (Flow<LocationFix>), LocationPermissionState, impl Fused + repli LocationManager
+core:location          LocationRepository (Flow<LocationFix>), LocationPermissionState, impl Fused
 core:map               Composable RoadlyMap (MapLibre), MapCameraController, couches position / marqueurs / tracés,
                        modes de caméra (libre, centré, suivi avec rotation)
 core:geocoding         GeocodingProvider, BanGeocodingProvider, PhotonGeocodingProvider, CoordinateParser,
@@ -71,7 +71,7 @@ Règles de dépendance : un module `feature:*` ne dépend que de modules `core:*
 | Géocodage POI, villes, Europe | Photon : `https://photon.komoot.io/api/` et `/reverse` | Fair-use, aucune garantie de production | Photon auto-hébergé |
 | Coordonnées saisies | Parseur local (décimal `48.85, 2.35`, DMS `48°51'N 2°21'E`) | — | — |
 | Routage | Valhalla FOSSGIS : `https://valhalla1.openstreetmap.de/route` | Fair-use, développement uniquement ; en production, Valhalla Docker sur VPS | GraphHopper, OSRM |
-| Position | `play-services-location` (FusedLocationProviderClient), repli `LocationManager` | — | — |
+| Position | `play-services-location` (FusedLocationProviderClient) | — | — |
 | Limitation de vitesse | Non disponible en v1 (affichage « — ») | Phase 2 via `trace_attributes` sur un Valhalla auto-hébergé | — |
 
 **Avertissement.** Le serveur Valhalla de FOSSGIS et le serveur Photon de Komoot sont des services publics offerts à titre de fair-use. Ils n'offrent aucune garantie de disponibilité ni de débit et ne conviennent pas à une application distribuée à grande échelle. Pour une mise en production, il faut auto-héberger Valhalla (voir `docs/API-PROVIDERS.md`) et idéalement Photon. Roadly limite sa charge : en-tête `User-Agent: Roadly/<version> (+https://roadly.example)`, cache HTTP OkHttp de 10 Mo, debounce de 300 ms sur la recherche, une requête en vol par type.
@@ -83,7 +83,7 @@ Détails par fournisseur : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 ## Configuration
 
 - `local.properties` (à la racine, hors suivi de version) : contient `sdk.dir=<chemin du SDK Android>`. Aucune clé d'API n'est nécessaire.
-- Les URL des fournisseurs ont des valeurs par défaut dans `core/data/src/main/java/fr/roadly/core/data/config/ProviderConfig.kt`. Elles sont modifiables à l'exécution dans **Réglages › Fournisseurs** (stockées dans DataStore) : style de carte clair, style sombre, BAN, Photon, Valhalla. C'est ce qui permet de pointer l'application vers un Valhalla auto-hébergé sans recompiler.
+- Les URL des fournisseurs ont des valeurs par défaut dans `core/data/src/main/java/fr/roadly/core/data/config/ProviderConfig.kt`. Elles sont modifiables à l'exécution dans **Réglages › Fournisseurs** (stockées dans DataStore) : style de carte clair, style sombre, BAN, Photon, Valhalla. C'est ce qui permet de pointer l'application vers un Valhalla auto-hébergé sans recompiler. Utiliser une URL `https://` (reverse proxy avec TLS, par exemple Caddy) : une URL `http://` en clair est refusée par la politique réseau d'Android (cleartext).
 - Si une clé devenait nécessaire plus tard, elle serait lue depuis `local.properties` à la compilation, jamais écrite dans le code.
 
 ## Ce qui fonctionne en v1
@@ -110,7 +110,7 @@ Détails par fournisseur : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 
 ## Confidentialité
 
-La position ne quitte l'appareil que vers les fournisseurs listés ci-dessus, et seulement pour les fonctions qui en ont besoin : requêtes de géocodage et de routage, ainsi que les tuiles de carte demandées à OpenFreeMap. Rien n'est stocké sur un serveur appartenant à Roadly, et l'application n'embarque aucun outil d'analyse. Favoris, récents et profil véhicule restent dans la base locale de l'appareil.
+La position ne quitte l'appareil que vers les fournisseurs listés ci-dessus, et seulement pour les fonctions qui en ont besoin : requêtes de géocodage et de routage, ainsi que les tuiles de carte demandées à OpenFreeMap. Rien n'est stocké sur un serveur appartenant à Roadly, et l'application n'embarque aucun outil d'analyse. Favoris, récents et profil véhicule restent dans la base locale de l'appareil. La sauvegarde Android est désactivée (`allowBackup=false`) : favoris et historique ne quittent pas l'appareil.
 
 ## Écarts assumés par rapport à la spec
 
@@ -122,6 +122,7 @@ La spec est [`docs/superpowers/specs/2026-10-30-roadly-v1-design.md`](docs/super
 - Hilt 2.58 : la série 2.60.x exige AGP 9.
 - `TimePickerDialog` remplacé par un `AlertDialog` contenant un `TimePicker`.
 - Les arguments de navigation sont lus depuis `SavedStateHandle` par clé, et non via `toRoute`, pour que les ViewModels restent testables sur JVM.
+- Pas de repli `LocationManager` : sans services Google Play, aucune position (prévu Phase 5).
 - Styles de carte `positron` et `dark` d'OpenFreeMap, au lieu du style `liberty` et du style sombre dérivé embarqué envisagés dans la spec.
 
 ## Licences

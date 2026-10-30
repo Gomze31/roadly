@@ -13,6 +13,14 @@ class ThemeResolverTest {
         assertEquals(false, ThemeResolver.isDark(ThemeMode.AUTO_SOLAR, false, null, null, noon))
         assertEquals(true, ThemeResolver.isDark(ThemeMode.AUTO_SOLAR, false, null, null, late))
     }
+    @Test fun `auto solar by day follows system`() {
+        val noon = java.time.ZonedDateTime.of(2026, 6, 1, 12, 0, 0, 0, java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val late = java.time.ZonedDateTime.of(2026, 6, 1, 22, 0, 0, 0, java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        assertEquals(true, ThemeResolver.isDark(ThemeMode.AUTO_SOLAR, true, null, null, noon))
+        assertEquals(false, ThemeResolver.isDark(ThemeMode.AUTO_SOLAR, false, null, null, noon))
+        assertEquals(true, ThemeResolver.isDark(ThemeMode.AUTO_SOLAR, false, null, null, late))
+        assertEquals(true, ThemeResolver.isDark(ThemeMode.AUTO_SOLAR, true, null, null, late))
+    }
     @Test fun `auto solar with position uses sun elevation`() {
         val midnightParis = java.time.Instant.parse("2026-06-21T23:30:00Z").toEpochMilli()
         assertEquals(true, ThemeResolver.isDark(ThemeMode.AUTO_SOLAR, false, 48.85, 2.35, midnightParis))

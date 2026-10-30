@@ -14,6 +14,7 @@ import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.location.PermissionEvents
 import fr.roadly.core.map.CameraMode
+import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
@@ -47,6 +48,9 @@ class HomeViewModel @Inject constructor(
     private val address = MutableStateFlow<String?>(null)
     private val picked = MutableStateFlow<Place?>(null)
     private val isDark = MutableStateFlow(true)
+    /** Dernière caméra de l'accueil ; le VM est lié à l'entrée de pile, elle survit donc à la navigation. */
+    var lastCamera: CameraSnapshot? = null
+        private set
     private var lastReversePoint: GeoPoint? = null
     private var reverseJob: Job? = null
 
@@ -93,6 +97,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun rememberCamera(s: CameraSnapshot?) { if (s != null) lastCamera = s }
+
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
 
     fun onUserGesture() {
@@ -111,9 +117,6 @@ class HomeViewModel @Inject constructor(
         }
         location.setMode(if (cameraMode.value == CameraMode.FOLLOW) LocationMode.FOLLOW else LocationMode.MAP)
     }
-
-    fun onPermissionResult() { location.refreshPermission() }
-    fun onPermissionDeniedForever() { location.markDeniedForever() }
 
     /** Appui long sur la carte : propose ce point comme destination. */
     fun onMapLongClick(point: GeoPoint) {

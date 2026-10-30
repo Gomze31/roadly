@@ -27,8 +27,12 @@ import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -77,8 +81,19 @@ fun HomeScreen(
 
     LaunchedEffect(isDark) { vm.setDarkTheme(isDark) }
     LaunchedEffect(c.routeActive, c.routeInactive) { map.setRouteColors(c.routeActive.toHex(), c.routeInactive.toHex()) }
-    LaunchedEffect(state.fix, state.cameraMode) { map.setUserLocation(state.fix); map.applyCameraMode(state.cameraMode, state.fix) }
-    LaunchedEffect(state.fix == null) { if (state.fix == null) map.moveTo(FRANCE_CENTER, 5.2, animate = false) }
+    // Mode libre : au retour sur l'accueil, on rétablit la caméra quittée (une seule fois, au premier passage).
+    var restored by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) { onDispose { vm.rememberCamera(map.cameraPosition()) } }
+    LaunchedEffect(state.fix, state.cameraMode) {
+        map.setUserLocation(state.fix)
+        val saved = vm.lastCamera
+        if (!restored) {
+            restored = true
+            if (state.cameraMode == CameraMode.FREE && saved != null) map.restore(saved)
+        }
+        map.applyCameraMode(state.cameraMode, state.fix)
+    }
+    LaunchedEffect(state.fix == null) { if (state.fix == null && vm.lastCamera == null) map.moveTo(FRANCE_CENTER, 5.2, animate = false) }
     LaunchedEffect(state.pickedPlace) { map.setMarkers(listOfNotNull(state.pickedPlace)) }
 
     Box(Modifier.fillMaxSize()) {

@@ -36,6 +36,7 @@
     <string name="settings_provider_valhalla">Itinéraires (Valhalla)</string>
     <string name="settings_provider_style_light">Style de carte clair</string>
     <string name="settings_provider_style_dark">Style de carte sombre</string>
+    <string name="settings_provider_invalid">URL invalide : %1$s</string>
     <string name="settings_reset">Réinitialiser</string>
 
     <string name="settings_about">À propos</string>

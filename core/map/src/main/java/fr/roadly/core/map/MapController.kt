@@ -59,6 +59,8 @@ class MapController(internal val context: Context) {
     /** Commande caméra reçue avant que la carte et son style soient prêts ; la dernière l'emporte, rejouée en fin de `replayState`. */
     private var pendingCamera: ((MapLibreMap) -> Unit)? = null
 
+    private var lastSnapshot: CameraSnapshot? = null
+
     var onRouteClick: ((String) -> Unit)? = null
 
     /** Détache la carte (la vue est détruite) ; l'état mémorisé reste pour un futur `attach`. */
@@ -162,6 +164,16 @@ class MapController(internal val context: Context) {
         if (m == null || !styleReady) { pendingCamera = action; return }
         action(m)
     }
+
+    /** Caméra courante, ou le dernier instantané pris au détachement ; null si aucune carte n'a jamais existé. */
+    fun cameraPosition(): CameraSnapshot? = liveCamera() ?: lastSnapshot
+
+    fun restore(snapshot: CameraSnapshot) = moveTo(GeoPoint(snapshot.lat, snapshot.lon), snapshot.zoom, snapshot.bearing, animate = false)
+
+    private fun liveCamera(): CameraSnapshot? = map?.cameraPosition?.let { CameraSnapshot(it.target?.latitude ?: return null, it.target?.longitude ?: return null, it.zoom, it.bearing) }
+
+    /** Mémorise la caméra juste avant la destruction de la vue (l'ordre de sortie de composition n'est pas garanti). */
+    internal fun captureCamera() { liveCamera()?.let { lastSnapshot = it } }
 
     fun fitBounds(points: List<GeoPoint>, paddingPx: Int) {
         val bbox = BoundingBox.of(points) ?: return

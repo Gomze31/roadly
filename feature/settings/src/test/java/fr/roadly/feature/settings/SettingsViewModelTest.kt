@@ -42,11 +42,14 @@ class SettingsViewModelTest {
         override suspend fun setThemeMode(mode: ThemeMode) { t.value = mode }
         override val locationRationaleSeen = flowOf(false)
         override suspend fun setLocationRationaleSeen() = Unit
+        override val locationDeniedForever = flowOf(false)
+        override suspend fun setLocationDeniedForever(value: Boolean) = Unit
     }
+    private var overrideCalls = 0
     private val config = object : ProviderConfigRepository {
         val c = MutableStateFlow(ProviderConfig.DEFAULT)
         override val config = c
-        override suspend fun override(config: ProviderConfig) { c.value = config }
+        override suspend fun override(config: ProviderConfig) { overrideCalls++; c.value = config }
         override suspend fun reset() { c.value = ProviderConfig.DEFAULT }
     }
     private var recentsCleared = false
@@ -83,5 +86,19 @@ class SettingsViewModelTest {
             vm.clearHistory(); advanceUntilIdle()
             assertEquals(true, recentsCleared)
         }
+    }
+
+    @Test fun `invalid provider url sets error and is not saved`() = runTest {
+        val vm = vm()
+        vm.saveProviders(ProviderConfig.DEFAULT.copy(valhallaBaseUrl = "pas une url")); advanceUntilIdle()
+        assertEquals("pas une url", vm.providerError.value)
+        assertEquals(0, overrideCalls)
+    }
+
+    @Test fun `valid provider urls are normalised and saved`() = runTest {
+        val vm = vm()
+        vm.saveProviders(ProviderConfig.DEFAULT.copy(valhallaBaseUrl = "  https://valhalla.exemple.fr/  ")); advanceUntilIdle()
+        assertNull(vm.providerError.value)
+        assertEquals("https://valhalla.exemple.fr", config.c.value.valhallaBaseUrl)
     }
 }

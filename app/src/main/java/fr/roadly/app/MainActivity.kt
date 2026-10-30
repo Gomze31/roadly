@@ -15,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
-import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.location.PermissionEvents
@@ -39,14 +38,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val mode by themeVm.themeMode.collectAsStateWithLifecycle()
-            val solarNight by themeVm.solarNight.collectAsStateWithLifecycle()
-            val systemDark = isSystemInDarkTheme()
-            val isDark = when (mode) {
-                ThemeMode.SYSTEM -> systemDark
-                ThemeMode.LIGHT -> false
-                ThemeMode.DARK -> true
-                ThemeMode.AUTO_SOLAR -> solarNight ?: systemDark
-            }
+            val now by themeVm.nowTick.collectAsStateWithLifecycle()
+            val p = location.lastKnown?.point
+            val isDark = ThemeResolver.isDark(mode, isSystemInDarkTheme(), p?.lat, p?.lon, now)
             RoadlyTheme(darkTheme = isDark) {
                 RoadlyNavHost(
                     isDark = isDark,

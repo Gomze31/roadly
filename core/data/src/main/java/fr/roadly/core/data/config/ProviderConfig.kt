@@ -1,5 +1,7 @@
 package fr.roadly.core.data.config
 
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+
 data class ProviderConfig(
     val banBaseUrl: String,
     val photonBaseUrl: String,
@@ -16,4 +18,10 @@ data class ProviderConfig(
             mapStyleDarkUrl = "https://tiles.openfreemap.org/styles/dark",
         )
     }
+}
+
+/** Normalise chaque URL (espaces et « / » finaux retirés) ; lève [IllegalArgumentException] (message = URL fautive) si l'une n'est pas une URL http(s) valide. */
+fun ProviderConfig.normalized(): ProviderConfig {
+    fun String.norm(): String = trim().trimEnd('/').also { require(it.toHttpUrlOrNull() != null) { it } }
+    return ProviderConfig(banBaseUrl.norm(), photonBaseUrl.norm(), valhallaBaseUrl.norm(), mapStyleLightUrl.norm(), mapStyleDarkUrl.norm())
 }

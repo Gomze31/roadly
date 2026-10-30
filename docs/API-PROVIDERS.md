@@ -85,19 +85,19 @@ services:
 
 Préparation des données : placer `france-latest.osm.pbf` (téléchargé depuis `https://download.geofabrik.de/europe/france.html`) dans le dossier `custom_files`. Selon l'image choisie, la construction des tuiles se fait au premier démarrage ou via une commande dédiée ; suivre la documentation de l'image retenue. Prévoir ensuite une mise à jour périodique du fichier `.osm.pbf` et la reconstruction des tuiles.
 
-Sécurité : le port 8002 n'est pas authentifié. Le placer derrière un reverse proxy avec TLS et, si besoin, une authentification ou une restriction d'adresses, plutôt que de l'exposer tel quel sur Internet. Android bloque le trafic HTTP en clair par défaut, et la v1 ne déclare aucune exception réseau (`usesCleartextTraffic` ou configuration de sécurité réseau absents du manifeste). Une URL `http://<ip>:8002` sera donc refusée telle quelle sur un appareil récent : il faut soit exposer Valhalla en HTTPS (recommandé), soit ajouter une exception de sécurité réseau pour votre adresse dans l'application. Ce comportement n'a pas été vérifié sur appareil.
+Sécurité : le port 8002 n'est pas authentifié. Le placer derrière un reverse proxy avec TLS et, si besoin, une authentification ou une restriction d'adresses, plutôt que de l'exposer tel quel sur Internet. Android bloque le trafic HTTP en clair par défaut, et la v1 ne déclare aucune exception réseau (`usesCleartextTraffic` ou configuration de sécurité réseau absents du manifeste). Une URL `http://<ip>:8002` est donc refusée par la politique cleartext d'Android (l'application affiche alors que le service est indisponible) : exposer Valhalla en HTTPS derrière un reverse proxy avec TLS.
 
 ### Pointer l'application vers ce serveur
 
 1. Ouvrir Réglages › Fournisseurs.
-2. Remplacer l'URL Valhalla par `http://<ip>:8002` (ou l'URL HTTPS du reverse proxy). Ne pas ajouter `/route` : l'application l'ajoute.
+2. Remplacer l'URL Valhalla par l'URL `https://` du reverse proxy avec TLS (par exemple Caddy devant le port 8002). Une URL `http://` en clair est refusée par la politique cleartext d'Android. Ne pas ajouter `/route` : l'application l'ajoute.
 3. Lancer une comparaison d'itinéraires. En cas d'échec, l'écran affiche l'état d'erreur du fournisseur.
 
 La même méthode vaut pour BAN, Photon et les styles de carte.
 
 ## 7. Position
 
-`play-services-location` (FusedLocationProviderClient) avec repli sur `LocationManager`. Ce n'est pas un service réseau de Roadly. Prérequis de production : les Google Play Services doivent être présents sur l'appareil ; sans eux, le repli `LocationManager` s'applique.
+`play-services-location` (FusedLocationProviderClient). Ce n'est pas un service réseau de Roadly. Prérequis : les Google Play Services doivent être présents sur l'appareil ; il n'y a pas de repli `LocationManager` en v1 (prévu Phase 5), donc sans eux aucune position n'est disponible.
 
 ## 8. Sources étudiées pour la Phase 3 (non intégrées)
 

@@ -37,6 +37,7 @@ class DataStoreProviderConfigRepository @Inject constructor(
     }
 
     override suspend fun override(config: ProviderConfig) {
+        val config = config.normalized()
         store.edit { p ->
             p[kBan] = config.banBaseUrl; p[kPhoton] = config.photonBaseUrl; p[kValhalla] = config.valhallaBaseUrl
             p[kLight] = config.mapStyleLightUrl; p[kDark] = config.mapStyleDarkUrl

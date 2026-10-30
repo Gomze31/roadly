@@ -13,6 +13,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import dagger.hilt.android.qualifiers.ApplicationContext
 import fr.roadly.core.data.di.ApplicationScope
+import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.shareIn
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,8 +36,9 @@ import javax.inject.Singleton
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class FusedLocationRepository @Inject constructor(
-    @ApplicationContext private val ctx: Context,
-    @ApplicationScope scope: CoroutineScope,
+    @param:ApplicationContext private val ctx: Context,
+    @param:ApplicationScope private val scope: CoroutineScope,
+    private val prefs: UserPreferencesRepository,
 ) : LocationRepository {
     private val fused = LocationServices.getFusedLocationProviderClient(ctx)
     private val mode = MutableStateFlow(LocationMode.OFF)
@@ -43,6 +46,15 @@ class FusedLocationRepository @Inject constructor(
     private var _permissionInitialized = false
     private val _permission = MutableStateFlow(readPermission())
     override val permissionState: StateFlow<LocationPermissionState> = _permission
+
+    init {
+        // Le refus définitif survit à la mort du processus : on le restaure tant que la permission n'est pas accordée.
+        scope.launch {
+            prefs.locationDeniedForever.collect { denied ->
+                if (denied && _permission.value != LocationPermissionState.GRANTED) _permission.value = LocationPermissionState.DENIED_FOREVER
+            }
+        }
+    }
 
     @Volatile override var lastKnown: LocationFix? = null
         private set
@@ -68,9 +80,16 @@ class FusedLocationRepository @Inject constructor(
 
     override fun setMode(mode: LocationMode) { this.mode.value = mode }
 
-    override fun refreshPermission() { _permission.value = readPermission() }
+    override fun refreshPermission() {
+        val fresh = readPermission()
+        if (fresh == LocationPermissionState.GRANTED) scope.launch { prefs.setLocationDeniedForever(false) }
+        _permission.value = nextPermissionState(_permission.value, fresh)
+    }
 
-    override fun markDeniedForever() { _permission.value = LocationPermissionState.DENIED_FOREVER }
+    override fun markDeniedForever() {
+        _permission.value = LocationPermissionState.DENIED_FOREVER
+        scope.launch { prefs.setLocationDeniedForever(true) }
+    }
 
     private fun readPermission(): LocationPermissionState {
         val fine = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -89,4 +108,11 @@ class FusedLocationRepository @Inject constructor(
         accuracyM = if (hasAccuracy()) accuracy else 50f,
         timestampMs = time,
     )
+}
+
+/** DENIED_FOREVER ne se dégrade jamais, sauf vers GRANTED (l'utilisateur a accordé la permission dans les réglages). */
+internal fun nextPermissionState(current: LocationPermissionState, fresh: LocationPermissionState): LocationPermissionState = when {
+    fresh == LocationPermissionState.GRANTED -> fresh
+    current == LocationPermissionState.DENIED_FOREVER -> current
+    else -> fresh
 }

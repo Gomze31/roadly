@@ -3,6 +3,7 @@ package fr.roadly.core.data.network
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -15,6 +16,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.net.UnknownServiceException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -25,13 +27,28 @@ class ApiClient @Inject constructor(
     private val client: OkHttpClient,
     private val dispatchers: DispatcherProvider,
 ) {
+    /** Pauses avant chaque nouvelle tentative après un HTTP 429 (spec §8) ; surchargeable par les tests. */
+    internal var retryDelaysMs: List<Long> = listOf(2_000L, 8_000L)
+
     suspend fun get(url: HttpUrl): Outcome<String> = execute(Request.Builder().url(url).get().build())
 
     suspend fun postJson(url: HttpUrl, body: String): Outcome<String> = execute(
         Request.Builder().url(url).post(body.toRequestBody("application/json; charset=utf-8".toMediaType())).build(),
     )
 
-    private suspend fun execute(request: Request): Outcome<String> = withContext(dispatchers.io) {
+    private suspend fun execute(request: Request): Outcome<String> {
+        var attempt = 0
+        while (true) {
+            val outcome = executeOnce(request)
+            if (outcome is Outcome.Failure && outcome.error == AppError.RateLimited && attempt < retryDelaysMs.size) {
+                delay(retryDelaysMs[attempt++])
+                continue
+            }
+            return outcome
+        }
+    }
+
+    private suspend fun executeOnce(request: Request): Outcome<String> = withContext(dispatchers.io) {
         try {
             client.newCall(request).await().use { resp ->
                 val text = resp.body?.string().orEmpty()
@@ -44,6 +61,9 @@ class ApiClient @Inject constructor(
             }
         } catch (e: SocketTimeoutException) {
             Outcome.Failure(AppError.Timeout)
+        } catch (e: UnknownServiceException) {
+            // Trafic http:// refusé par la politique cleartext d'Android : le fournisseur est inutilisable tel quel.
+            Outcome.Failure(AppError.ProviderUnavailable(request.url.host))
         } catch (e: IOException) {
             Outcome.Failure(AppError.Network)
         }

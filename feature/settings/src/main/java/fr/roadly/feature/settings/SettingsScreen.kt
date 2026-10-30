@@ -55,6 +55,7 @@ import fr.roadly.core.model.VehicleType
 @Composable
 fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val providerError by vm.providerError.collectAsStateWithLifecycle()
     val c = LocalRoadlyColors.current
 
     Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
@@ -72,7 +73,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
             ThemeSection(state.themeMode, onSelect = vm::setTheme)
             DataSection(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
             PrivacySection()
-            ProvidersSection(state.providers, onSave = vm::saveProviders, onReset = vm::resetProviders)
+            ProvidersSection(state.providers, providerError, onSave = vm::saveProviders, onReset = vm::resetProviders)
             AboutSection()
         }
     }
@@ -204,7 +205,7 @@ private fun PrivacySection() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ProvidersSection(providers: ProviderConfig, onSave: (ProviderConfig) -> Unit, onReset: () -> Unit) {
+private fun ProvidersSection(providers: ProviderConfig, error: String?, onSave: (ProviderConfig) -> Unit, onReset: () -> Unit) {
     // Champs réinitialisés quand la configuration enregistrée change (enregistrement ou réinitialisation).
     var ban by remember(providers) { mutableStateOf(providers.banBaseUrl) }
     var photon by remember(providers) { mutableStateOf(providers.photonBaseUrl) }
@@ -231,6 +232,7 @@ private fun ProvidersSection(providers: ProviderConfig, onSave: (ProviderConfig)
                 )
                 GlassButton(stringResource(R.string.settings_reset), onClick = onReset, style = GlassButtonStyle.Secondary)
             }
+            if (error != null) Text(stringResource(R.string.settings_provider_invalid, error), style = MaterialTheme.typography.bodySmall, color = LocalRoadlyColors.current.danger)
         }
     }
 }

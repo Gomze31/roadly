@@ -37,8 +37,26 @@ class ApiClientTest {
     }
 
     @Test fun `429 maps to RateLimited`() = runTest {
+        client.retryDelaysMs = emptyList() // sans nouvelle tentative
         server.enqueue(MockResponse().setResponseCode(429))
         assertEquals(AppError.RateLimited, (client.get(server.url("/x")) as Outcome.Failure).error)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test fun `429 twice then 200 retries and succeeds`() = runTest {
+        client.retryDelaysMs = listOf(0L, 0L)
+        server.enqueue(MockResponse().setResponseCode(429))
+        server.enqueue(MockResponse().setResponseCode(429))
+        server.enqueue(MockResponse().setBody("ok"))
+        assertEquals("ok", (client.get(server.url("/x")) as Outcome.Success).value)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test fun `429 three times gives up with RateLimited`() = runTest {
+        client.retryDelaysMs = listOf(0L, 0L)
+        repeat(3) { server.enqueue(MockResponse().setResponseCode(429)) }
+        assertEquals(AppError.RateLimited, (client.get(server.url("/x")) as Outcome.Failure).error)
+        assertEquals(3, server.requestCount)
     }
 
     @Test fun `503 maps to ProviderUnavailable`() = runTest {

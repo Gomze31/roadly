@@ -17,14 +17,19 @@ interface UserPreferencesRepository {
     suspend fun setThemeMode(mode: ThemeMode)
     val locationRationaleSeen: Flow<Boolean>
     suspend fun setLocationRationaleSeen()
+    val locationDeniedForever: Flow<Boolean>
+    suspend fun setLocationDeniedForever(value: Boolean)
 }
 
 @Singleton
 class DataStoreUserPreferencesRepository @Inject constructor(private val store: DataStore<Preferences>) : UserPreferencesRepository {
     private val kTheme = stringPreferencesKey("theme.mode")
     private val kRationale = booleanPreferencesKey("location.rationale.seen")
+    private val kDeniedForever = booleanPreferencesKey("location.denied.forever")
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
     override suspend fun setThemeMode(mode: ThemeMode) { store.edit { it[kTheme] = mode.name } }
     override val locationRationaleSeen: Flow<Boolean> = store.data.map { it[kRationale] ?: false }
     override suspend fun setLocationRationaleSeen() { store.edit { it[kRationale] = true } }
+    override val locationDeniedForever: Flow<Boolean> = store.data.map { it[kDeniedForever] ?: false }
+    override suspend fun setLocationDeniedForever(value: Boolean) { store.edit { it[kDeniedForever] = value } }
 }
