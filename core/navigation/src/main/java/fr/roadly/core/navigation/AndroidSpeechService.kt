@@ -77,6 +77,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     private fun isSilenced(): Boolean = muted || volume == 0f
 
     override fun beep() {
+        if (isSilenced()) return
         try {
             val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
             tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 250)

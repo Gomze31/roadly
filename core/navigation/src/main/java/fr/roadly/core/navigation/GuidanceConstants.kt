@@ -40,4 +40,8 @@ object GuidanceConstants {
     const val GLOBAL_CONFIRM_RADIUS_M = 50.0
     /** Après l'arrivée, le moteur de synthèse n'est libéré qu'au bout de ce délai : la dernière annonce doit pouvoir se terminer. */
     const val SPEECH_RELEASE_DELAY_MS = 20_000L
+    /** Un recalcul sans réponse au bout de ce délai est traité comme un échec (l'ancien tracé est conservé). */
+    const val REROUTE_TIMEOUT_MS = 10_000L
+    /** Un fix plus ancien que le démarrage de la course (moins cette tolérance) est un rejeu périmé : ignoré. */
+    const val STALE_FIX_TOLERANCE_MS = 2_000L
 }

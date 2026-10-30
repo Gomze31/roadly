@@ -18,6 +18,7 @@ import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
@@ -60,27 +62,32 @@ class NavigationSession @Inject constructor(
 
     private val confined = dispatchers.default.limitedParallelism(1)
     private var job: Job? = null
+    /** Rend atomiques « incrémenter la génération » et « écrire l'état » : plus aucune publication périmée après un arrêt. */
+    private val stateLock = Any()
     @Volatile private var generation = 0
     private var lastOption: RouteOption? = null
     private var lastPreferences = RoutePreferences()
 
     /** Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs. */
     fun start(option: RouteOption, preferences: RoutePreferences) {
-        cancelRun()
+        cancelRun(null)
         lastOption = option
         lastPreferences = preferences
         if (location.permissionState.value != LocationPermissionState.GRANTED) {
-            _state.value = NavigationState.Failed(AppError.PermissionDenied)
+            publishFailure(NavigationState.Failed(AppError.PermissionDenied))
             return
         }
         val tracker = try {
             RouteTracker(option.route)
         } catch (e: IllegalArgumentException) {
-            _state.value = NavigationState.Failed(AppError.NoResult)
+            publishFailure(NavigationState.Failed(AppError.NoResult))
             return
         }
-        val run = Run(++generation, option.route, tracker, preferences)
-        _state.value = run.guiding(tracker.initialProgress(), clock.nowMs(), gpsLost = false)
+        val run = synchronized(stateLock) {
+            Run(++generation, option.route, tracker, preferences).also {
+                _state.value = it.guiding(tracker.initialProgress(), it.startedAtMs, gpsLost = false)
+            }
+        }
         location.setGuidanceActive(true)
         serviceController.start()
         job = scope.launch(confined) { run.execute() }
@@ -88,8 +95,7 @@ class NavigationSession @Inject constructor(
 
     /** Arrête la course : `Idle`, GPS relâché, parole coupée et moteur de synthèse libéré. */
     fun stop() {
-        cancelRun()
-        _state.value = NavigationState.Idle
+        cancelRun(NavigationState.Idle)
         speech.release()
     }
 
@@ -103,8 +109,16 @@ class NavigationSession @Inject constructor(
         if (muted) speech.stop()
     }
 
-    private fun cancelRun() {
-        generation++
+    private fun publishFailure(failed: NavigationState.Failed) {
+        synchronized(stateLock) { _state.value = failed }
+    }
+
+    /** Invalide la course en cours ([generation]) et, si [state] n'est pas nul, l'écrit dans le même verrou. */
+    private fun cancelRun(state: NavigationState?) {
+        synchronized(stateLock) {
+            generation++
+            if (state != null) _state.value = state
+        }
         job?.cancel()
         job = null
         location.setGuidanceActive(false)
@@ -122,7 +136,8 @@ class NavigationSession @Inject constructor(
         private val recent = ArrayDeque<LocationFix>()
         private var speedKmh: Double? = null
         private var speedLimitKmh: Int? = null
-        private var lastFixAtMs = clock.nowMs()
+        val startedAtMs = clock.nowMs()
+        private var lastFixAtMs = startedAtMs
         private var lastAdvanceAtMs = lastFixAtMs
         private var hadFix = false
         private var lastRerouteAtMs: Long? = null
@@ -131,7 +146,23 @@ class NavigationSession @Inject constructor(
         private var limitJob: Job? = null
         private lateinit var runScope: CoroutineScope
 
-        suspend fun execute() = coroutineScope {
+        /** Garde de dernier recours : une exception inattendue publie `Failed` et relâche le GPS (le service s'arrête alors). */
+        suspend fun execute() {
+            try {
+                body()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                synchronized(stateLock) {
+                    if (gen == generation) {
+                        _state.value = NavigationState.Failed(AppError.Unknown(e.message))
+                        location.setGuidanceActive(false)
+                    }
+                }
+            }
+        }
+
+        private suspend fun body() = coroutineScope {
             runScope = this
             speech.setVolume(prefs.voiceVolume.first())
             launch { prefs.voiceVolume.collect { speech.setVolume(it) } }
@@ -144,7 +175,8 @@ class NavigationSession @Inject constructor(
             announced += 0 to Tier.NOW
             say(depart.verbalPre ?: depart.instruction)
             launch { watchdog() }
-            location.fixes.collect { onFix(it) }
+            // Le flux de localisation rejoue son dernier fix : un fix antérieur au démarrage de la course est périmé.
+            location.fixes.collect { if (it.timestampMs >= startedAtMs - GuidanceConstants.STALE_FIX_TOLERANCE_MS) onFix(it) }
         }
 
         private suspend fun onFix(fix: LocationFix) {
@@ -181,8 +213,10 @@ class NavigationSession @Inject constructor(
                 say(m.verbalPre ?: m.instruction)
             }
             publish(NavigationState.Arrived(route))
-            if (gen == generation) {
-                location.setGuidanceActive(false)
+            val current = synchronized(stateLock) {
+                (gen == generation).also { if (it) location.setGuidanceActive(false) }
+            }
+            if (current) {
                 // Le moteur vocal n'est libéré qu'après un délai : la phrase d'arrivée doit pouvoir se terminer.
                 scope.launch {
                     delay(GuidanceConstants.SPEECH_RELEASE_DELAY_MS)
@@ -201,7 +235,12 @@ class NavigationSession @Inject constructor(
             say(SpokenPhrases.REROUTING)
             runScope.launch {
                 val result = try {
-                    routing.route(RouteRequest(origin = fix.point, destination = destination, costing = costing, preferences = routePreferences))
+                    withTimeout(GuidanceConstants.REROUTE_TIMEOUT_MS) {
+                        routing.route(RouteRequest(origin = fix.point, destination = destination, costing = costing, preferences = routePreferences))
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    // Sans réponse : traité comme un échec (ancien tracé conservé, nouvel essai après l'intervalle).
+                    Outcome.Failure(AppError.Timeout)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -261,19 +300,21 @@ class NavigationSession @Inject constructor(
             val over = limit != null && v != null && v > limit + prefs.speedAlertToleranceKmh.first()
             if (over && !overSpeedAlerted) {
                 overSpeedAlerted = true
-                if (prefs.speedAlertSound.first() && !_muted.value) speech.beep()
+                if (prefs.speedAlertSound.first() && !_muted.value && prefs.voiceEnabled.first()) speech.beep()
             } else if (!over) {
                 overSpeedAlerted = false
             }
         }
 
         private suspend fun say(text: String) {
-            if (text.isBlank() || gen != generation || _muted.value || !prefs.voiceEnabled.first()) return
+            if (text.isBlank() || _muted.value || !prefs.voiceEnabled.first()) return
+            // Revérifié après la suspension : un arrêt ou un nouveau départ a pu survenir entre-temps.
+            if (gen != generation) return
             speech.speak(text)
         }
 
         private fun publish(s: NavigationState) {
-            if (gen == generation) _state.value = s
+            synchronized(stateLock) { if (gen == generation) _state.value = s }
         }
 
         fun guiding(progress: RouteProgress, now: Long, gpsLost: Boolean): NavigationState.Guiding {

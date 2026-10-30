@@ -3,6 +3,7 @@ package fr.roadly.core.navigation
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.location.testing.FakeLocationRepository
@@ -18,6 +19,9 @@ import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -27,6 +31,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 /** Pas de `advanceUntilIdle()` ici : le tic de surveillance d'1 s boucle indéfiniment. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -40,25 +45,30 @@ class NavigationSessionTest {
     private val option = RouteOption(route, "Le plus rapide", 0L, null, sameAsFastest = false)
     private val requests = mutableListOf<RouteRequest>()
     private var routingResult: Outcome<List<Route>> = Outcome.Success(listOf(TestRoutes.straight("rerouted")))
+    private var routeHangs = false
     private val routing = object : RoutingProvider {
         override val id = "fake"
-        override suspend fun route(request: RouteRequest): Outcome<List<Route>> { requests += request; return routingResult }
+        override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
+            requests += request
+            if (routeHangs) awaitCancellation()
+            return routingResult
+        }
     }
     private var limit: Int? = null
     private val speedLimits = object : SpeedLimitProvider {
         override suspend fun speedLimitKmh(recent: List<LocationFix>): Outcome<Int?> = Outcome.Success(limit)
     }
 
-    private fun TestScope.session(): NavigationSession {
+    private fun TestScope.session(preferences: UserPreferencesRepository = prefs): NavigationSession {
         val d = StandardTestDispatcher(testScheduler)
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
-        return NavigationSession(location, routing, speedLimits, speech, prefs, service, { testScheduler.currentTime }, dispatchers, backgroundScope)
+        return NavigationSession(location, routing, speedLimits, speech, preferences, service, { testScheduler.currentTime }, dispatchers, backgroundScope)
     }
 
-    private fun fixAt(along: Double, speedMps: Float? = 10f, northM: Double = 0.0) =
-        LocationFix(TestRoutes.north(tracker.pointAt(along), northM), 90f, speedMps, 5f, 0L)
+    private fun fixAt(along: Double, speedMps: Float? = 10f, northM: Double = 0.0, timestampMs: Long = 0L) =
+        LocationFix(TestRoutes.north(tracker.pointAt(along), northM), 90f, speedMps, 5f, timestampMs)
 
     private fun guiding(s: NavigationSession) = s.state.value as NavigationState.Guiding
 
@@ -161,7 +171,8 @@ class NavigationSessionTest {
         val s = session()
         s.start(option, RoutePreferences()); runCurrent()
         location.emit(fixAt(tracker.totalGeometryM)); runCurrent()
-        location.emit(fixAt(100.0)); runCurrent() // le flux rejoue son dernier fix : on n'y laisse pas l'arrivée
+        advanceTimeBy(5_000)
+        // Le flux rejoue le fix d'arrivée, désormais antérieur au départ de la nouvelle course : il est ignoré.
         s.start(option, RoutePreferences()); runCurrent()
         advanceTimeBy(GuidanceConstants.SPEECH_RELEASE_DELAY_MS + 1); runCurrent()
         assertEquals(0, speech.releases)
@@ -322,5 +333,52 @@ class NavigationSessionTest {
         location.emit(fixAt(300.0)); runCurrent()
         assertEquals("other", guiding(s).route.id)
         assertEquals(2, service.starts)
+    }
+
+    @Test fun `unexpected failure publishes Failed and releases GPS`() = runTest {
+        val broken = object : UserPreferencesRepository by prefs {
+            override val voiceEnabled: Flow<Boolean> = flow { throw IOException("datastore illisible") }
+        }
+        val s = session(broken)
+        s.start(option, RoutePreferences()); runCurrent()
+        assertEquals(NavigationState.Failed(AppError.Unknown("datastore illisible")), s.state.value)
+        assertFalse(location.guidanceActive)
+    }
+
+    @Test fun `disabled voice also silences the over-speed beep`() = runTest {
+        limit = 50
+        prefs.setSpeedAlertSound(true)
+        prefs.setVoiceEnabled(false)
+        val s = session()
+        s.start(option, RoutePreferences()); runCurrent()
+        repeat(3) { location.emit(fixAt(100.0 + it * 20, speedMps = 20f)); runCurrent() }
+        assertEquals(50, guiding(s).speedLimitKmh)
+        assertEquals(0, speech.beeps)
+    }
+
+    @Test fun `a fix older than the run start is ignored`() = runTest {
+        advanceTimeBy(10_000)
+        val s = session()
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(300.0, timestampMs = 0L)); runCurrent() // rejeu périmé
+        assertEquals(0.0, guiding(s).progress.distanceAlongM, 0.0)
+        location.emit(fixAt(300.0, timestampMs = 10_000L)); runCurrent()
+        assertEquals(300.0, guiding(s).progress.distanceAlongM, 0.5)
+    }
+
+    @Test fun `a reroute without answer times out, keeps the old route and allows a new try`() = runTest {
+        routeHangs = true
+        val s = session()
+        s.start(option, RoutePreferences()); runCurrent()
+        repeat(5) { location.emit(fixAt(300.0, northM = 60.0)); runCurrent() }
+        assertEquals(1, requests.size)
+        assertTrue(guiding(s).rerouting)
+        advanceTimeBy(10_001); runCurrent()
+        assertFalse(guiding(s).rerouting)
+        assertEquals("straight", guiding(s).route.id)
+        location.emit(fixAt(300.0, northM = 60.0, timestampMs = 10_001L)); runCurrent() // 1er fix après 10 s de silence : on attend le suivant
+        advanceTimeBy(1_000); runCurrent()
+        location.emit(fixAt(300.0, northM = 60.0, timestampMs = 11_001L)); runCurrent()
+        assertEquals(2, requests.size)
     }
 }
