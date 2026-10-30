@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,20 +27,24 @@ class PhotonGeocodingProvider @Inject constructor(
 
     override suspend fun search(query: String, near: GeoPoint?, limit: Int): Outcome<List<Place>> {
         val base = config.config.first().photonBaseUrl
-        val url = "$base/api/".toHttpUrl().newBuilder()
+        val url = "$base/api/".toHttpUrlOrNull()?.newBuilder()
+            ?: return Outcome.Failure(AppError.ProviderUnavailable(id))
+        val request = url
             .addFormQueryParameter("q", query)
             .addQueryParameter("lang", "fr")
             .addQueryParameter("limit", limit.toString())
-            .apply { if (near != null) { addQueryParameter("lat", near.lat.toString()); addQueryParameter("lon", near.lon.toString()) } }
+            .apply { if (near != null) { addQueryParameter("lat", near.lat.toQueryString()); addQueryParameter("lon", near.lon.toQueryString()) } }
             .build()
-        return api.get(url).flatMap { parse(it) }
+        return api.get(request).flatMap { parse(it) }
     }
 
     override suspend fun reverse(point: GeoPoint): Outcome<Place?> {
         val base = config.config.first().photonBaseUrl
-        val url = "$base/reverse".toHttpUrl().newBuilder()
-            .addQueryParameter("lat", point.lat.toString()).addQueryParameter("lon", point.lon.toString()).addQueryParameter("lang", "fr").build()
-        return when (val r = api.get(url).flatMap { parse(it) }) { is Outcome.Success -> Outcome.Success(r.value.firstOrNull()); is Outcome.Failure -> r }
+        val url = "$base/reverse".toHttpUrlOrNull()?.newBuilder()
+            ?: return Outcome.Failure(AppError.ProviderUnavailable(id))
+        val request = url
+            .addQueryParameter("lat", point.lat.toQueryString()).addQueryParameter("lon", point.lon.toQueryString()).addQueryParameter("lang", "fr").build()
+        return when (val r = api.get(request).flatMap { parse(it) }) { is Outcome.Success -> Outcome.Success(r.value.firstOrNull()); is Outcome.Failure -> r }
     }
 
     /** Convertit le GeoJSON Photon en lieux ; le type (ville, rue, adresse, POI) est déduit des clés OSM. */

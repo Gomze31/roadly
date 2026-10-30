@@ -1,5 +1,6 @@
 package fr.roadly.core.geocoding
 
+import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfig
@@ -58,7 +59,7 @@ class BanGeocodingProviderTest {
         server.enqueue(MockResponse().setBody(fixture("ban_search.json")))
         provider.search("port", GeoPoint(49.0, 2.0))
         val path = server.takeRequest().path!!
-        assertTrue(path.contains("lat=49.0") && path.contains("lon=2.0"))
+        assertTrue(path.contains("lat=49.000000") && path.contains("lon=2.000000"))
     }
 
     @Test fun `reverse returns first feature or null`() = runTest {
@@ -74,5 +75,19 @@ class BanGeocodingProviderTest {
     @Test fun `empty features gives empty list not error`() = runTest {
         server.enqueue(MockResponse().setBody("""{"type":"FeatureCollection","features":[]}"""))
         assertEquals(emptyList<Any>(), (provider.search("zzzz", null) as Outcome.Success).value)
+    }
+
+    @Test fun `malformed base url returns failure not exception`() = runTest {
+        val dispatchers = object : DispatcherProvider {
+            override val io = Dispatchers.Unconfined; override val default = Dispatchers.Unconfined; override val main = Dispatchers.Unconfined
+        }
+        val badConfig = object : ProviderConfigRepository {
+            override val config = flowOf(ProviderConfig.DEFAULT.copy(banBaseUrl = "not a url"))
+            override suspend fun override(config: ProviderConfig) = Unit
+            override suspend fun reset() = Unit
+        }
+        val bad = BanGeocodingProvider(ApiClient(OkHttpClient(), dispatchers), badConfig, Json { ignoreUnknownKeys = true })
+        val r = bad.search("x", null) as Outcome.Failure
+        assertTrue(r.error is AppError.ProviderUnavailable)
     }
 }

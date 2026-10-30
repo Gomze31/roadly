@@ -32,3 +32,6 @@ interface GeocodingProvider {
  */
 internal fun HttpUrl.Builder.addFormQueryParameter(name: String, value: String): HttpUrl.Builder =
     addEncodedQueryParameter(name, URLEncoder.encode(value, "UTF-8"))
+
+/** Formate une coordonnée pour une requête : jamais de notation scientifique (ex. 5.0E-4 près du méridien de Greenwich). */
+internal fun Double.toQueryString(): String = String.format(java.util.Locale.ROOT, "%.6f", this)

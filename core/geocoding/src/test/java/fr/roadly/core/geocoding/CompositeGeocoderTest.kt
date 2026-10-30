@@ -42,4 +42,13 @@ class CompositeGeocoderTest {
         val g = CompositeGeocoder(FakeProvider("ban", Outcome.Failure(AppError.Timeout)), FakeProvider("photon", Outcome.Failure(AppError.Network)))
         assertTrue((g.search("x", null) as Outcome.Failure).error is AppError.ProviderUnavailable)
     }
+
+    @Test fun `photon results are not truncated by limit`() = runTest {
+        val banPlaces = listOf(place("b1", "Rue A", 48.80, 2.30, "ban"), place("b2", "Rue B", 48.81, 2.31, "ban"), place("b3", "Rue C", 48.82, 2.32, "ban"))
+        val ban = FakeProvider("ban", Outcome.Success(banPlaces))
+        val photon = FakeProvider("photon", Outcome.Success(listOf(place("p1", "Gare de Lyon", 48.8447, 2.3738, "photon"))))
+        val r = (CompositeGeocoder(ban, photon).search("rue", null, limit = 3) as Outcome.Success).value
+        assertEquals(4, r.size)
+        assertTrue(r.any { it.name == "Gare de Lyon" && it.source == "photon" })
+    }
 }

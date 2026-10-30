@@ -11,7 +11,7 @@ import java.text.Normalizer
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** BAN d'abord (adresses France), Photon ensuite (POI, villes, Europe). Fusion, déduplication, repli. */
+/** BAN d'abord (adresses France), Photon ensuite (POI, villes, Europe). Fusion, déduplication, repli. Pas de troncature à `limit` après fusion : à l'appelant de couper. */
 @Singleton
 class CompositeGeocoder @Inject constructor(
     @param:BanGeocoder private val ban: GeocodingProvider,
@@ -26,8 +26,8 @@ class CompositeGeocoder @Inject constructor(
             return Outcome.Success(listOf(Place("coord:${coord.lat},${coord.lon}", "Coordonnées GPS", "%.5f, %.5f".format(java.util.Locale.ROOT, coord.lat, coord.lon), coord, PlaceKind.COORDINATES, "local")))
         }
         val (banR, photonR) = coroutineScope {
-            val a = async { ban.search(query, near, limit) }
-            val b = async { photon.search(query, near, limit) }
+            val a = async { safely { ban.search(query, near, limit) } }
+            val b = async { safely { photon.search(query, near, limit) } }
             a.await() to b.await()
         }
         val merged = mutableListOf<Place>()
@@ -36,7 +36,7 @@ class CompositeGeocoder @Inject constructor(
         }
         addAll(banR); addAll(photonR)
         return when {
-            merged.isNotEmpty() -> Outcome.Success(merged.take(limit))
+            merged.isNotEmpty() -> Outcome.Success(merged)
             banR is Outcome.Failure && photonR is Outcome.Failure -> Outcome.Failure(AppError.ProviderUnavailable("géocodage"))
             else -> Outcome.Success(emptyList())
         }
@@ -52,3 +52,10 @@ class CompositeGeocoder @Inject constructor(
     private fun Place.isSameAs(o: Place): Boolean = point.distanceTo(o.point) < 30.0 && name.normalized() == o.name.normalized()
     private fun String.normalized() = Normalizer.normalize(lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "").replace(Regex("[^a-z0-9]+"), " ").trim()
 }
+
+/** Isole un fournisseur : toute exception (hors annulation) devient un échec, pour ne pas annuler le fournisseur frère. */
+private suspend fun safely(block: suspend () -> Outcome<List<Place>>): Outcome<List<Place>> =
+    runCatching { block() }.getOrElse { e ->
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        Outcome.Failure(AppError.Unknown(e.message))
+    }

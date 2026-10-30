@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,21 +27,25 @@ class BanGeocodingProvider @Inject constructor(
 
     override suspend fun search(query: String, near: GeoPoint?, limit: Int): Outcome<List<Place>> {
         val base = config.config.first().banBaseUrl
-        val url = "$base/search/".toHttpUrl().newBuilder()
+        val url = "$base/search/".toHttpUrlOrNull()?.newBuilder()
+            ?: return Outcome.Failure(AppError.ProviderUnavailable(id))
+        val request = url
             .addFormQueryParameter("q", query)
             .addQueryParameter("limit", limit.toString())
-            .apply { if (near != null) { addQueryParameter("lat", near.lat.toString()); addQueryParameter("lon", near.lon.toString()) } }
+            .apply { if (near != null) { addQueryParameter("lat", near.lat.toQueryString()); addQueryParameter("lon", near.lon.toQueryString()) } }
             .build()
-        return api.get(url).flatMap { parse(it) }
+        return api.get(request).flatMap { parse(it) }
     }
 
     override suspend fun reverse(point: GeoPoint): Outcome<Place?> {
         val base = config.config.first().banBaseUrl
-        val url = "$base/reverse/".toHttpUrl().newBuilder()
-            .addQueryParameter("lon", point.lon.toString())
-            .addQueryParameter("lat", point.lat.toString())
+        val url = "$base/reverse/".toHttpUrlOrNull()?.newBuilder()
+            ?: return Outcome.Failure(AppError.ProviderUnavailable(id))
+        val request = url
+            .addQueryParameter("lon", point.lon.toQueryString())
+            .addQueryParameter("lat", point.lat.toQueryString())
             .build()
-        return api.get(url).flatMap { parse(it) }.let { r -> when (r) { is Outcome.Success -> Outcome.Success(r.value.firstOrNull()); is Outcome.Failure -> r } }
+        return api.get(request).flatMap { parse(it) }.let { r -> when (r) { is Outcome.Success -> Outcome.Success(r.value.firstOrNull()); is Outcome.Failure -> r } }
     }
 
     /** Convertit le GeoJSON BAN en lieux ; les entités sans coordonnées exploitables sont ignorées. */
