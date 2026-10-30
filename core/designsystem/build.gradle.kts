@@ -6,7 +6,10 @@ plugins {
 android {
     namespace = "fr.roadly.core.designsystem"
     compileSdk = 36
-    defaultConfig { minSdk = 29 }
+    defaultConfig {
+        minSdk = 29
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildFeatures { compose = true }
 }
