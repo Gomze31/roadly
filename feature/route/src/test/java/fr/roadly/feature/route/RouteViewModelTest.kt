@@ -3,30 +3,43 @@ package fr.roadly.feature.route
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import fr.roadly.core.common.AppError
+import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
+import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
+import fr.roadly.core.model.Maneuver
+import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
+import fr.roadly.core.navigation.NavigationSession
+import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.navigation.NoopSpeedLimitProvider
+import fr.roadly.core.navigation.testing.FakeNavigationServiceController
+import fr.roadly.core.navigation.testing.FakeSpeechService
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RoutingProvider
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -49,15 +62,31 @@ class RouteViewModelTest {
     private var routing: RoutingProvider = object : RoutingProvider {
         override val id = "fake"
         override suspend fun route(request: RouteRequest) = Outcome.Success(listOf(
-            Route(request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, request.destination), emptyList(), false, "fake"),
+            Route(
+                request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, request.destination),
+                listOf(
+                    Maneuver(ManeuverType.DEPART, "Conduisez.", null, 10_000.0, 600.0, 0, null),
+                    Maneuver(ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 1, null),
+                ),
+                false, "fake",
+            ),
         ))
     }
+    private val prefs = FakeUserPreferencesRepository()
+    private lateinit var session: NavigationSession
     private val handle = SavedStateHandle(mapOf("destLat" to 48.9, "destLon" to 2.4, "destName" to "Test"))
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config)
+    private fun TestScope.vm(): RouteViewModel {
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, dispatchers, backgroundScope)
+        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, session)
+    }
 
     @Test fun `without known position state is NoOrigin`() = runTest {
         vm().uiState.test {
@@ -109,6 +138,55 @@ class RouteViewModelTest {
             val s = expectMostRecentItem().phase as RouteUiState.Content
             assertEquals(3, s.options.size)
             assertEquals(GeoPoint(48.8, 2.3), s.origin)
+        }
+    }
+
+    @Test fun `start guidance hands the active option to the session`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val vm = vm()
+        vm.uiState.test {
+            advanceUntilIdle()
+            val content = expectMostRecentItem().phase as RouteUiState.Content
+            val shortest = content.options.first { it.route.costing == RouteCosting.SHORTEST }
+            vm.selectRoute(shortest.route.id)
+            assertTrue(vm.startGuidance())
+            // Pas d'advanceUntilIdle ensuite : la session tourne (boucle de surveillance).
+            assertEquals(shortest.route.id, (session.state.value as NavigationState.Guiding).route.id)
+            assertTrue(location.guidanceActive)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `start guidance without routes does nothing`() = runTest {
+        val vm = vm()
+        vm.uiState.test {
+            advanceUntilIdle()
+            assertFalse(vm.startGuidance())
+            assertEquals(NavigationState.Idle, session.state.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `route preferences reach the three variants and a change recomputes`() = runTest {
+        val seen = mutableListOf<RouteRequest>()
+        val base = routing
+        routing = object : RoutingProvider {
+            override val id = "fake"
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> { seen += request; return base.route(request) }
+        }
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        prefs.setRoutePreferences(RoutePreferences(avoidHighways = true))
+        val vm = vm()
+        vm.uiState.test {
+            advanceUntilIdle()
+            expectMostRecentItem()
+            assertEquals(3, seen.size)
+            assertTrue(seen.all { it.preferences == RoutePreferences(avoidHighways = true) })
+            prefs.setRoutePreferences(RoutePreferences(avoidHighways = true, avoidTolls = true))
+            advanceUntilIdle()
+            expectMostRecentItem()
+            assertEquals(6, seen.size)
+            assertTrue(seen.drop(3).all { it.preferences.avoidTolls })
         }
     }
 }

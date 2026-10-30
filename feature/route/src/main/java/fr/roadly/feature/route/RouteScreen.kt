@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,7 +61,13 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RouteScreen(isDark: Boolean, onBack: () -> Unit, onOpenSettings: () -> Unit, vm: RouteViewModel = hiltViewModel()) {
+fun RouteScreen(
+    isDark: Boolean,
+    onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onStartNavigation: (begin: () -> Boolean) -> Unit,
+    vm: RouteViewModel = hiltViewModel(),
+) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
@@ -130,8 +137,13 @@ fun RouteScreen(isDark: Boolean, onBack: () -> Unit, onOpenSettings: () -> Unit,
                             Spacer(Modifier.height(RoadlySpacing.s))
                         }
                     }
-                    // Guidage hors périmètre de la phase 1 : bouton présent mais désactivé.
-                    GlassButton(stringResource(R.string.route_start_phase2), onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+                    // L'hôte (app) demande d'abord POST_NOTIFICATIONS (API 33+), puis appelle begin() et ouvre l'écran de guidage.
+                    GlassButton(
+                        stringResource(R.string.route_start),
+                        onClick = { onStartNavigation(vm::startGuidance) },
+                        icon = Icons.Default.Navigation,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }

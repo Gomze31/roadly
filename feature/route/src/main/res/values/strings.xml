@@ -2,7 +2,6 @@
     <string name="route_title">Itinéraires vers %1$s</string>
     <string name="route_back">Retour</string>
     <string name="route_start">Démarrer</string>
-    <string name="route_start_phase2">Guidage : Phase 2</string>
     <string name="route_no_origin_title">Position inconnue</string>
     <string name="route_no_origin_body">Appuyez longuement sur la carte pour choisir un point de départ.</string>
     <string name="route_toll_yes">Avec péage (montant : Phase 3)</string>
