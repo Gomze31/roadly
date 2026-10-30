@@ -1,6 +1,6 @@
 # Roadly
 
-Roadly est une application GPS Android native, écrite en Kotlin avec Jetpack Compose. Elle affiche une carte, suit la position de l'utilisateur, recherche des adresses et des lieux, et compare trois itinéraires en voiture (rapide, court, sans péage). La version actuelle est la **v0.1.0** : elle livre la Phase 1 de la feuille de route et la partie « comparaison d'itinéraires » qui ouvre la Phase 2. Le guidage pas à pas n'existe pas encore.
+Roadly est une application GPS Android native, écrite en Kotlin avec Jetpack Compose. Elle affiche une carte, suit la position de l'utilisateur, recherche des adresses et des lieux, et compare trois itinéraires en voiture (rapide, court, sans péage). La version actuelle est la **v0.1.0** : elle livre la Phase 1 de la feuille de route et le guidage pas à pas de la Phase 2 (code livré et testé en JVM ; la vérification sur appareil reste à faire, voir « Vérification sur appareil »). Pas de trafic.
 
 Le nom « Roadly » est provisoire. Tous les fournisseurs de données de la v1 sont gratuits et sans clé d'API.
 
@@ -30,9 +30,13 @@ Depuis la racine du dépôt (PowerShell sous Windows) :
 .\gradlew.bat connectedDebugAndroidTest
 ```
 
-État de la vérification à la livraison : 74 tests unitaires passent (model 2, common 12, data 6, geocoding 17, routing 15, location 1, map 1, search 6, home 3, route 5, settings 2, app 4). Les tests instrumentés existent mais **n'ont pas été exécutés** : aucun appareil n'était connecté pendant la construction. La vérification manuelle sur appareil reste à faire.
+État de la vérification : **218 tests unitaires passent** (`testDebugUnitTest :core:model:test :core:common:test`, 0 échec). Les tests instrumentés (Room, Compose) existent mais **n'ont pas été exécutés** pour la Phase 2.
 
-L'APK de debug pèse environ 115 Mo, car MapLibre embarque ses bibliothèques natives pour toutes les architectures. Un App Bundle ou des découpages par ABI réduiraient fortement cette taille ; ce n'est pas fait en v1.
+L'APK de debug pèse environ 116 Mo (121 596 756 octets), car MapLibre embarque ses bibliothèques natives pour toutes les architectures. Un App Bundle ou des découpages par ABI réduiraient fortement cette taille ; ce n'est pas fait.
+
+### Vérification sur appareil (en attente)
+
+Pendant l'intégration finale de la Phase 2 (Task 12), le HONOR Magic 8 Pro n'était plus visible par ADB (`adb devices` vide). Ne sont donc **pas vérifiés** : l'installation de l'APK de la Phase 2, `connectedDebugAndroidTest`, et le contrôle manuel du guidage (service de premier plan, notification, écran maintenu allumé, voix française et focus audio, bouton Arrêter). À refaire téléphone branché : `adb install -r app\build\outputs\apk\debug\app-debug.apk`, puis `.\gradlew.bat connectedDebugAndroidTest`, puis un guidage réel.
 
 ## Structure des modules
 
@@ -46,17 +50,21 @@ core:designsystem      Tokens (couleurs, typographie Inter, espacements, formes)
                        composants Glass*, icônes de manœuvre vectorielles, CompositionLocal DrivingMode
 core:data              Room (favoris, récents, profil véhicule, itinéraires sauvegardés), DataStore (préférences),
                        client HTTP OkHttp + kotlinx.serialization, ProviderConfig
-core:location          LocationRepository (Flow<LocationFix>), LocationPermissionState, impl Fused
+core:location          LocationRepository (Flow<LocationFix>), LocationPermissionState, LocationMode (dont GUIDANCE, 1 Hz), impl Fused
 core:map               Composable RoadlyMap (MapLibre), MapCameraController, couches position / marqueurs / tracés,
                        modes de caméra (libre, centré, suivi avec rotation)
 core:geocoding         GeocodingProvider, BanGeocodingProvider, PhotonGeocodingProvider, CoordinateParser,
                        CompositeGeocoder (BAN puis Photon, fusion et déduplication)
 core:routing           RoutingProvider, ValhallaRoutingProvider (requête, décodage polyline précision 6, mapping manœuvres),
                        RouteAlternativesUseCase (FASTEST, SHORTEST, NO_TOLL), FuelCostCalculator
+core:navigation        RouteTracker, AnnouncementPolicy, NavigationSession, SpeechService (TTS fr-FR), SpeedLimitProvider,
+                       NavigationService (service de premier plan)
 feature:home           Écran d'accueil : carte, barre de recherche flottante, badge vitesse, recentrage, panneau inférieur
 feature:search         Recherche plein écran, suggestions, récents, favoris, fiche lieu (bottom sheet)
 feature:route          Comparaison d'itinéraires, tracés multiples, fiche itinéraire, estimation de coût
-feature:settings       Profil véhicule, thème, données locales, confidentialité, à propos et licences
+feature:settings       Profil véhicule, thème, voix et sons, alertes de vitesse, préférences d'itinéraire, données locales,
+                       confidentialité, à propos et licences
+feature:navigation     Écran de guidage en mode conduite : bandeau de manœuvre, voies, « à venir », ETA, vitesse, arrivée
 ```
 
 Règles de dépendance : un module `feature:*` ne dépend que de modules `core:*`, jamais d'un autre `feature:*`. `core:model` et `core:common` sont des modules JVM purs, sans dépendance Android. `app` est le seul module qui connaît tous les features. Chaque fournisseur de données est derrière une interface Kotlin d'un module `core:*`, liée par Hilt, donc remplaçable sans toucher aux features.
@@ -72,7 +80,7 @@ Règles de dépendance : un module `feature:*` ne dépend que de modules `core:*
 | Coordonnées saisies | Parseur local (décimal `48.85, 2.35`, DMS `48°51'N 2°21'E`) | — | — |
 | Routage | Valhalla FOSSGIS : `https://valhalla1.openstreetmap.de/route` | Fair-use, développement uniquement ; en production, Valhalla Docker sur VPS | GraphHopper, OSRM |
 | Position | `play-services-location` (FusedLocationProviderClient) | — | — |
-| Limitation de vitesse | Non disponible en v1 (affichage « — ») | Phase 2 via `trace_attributes` sur un Valhalla auto-hébergé | — |
+| Limitation de vitesse | Valhalla `trace_attributes`, **uniquement** sur une instance auto-hébergée (jamais sur FOSSGIS : « — ») | Au plus une requête toutes les 5 s pendant le guidage | — |
 
 **Avertissement.** Le serveur Valhalla de FOSSGIS et le serveur Photon de Komoot sont des services publics offerts à titre de fair-use. Ils n'offrent aucune garantie de disponibilité ni de débit et ne conviennent pas à une application distribuée à grande échelle. Pour une mise en production, il faut auto-héberger Valhalla (voir `docs/API-PROVIDERS.md`) et idéalement Photon. Roadly limite sa charge : en-tête `User-Agent: Roadly/<version> (+https://roadly.example)`, cache HTTP OkHttp de 10 Mo, debounce de 300 ms sur la recherche, une requête en vol par type.
 
@@ -86,10 +94,10 @@ Détails par fournisseur : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 - Les URL des fournisseurs ont des valeurs par défaut dans `core/data/src/main/java/fr/roadly/core/data/config/ProviderConfig.kt`. Elles sont modifiables à l'exécution dans **Réglages › Fournisseurs** (stockées dans DataStore) : style de carte clair, style sombre, BAN, Photon, Valhalla. C'est ce qui permet de pointer l'application vers un Valhalla auto-hébergé sans recompiler. Utiliser une URL `https://` (reverse proxy avec TLS, par exemple Caddy) : une URL `http://` en clair est refusée par la politique réseau d'Android (cleartext).
 - Si une clé devenait nécessaire plus tard, elle serait lue depuis `local.properties` à la compilation, jamais écrite dans le code.
 
-## Ce qui fonctionne en v1
+## Ce qui fonctionne (Phase 1)
 
 - Carte vectorielle clair/sombre, thème automatique selon le lever et le coucher du soleil calculés localement.
-- Position de l'utilisateur et cap, badge de vitesse (la limitation de vitesse affiche « — » faute de source), bouton de recentrage à trois états (libre, centré, suivi).
+- Position de l'utilisateur et cap, badge de vitesse (la limitation de vitesse affiche « — » sans Valhalla auto-hébergé), bouton de recentrage à trois états (libre, centré, suivi).
 - Adresse courante obtenue par géocodage inverse.
 - Recherche : adresses (BAN), lieux et POI (Photon), coordonnées GPS en décimal ou DMS ; récents (50 maximum) ; favoris ; domicile et travail ; fiche lieu avec distance.
 - Appui long sur la carte pour choisir une destination.
@@ -98,15 +106,51 @@ Détails par fournisseur : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 - Coût carburant, uniquement si un profil véhicule est saisi (type, carburant, consommation, prix du carburant saisi par l'utilisateur). Aucun prix par défaut n'existe.
 - Mode hors ligne détecté : bandeau d'information, recherche limitée aux favoris et récents.
 - Permission de localisation expliquée à l'utilisateur, avec repli vers les réglages système si elle est refusée définitivement.
-- Réglages : véhicule, thème, données locales, fournisseurs, à propos et licences.
+- Réglages : véhicule, thème, voix et sons, alertes de vitesse, préférences d'itinéraire, données locales, fournisseurs, à propos et licences.
+
+## Guidage (Phase 2)
+
+- « Démarrer » sur la comparaison d'itinéraires lance le guidage : suivi GPS à 1 Hz, bandeau de manœuvre (icône, distance, instruction, rue, sortie de rond-point), voies si Valhalla les fournit, bandeau « à venir » (3 manœuvres), heure d'arrivée et restant, vitesse et limitation.
+- Voix française (synthèse vocale Android, sans serveur) : annonces anticipées selon la vitesse (trois paliers par classe de vitesse), anti-répétition, bouton Silence.
+- Recalcul automatique hors itinéraire (au plus un toutes les 10 s), extrapolation en tunnel (plafonnée à 150 m / 10 s), badge « GPS perdu ».
+- Service de premier plan avec notification persistante (instruction, distance, arrivée, « Arrêter ») ; arrêt automatique à l'arrivée.
+- Réglages : Voix et sons, Alertes de vitesse (tolérance 0/5/10 km/h), Préférences d'itinéraire (éviter péages, autoroutes, ferries).
+
+Limites : pas de trafic ; limitation de vitesse (et donc alerte de dépassement) seulement avec un Valhalla auto-hébergé ; les voies ne s'affichent que si la réponse Valhalla en contient (aucune dans les réponses FOSSGIS observées) ; changer de destination est possible, ajouter un arrêt pas encore (Phase 4) ; voix muette si aucune voix française n'est installée sur l'appareil.
+
+## Permissions Android
+
+| Permission | Pourquoi | Quand |
+|---|---|---|
+| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | Position sur la carte et guidage | Au premier affichage de la carte |
+| `POST_NOTIFICATIONS` (Android 13+) | Notification persistante du guidage | Au premier « Démarrer » ; un refus masque seulement la notification |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` | Continuer le guidage écran éteint ou application en arrière-plan | Accordées à l'installation ; service actif uniquement pendant un guidage |
+
+Roadly ne demande pas `ACCESS_BACKGROUND_LOCATION` : aucune localisation en arrière-plan hors guidage actif.
+
+## Limitation de vitesse : Valhalla auto-hébergé
+
+L'instance publique FOSSGIS n'est jamais interrogée pour la limitation (fair-use). Pour l'activer :
+
+```powershell
+mkdir valhalla_tiles
+docker run -dt --name valhalla -p 8002:8002 -v "${PWD}\valhalla_tiles:/custom_files" -e tile_urls=https://download.geofabrik.de/europe/france/ile-de-france-latest.osm.pbf ghcr.io/valhalla/valhalla-scripted:latest
+```
+
+La construction des tuiles prend du temps (commencer par une région ; `europe/france-latest.osm.pbf` pour tout le pays). Exposer ensuite le port 8002 en **HTTPS** (reverse proxy, par exemple `caddy reverse-proxy --from valhalla.exemple.fr --to localhost:8002`) et saisir `https://valhalla.exemple.fr` dans **Réglages › Fournisseurs › Itinéraires (Valhalla)**. Vérification de `/trace_attributes` :
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://valhalla.exemple.fr/trace_attributes" -ContentType "application/json" -Body '{"shape":[{"lat":48.8566,"lon":2.3522},{"lat":48.8570,"lon":2.3530}],"costing":"auto","shape_match":"map_snap","filters":{"attributes":["edge.speed_limit"],"action":"include"}}'
+```
+
+La réponse contient `edges[].speed_limit` (km/h) quand OpenStreetMap renseigne `maxspeed` ; sinon la limitation reste « — ». La commande Docker est indicative (image et variables à vérifier dans la documentation de l'image) et n'a pas été exécutée dans le cadre de cette phase.
 
 ## Marqué « Bientôt » ou désactivé
 
 - Pastilles Stations, Bornes, Parkings, Incidents de l'écran d'accueil.
-- Bouton « Démarrer » d'un itinéraire (libellé « Guidage : Phase 2 »).
 - Péages : le montant affiche « Phase 3 ».
-- Trafic : aucun en v1.
-- Limitation de vitesse : inconnue en v1.
+- Trafic : aucun, ni dans le calcul d'itinéraire ni pendant le guidage.
+- Limitation de vitesse : « — » tant qu'aucun Valhalla auto-hébergé n'est configuré (voir « Limitation de vitesse : Valhalla auto-hébergé »).
 
 ## Confidentialité
 
@@ -139,4 +183,4 @@ L'écran Réglages › À propos reproduit ces mentions. Le projet lui-même n'a
 ## Documentation complémentaire
 
 - [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md) : chaque API, ses endpoints, ses limites, le passage en production.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) : Phases 2 à 5.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) : Phase 2 livrée, Phases 3 à 5.

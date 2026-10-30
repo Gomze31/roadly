@@ -64,8 +64,21 @@ Pas de service : le parseur local (`CoordinateParser`, module `core:geocoding`) 
 - **Erreurs** : une réponse 400 avec un code Valhalla 170, 171 ou 442 (pas d'arête proche, pas de chemin) est traitée comme « aucun résultat » et non comme une panne.
 - **Licence** : moteur sous licence MIT ; données OpenStreetMap sous ODbL.
 - **Limites** : l'instance FOSSGIS est un service public en fair-use, destiné au développement. Elle ne garantit ni disponibilité ni débit. La v1 envoie trois requêtes en parallèle (une par itinéraire : rapide, court, sans péage) à chaque comparaison.
-- **Prérequis de production** : Valhalla auto-hébergé (section suivante). Cette étape est aussi nécessaire pour la limitation de vitesse (`trace_attributes`) prévue en Phase 2.
+- **Prérequis de production** : Valhalla auto-hébergé (section suivante). Cette étape est aussi nécessaire pour la limitation de vitesse (`trace_attributes`, voir plus bas).
 - **Alternative** : GraphHopper, OSRM.
+
+### Valhalla `/trace_attributes` : limitation de vitesse (guidage)
+
+- **Endpoint** : `POST <base Valhalla>/trace_attributes`, corps JSON ; implémenté par `ValhallaTraceSpeedLimitProvider` (`core:navigation`).
+- **Corps de requête** :
+  - `shape` : les 10 derniers fixes GPS (`{ "lat": ..., "lon": ... }`) ;
+  - `costing` : `auto` ; `shape_match` : `map_snap` ; `units` : `kilometers` ;
+  - `filters` : `{ "attributes": ["edge.speed_limit", "edge.names", "edge.road_class"], "action": "include" }`.
+- **Réponse** : la limitation est lue dans `edges[].speed_limit` (km/h), pour l'arête désignée par le dernier `matched_points[].edge_index` (à défaut, la dernière arête). Une valeur absente ou hors de 1..254 donne « inconnue » : l'interface affiche « — », jamais une valeur devinée.
+- **Règle de blocage** : l'appel n'est jamais émis si l'hôte configuré est `openstreetmap.de` ou un sous-domaine (instance publique FOSSGIS, fair-use). La limitation n'existe donc qu'avec un Valhalla auto-hébergé, configuré dans Réglages › Fournisseurs.
+- **Débit** : au plus une requête toutes les 5 s pendant le guidage ; entre deux appels, la dernière valeur est conservée. En cas d'échec, la valeur est effacée (« — »).
+- **Limite** : `speed_limit` n'est renseigné que si OpenStreetMap porte `maxspeed` sur la route. Le format exact de la réponse n'a pas été vérifié sur une instance réelle (les tests utilisent des réponses JSON écrites à la main).
+- **Alerte de dépassement** : se déclenche seulement quand une limitation est connue (tolérance 0/5/10 km/h réglable).
 
 ### Valhalla auto-hébergé : `docker-compose.yml` indicatif
 

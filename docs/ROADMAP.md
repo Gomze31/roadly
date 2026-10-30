@@ -2,11 +2,13 @@
 
 Ce document reprend la section 11 de la spec (`docs/superpowers/specs/2026-10-30-roadly-v1-design.md`) et détaille les Phases 2 à 5 : fonctionnalités, modules impactés, prérequis externes et risques. Il s'agit d'un plan d'intention, sans dates ni estimations : rien ici n'est engagé tant que la phase n'a pas fait l'objet de sa propre spec.
 
-Point de départ : la v0.1.0 livre la Phase 1 (carte, position, recherche, favoris, comparaison de trois itinéraires, coût carburant sur saisie utilisateur). Le guidage, le trafic et les données de stations ne sont pas là. Voir le `README.md` pour l'état exact.
+Point de départ : la v0.1.0 livre la Phase 1 (carte, position, recherche, favoris, comparaison de trois itinéraires, coût carburant sur saisie utilisateur) et la Phase 2 (guidage vocal pas à pas, voir son statut ci-dessous). Le trafic et les données de stations ne sont pas là. Voir le `README.md` pour l'état exact.
 
 Principe constant : aucune donnée de trafic, de prix, de péage ou de limitation de vitesse n'est jamais inventée ni simulée. Sans source fiable, la fonction reste « Bientôt ».
 
 ## Phase 2 : guidage
+
+Statut : livrée le 2026-10-30 (plan `docs/superpowers/plans/2026-10-30-roadly-phase2-guidage.md`), **vérification sur appareil en attente** : 218 tests unitaires passent, mais l'installation sur le HONOR Magic 8 Pro, les tests instrumentés et le contrôle manuel du guidage n'ont pas pu être faits (téléphone non visible par ADB pendant la Task 12). Restent bloquées la limitation de vitesse et l'alerte de dépassement tant qu'aucun Valhalla auto-hébergé n'est configuré ; l'affichage des voies dépend de la réponse Valhalla (aucune voie dans les réponses FOSSGIS observées). Prochaine étape : Phase 3, après la vérification sur appareil de la Phase 2.
 
 ### Fonctionnalités
 
@@ -14,18 +16,18 @@ Principe constant : aucune donnée de trafic, de prix, de péage ou de limitatio
 - Suivi d'itinéraire : projection de la position sur le tracé, manœuvre suivante, distance restante, heure d'arrivée mise à jour.
 - Détection de sortie d'itinéraire et recalcul.
 - Service de premier plan avec notification persistante pour continuer le guidage écran éteint ou application en arrière-plan.
-- Mode conduite complet (interface dédiée, bouton « Démarrer » activé ; il est désactivé en v1 avec le libellé « Guidage : Phase 2 »).
-- Limitations de vitesse obtenues par `trace_attributes` sur un Valhalla auto-hébergé, et alerte de dépassement. Le badge de vitesse affiche « — » en v1 faute de source.
+- Mode conduite complet (interface dédiée, bouton « Démarrer » activé).
+- Limitations de vitesse obtenues par `trace_attributes` sur un Valhalla auto-hébergé, et alerte de dépassement. Le badge de vitesse affiche « — » sans Valhalla auto-hébergé.
 
 ### Modules impactés
 
-- `feature:route` : écran de guidage, activation du bouton « Démarrer ».
-- `core:routing` : suivi de progression sur le tracé, détection de sortie, recalcul, appel `trace_attributes`.
-- `core:location` : service de premier plan, fréquence de mise à jour de la position en navigation.
-- `core:designsystem` : mode conduite (le `CompositionLocal DrivingMode` existe déjà), icônes de manœuvre.
-- `core:map` : caméra de suivi pendant le guidage, mise en évidence du tronçon courant.
-- `feature:home` : badge de vitesse alimenté par la limitation réelle.
-- `app` : déclaration du service, permission de notification, gestion de l'économie d'énergie.
+- `core:navigation` (nouveau) : suivi sur le tracé, annonces, recalcul, perte GPS, synthèse vocale, limitation (`trace_attributes`), service de premier plan.
+- `feature:navigation` (nouveau) : écran de guidage en mode conduite.
+- `core:model`, `core:routing` : voies, consignes vocales, numéros de sortie, préférences d'itinéraire.
+- `core:data` : réglages voix, volume, alertes, préférences (DataStore).
+- `core:location` : mode GUIDANCE 1 Hz prioritaire.
+- `core:map`, `core:designsystem` : tracé parcouru, tolérance du badge de vitesse.
+- `feature:route`, `feature:settings`, `app` : « Démarrer », réglages, permissions, service, retour depuis la notification.
 
 ### Prérequis externes
 

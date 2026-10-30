@@ -2,41 +2,43 @@
 
 Référentiel : `docs/SILLAXE-ANALYSE.md` (fonctions vérifiées sur les pages publiques de Sillaxe) et `docs/BENCHMARK-SILLAXE.md` (sources de données et contraintes). Statuts : **non commencée** · **en cours** · **fonctionnelle** · **bloquée** (dépend d'une source externe non configurée). « Palier Sillaxe » = gratuit (G) ou Sillaxe+ (+) chez Sillaxe ; Roadly ne reproduit pas le modèle économique, l'information sert à prioriser.
 
-Mise à jour : 2026-10-30 (fin de la v1, branche `feat/roadly-v1`).
+Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
+
+État de la Phase 2 : le code est livré et couvert par 218 tests unitaires (JVM) qui passent. **La vérification sur appareil n'a pas eu lieu** (téléphone déconnecté pendant la Task 12) : les statuts « fonctionnelle » de la Phase 2 signifient « code livré et testé en JVM », pas « vérifié en conduite ».
 
 ## 1. Navigation et guidage
 
 | Fonction | Palier | Statut Roadly | Phase | Notes |
 |---|---|---|---|---|
-| Position GPS en direct, cap, vitesse | G | fonctionnelle | 1 | FusedLocation ; 1 Hz carte, 2 Hz suivi |
+| Position GPS en direct, cap, vitesse | G | fonctionnelle | 1 | FusedLocation ; 1 Hz carte et guidage, 2 Hz suivi |
 | Orientation de la carte (suivi cap) | G | fonctionnelle | 1 | Mode FOLLOW |
 | Calcul d'itinéraires (3 variantes) | G | fonctionnelle | 1 | Valhalla ; rapide / court / sans péage |
-| Guidage vocal français | G | non commencée | 2 | TTS Android `fr-FR`, anti-répétition |
-| Bandeau de manœuvre (prochaine instruction, distance) | G | non commencée | 2 | Manœuvres Valhalla déjà décodées |
-| Affichage des voies | G | non commencée | 2 | `lanes` Valhalla si `turn:lanes` OSM |
-| Ronds-points avec sortie | G | non commencée | 2 | `roundabout_exit_count` déjà mappé |
-| Suivi d'itinéraire, détection de sortie, recalcul | G | non commencée | 2 | Projection sur polyligne |
-| Temps/distance restants, heure d'arrivée en guidage | G | non commencée | 2 | ETA statique déjà en comparaison |
-| Limitation de vitesse de la route | G | bloquée | 2 | Nécessite Valhalla auto-hébergé (`trace_attributes`) ; « — » affiché |
-| Alerte sonore de dépassement (option) | G | non commencée | 2 | Dépend de la limitation |
+| Guidage vocal français | G | fonctionnelle | 2 | TTS Android `Locale.FRANCE`, textes Valhalla, 3 paliers selon la vitesse (2000/300/40 m, 600/150/40 m, 300/80/40 m), anti-répétition (manœuvre, palier) |
+| Bandeau de manœuvre (prochaine instruction, distance) | G | fonctionnelle | 2 | Icône, distance, instruction, rue, pastille de sortie |
+| Affichage des voies | G | en cours | 2 | Décodage et affichage faits ; aucune voie dans les réponses FOSSGIS observées (fixture Paris) : données absentes sur l'instance publique, à confirmer sur un Valhalla récent |
+| Ronds-points avec sortie | G | fonctionnelle | 2 | Pastille « 2e sortie » ; numéro de sortie (`sign`) si présent |
+| Suivi d'itinéraire, détection de sortie, recalcul | G | fonctionnelle | 2 | RouteTracker (garde de cap) ; hors itinéraire 40 m × 5 fixes ou 100 m ; recalcul ≤ 1/10 s, délai 10 s |
+| Temps/distance restants, heure d'arrivée en guidage | G | fonctionnelle | 2 | Durées Valhalla restantes, manœuvre courante au prorata |
+| Limitation de vitesse de la route | G | bloquée | 2 | Implémentée (`trace_attributes`, ≤ 1/5 s) ; active seulement avec un Valhalla auto-hébergé ; « — » sur FOSSGIS |
+| Alerte sonore de dépassement (option) | G | bloquée | 2 | Implémentée (bip + badge rouge, tolérance 0/5/10 km/h) ; dépend de la limitation |
 | Limitation abaissée par pluie (option) | G | non commencée | 3 | Dépend météo |
-| Changer de destination / ajouter un arrêt en guidage | G | non commencée | 2 | |
+| Changer de destination / ajouter un arrêt en guidage | G | en cours | 2 | Changer de destination : fait ; ajout d'arrêt : Phase 4 |
 | Jusqu'à 10 arrêts réordonnables | G | non commencée | 4 | Valhalla multi-locations déjà supporté côté provider |
 | Départ planifié (heure de départ) | G | fonctionnelle | 1 | Décale seulement l'heure d'arrivée |
 | « Arriver à l'heure » + rappel avant départ | G | non commencée | 4 | WorkManager |
 | Mode paysage | G | en cours | 1 | Compose s'adapte ; non vérifié visuellement |
 | Thème clair / sombre / automatique | G | fonctionnelle | 1 | Auto solaire (position) + système |
-| Mode Silence | G | non commencée | 2 | Avec le TTS |
+| Mode Silence | G | fonctionnelle | 2 | Bouton voix de l'écran de guidage |
 | Import GPX | ? | non commencée | 5 | |
 | Guidage allégé hors connexion | G | non commencée | 5 | Cache tuiles MapLibre + itinéraire mémorisé |
 | ZFE / Crit'Air | ? | non commencée | 3 | Source à identifier |
-| Tunnels (perte GPS) | G | non commencée | 2 | Extrapolation sur la polyligne |
+| Tunnels (perte GPS) | G | fonctionnelle | 2 | Extrapolation sur la polyligne après 3 s sans fix, plafonnée à 150 m / 10 s ; badge « GPS perdu » après 10 s |
 
 ## 2. Horizon (route à venir)
 
 | Fonction | Palier | Statut | Phase | Notes |
 |---|---|---|---|---|
-| Bandeau « à venir » : manœuvres, virages | G | non commencée | 2 | Design original Roadly (verre, bas d'écran) |
+| Bandeau « à venir » : manœuvres, virages | G | fonctionnelle | 2 | 3 prochaines manœuvres (icône, distance, rue) |
 | Ralentissements, bouchons, incidents dans le bandeau | G | bloquée | 3 | Dépend trafic |
 | Services (stations, aires) dans le bandeau | G | bloquée | 3 | Dépend POI |
 | Zones de vigilance dans le bandeau | G | bloquée | 3 | Dépend base de zones + cadre légal |
@@ -153,9 +155,10 @@ Mise à jour : 2026-10-30 (fin de la v1, branche `feat/roadly-v1`).
 | Données locales (effacer historique / favoris) | fonctionnelle | |
 | Confidentialité (texte) | fonctionnelle | |
 | À propos / licences | fonctionnelle | |
-| Voix et sons, volume, mode Silence | non commencée | Phase 2 |
-| Alertes de vitesse / de vigilance | non commencée | Phase 2 / 3 |
-| Préférences d'itinéraire (péages, autoroutes, ferries) | non commencée | Phase 2 (options Valhalla) |
+| Voix et sons, volume, mode Silence | fonctionnelle | Voix, volume 0–100, son de dépassement, « Tester la voix » ; Silence sur l'écran de guidage |
+| Alertes de vitesse (tolérance 0/5/10 km/h) | fonctionnelle | Réglage fait ; l'alerte ne se déclenche que si une limitation est connue (voir « Limitation de vitesse », bloquée) |
+| Alertes de vigilance | non commencée | Phase 3 |
+| Préférences d'itinéraire (péages, autoroutes, ferries) | fonctionnelle | `use_tolls/use_highways/use_ferry = 0`, 3 variantes et recalcul |
 | Domicile / travail dans les réglages | en cours | Définis via la fiche lieu ; pas d'écran dédié |
 | Compte, abonnement, assistance | non commencée | Phase 4 (Supabase) |
 
@@ -163,9 +166,9 @@ Mise à jour : 2026-10-30 (fin de la v1, branche `feat/roadly-v1`).
 
 | Fonction | Statut | Notes |
 |---|---|---|
-| APK debug installable | fonctionnelle | ~115 Mo (toutes ABI) ; App Bundle en Phase 5 |
-| Tests unitaires | fonctionnelle | 83 tests |
-| Tests instrumentés | en cours | Lancés sur HONOR Magic 8 Pro |
-| Service de premier plan / notification | non commencée | Phase 2 |
+| APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
+| Tests unitaires | fonctionnelle | 218 tests (JVM) |
+| Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
+| Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; non vérifié sur appareil |
 | Widgets, Android Auto | non commencée | Phase 5 |
 | Backend Supabase | non commencée | Phase 3 |
