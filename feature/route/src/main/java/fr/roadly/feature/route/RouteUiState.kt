@@ -2,12 +2,17 @@ package fr.roadly.feature.route
 
 import fr.roadly.core.common.AppError
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.routing.RouteOption
 
 sealed interface RouteUiState {
     data object Loading : RouteUiState
     data class NoOrigin(val destinationName: String) : RouteUiState
     data class Error(val error: AppError) : RouteUiState
+    /**
+     * [arriveAtEpochMs] non nul = mode « Arriver à » : [departAtEpochMs] est déduit de la durée du plus rapide,
+     * et les heures d'arrivée des options sont recalées sur ce départ.
+     */
     data class Content(
         val origin: GeoPoint,
         val destinationName: String,
@@ -15,6 +20,8 @@ sealed interface RouteUiState {
         val activeId: String,
         val hasVehicleProfile: Boolean,
         val departAtEpochMs: Long,
+        val arriveAtEpochMs: Long? = null,
+        val preferences: RoutePreferences = RoutePreferences(),
     ) : RouteUiState
 }
 

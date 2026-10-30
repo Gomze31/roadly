@@ -25,4 +25,13 @@
     <string name="nav_finish">Terminer</string>
     <string name="nav_failed_title">Guidage impossible</string>
     <string name="nav_retry">Réessayer</string>
+    <string name="nav_alternatives">Itinéraires</string>
+
+    <string name="alt_overline">En cours de trajet</string>
+    <string name="alt_title">Changer d\'itinéraire</string>
+    <string name="alt_loading">Calcul depuis votre position…</string>
+    <string name="alt_arrival">Arrivée %1$s</string>
+    <string name="alt_toll">péage</string>
+    <string name="alt_note">Calculé depuis votre position actuelle, sans trafic. Choisir un itinéraire relance le guidage dessus.</string>
+    <string name="alt_keep">Garder l\'itinéraire actuel</string>
 </resources>

@@ -16,6 +16,11 @@
     <string name="route_same_as_fastest">Identique au plus rapide</string>
     <string name="route_depart_now">Départ maintenant</string>
     <string name="route_depart_at">Départ à %1$s</string>
+    <string name="route_arrive_at">Arriver à %1$s · partir à %2$s</string>
+    <string name="route_arrive_note">Le départ est déduit de la durée du plus rapide, sans trafic prévisionnel.</string>
+    <string name="route_opt_no_tolls">Éviter les péages</string>
+    <string name="route_opt_no_highways">Éviter les autoroutes</string>
+    <string name="route_opt_no_ferries">Éviter les ferries</string>
     <string name="route_vehicle_cta">Renseigner le véhicule</string>
     <string name="route_cost_line">Carburant ≈ %1$s · %2$s/km</string>
     <string name="route_cost_chip">Carburant ≈ %1$s</string>

@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.MyLocation
@@ -64,6 +66,7 @@ import fr.roadly.core.designsystem.component.OverlineText
 import fr.roadly.core.designsystem.component.RouteHeadline
 import fr.roadly.core.designsystem.component.RouteOptionRow
 import fr.roadly.core.designsystem.component.RowDivider
+import fr.roadly.core.designsystem.component.SegmentedControl
 import fr.roadly.core.designsystem.component.userMessage
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlySpacing
@@ -71,6 +74,7 @@ import fr.roadly.core.map.RoadlyMap
 import fr.roadly.core.map.rememberMapController
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.routing.RouteOption
 import java.time.Instant
 import java.time.ZoneId
@@ -151,7 +155,7 @@ fun RouteScreen(
                 is RouteUiState.Error -> GlassPanel(Modifier.fillMaxWidth()) { ErrorState(s.error.userMessage(), onRetry = vm::retry) }
                 is RouteUiState.Content -> ChoicePanel(
                     s, onSelect = vm::selectRoute, onPickTime = { showTimePicker = true }, onOpenSettings = onOpenSettings,
-                    onStart = { onStartNavigation(vm::startGuidance) },
+                    onStart = { onStartNavigation(vm::startGuidance) }, onPreferences = vm::setPreferences,
                 )
             }
         }
@@ -160,20 +164,33 @@ fun RouteScreen(
     if (showTimePicker) {
         val now = Instant.now().atZone(ZoneId.systemDefault())
         val tp = rememberTimePickerState(initialHour = now.hour, initialMinute = now.minute, is24Hour = true)
-        // TimePickerDialog absent du Material 3 du BOM : AlertDialog + TimePicker.
+        val content = phase as? RouteUiState.Content
+        var arriveMode by remember { mutableStateOf(content?.arriveAtEpochMs != null) }
+        // TimePickerDialog absent du Material 3 du BOM : AlertDialog + TimePicker ; « Partir à » ou « Arriver à ».
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
             containerColor = c.surfaceElevated,
             confirmButton = { GlassButton(stringResource(R.string.route_time_confirm), onClick = {
                 var target = now.withHour(tp.hour).withMinute(tp.minute).withSecond(0)
                 if (target.isBefore(now)) target = target.plusDays(1)
-                vm.setDepartAt(target.toInstant().toEpochMilli()); showTimePicker = false
+                val ms = target.toInstant().toEpochMilli()
+                if (arriveMode) vm.setArriveAt(ms) else vm.setDepartAt(ms)
+                showTimePicker = false
             }) },
             dismissButton = { GlassButton(stringResource(R.string.route_time_now), onClick = { vm.setDepartAt(System.currentTimeMillis()); showTimePicker = false }, style = GlassButtonStyle.Secondary) },
-            text = { TimePicker(state = tp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
+                    SegmentedControl(listOf(false, true), arriveMode, { arriveMode = it }, { if (it) arriveLabel else departLabel })
+                    if (arriveMode) Text(stringResource(R.string.route_arrive_note), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
+                    TimePicker(state = tp)
+                }
+            },
         )
     }
 }
+
+private const val departLabel = "Partir à"
+private const val arriveLabel = "Arriver à"
 
 /** En-tête : retour, destination (tuile + nom), ligne « Partir de · Ma position ». */
 @Composable
@@ -211,6 +228,7 @@ private fun ChoicePanel(
     onPickTime: () -> Unit,
     onOpenSettings: () -> Unit,
     onStart: () -> Unit,
+    onPreferences: (RoutePreferences) -> Unit,
 ) {
     val c = LocalRoadlyColors.current
     val active = s.options.firstOrNull { it.route.id == s.activeId } ?: s.options.first()
@@ -225,6 +243,14 @@ private fun ChoicePanel(
                 distance = Formatters.distance(active.route.distanceMeters), distanceLabel = stringResource(R.string.route_distance_label),
                 chips = { InfoChips(s, active, onPickTime, onOpenSettings) },
             )
+            Spacer(Modifier.height(RoadlySpacing.s))
+            // Options d'itinéraire : éviter péages / autoroutes / ferries, appliquées aux trois variantes et au recalcul.
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                val p = s.preferences
+                GlassChip(stringResource(R.string.route_opt_no_tolls), onClick = { onPreferences(p.copy(avoidTolls = !p.avoidTolls)) }, icon = Icons.Default.Toll, compact = true, selected = p.avoidTolls)
+                GlassChip(stringResource(R.string.route_opt_no_highways), onClick = { onPreferences(p.copy(avoidHighways = !p.avoidHighways)) }, icon = Icons.Default.AltRoute, compact = true, selected = p.avoidHighways)
+                GlassChip(stringResource(R.string.route_opt_no_ferries), onClick = { onPreferences(p.copy(avoidFerries = !p.avoidFerries)) }, icon = Icons.Default.DirectionsBoat, compact = true, selected = p.avoidFerries)
+            }
             Spacer(Modifier.height(RoadlySpacing.sm))
             RowDivider(inset = 0.dp)
             Spacer(Modifier.height(RoadlySpacing.xs))
@@ -252,9 +278,15 @@ private fun ChoicePanel(
 @Composable
 private fun InfoChips(s: RouteUiState.Content, active: RouteOption, onPickTime: () -> Unit, onOpenSettings: () -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+        val zone = ZoneId.systemDefault()
+        val arrive = s.arriveAtEpochMs
         GlassChip(
-            text = if (s.departAtEpochMs - System.currentTimeMillis() < 60_000) stringResource(R.string.route_depart_now) else stringResource(R.string.route_depart_at, Formatters.clockTime(s.departAtEpochMs, ZoneId.systemDefault())),
-            onClick = onPickTime, icon = Icons.Default.Schedule, compact = true,
+            text = when {
+                arrive != null -> stringResource(R.string.route_arrive_at, Formatters.clockTime(arrive, zone), Formatters.clockTime(s.departAtEpochMs, zone))
+                s.departAtEpochMs - System.currentTimeMillis() < 60_000 -> stringResource(R.string.route_depart_now)
+                else -> stringResource(R.string.route_depart_at, Formatters.clockTime(s.departAtEpochMs, zone))
+            },
+            onClick = onPickTime, icon = Icons.Default.Schedule, compact = true, selected = arrive != null,
         )
         GlassChip(stringResource(if (active.route.hasToll) R.string.route_toll_yes else R.string.route_toll_no), onClick = {}, icon = Icons.Default.Toll, compact = true, enabled = false)
         val cost = active.cost

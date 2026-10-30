@@ -24,6 +24,7 @@ import fr.roadly.core.navigation.RouteTracker
 import fr.roadly.core.navigation.testing.FakeNavigationServiceController
 import fr.roadly.core.navigation.testing.FakeSpeechService
 import fr.roadly.core.navigation.testing.TestRoutes
+import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CoroutineDispatcher
@@ -75,6 +76,32 @@ class NavigationViewModelTest {
     }
 
     private fun fixAt(along: Double) = LocationFix(tracker.pointAt(along), 90f, 10f, 5f, 0L)
+
+    private fun NavigationViewModel(s: NavigationSession, p: FakeUserPreferencesRepository, c: ProviderConfigRepository) =
+        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing))
+
+    @Test fun `alternatives are computed from the snapped position and switching restarts guidance on the chosen route`() = runTest {
+        val okRouting = object : RoutingProvider {
+            override val id = "ok"
+            val origins = mutableListOf<fr.roadly.core.model.GeoPoint>()
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> { origins += request.origin; return Outcome.Success(listOf(route.copy(id = "alt-" + request.costing.name))) }
+        }
+        val s = session()
+        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting))
+        vm.uiState.test {
+            s.start(option, RoutePreferences()); runCurrent()
+            location.emit(fixAt(300.0)); runCurrent()
+            vm.loadAlternatives(); runCurrent()
+            val alt = vm.alternativesUi.value as AlternativesUi.Content
+            assertEquals(3, alt.options.size)
+            assertEquals(route.id, alt.currentRouteId)
+            assertEquals((s.state.value as NavigationState.Guiding).progress.snapped, okRouting.origins.first())
+            vm.switchTo(alt.options[1]); runCurrent()
+            assertEquals("alt-SHORTEST", (s.state.value as NavigationState.Guiding).route.id)
+            assertEquals(AlternativesUi.Hidden, vm.alternativesUi.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
     @Test fun `guiding state is formatted for the banner, the upcoming strip and the ETA`() = runTest {
         val s = session()

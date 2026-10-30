@@ -48,8 +48,8 @@ Constats de l'audit (écarts avec Sillaxe) :
 | 1 | Accueil avec carte | L2 | 🟡 | Carte, position, recherche, domicile/travail, recentrage, **boussole (L2)**, **bouton Signaler (L2, envoi L8)**, **toucher sa position → copier/partager (L2)**, **puces Stations/Bornes/Parkings/Aires → recherche à proximité (L2)**. Manque : carte de profil (L9), autres conducteurs (L8), couches sur la carte (L5) |
 | 2 | Recherche | L2 | 🟡 | BAN + Photon + coordonnées, récents, favoris, **catégories à proximité (Photon `reverse` + `osm_tag`, triées par distance, distance affichée) (L2)**. Manque : horaires d'ouverture (⛔ non fournis par Photon), contacts/calendrier (L6), dictée (L12) |
 | 3 | Fiche de lieu | L2 | 🟡 | Distance, itinéraire, favori, domicile/travail. Manque : horaires, téléphone, partage, « Enregistrer un repère », parking à proximité, mise en page Sillaxe |
-| 4 | Choix des itinéraires | L3 | 🟡 | 3 variantes, carte, coût carburant, heure de départ. Manque : panneau « Votre choix » (durée grande, arrivée, distance, péage, trafic), alternatives compactes, « Ajouter un arrêt », « Arriver à », puces d'options, feux/ralentisseurs comptés |
-| 5 | Navigation GPS | L3 | 🟡 | Bandeau, voies, « à venir », ETA, vitesse, arrivée, recalcul, GPS perdu, notification, TTS. Manque : barre d'information (ETA · min · km · recentrer · stop), bouton signalement, replier le bandeau, mode paysage, Horizon |
+| 4 | Choix des itinéraires | L3 | 🟡 | 3 variantes, carte, coût carburant, panneau « Votre choix » (L1), **« Partir à » / « Arriver à » (L3)**, **puces éviter péages / autoroutes / ferries (L3)**. Manque : montant des péages (⛔), trafic (⛔), « Ajouter un arrêt » (L6), feux/ralentisseurs comptés (⛔ données) |
+| 5 | Navigation GPS | L3 | 🟡 | Bandeau repliable, voies, Horizon, barre ETA · min · km, vitesse, arrivée, recalcul, GPS perdu, notification, TTS, Signaler, paysage, **« Changer d'itinéraire » en cours de trajet (L3)**. Manque : limitation (⛔ Valhalla auto-hébergé), ajout d'arrêt (L6), autres conducteurs (L8) |
 | 6 | Horizon | L4 | 🟡 | Ruban « route à venir » livré (L1) : manœuvres et arrivée réelles, échelle log 0–5 km. Manque : virages (courbure), ralentissements/travaux/fermetures/zones/services (⛔ sources) |
 | 7 | Signalements | L8 | 🟡 | Bouton « Signaler » en guidage + feuille des 9 types (désactivés, explication). Manque : envoi, confirmation, invalidation, expiration, carte, points, historique, modération (backend Supabase) |
 | 8 | Stations-service | L5 | 🟡 | Liste à proximité (OSM via Photon, L2). ⛔ prix : data.economie.gouv.fr (flux instantané, Licence Ouverte) ; comparaison, détour, horaires |
@@ -91,7 +91,7 @@ Constats de l'audit (écarts avec Sillaxe) :
 | Virages à venir | L4 | ⬜ | Courbure de la polyligne |
 | Ralentissements, travaux, routes fermées | L4 | ⛔ | Bison Futé DATEX II, Autoroutes.fr ; fournisseur à conventionner |
 | Recalcul automatique | — | ✅ | Non vérifié en conduite réelle |
-| Itinéraire alternatif en cours de trajet | L3 | ⬜ | |
+| Itinéraire alternatif en cours de trajet | L3 | ✅ | Feuille « Changer d'itinéraire » : 3 variantes depuis la position projetée, bascule sans quitter le guidage |
 | Changement de destination en guidage | — | ✅ | |
 | Ajout d'arrêts pendant le guidage | L6 | ⬜ | Valhalla multi-locations déjà supporté |
 | Autres conducteurs sur la carte | L8 | ⬜ | Backend ; décalage ≥ 1 km et ≥ 90 s, désactivable |
@@ -134,7 +134,8 @@ Constats de l'audit (écarts avec Sillaxe) :
 | Durée, distance, heure d'arrivée | — | ✅ | |
 | Trafic prévu | L4 | ⛔ | |
 | Départ planifié | — | ✅ | Décale l'heure d'arrivée |
-| Arrivée à une heure souhaitée + rappel | L6 | ⬜ | WorkManager |
+| Arrivée à une heure souhaitée | L3 | ✅ | Départ = arrivée − durée du plus rapide (sans trafic prévisionnel) |
+| Rappel avant le départ planifié | L6 | ⬜ | WorkManager |
 | Jusqu'à 10 arrêts, réorganisation manuelle | L6 | ⬜ | |
 | Optimisation automatique | L6 | ⬜ | Valhalla `optimized_route` |
 | Pauses, aires, arrêts personnalisés | L6 | ⬜ | |
@@ -224,3 +225,4 @@ Constats de l'audit (écarts avec Sillaxe) :
   - Écran 6 (Horizon) : composant livré et affiché en guidage avec manœuvres + arrivée ; trafic/zones/services restent ⛔ (L4).
   - Écran 7 (Signalements) : interface de saisie livrée, envoi ⛔ (L8).
 - 2026-10-31 — **LOT 2 livré** (accueil, carte, recherche) : `NearbyPoiProvider` / `PhotonNearbyPoiProvider` (Photon `reverse` + `radius` + `osm_tag`, fixture réelle, 2 tests) ; recherche : puces Stations / Bornes / Parkings / Aires / Restaurants réelles (lieux OSM triés par distance, distance par ligne, états « position inconnue » et « aucun lieu », pied de carte rappelant l'absence de prix/disponibilité), route `SearchRoute(category)` ; accueil : boussole animée (apparaît quand la carte est tournée, remet le nord), bouton Signaler (feuille partagée dans `core:designsystem`), position courante → feuille Copier/Partager (adresse + coordonnées + lien OSM), puces de catégories branchées sur la recherche, « Incidents » reste « Bientôt ». 235 tests verts ; vérifié sur HONOR : stations à 630 m, parkings à 730 m, feuille position, bouton Signaler.
+- 2026-10-31 — **LOT 3 livré** (itinéraires et navigation avancée) : mode « Arriver à » (sélecteur Partir à / Arriver à, départ déduit du plus rapide, arrivées recalées, test `ArrivalShiftTest`) ; puces d'options éviter péages / autoroutes / ferries sur le panneau « Votre choix » (persistées, appliquées aux 3 variantes et au recalcul) ; en guidage, bouton « Itinéraires » → feuille « Changer d'itinéraire » (3 variantes depuis la position projetée, arrivée, péage, bascule immédiate du guidage ; test VM). 238 tests verts ; vérifié sur HONOR (bascule vers « Le plus court » : 26 min · 4,6 km).

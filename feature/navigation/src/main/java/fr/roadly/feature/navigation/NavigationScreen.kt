@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -130,6 +131,8 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     }
 
     if (showReport) ReportSheet(onDismiss = { showReport = false })
+    val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
+    if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives)
 }
 
 /** Portrait : bandeau en haut (replier à droite), actions à droite, compteur + Horizon + barre d'information en bas. */
@@ -178,6 +181,7 @@ private fun PortraitOverlay(
                 onClick = vm::toggleMute,
             )
             RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
+            if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
         }
 
         Column(
@@ -232,6 +236,7 @@ private fun LandscapeOverlay(
                 onClick = vm::toggleMute,
             )
             RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
+            if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
         }
         // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges).
         Row(Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm), verticalAlignment = Alignment.Bottom) {

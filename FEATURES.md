@@ -25,7 +25,9 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Changer de destination / ajouter un arrêt en guidage | G | en cours | 2 | Changer de destination : fait ; ajout d'arrêt : Phase 4 |
 | Jusqu'à 10 arrêts réordonnables | G | non commencée | 4 | Valhalla multi-locations déjà supporté côté provider |
 | Départ planifié (heure de départ) | G | fonctionnelle | 1 | Décale seulement l'heure d'arrivée |
-| « Arriver à l'heure » + rappel avant départ | G | non commencée | 4 | WorkManager |
+| « Arriver à l'heure » | G | fonctionnelle | 1 | Départ déduit de la durée du plus rapide, sans trafic (LOT 3) ; rappel avant départ : Phase 4 |
+| Itinéraire alternatif en cours de guidage | G | fonctionnelle | 2 | Feuille « Changer d'itinéraire » depuis la position projetée (LOT 3) |
+| Options d'itinéraire sur l'écran de choix | G | fonctionnelle | 1 | Puces éviter péages / autoroutes / ferries (LOT 3) |
 | Mode paysage | G | en cours | 1 | Accueil, itinéraires et guidage en deux colonnes (LOT 1) ; non vérifié sur appareil |
 | Thème clair / sombre / automatique | G | fonctionnelle | 1 | Auto solaire (position) + système |
 | Mode Silence | G | fonctionnelle | 2 | Bouton voix de l'écran de guidage |
@@ -169,7 +171,7 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Fonction | Statut | Notes |
 |---|---|---|
 | APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
-| Tests unitaires | fonctionnelle | 235 tests (JVM) |
+| Tests unitaires | fonctionnelle | 238 tests (JVM) |
 | Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
 | Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
 | Widgets, Android Auto | non commencée | Phase 5 |

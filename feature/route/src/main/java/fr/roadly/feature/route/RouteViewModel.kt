@@ -10,10 +10,12 @@ import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.routing.RouteAlternativesUseCase
+import fr.roadly.core.routing.RouteOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +44,8 @@ class RouteViewModel @Inject constructor(
     )
     private val origin = MutableStateFlow(location.lastKnown?.point)
     private val departAt = MutableStateFlow(System.currentTimeMillis())
+    /** Heure d'arrivée souhaitée ; null = mode « Partir à ». */
+    private val arriveAt = MutableStateFlow<Long?>(null)
     private val activeId = MutableStateFlow<String?>(null)
     private val isDark = MutableStateFlow(true)
     private val computed = MutableStateFlow<RouteUiState>(RouteUiState.Loading)
@@ -49,20 +53,22 @@ class RouteViewModel @Inject constructor(
     /** Préférences du dernier calcul affiché : transmises à la session (et donc au recalcul). */
     private var computedWith = RoutePreferences()
 
-    private data class Params(val origin: GeoPoint?, val departAt: Long, val vehicle: VehicleProfile?, val preferences: RoutePreferences)
+    private data class Params(val origin: GeoPoint?, val departAt: Long, val arriveAt: Long?, val vehicle: VehicleProfile?, val preferences: RoutePreferences)
 
     init {
         viewModelScope.launch {
-            combine(origin, departAt, vehicleRepo.profile, prefs.routePreferences, reload) { o, d, v, p, _ -> Params(o, d, v, p) }.collect { (o, d, v, p) ->
+            combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, reload) { values ->
+                Params(values[0] as GeoPoint?, values[1] as Long, values[2] as Long?, values[3] as VehicleProfile?, values[4] as RoutePreferences)
+            }.collect { (o, d, a, v, p) ->
                 if (o == null) { computed.value = RouteUiState.NoOrigin(destName); return@collect }
                 computed.value = RouteUiState.Loading
                 when (val r = alternatives(o, destination, v, d, p)) {
                     is Outcome.Success -> {
-                        val options = r.value
+                        val (options, effectiveDepart) = if (a != null) shiftToArrival(r.value, a) else r.value to d
                         // L'option active doit toujours exister dans la liste affichée.
                         if (activeId.value == null || options.none { it.route.id == activeId.value }) activeId.value = options.first().route.id
                         computedWith = p
-                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, d)
+                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, effectiveDepart, a, p)
                     }
                     is Outcome.Failure -> computed.value = RouteUiState.Error(r.error)
                 }
@@ -77,7 +83,11 @@ class RouteViewModel @Inject constructor(
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
     fun selectRoute(id: String) { activeId.value = id }
-    fun setDepartAt(epochMs: Long) { departAt.value = epochMs }
+    /** Mode « Partir à » : l'heure d'arrivée souhaitée est oubliée. */
+    fun setDepartAt(epochMs: Long) { arriveAt.value = null; departAt.value = epochMs }
+    /** Mode « Arriver à » : le départ est déduit de la durée du plus rapide (sans trafic prédictif). */
+    fun setArriveAt(epochMs: Long) { arriveAt.value = epochMs }
+    fun setPreferences(value: RoutePreferences) { viewModelScope.launch { prefs.setRoutePreferences(value) } }
     fun retry() { reload.value++ }
     /** Origine choisie par appui long sur la carte quand la position est inconnue. */
     fun setOrigin(point: GeoPoint) { origin.value = point }
@@ -90,5 +100,14 @@ class RouteViewModel @Inject constructor(
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
         session.start(option, computedWith)
         return true
+    }
+
+    companion object {
+        /** Départ = arrivée souhaitée − durée du plus rapide ; chaque option reçoit l'arrivée correspondante. */
+        internal fun shiftToArrival(options: List<RouteOption>, arriveAtMs: Long): Pair<List<RouteOption>, Long> {
+            val reference = options.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: options.first()
+            val depart = arriveAtMs - (reference.route.durationSeconds * 1000).toLong()
+            return options.map { it.copy(arrivalEpochMs = depart + (it.route.durationSeconds * 1000).toLong()) } to depart
+        }
     }
 }
