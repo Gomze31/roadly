@@ -56,7 +56,17 @@ class MapController(internal val context: Context) {
     private var routeColorActive = "#4FD1E0"
     private var routeColorInactive = "#5B6774"
 
+    /** Commande caméra reçue avant que la carte et son style soient prêts ; la dernière l'emporte, rejouée en fin de `replayState`. */
+    private var pendingCamera: ((MapLibreMap) -> Unit)? = null
+
     var onRouteClick: ((String) -> Unit)? = null
+
+    /** Détache la carte (la vue est détruite) ; l'état mémorisé reste pour un futur `attach`. */
+    internal fun detach() {
+        map = null
+        styleReady = false
+        onRouteClick = null
+    }
 
     internal fun attach(map: MapLibreMap) {
         this.map = map
@@ -122,6 +132,7 @@ class MapController(internal val context: Context) {
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
         (style.getLayer(MapIds.LYR_ROUTE_ACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorActive))
         (style.getLayer(MapIds.LYR_ROUTE_INACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
+        map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
     fun setUserLocation(fix: LocationFix?) {
@@ -142,18 +153,26 @@ class MapController(internal val context: Context) {
     }
 
     fun moveTo(point: GeoPoint, zoom: Double, bearing: Double = 0.0, animate: Boolean = true) {
-        val m = map ?: return
-        val pos = CameraPosition.Builder().target(LatLng(point.lat, point.lon)).zoom(zoom).bearing(bearing).tilt(0.0).build()
-        val update = CameraUpdateFactory.newCameraPosition(pos)
-        if (animate) m.animateCamera(update, 600) else m.moveCamera(update)
+        val action: (MapLibreMap) -> Unit = { m ->
+            val pos = CameraPosition.Builder().target(LatLng(point.lat, point.lon)).zoom(zoom).bearing(bearing).tilt(0.0).build()
+            val update = CameraUpdateFactory.newCameraPosition(pos)
+            if (animate) m.animateCamera(update, 600) else m.moveCamera(update)
+        }
+        val m = map
+        if (m == null || !styleReady) { pendingCamera = action; return }
+        action(m)
     }
 
     fun fitBounds(points: List<GeoPoint>, paddingPx: Int) {
-        val m = map ?: return
         val bbox = BoundingBox.of(points) ?: return
         if (bbox.north == bbox.south && bbox.east == bbox.west) { moveTo(points.first(), 15.0); return }
-        val bounds = LatLngBounds.Builder().include(LatLng(bbox.south, bbox.west)).include(LatLng(bbox.north, bbox.east)).build()
-        m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, paddingPx), 600)
+        val action: (MapLibreMap) -> Unit = { m ->
+            val bounds = LatLngBounds.Builder().include(LatLng(bbox.south, bbox.west)).include(LatLng(bbox.north, bbox.east)).build()
+            m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, paddingPx), 600)
+        }
+        val m = map
+        if (m == null || !styleReady) { pendingCamera = action; return }
+        action(m)
     }
 
     fun applyCameraMode(mode: CameraMode, fix: LocationFix?) {
