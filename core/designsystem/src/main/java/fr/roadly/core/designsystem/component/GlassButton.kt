@@ -49,12 +49,12 @@ fun GlassButton(
     val fg = if (style == GlassButtonStyle.Primary) c.onAccent else c.textPrimary
     Row(
         modifier
+            .alpha(if (enabled) 1f else 0.45f)
             .defaultMinSize(minHeight = minHeight)
             .clip(RoadlyShapes.Button)
             .background(bg)
             .border(1.dp, c.glassBorder, RoadlyShapes.Button)
             .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.45f)
             .padding(horizontal = RoadlySpacing.l, vertical = RoadlySpacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -79,12 +79,12 @@ fun GlassIconButton(
     val size = if (LocalDrivingMode.current) RoadlySpacing.touchTargetDriving else RoadlySpacing.touchTarget
     Box(
         modifier
+            .alpha(if (enabled) 1f else 0.45f)
             .size(size + 8.dp)
             .clip(RoadlyShapes.Button)
             .background(c.glass)
             .border(1.dp, c.glassBorder, RoadlyShapes.Button)
-            .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.45f),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(24.dp)) }
 }

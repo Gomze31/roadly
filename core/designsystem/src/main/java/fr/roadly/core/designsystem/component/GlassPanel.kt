@@ -2,6 +2,7 @@ package fr.roadly.core.designsystem.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
@@ -30,12 +31,14 @@ fun GlassPanel(
     modifier: Modifier = Modifier,
     shape: Shape = RoadlyShapes.Panel,
     contentPadding: Dp = RoadlySpacing.m,
+    onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val c = LocalRoadlyColors.current
     Box(
         modifier
             .clip(shape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .background(c.glass)
             .background(Brush.verticalGradient(0f to c.glassHighlight, 0.4f to Color.Transparent))
             .border(1.dp, c.glassBorder, shape)

@@ -1,7 +1,6 @@
 package fr.roadly.core.designsystem.component
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,8 +32,8 @@ fun RouteCard(
     val c = LocalRoadlyColors.current
     GlassPanel(
         modifier.fillMaxWidth()
-            .then(if (selected) Modifier.border(2.dp, c.routeActive, RoadlyShapes.Panel) else Modifier)
-            .clickable(onClick = onClick),
+            .then(if (selected) Modifier.border(2.dp, c.routeActive, RoadlyShapes.Panel) else Modifier),
+        onClick = onClick,
     ) {
         Column {
             Row(Modifier.fillMaxWidth()) {

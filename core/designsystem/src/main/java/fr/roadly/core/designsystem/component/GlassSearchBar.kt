@@ -2,11 +2,13 @@ package fr.roadly.core.designsystem.component
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -47,9 +49,10 @@ fun GlassSearchBar(
 ) {
     val c = LocalRoadlyColors.current
     GlassPanel(
-        modifier = modifier.fillMaxWidth().height(56.dp).then(if (readOnly) Modifier.clickable(onClick = onClick) else Modifier),
+        modifier = modifier.fillMaxWidth().height(56.dp),
         shape = RoadlyShapes.Panel,
         contentPadding = 0.dp,
+        onClick = if (readOnly) onClick else null,
     ) {
         Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.width(RoadlySpacing.m))
@@ -79,10 +82,12 @@ fun GlassSearchBar(
                     },
                 )
                 if (value.isNotEmpty()) {
-                    Icon(
-                        Icons.Default.Close, contentDescription = "Effacer", tint = c.textSecondary,
-                        modifier = Modifier.clickable(onClick = onClear).testTag("search_clear"),
-                    )
+                    Box(
+                        Modifier.size(48.dp).clickable(onClick = onClear).testTag("search_clear"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Effacer", tint = c.textSecondary)
+                    }
                 }
             }
             Spacer(Modifier.width(RoadlySpacing.m))

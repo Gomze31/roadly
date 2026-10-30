@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import fr.roadly.core.designsystem.theme.LocalDrivingMode
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
@@ -39,14 +40,15 @@ fun GlassChip(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val c = LocalRoadlyColors.current
+    val minHeight = if (LocalDrivingMode.current) RoadlySpacing.touchTargetDriving else RoadlySpacing.touchTarget
     Row(
         modifier
-            .defaultMinSize(minHeight = 40.dp)
+            .alpha(if (enabled) 1f else 0.5f)
+            .defaultMinSize(minHeight = minHeight)
             .clip(RoadlyShapes.Chip)
             .background(if (selected) c.accent else c.glass)
             .border(1.dp, c.glassBorder, RoadlyShapes.Chip)
             .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.5f)
             .padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
