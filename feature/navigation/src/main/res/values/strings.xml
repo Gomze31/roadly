@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_loading">Préparation du guidage…</string>
+    <string name="nav_rerouting">Recalcul…</string>
+    <string name="nav_gps_lost">GPS perdu</string>
+    <string name="nav_eta">Arrivée %1$s</string>
+    <string name="nav_remaining">%1$s · %2$s</string>
+    <string name="nav_stop">Arrêter</string>
+    <string name="nav_mute">Couper la voix</string>
+    <string name="nav_unmute">Réactiver la voix</string>
+    <string name="nav_recenter">Recentrer</string>
+    <string name="nav_change_destination">Changer de destination</string>
+    <string name="nav_exit_number">Sortie %1$s</string>
+    <string name="nav_roundabout_exit_first">1re sortie</string>
+    <string name="nav_roundabout_exit_n">%1$de sortie</string>
+    <string name="nav_lanes">Voies conseillées</string>
+    <string name="nav_arrived_title">Vous êtes arrivé</string>
+    <string name="nav_finish">Terminer</string>
+    <string name="nav_failed_title">Guidage impossible</string>
+    <string name="nav_retry">Réessayer</string>
+</resources>
