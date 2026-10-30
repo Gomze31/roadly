@@ -3,35 +3,51 @@ package fr.roadly.feature.settings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Toll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,10 +58,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.roadly.core.data.config.ProviderConfig
@@ -54,58 +72,66 @@ import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.designsystem.component.GlassButton
 import fr.roadly.core.designsystem.component.GlassButtonStyle
 import fr.roadly.core.designsystem.component.GlassChip
-import fr.roadly.core.designsystem.component.GlassIconButton
-import fr.roadly.core.designsystem.component.GlassPanel
+import fr.roadly.core.designsystem.component.IconTile
+import fr.roadly.core.designsystem.component.IconTileStyle
+import fr.roadly.core.designsystem.component.ListRow
+import fr.roadly.core.designsystem.component.RoadlyScreen
+import fr.roadly.core.designsystem.component.RoadlyTopBar
+import fr.roadly.core.designsystem.component.RowDivider
+import fr.roadly.core.designsystem.component.SegmentedControl
+import fr.roadly.core.designsystem.component.SettingsGroup
 import fr.roadly.core.designsystem.component.StatRow
+import fr.roadly.core.designsystem.component.ToggleRow
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
+import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.model.FuelType
 import fr.roadly.core.model.RoutePreferences
+import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
+import java.util.Locale
 import kotlin.math.roundToInt
+
+/** Retrait du contenu placé sous une ligne avec tuile d'icône (aligné sur le texte de la ligne). */
+private val RowContentInset = 64.dp
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
-    val c = LocalRoadlyColors.current
 
-    Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding()) {
-        Row(Modifier.padding(RoadlySpacing.m), verticalAlignment = Alignment.CenterVertically) {
-            GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.settings_back), onClick = onBack)
-            Spacer(Modifier.width(RoadlySpacing.s))
-            Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
-        }
+    RoadlyScreen {
+        RoadlyTopBar(title = stringResource(R.string.settings_title), onBack = onBack, backDescription = stringResource(R.string.settings_back))
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding()
-                .padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.s),
-            verticalArrangement = Arrangement.spacedBy(RoadlySpacing.m),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.s)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            VehicleSection(state, vm)
-            ThemeSection(state.themeMode, onSelect = vm::setTheme)
-            VoiceSection(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
-            SpeedAlertSection(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
-            RoutePreferencesSection(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
-            DataSection(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
-            PrivacySection()
-            ProvidersSection(state.providers, providerError, onSave = vm::saveProviders, onReset = vm::resetProviders)
-            AboutSection()
+            DrivingGroup(state, vm)
+            AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
+            VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
+            SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
+            RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
+            DataGroup(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
+            PrivacyGroup()
+            ProvidersGroup(state.providers, providerError, onSave = vm::saveProviders, onReset = vm::resetProviders)
+            AboutGroup()
+            Spacer(Modifier.height(RoadlySpacing.s))
         }
     }
 }
 
-@Composable
-private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, color = LocalRoadlyColors.current.textPrimary)
-}
+// ── Briques communes ────────────────────────────────────────────────────────
 
 @Composable
 private fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
     OutlinedTextFieldDefaults.colors(
         focusedTextColor = c.textPrimary, unfocusedTextColor = c.textPrimary,
-        focusedBorderColor = c.accent, unfocusedBorderColor = c.glassBorder,
-        focusedLabelColor = c.accent, unfocusedLabelColor = c.textSecondary,
-        cursorColor = c.accent,
+        focusedBorderColor = c.brand, unfocusedBorderColor = c.glassBorder,
+        focusedLabelColor = c.brand, unfocusedLabelColor = c.textSecondary,
+        cursorColor = c.brand,
+        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
     )
 }
 
@@ -114,33 +140,67 @@ private fun SettingsField(label: String, value: String, onValueChange: (String) 
     OutlinedTextField(
         value = value, onValueChange = onValueChange, label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        singleLine = true, colors = settingsFieldColors(), modifier = Modifier.fillMaxWidth(),
+        singleLine = true, colors = settingsFieldColors(), shape = RoadlyShapes.Tile, modifier = Modifier.fillMaxWidth(),
     )
 }
 
-// ── Véhicule ────────────────────────────────────────────────────────────────
+/** Flèche de repli/dépli placée à droite d'une ligne qui ouvre un éditeur en ligne. */
+@Composable
+private fun ExpandArrow(expanded: Boolean) {
+    Icon(
+        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+        contentDescription = null, tint = LocalRoadlyColors.current.textTertiary, modifier = Modifier.size(22.dp),
+    )
+}
+
+/** Zone dépliable sous une ligne : même carte, retrait horizontal standard. */
+@Composable
+private fun ExpandableContent(expanded: Boolean, content: @Composable () -> Unit) {
+    AnimatedVisibility(visible = expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        Column(
+            Modifier.fillMaxWidth().padding(start = RoadlySpacing.m, end = RoadlySpacing.m, top = RoadlySpacing.xs, bottom = RoadlySpacing.m),
+            verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
+        ) { content() }
+    }
+}
+
+@Composable
+private fun FieldCaption(text: String) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = LocalRoadlyColors.current.textSecondary)
+}
+
+// ── Conduite : véhicule ─────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun VehicleSection(state: SettingsUiState, vm: SettingsViewModel) {
-    val c = LocalRoadlyColors.current
+private fun DrivingGroup(state: SettingsUiState, vm: SettingsViewModel) {
     // L'état local est réinitialisé dès que le profil enregistré change ; aucun prix par défaut n'est inventé.
     var type by remember(state.vehicle) { mutableStateOf(state.vehicle?.type ?: VehicleType.SEDAN) }
     var fuel by remember(state.vehicle) { mutableStateOf(state.vehicle?.fuel ?: FuelType.SP95) }
     var consumption by remember(state.vehicle) { mutableStateOf(state.vehicle?.consumptionPer100?.toString().orEmpty()) }
     var price by remember(state.vehicle) { mutableStateOf(state.vehicle?.fuelPriceEur?.toString().orEmpty()) }
     val consumptionValid = consumption.trim().replace(',', '.').toDoubleOrNull()?.let { it > 0 } == true
+    // Éditeur replié par défaut ; la ligne résume le profil enregistré.
+    var editing by remember { mutableStateOf(false) }
 
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_vehicle))
-            Text(stringResource(R.string.settings_vehicle_type), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary)
+    SettingsGroup(stringResource(R.string.settings_group_driving)) {
+        ListRow(
+            stringResource(R.string.settings_vehicle),
+            subtitle = state.vehicle?.summary() ?: stringResource(R.string.settings_vehicle_none),
+            icon = Icons.Default.DirectionsCar,
+            onClick = { editing = !editing },
+            chevron = false,
+            divider = false,
+            trailing = { ExpandArrow(editing) },
+        )
+        ExpandableContent(editing) {
+            FieldCaption(stringResource(R.string.settings_vehicle_type))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                VehicleType.entries.forEach { GlassChip(it.label(), onClick = { type = it }, selected = type == it) }
+                VehicleType.entries.forEach { GlassChip(it.label(), onClick = { type = it }, selected = type == it, compact = true) }
             }
-            Text(stringResource(R.string.settings_fuel), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary)
+            FieldCaption(stringResource(R.string.settings_fuel))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                FuelType.entries.forEach { GlassChip(it.label(), onClick = { fuel = it }, selected = fuel == it) }
+                FuelType.entries.forEach { GlassChip(it.label(), onClick = { fuel = it }, selected = fuel == it, compact = true) }
             }
             SettingsField(stringResource(R.string.settings_consumption), consumption, { consumption = it }, KeyboardType.Decimal)
             SettingsField(stringResource(R.string.settings_price), price, { price = it }, KeyboardType.Decimal)
@@ -150,24 +210,98 @@ private fun VehicleSection(state: SettingsUiState, vm: SettingsViewModel) {
                     onClick = { vm.saveVehicle(type, fuel, consumption, price) },
                     enabled = consumptionValid,
                 )
-                if (state.vehicle != null) GlassChip(stringResource(R.string.settings_clear_vehicle), onClick = vm::clearVehicle)
+                if (state.vehicle != null) GlassButton(stringResource(R.string.settings_clear_vehicle), onClick = vm::clearVehicle, style = GlassButtonStyle.Danger)
             }
         }
     }
 }
 
-// ── Thème ───────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class)
+/** « Berline · SP95 · 6,5 L/100 » (kWh/100 pour l'électrique). */
 @Composable
-private fun ThemeSection(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_theme))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                ThemeMode.entries.forEach { GlassChip(it.label(), onClick = { onSelect(it) }, selected = current == it) }
-            }
-        }
+private fun VehicleProfile.summary(): String {
+    val cons = String.format(Locale.FRANCE, "%.1f", consumptionPer100)
+    val res = if (fuel == FuelType.ELECTRIC) R.string.settings_vehicle_summary_electric else R.string.settings_vehicle_summary_fuel
+    return stringResource(res, type.label(), fuel.label(), cons)
+}
+
+// ── Apparence : thème ───────────────────────────────────────────────────────
+
+@Composable
+private fun AppearanceGroup(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    SettingsGroup(stringResource(R.string.settings_group_appearance)) {
+        ListRow(
+            stringResource(R.string.settings_theme),
+            subtitle = stringResource(R.string.settings_theme_auto),
+            icon = Icons.Default.Palette,
+            divider = false,
+        )
+        // Les libellés sont résolus ici : le sélecteur reçoit une fonction non composable.
+        val labels = ThemeMode.entries.associateWith { it.shortLabel() }
+        SegmentedControl(
+            options = ThemeMode.entries, selected = current, onSelect = onSelect, label = { labels.getValue(it) },
+            modifier = Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m),
+        )
+    }
+}
+
+// ── Voix et sons ────────────────────────────────────────────────────────────
+
+@Composable
+private fun VoiceGroup(voice: VoiceSettings, onEnabled: (Boolean) -> Unit, onVolume: (Int) -> Unit, onOverSpeedSound: (Boolean) -> Unit, onTest: (String) -> Unit) {
+    val c = LocalRoadlyColors.current
+    // Valeur locale pendant le glissement ; enregistrée au relâchement.
+    var volume by remember(voice.volume) { mutableFloatStateOf(voice.volume.toFloat()) }
+    val phrase = stringResource(R.string.settings_voice_test_phrase)
+    SettingsGroup(stringResource(R.string.settings_voice)) {
+        ToggleRow(stringResource(R.string.settings_voice_enabled), checked = voice.enabled, onCheckedChange = onEnabled, icon = Icons.Default.RecordVoiceOver)
+        ListRow(
+            stringResource(R.string.settings_voice_volume),
+            icon = Icons.Default.GraphicEq,
+            value = stringResource(R.string.settings_voice_volume_value, volume.roundToInt()),
+            divider = false,
+        )
+        Slider(
+            value = volume, onValueChange = { volume = it }, onValueChangeFinished = { onVolume(volume.roundToInt()) },
+            valueRange = 0f..100f,
+            colors = SliderDefaults.colors(thumbColor = c.brand, activeTrackColor = c.brand, inactiveTrackColor = c.glassBorder),
+            modifier = Modifier.padding(start = RowContentInset, end = RoadlySpacing.m, bottom = RoadlySpacing.xs),
+        )
+        RowDivider(inset = RowContentInset)
+        ToggleRow(stringResource(R.string.settings_speed_sound), checked = voice.overSpeedSound, onCheckedChange = onOverSpeedSound, icon = Icons.Default.Speed)
+        ListRow(
+            stringResource(R.string.settings_voice_test),
+            icon = Icons.AutoMirrored.Filled.VolumeUp,
+            onClick = { onTest(phrase) },
+            chevron = false,
+            divider = false,
+            trailing = { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(22.dp)) },
+        )
+    }
+}
+
+// ── Alertes de vitesse ──────────────────────────────────────────────────────
+
+@Composable
+private fun SpeedAlertGroup(toleranceKmh: Int, onSelect: (Int) -> Unit) {
+    SettingsGroup(stringResource(R.string.settings_speed_alerts), footer = stringResource(R.string.settings_speed_limit_note)) {
+        ListRow(stringResource(R.string.settings_speed_tolerance), icon = Icons.Default.Speed, iconStyle = IconTileStyle.Warning, divider = false)
+        val options = GuidanceDefaults.ALLOWED_TOLERANCES_KMH
+        val labels = options.associateWith { stringResource(R.string.settings_speed_tolerance_value, it) }
+        SegmentedControl(
+            options = options, selected = toleranceKmh, onSelect = onSelect, label = { labels.getValue(it) },
+            modifier = Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m),
+        )
+    }
+}
+
+// ── Itinéraires ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit) {
+    SettingsGroup(stringResource(R.string.settings_group_routes)) {
+        ToggleRow(stringResource(R.string.settings_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = onTolls, icon = Icons.Default.Toll)
+        ToggleRow(stringResource(R.string.settings_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = onHighways, icon = Icons.Default.Route)
+        ToggleRow(stringResource(R.string.settings_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = onFerries, icon = Icons.Default.DirectionsBoat, divider = false)
     }
 }
 
@@ -175,105 +309,32 @@ private fun ThemeSection(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
 
 private enum class PendingClear { HISTORY, FAVORITES }
 
-// ── Voix et sons ────────────────────────────────────────────────────────────
-
 @Composable
-private fun SettingsSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun DataGroup(onClearHistory: () -> Unit, onClearFavorites: () -> Unit) {
     val c = LocalRoadlyColors.current
-    // Toute la ligne est cliquable (cible ≥ 48 dp) ; le Switch ne fait qu'afficher l'état.
-    Row(
-        Modifier.fillMaxWidth().defaultMinSize(minHeight = RoadlySpacing.touchTarget).toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = c.textPrimary, modifier = Modifier.weight(1f))
-        Switch(
-            checked = checked, onCheckedChange = null,
-            colors = SwitchDefaults.colors(checkedThumbColor = c.onAccent, checkedTrackColor = c.accent, uncheckedThumbColor = c.textSecondary, uncheckedTrackColor = c.glass, uncheckedBorderColor = c.glassBorder),
-        )
-    }
-}
-
-@Composable
-private fun VoiceSection(voice: VoiceSettings, onEnabled: (Boolean) -> Unit, onVolume: (Int) -> Unit, onOverSpeedSound: (Boolean) -> Unit, onTest: (String) -> Unit) {
-    val c = LocalRoadlyColors.current
-    // Valeur locale pendant le glissement ; enregistrée au relâchement.
-    var volume by remember(voice.volume) { mutableFloatStateOf(voice.volume.toFloat()) }
-    val phrase = stringResource(R.string.settings_voice_test_phrase)
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_voice))
-            SettingsSwitch(stringResource(R.string.settings_voice_enabled), voice.enabled, onEnabled)
-            Text(stringResource(R.string.settings_voice_volume, volume.roundToInt()), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary)
-            Slider(
-                value = volume, onValueChange = { volume = it }, onValueChangeFinished = { onVolume(volume.roundToInt()) },
-                valueRange = 0f..100f,
-                colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.glassBorder),
-            )
-            SettingsSwitch(stringResource(R.string.settings_speed_sound), voice.overSpeedSound, onOverSpeedSound)
-            GlassButton(stringResource(R.string.settings_voice_test), onClick = { onTest(phrase) }, icon = Icons.AutoMirrored.Filled.VolumeUp, style = GlassButtonStyle.Secondary)
-        }
-    }
-}
-
-// ── Alertes de vitesse ──────────────────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SpeedAlertSection(toleranceKmh: Int, onSelect: (Int) -> Unit) {
-    val c = LocalRoadlyColors.current
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_speed_alerts))
-            Text(stringResource(R.string.settings_speed_tolerance), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                GuidanceDefaults.ALLOWED_TOLERANCES_KMH.forEach { t ->
-                    GlassChip(stringResource(R.string.settings_speed_tolerance_value, t), onClick = { onSelect(t) }, selected = toleranceKmh == t)
-                }
-            }
-            Text(stringResource(R.string.settings_speed_limit_note), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
-        }
-    }
-}
-
-// ── Préférences d'itinéraire ────────────────────────────────────────────────
-
-@Composable
-private fun RoutePreferencesSection(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit) {
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs)) {
-            SectionTitle(stringResource(R.string.settings_route_prefs))
-            SettingsSwitch(stringResource(R.string.settings_avoid_tolls), prefs.avoidTolls, onTolls)
-            SettingsSwitch(stringResource(R.string.settings_avoid_highways), prefs.avoidHighways, onHighways)
-            SettingsSwitch(stringResource(R.string.settings_avoid_ferries), prefs.avoidFerries, onFerries)
-        }
-    }
-}
-
-@Composable
-private fun DataSection(onClearHistory: () -> Unit, onClearFavorites: () -> Unit) {
     var pending by remember { mutableStateOf<PendingClear?>(null) }
 
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_data))
-            GlassButton(stringResource(R.string.settings_clear_history), onClick = { pending = PendingClear.HISTORY }, style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth())
-            GlassButton(stringResource(R.string.settings_clear_favorites), onClick = { pending = PendingClear.FAVORITES }, style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth())
-        }
+    SettingsGroup(stringResource(R.string.settings_data)) {
+        ListRow(stringResource(R.string.settings_clear_history), icon = Icons.Default.History, iconStyle = IconTileStyle.Danger, onClick = { pending = PendingClear.HISTORY })
+        ListRow(stringResource(R.string.settings_clear_favorites), icon = Icons.Default.Star, iconStyle = IconTileStyle.Danger, onClick = { pending = PendingClear.FAVORITES }, divider = false)
     }
 
     pending?.let { which ->
         val history = which == PendingClear.HISTORY
         AlertDialog(
             onDismissRequest = { pending = null },
+            containerColor = c.surfaceElevated,
+            titleContentColor = c.textPrimary,
+            textContentColor = c.textSecondary,
             title = { Text(stringResource(if (history) R.string.settings_confirm_history_title else R.string.settings_confirm_favorites_title)) },
             text = { Text(stringResource(if (history) R.string.settings_confirm_history_body else R.string.settings_confirm_favorites_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     if (history) onClearHistory() else onClearFavorites()
                     pending = null
-                }) { Text(stringResource(R.string.settings_confirm_action)) }
+                }) { Text(stringResource(R.string.settings_confirm_action), color = c.danger) }
             },
-            dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.settings_cancel)) } },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.settings_cancel), color = c.textSecondary) } },
         )
     }
 }
@@ -281,10 +342,11 @@ private fun DataSection(onClearHistory: () -> Unit, onClearFavorites: () -> Unit
 // ── Confidentialité ─────────────────────────────────────────────────────────
 
 @Composable
-private fun PrivacySection() {
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_privacy))
+private fun PrivacyGroup() {
+    SettingsGroup(stringResource(R.string.settings_privacy)) {
+        Row(Modifier.fillMaxWidth().padding(RoadlySpacing.m), verticalAlignment = Alignment.Top) {
+            IconTile(Icons.Default.Shield, size = 36.dp)
+            Spacer(Modifier.width(RoadlySpacing.sm))
             Text(stringResource(R.string.settings_privacy_body), style = MaterialTheme.typography.bodyMedium, color = LocalRoadlyColors.current.textSecondary)
         }
     }
@@ -294,17 +356,28 @@ private fun PrivacySection() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ProvidersSection(providers: ProviderConfig, error: String?, onSave: (ProviderConfig) -> Unit, onReset: () -> Unit) {
+private fun ProvidersGroup(providers: ProviderConfig, error: String?, onSave: (ProviderConfig) -> Unit, onReset: () -> Unit) {
     // Champs réinitialisés quand la configuration enregistrée change (enregistrement ou réinitialisation).
     var ban by remember(providers) { mutableStateOf(providers.banBaseUrl) }
     var photon by remember(providers) { mutableStateOf(providers.photonBaseUrl) }
     var valhalla by remember(providers) { mutableStateOf(providers.valhallaBaseUrl) }
     var styleLight by remember(providers) { mutableStateOf(providers.mapStyleLightUrl) }
     var styleDark by remember(providers) { mutableStateOf(providers.mapStyleDarkUrl) }
+    // Réglage avancé : replié par défaut pour ne pas encombrer l'écran.
+    var expanded by remember { mutableStateOf(false) }
 
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_providers))
+    SettingsGroup(stringResource(R.string.settings_providers)) {
+        ListRow(
+            stringResource(R.string.settings_providers_servers),
+            subtitle = stringResource(R.string.settings_providers_servers_subtitle),
+            icon = Icons.Default.Dns,
+            iconStyle = IconTileStyle.Neutral,
+            onClick = { expanded = !expanded },
+            chevron = false,
+            divider = false,
+            trailing = { ExpandArrow(expanded) },
+        )
+        ExpandableContent(expanded) {
             SettingsField(stringResource(R.string.settings_provider_ban), ban, { ban = it }, KeyboardType.Uri)
             SettingsField(stringResource(R.string.settings_provider_photon), photon, { photon = it }, KeyboardType.Uri)
             SettingsField(stringResource(R.string.settings_provider_valhalla), valhalla, { valhalla = it }, KeyboardType.Uri)
@@ -329,14 +402,17 @@ private fun ProvidersSection(providers: ProviderConfig, error: String?, onSave: 
 // ── À propos ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun AboutSection() {
+private fun AboutGroup() {
     val context = LocalContext.current
     val version = remember(context) { context.versionName() }
-    GlassPanel(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            SectionTitle(stringResource(R.string.settings_about))
-            if (version != null) StatRow(stringResource(R.string.settings_version), version)
-            Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.bodySmall, color = LocalRoadlyColors.current.textSecondary)
+    SettingsGroup(stringResource(R.string.settings_about)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.s)) {
+            if (version != null) {
+                StatRow(stringResource(R.string.settings_version), version)
+                RowDivider(inset = 0.dp)
+                Spacer(Modifier.height(RoadlySpacing.s))
+            }
+            Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.bodySmall, color = LocalRoadlyColors.current.textTertiary)
         }
     }
 }
@@ -378,12 +454,13 @@ internal fun FuelType.label(): String = stringResource(
     },
 )
 
+/** Libellé court pour le sélecteur segmenté ; le détail du mode solaire est donné en sous-titre. */
 @Composable
-private fun ThemeMode.label(): String = stringResource(
+private fun ThemeMode.shortLabel(): String = stringResource(
     when (this) {
         ThemeMode.SYSTEM -> R.string.settings_theme_system
         ThemeMode.LIGHT -> R.string.settings_theme_light
         ThemeMode.DARK -> R.string.settings_theme_dark
-        ThemeMode.AUTO_SOLAR -> R.string.settings_theme_auto
+        ThemeMode.AUTO_SOLAR -> R.string.settings_theme_auto_short
     },
 )

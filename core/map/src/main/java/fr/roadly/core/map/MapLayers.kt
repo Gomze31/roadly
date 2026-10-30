@@ -19,6 +19,7 @@ internal object MapIds {
     const val SRC_TRAVERSED = "roadly-traversed"
     const val LYR_ACCURACY = "roadly-accuracy"
     const val LYR_USER = "roadly-user-arrow"
+    const val LYR_ROUTE_GLOW = "roadly-route-glow"
     const val LYR_ROUTE_CASING = "roadly-route-casing"
     const val LYR_ROUTE_INACTIVE = "roadly-route-inactive"
     const val LYR_ROUTE_ACTIVE = "roadly-route-active"

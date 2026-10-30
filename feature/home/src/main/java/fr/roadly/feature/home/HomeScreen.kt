@@ -1,10 +1,15 @@
 package fr.roadly.feature.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +26,7 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Work
@@ -35,10 +41,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,9 +59,14 @@ import fr.roadly.core.designsystem.component.GlassChip
 import fr.roadly.core.designsystem.component.GlassIconButton
 import fr.roadly.core.designsystem.component.GlassPanel
 import fr.roadly.core.designsystem.component.GlassSearchBar
+import fr.roadly.core.designsystem.component.IconTile
+import fr.roadly.core.designsystem.component.IconTileStyle
 import fr.roadly.core.designsystem.component.OfflineBanner
+import fr.roadly.core.designsystem.component.RoundButtonStyle
+import fr.roadly.core.designsystem.component.RoundIconButton
 import fr.roadly.core.designsystem.component.SpeedBadge
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
+import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.map.CameraMode
@@ -82,7 +96,7 @@ fun HomeScreen(
     val map = rememberMapController()
 
     LaunchedEffect(isDark) { vm.setDarkTheme(isDark) }
-    LaunchedEffect(c.routeActive, c.routeInactive) { map.setRouteColors(c.routeActive.toHex(), c.routeInactive.toHex()) }
+    LaunchedEffect(c.routeActive, c.routeInactive, c.routeCasing) { map.setRouteColors(c.routeActive.toHex(), c.routeInactive.toHex(), c.routeCasing.toHex()) }
     // Mode libre : au retour sur l'accueil, on rétablit la caméra quittée (une seule fois, au premier passage).
     var restored by remember { mutableStateOf(false) }
     DisposableEffect(Unit) { onDispose { vm.rememberCamera(map.cameraPosition()) } }
@@ -98,7 +112,8 @@ fun HomeScreen(
     LaunchedEffect(state.fix == null) { if (state.fix == null && vm.lastCamera == null) map.moveTo(FRANCE_CENTER, 5.2, animate = false) }
     LaunchedEffect(state.pickedPlace) { map.setMarkers(listOfNotNull(state.pickedPlace)) }
 
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val landscape = maxWidth > maxHeight
         if (state.styleUrl.isNotEmpty()) {
             RoadlyMap(
                 styleUrl = state.styleUrl,
@@ -110,7 +125,7 @@ fun HomeScreen(
         }
 
         // Barre du haut : bannière hors-ligne, recherche (ouvre l'écran de recherche) et réglages.
-        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = RoadlySpacing.m)) {
+        Column(Modifier.fillMaxWidth(if (landscape) 0.5f else 1f).statusBarsPadding().padding(RoadlySpacing.screenEdge)) {
             if (!state.isOnline) OfflineBanner(Modifier.padding(bottom = RoadlySpacing.s))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GlassSearchBar(
@@ -126,10 +141,15 @@ fun HomeScreen(
             }
         }
 
-        // Bas d'écran : vitesse, bouton de recentrage (3 modes) puis panneau verre.
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.m)) {
+        // Bas d'écran : compteur à gauche, recentrage à droite, puis panneau d'accueil.
+        val bottomModifier = if (landscape) {
+            Modifier.align(Alignment.BottomEnd).fillMaxWidth(0.5f).navigationBarsPadding().padding(RoadlySpacing.screenEdge)
+        } else {
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.screenEdge)
+        }
+        Column(bottomModifier) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                // Pas de source de limitation de vitesse en v1 : le badge affiche « — ».
+                // Pas de source de limitation de vitesse hors guidage : le badge affiche « — ».
                 SpeedBadge(speedKmh = state.speedKmh, limitKmh = null)
                 Spacer(Modifier.weight(1f))
                 val recenterIcon = when (state.cameraMode) {
@@ -137,14 +157,14 @@ fun HomeScreen(
                     CameraMode.CENTERED -> Icons.Default.Explore
                     CameraMode.FOLLOW -> Icons.Default.Navigation
                 }
-                GlassIconButton(
+                RoundIconButton(
                     recenterIcon,
                     stringResource(R.string.home_recenter),
                     onClick = vm::onRecenter,
-                    tint = if (state.cameraMode == CameraMode.FREE) c.textPrimary else c.accent,
+                    style = if (state.cameraMode == CameraMode.FREE) RoundButtonStyle.Glass else RoundButtonStyle.Brand,
                 )
             }
-            Spacer(Modifier.height(RoadlySpacing.m))
+            Spacer(Modifier.height(RoadlySpacing.sm))
             when (state.permission) {
                 LocationPermissionState.GRANTED -> BottomPanel(state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance)
                 else -> PermissionPanel(state.permission, onRequestLocationPermission, onOpenAppSettings)
@@ -155,13 +175,21 @@ fun HomeScreen(
     // Point choisi par appui long : fiche avec l'action d'itinéraire.
     state.pickedPlace?.let { p ->
         GlassBottomSheet(onDismiss = vm::onDismissPicked) {
-            Column(Modifier.padding(RoadlySpacing.l).navigationBarsPadding()) {
-                Text(p.name, style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
-                p.address?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.textSecondary) }
+            Column(Modifier.padding(horizontal = RoadlySpacing.l).padding(bottom = RoadlySpacing.l).navigationBarsPadding()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(Icons.Default.Place, style = IconTileStyle.BrandFilled, size = 44.dp)
+                    Spacer(Modifier.width(RoadlySpacing.sm))
+                    Column(Modifier.weight(1f)) {
+                        Text(p.name, style = MaterialTheme.typography.titleLarge, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        p.address?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
                 Spacer(Modifier.height(RoadlySpacing.m))
                 GlassButton(
                     stringResource(R.string.home_picked_route),
                     onClick = { vm.onDismissPicked(); onNavigateToRoute(p) },
+                    style = GlassButtonStyle.Brand,
+                    icon = Icons.Default.Navigation,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -178,55 +206,74 @@ private fun BottomPanel(
     onResumeGuidance: () -> Unit,
 ) {
     val c = LocalRoadlyColors.current
-    GlassPanel(Modifier.fillMaxWidth()) {
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = 14.dp) {
         Column {
             if (isGuiding) {
-                GlassChip(stringResource(R.string.home_resume_guidance), onClick = onResumeGuidance, icon = Icons.Default.Navigation)
-                Spacer(Modifier.height(RoadlySpacing.s))
+                GlassButton(stringResource(R.string.home_resume_guidance), onClick = onResumeGuidance, icon = Icons.Default.Navigation, style = GlassButtonStyle.Brand, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(RoadlySpacing.sm))
             }
-            Text(
-                state.address ?: stringResource(R.string.home_locating),
-                style = MaterialTheme.typography.bodyMedium,
-                color = c.textSecondary,
-                maxLines = 1,
-            )
-            Spacer(Modifier.height(RoadlySpacing.s))
-            Row {
-                ShortcutChip(stringResource(R.string.home_home), Icons.Default.Home, state.home, onNavigateToRoute, onDefine)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(Icons.Default.MyLocation, style = IconTileStyle.Neutral, size = 28.dp)
                 Spacer(Modifier.width(RoadlySpacing.s))
-                ShortcutChip(stringResource(R.string.home_work), Icons.Default.Work, state.work, onNavigateToRoute, onDefine)
+                Text(
+                    state.address ?: stringResource(R.string.home_locating),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = c.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Spacer(Modifier.height(RoadlySpacing.s))
+            Spacer(Modifier.height(RoadlySpacing.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                ShortcutTile(stringResource(R.string.home_home), Icons.Default.Home, state.home, onNavigateToRoute, onDefine, Modifier.weight(1f))
+                ShortcutTile(stringResource(R.string.home_work), Icons.Default.Work, state.work, onNavigateToRoute, onDefine, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(RoadlySpacing.sm))
             // Catégories annoncées mais pas encore disponibles : seul cas « sans action », marqué « Bientôt ».
-            Row(Modifier.horizontalScroll(rememberScrollState())) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 listOf(
                     R.string.home_stations to Icons.Default.LocalGasStation,
                     R.string.home_chargers to Icons.Default.EvStation,
                     R.string.home_parkings to Icons.Default.LocalParking,
                     R.string.home_incidents to Icons.Default.Warning,
                 ).forEach { (label, icon) ->
-                    GlassChip(stringResource(label), onClick = {}, icon = icon, enabled = false, trailing = { ComingSoonTag() })
-                    Spacer(Modifier.width(RoadlySpacing.s))
+                    GlassChip(stringResource(label), onClick = {}, icon = icon, enabled = false, compact = true, trailing = { ComingSoonTag() })
                 }
             }
         }
     }
 }
 
-/** Raccourci Domicile/Travail : lance l'itinéraire s'il est défini, sinon renvoie vers la recherche pour le définir. */
+/** Raccourci Domicile/Travail : tuile avec l'adresse si défini, sinon « Définir » (ouvre la recherche). */
 @Composable
-private fun ShortcutChip(
+private fun ShortcutTile(
     label: String,
     icon: ImageVector,
     place: Place?,
     onNavigateToRoute: (Place) -> Unit,
     onDefine: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    GlassChip(
-        text = if (place != null) label else "$label · ${stringResource(R.string.home_define)}",
-        icon = icon,
-        onClick = { if (place != null) onNavigateToRoute(place) else onDefine() },
-    )
+    val c = LocalRoadlyColors.current
+    Row(
+        modifier
+            .defaultMinSize(minHeight = 56.dp)
+            .clip(RoadlyShapes.Tile)
+            .background(c.glassBorder)
+            .clickable(role = Role.Button, onClick = { if (place != null) onNavigateToRoute(place) else onDefine() })
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTile(icon, style = if (place != null) IconTileStyle.Brand else IconTileStyle.Neutral, size = 36.dp)
+        Spacer(Modifier.width(RoadlySpacing.s))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = c.textPrimary, maxLines = 1)
+            Text(
+                place?.address ?: place?.name ?: stringResource(R.string.home_define),
+                style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 @Composable
@@ -234,9 +281,13 @@ private fun PermissionPanel(state: LocationPermissionState, onRequest: () -> Uni
     val c = LocalRoadlyColors.current
     GlassPanel(Modifier.fillMaxWidth()) {
         Column {
-            Text(stringResource(R.string.home_permission_title), style = MaterialTheme.typography.titleMedium, color = c.textPrimary)
-            Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.home_permission_body), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(Icons.Default.MyLocation, style = IconTileStyle.Accent, size = 44.dp)
+                Spacer(Modifier.width(RoadlySpacing.sm))
+                Text(stringResource(R.string.home_permission_title), style = MaterialTheme.typography.titleMedium, color = c.textPrimary)
+            }
+            Spacer(Modifier.height(RoadlySpacing.s))
+            Text(stringResource(R.string.home_permission_body), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
             Spacer(Modifier.height(RoadlySpacing.m))
             if (state == LocationPermissionState.DENIED_FOREVER) {
                 GlassButton(

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Flèche de position utilisateur : disque cyan, anneau blanc de 3 dp, pointe blanche vers le haut. -->
+<!-- Flèche de position utilisateur : disque violet, anneau blanc de 3 dp, pointe blanche vers le haut. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="40dp"
     android:height="40dp"
     android:viewportWidth="40"
     android:viewportHeight="40">
     <path
-        android:fillColor="#4FD1E0"
+        android:fillColor="#8B5CF6"
         android:strokeColor="#FFFFFF"
         android:strokeWidth="3"
         android:pathData="M20,20m-18.5,0a18.5,18.5 0,1 1,37 0a18.5,18.5 0,1 1,-37 0" />

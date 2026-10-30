@@ -28,15 +28,16 @@ fun GlassBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier, conte
         onDismissRequest = onDismiss,
         modifier = modifier,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = if (c.isDark) Color(0xF2161C24) else Color(0xF7FFFFFF),
+        containerColor = c.surfaceElevated,
+        contentColor = c.textPrimary,
         shape = RoadlyShapes.Sheet,
-        scrimColor = Color.Black.copy(alpha = 0.35f),
-        dragHandle = { Box(Modifier.padding(vertical = 10.dp).width(36.dp).height(4.dp).background(c.textSecondary.copy(alpha = 0.5f), RoundedCornerShape(2.dp))) },
+        scrimColor = Color.Black.copy(alpha = if (c.isDark) 0.5f else 0.3f),
+        dragHandle = { Box(Modifier.padding(vertical = 10.dp).width(36.dp).height(4.dp).background(c.textTertiary.copy(alpha = 0.6f), RoundedCornerShape(2.dp))) },
         content = content,
     )
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0B0F14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
 @Composable
 private fun GlassBottomSheetNightPreview() {
     RoadlyTheme(darkTheme = true) {
@@ -44,7 +45,7 @@ private fun GlassBottomSheetNightPreview() {
     }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF4F6F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
 @Composable
 private fun GlassBottomSheetDayPreview() {
     RoadlyTheme(darkTheme = false) {

@@ -34,7 +34,7 @@ fun LaneStrip(lanes: List<Lane>, modifier: Modifier = Modifier) {
     GlassPanel(modifier.semantics { contentDescription = description }, contentPadding = 8.dp) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             lanes.forEach { lane ->
-                val tint = if (lane.valid) c.accent else c.textSecondary.copy(alpha = 0.5f)
+                val tint = if (lane.valid) c.brandBright else c.textTertiary
                 Box(Modifier.size(width = 32.dp, height = 40.dp), contentAlignment = Alignment.Center) {
                     lane.directions.sortedBy { it.ordinal }.ifEmpty { listOf(LaneDirection.STRAIGHT) }.forEach { d ->
                         Icon(d.icon(), contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))

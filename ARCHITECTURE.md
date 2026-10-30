@@ -15,7 +15,8 @@
 app                 Application Hilt, MainActivity, NavHost typé, résolution du thème, permission localisation
 core:model          GeoPoint, Place, Route/Maneuver, VehicleProfile, LocationFix (JVM pur)
 core:common         Outcome/AppError, Formatters, SunTimes, DispatcherProvider (JVM pur)
-core:designsystem   tokens, RoadlyTheme, composants Glass*, SpeedBadge, RouteCard, états
+core:designsystem   tokens (violet marque / orange action, CockpitTint), RoadlyTheme, Glass*/SurfaceCard, boutons, tuiles, SpeedBadge,
+                    NavInfoBar, HorizonStrip, ListRow/ToggleRow/SegmentedControl, RoadlyTopBar, RouteHeadline/RouteOptionRow (docs/DESIGN-SYSTEM.md)
 core:data           ApiClient (OkHttp, UA, cache, retry 429), ProviderConfig(+Repository), Room, DataStore, ConnectivityObserver
 core:location       LocationRepository (Fused), LocationMode (+ GUIDANCE 1 Hz prioritaire), LocationPermissionState, PermissionEvents, FakeLocationRepository
 core:map            MapController + RoadlyMap (MapLibre), couches GeoJSON (position, tracés, marqueurs), caméra différée
@@ -67,4 +68,4 @@ Supabase : Auth (pseudonyme d'appareil puis e-mail sans mot de passe), tables `r
 
 ## 8. Qualité
 
-224 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.
+230 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.

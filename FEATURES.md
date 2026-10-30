@@ -2,7 +2,7 @@
 
 Référentiel : `docs/SILLAXE-ANALYSE.md` (fonctions vérifiées sur les pages publiques de Sillaxe) et `docs/BENCHMARK-SILLAXE.md` (sources de données et contraintes). Statuts : **non commencée** · **en cours** · **fonctionnelle** · **bloquée** (dépend d'une source externe non configurée). « Palier Sillaxe » = gratuit (G) ou Sillaxe+ (+) chez Sillaxe ; Roadly ne reproduit pas le modèle économique, l'information sert à prioriser.
 
-Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
+Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La matrice de parité complète avec Sillaxe est dans `SILLAXE_PARITY.md` (référence pour les lots suivants) ; le design system est décrit dans `docs/DESIGN-SYSTEM.md`.
 
 État de la Phase 2 : code livré, 224 tests unitaires (JVM) et 3 tests instrumentés passent. Vérifié sur HONOR Magic 8 Pro (Android 17) **à l'arrêt** : démarrage du guidage, service de premier plan, notification et son action « Arrêter », voix et focus audio, écran maintenu allumé, refus de `POST_NOTIFICATIONS` sans plantage. **Non vérifié en conduite** : recalcul, paliers d'annonces, arrivée, « GPS perdu ».
 
@@ -26,7 +26,7 @@ Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
 | Jusqu'à 10 arrêts réordonnables | G | non commencée | 4 | Valhalla multi-locations déjà supporté côté provider |
 | Départ planifié (heure de départ) | G | fonctionnelle | 1 | Décale seulement l'heure d'arrivée |
 | « Arriver à l'heure » + rappel avant départ | G | non commencée | 4 | WorkManager |
-| Mode paysage | G | en cours | 1 | Compose s'adapte ; non vérifié visuellement |
+| Mode paysage | G | en cours | 1 | Accueil, itinéraires et guidage en deux colonnes (LOT 1) ; non vérifié sur appareil |
 | Thème clair / sombre / automatique | G | fonctionnelle | 1 | Auto solaire (position) + système |
 | Mode Silence | G | fonctionnelle | 2 | Bouton voix de l'écran de guidage |
 | Import GPX | ? | non commencée | 5 | |
@@ -38,7 +38,7 @@ Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
 
 | Fonction | Palier | Statut | Phase | Notes |
 |---|---|---|---|---|
-| Bandeau « à venir » : manœuvres, virages | G | fonctionnelle | 2 | 3 prochaines manœuvres (icône, distance, rue) |
+| Ruban Horizon : manœuvres, arrivée | G | fonctionnelle | 2 | `HorizonStrip` (LOT 1) : échelle log 0–5 km, 3 prochaines manœuvres + arrivée ; virages par courbure : LOT 4 |
 | Ralentissements, bouchons, incidents dans le bandeau | G | bloquée | 3 | Dépend trafic |
 | Services (stations, aires) dans le bandeau | G | bloquée | 3 | Dépend POI |
 | Zones de vigilance dans le bandeau | G | bloquée | 3 | Dépend base de zones + cadre légal |
@@ -53,7 +53,7 @@ Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
 | Récents (50), favoris, domicile, travail | G | fonctionnelle | 1 | Local (Room) |
 | Fiche lieu : distance, itinéraire, favori, domicile/travail | G | fonctionnelle | 1 | Retour visuel après « Définir » à ajouter |
 | Appui long sur la carte → destination | G | fonctionnelle | 1 | |
-| Toucher sa position → adresse copiable/partageable | G | en cours | 1 | Adresse affichée ; copie/partage non faits |
+| Toucher sa position → adresse copiable/partageable | G | en cours | 1 | Adresse affichée ; copier/partager faits sur la fiche lieu (LOT 1), pas encore sur la position courante |
 | Horaires d'ouverture des lieux | G | non commencée | 3 | OSM `opening_hours` via Photon/Overpass |
 | Adresses des contacts, lieux de rendez-vous | G | non commencée | 4 | Permissions contacts/calendrier |
 | Commande vocale (Assistant / App Actions) | G | non commencée | 5 | |
@@ -167,7 +167,7 @@ Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
 | Fonction | Statut | Notes |
 |---|---|---|
 | APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
-| Tests unitaires | fonctionnelle | 218 tests (JVM) |
+| Tests unitaires | fonctionnelle | 230 tests (JVM) |
 | Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
 | Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
 | Widgets, Android Auto | non commencée | Phase 5 |

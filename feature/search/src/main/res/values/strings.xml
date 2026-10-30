@@ -5,11 +5,20 @@
     <string name="search_empty_title">Aucun résultat</string>
     <string name="search_empty_subtitle">Essayez une adresse, une ville, un lieu ou des coordonnées (48.85, 2.35)</string>
     <string name="search_idle_title">Recherchez une destination</string>
+    <string name="search_loading">Recherche…</string>
     <string name="search_back">Retour</string>
+    <string name="search_cat_stations">Stations</string>
+    <string name="search_cat_charging">Bornes</string>
+    <string name="search_cat_parkings">Parkings</string>
+    <string name="search_cat_rest_areas">Aires</string>
+    <string name="search_cat_restaurants">Restaurants</string>
     <string name="place_route">Itinéraire</string>
-    <string name="place_favorite_add">Ajouter aux favoris</string>
-    <string name="place_favorite_remove">Retirer des favoris</string>
-    <string name="place_set_home">Définir comme domicile</string>
-    <string name="place_set_work">Définir comme travail</string>
+    <string name="place_favorite_add">Favori</string>
+    <string name="place_favorite_remove">Retirer</string>
+    <string name="place_set_home">Domicile</string>
+    <string name="place_set_work">Travail</string>
+    <string name="place_copy_address">Copier l\'adresse</string>
+    <string name="place_share">Partager</string>
+    <string name="place_share_title">Partager le lieu</string>
     <string name="place_distance">à %1$s</string>
 </resources>

@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fr.roadly.core.designsystem.theme.LocalDrivingMode
@@ -29,6 +30,7 @@ import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 
+/** Puce verre ; [selected] passe en fond marque doux + texte marque (filtres, options). */
 @Composable
 fun GlassChip(
     text: String,
@@ -37,24 +39,29 @@ fun GlassChip(
     icon: ImageVector? = null,
     selected: Boolean = false,
     enabled: Boolean = true,
+    compact: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val c = LocalRoadlyColors.current
-    val minHeight = if (LocalDrivingMode.current) RoadlySpacing.touchTargetDriving else RoadlySpacing.touchTarget
+    val minHeight = when {
+        compact -> 36.dp
+        LocalDrivingMode.current -> RoadlySpacing.touchTargetDriving
+        else -> RoadlySpacing.touchTarget
+    }
+    val fg = if (selected) c.brandBright else c.textPrimary
     Row(
         modifier
             .alpha(if (enabled) 1f else 0.5f)
             .defaultMinSize(minHeight = minHeight)
             .clip(RoadlyShapes.Chip)
-            .background(if (selected) c.accent else c.glass)
-            .border(1.dp, c.glassBorder, RoadlyShapes.Chip)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.s),
+            .background(if (selected) c.brandSoft else c.glass)
+            .border(1.dp, if (selected) c.brand.copy(alpha = 0.6f) else c.glassBorder, RoadlyShapes.Chip)
+            .clickable(enabled = enabled, onClick = onClick, role = Role.Button)
+            .padding(horizontal = if (compact) RoadlySpacing.sm else RoadlySpacing.m, vertical = if (compact) RoadlySpacing.xs else RoadlySpacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val fg = if (selected) c.onAccent else c.textPrimary
         if (icon != null) { Icon(icon, null, tint = fg, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)) }
-        Text(text, style = MaterialTheme.typography.labelLarge, color = fg)
+        Text(text, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge, color = fg)
         if (trailing != null) { Spacer(Modifier.width(6.dp)); trailing() }
     }
 }
@@ -65,16 +72,17 @@ private fun GlassChipSamples() {
         GlassChip("Domicile", onClick = {}, icon = Icons.Default.Home)
         GlassChip("Sans péage", onClick = {}, selected = true)
         GlassChip("Covoiturage", onClick = {}, enabled = false, trailing = { ComingSoonTag() })
+        GlassChip("SP98", onClick = {}, compact = true)
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0B0F14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
 @Composable
 private fun GlassChipNightPreview() {
     RoadlyTheme(darkTheme = true) { GlassChipSamples() }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF4F6F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
 @Composable
 private fun GlassChipDayPreview() {
     RoadlyTheme(darkTheme = false) { GlassChipSamples() }

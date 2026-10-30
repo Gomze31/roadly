@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Roadly" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="android:windowBackground">#0B0F14</item>
+        <item name="android:windowBackground">#0E0B14</item>
     </style>
 </resources>

@@ -3,7 +3,15 @@
     <string name="settings_title">Réglages</string>
     <string name="settings_back">Retour</string>
 
+    <string name="settings_group_driving">Conduite</string>
+    <string name="settings_group_appearance">Apparence</string>
+    <string name="settings_group_routes">Itinéraires</string>
+
     <string name="settings_vehicle">Véhicule</string>
+    <string name="settings_vehicle_none">Non renseigné</string>
+    <!-- Résumé du profil : type · carburant · consommation (unité selon l'énergie). -->
+    <string name="settings_vehicle_summary_fuel">%1$s · %2$s · %3$s L/100</string>
+    <string name="settings_vehicle_summary_electric">%1$s · %2$s · %3$s kWh/100</string>
     <string name="settings_vehicle_type">Type de véhicule</string>
     <string name="settings_fuel">Carburant</string>
     <string name="settings_consumption">Consommation moyenne (L/100 km ou kWh/100 km)</string>
@@ -16,10 +24,12 @@
     <string name="settings_theme_light">Clair</string>
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_theme_auto">Auto (jour/nuit solaire)</string>
+    <string name="settings_theme_auto_short">Auto</string>
 
     <string name="settings_voice">Voix et sons</string>
     <string name="settings_voice_enabled">Annonces vocales</string>
-    <string name="settings_voice_volume">Volume des annonces : %1$d %%</string>
+    <string name="settings_voice_volume">Volume des annonces</string>
+    <string name="settings_voice_volume_value">%1$d %%</string>
     <string name="settings_speed_sound">Son de dépassement de vitesse</string>
     <string name="settings_voice_test">Tester la voix</string>
     <string name="settings_voice_test_phrase">Dans 300 mètres, tournez à droite. Ceci est un test de la voix de guidage Roadly.</string>
@@ -48,6 +58,8 @@
     <string name="settings_privacy_body">Vos positions ne quittent l\'appareil que vers les services listés ci-dessous (géocodage, routage, tuiles). Aucune donnée n\'est vendue ni stockée sur un serveur Roadly en v1.</string>
 
     <string name="settings_providers">Fournisseurs (avancé)</string>
+    <string name="settings_providers_servers">Serveurs de données</string>
+    <string name="settings_providers_servers_subtitle">Adresses, lieux, itinéraires et styles de carte</string>
     <string name="settings_provider_ban">Adresses (BAN)</string>
     <string name="settings_provider_photon">Lieux et POI (Photon)</string>
     <string name="settings_provider_valhalla">Itinéraires (Valhalla)</string>

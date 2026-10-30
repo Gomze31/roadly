@@ -4,6 +4,8 @@ Roadly est une application GPS Android native, écrite en Kotlin avec Jetpack Co
 
 Le nom « Roadly » est provisoire. Tous les fournisseurs de données de la v1 sont gratuits et sans clé d'API.
 
+Objectif du projet : une alternative Android à parité fonctionnelle et visuelle avec Sillaxe (iPhone). L'état de chaque fonction et de chaque écran par rapport à cette référence est tenu dans `SILLAXE_PARITY.md` ; le design system dans `docs/DESIGN-SYSTEM.md`.
+
 Captures d'écran : à ajouter.
 
 ## Prérequis

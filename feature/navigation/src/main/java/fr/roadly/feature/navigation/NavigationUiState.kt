@@ -9,6 +9,8 @@ import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteProgress
 import fr.roadly.core.navigation.NavigationState
 import java.time.ZoneId
+import java.util.Locale
+import kotlin.math.roundToInt
 
 /** LOADING = avant la première émission ; IDLE = guidage terminé → l'écran se ferme. */
 enum class NavigationPhase { LOADING, GUIDING, ARRIVED, FAILED, IDLE }
@@ -22,7 +24,11 @@ data class BannerUi(
     val roundaboutExit: Int?,
 )
 
-data class UpcomingUi(val type: ManeuverType, val distanceText: String, val street: String?)
+/** Manœuvre à venir ; [distanceM] sert au ruban Horizon (échelle), [distanceText] à l'affichage. */
+data class UpcomingUi(val type: ManeuverType, val distanceText: String, val street: String?, val distanceM: Double = 0.0)
+
+/** Valeur et unité séparées pour la barre d'information (« 6 » + « min », « 2,1 » + « km »). */
+data class SplitValue(val value: String, val unit: String)
 
 data class NavigationUiState(
     val phase: NavigationPhase = NavigationPhase.LOADING,
@@ -35,6 +41,8 @@ data class NavigationUiState(
     val etaClock: String = "",
     val remainingDuration: String = "",
     val remainingDistance: String = "",
+    val remainingDurationSplit: SplitValue = SplitValue("", ""),
+    val remainingDistanceSplit: SplitValue = SplitValue("", ""),
     val speedKmh: Double? = null,
     val speedLimitKmh: Int? = null,
     val toleranceKmh: Int = GuidanceDefaults.SPEED_TOLERANCE_KMH,
@@ -44,6 +52,19 @@ data class NavigationUiState(
     val following: Boolean = true,
     val error: AppError? = null,
 )
+
+/** « 6 » / « min » sous l'heure ; « 1 h 12 » / « restant » au-delà d'une heure. */
+internal fun splitDuration(seconds: Double): SplitValue {
+    val totalMin = (seconds / 60).roundToInt()
+    return if (totalMin < 60) SplitValue(totalMin.toString(), "min") else SplitValue(Formatters.duration(seconds), "restant")
+}
+
+/** « 850 » / « m » sous 1 km ; « 2,1 » / « km » ensuite ; entier au-delà de 10 km. */
+internal fun splitDistance(meters: Double): SplitValue = when {
+    meters < 1000 -> SplitValue(((meters / 10).roundToInt() * 10).toString(), "m")
+    meters < 10_000 -> SplitValue(String.format(Locale.FRANCE, "%.1f", meters / 1000), "km")
+    else -> SplitValue((meters / 1000).roundToInt().toString(), "km")
+}
 
 /** Formatage pur (testé via le ViewModel) : distances et durées par `Formatters`, comme la v1. */
 internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean, toleranceKmh: Int, styleUrl: String, zone: ZoneId): NavigationUiState {
@@ -61,7 +82,7 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
             var acc = p.distanceToNextManeuverM
             val upcoming = s.upcoming.mapIndexed { i, u ->
                 acc += ms[next + i].lengthMeters
-                UpcomingUi(u.type, Formatters.distance(acc), u.streetName)
+                UpcomingUi(u.type, Formatters.distance(acc), u.streetName, acc)
             }
             base.copy(
                 phase = NavigationPhase.GUIDING,
@@ -73,6 +94,8 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 etaClock = Formatters.clockTime(s.etaEpochMs, zone),
                 remainingDuration = Formatters.duration(p.remainingDurationS),
                 remainingDistance = Formatters.distance(p.remainingDistanceM),
+                remainingDurationSplit = splitDuration(p.remainingDurationS),
+                remainingDistanceSplit = splitDistance(p.remainingDistanceM),
                 speedKmh = s.speedKmh,
                 speedLimitKmh = s.speedLimitKmh,
                 gpsLost = s.gpsLost,

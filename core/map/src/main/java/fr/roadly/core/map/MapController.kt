@@ -30,6 +30,7 @@ import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
+import org.maplibre.android.style.layers.PropertyFactory.lineBlur
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
@@ -54,8 +55,9 @@ class MapController(internal val context: Context) {
     private var lastActiveRouteId: String? = null
     private var lastMarkers: List<Place> = emptyList()
     private var lastTraversed: String = TraversedFeatureBuilder.EMPTY
-    private var routeColorActive = "#4FD1E0"
-    private var routeColorInactive = "#5B6774"
+    private var routeColorActive = "#B794FF"
+    private var routeColorInactive = "#5A5470"
+    private var routeColorCasing = "#0E0B14"
 
     /** Commande caméra reçue avant que la carte et son style soient prêts ; la dernière l'emporte, rejouée en fin de `replayState`. */
     private var pendingCamera: ((MapLibreMap) -> Unit)? = null
@@ -88,7 +90,11 @@ class MapController(internal val context: Context) {
         currentStyleUrl?.let { loadStyle(it) }
     }
 
-    fun setRouteColors(active: String, inactive: String) { routeColorActive = active; routeColorInactive = inactive; if (styleReady) replayState() }
+    /** Couleurs CSS `#RRGGBB` : tracé actif (halo + trait), tracés inactifs et parcourus, liseré sombre/clair sous le tracé actif. */
+    fun setRouteColors(active: String, inactive: String, casing: String = routeColorCasing) {
+        routeColorActive = active; routeColorInactive = inactive; routeColorCasing = casing
+        if (styleReady) replayState()
+    }
 
     fun setStyle(url: String) {
         if (url == currentStyleUrl && styleReady) return
@@ -109,8 +115,12 @@ class MapController(internal val context: Context) {
         style.addSource(GeoJsonSource(MapIds.SRC_MARKERS))
         style.addSource(GeoJsonSource(MapIds.SRC_USER))
 
+        // Halo lumineux large et translucide sous le tracé actif (lueur), puis liseré, puis trait.
+        style.addLayer(LineLayer(MapIds.LYR_ROUTE_GLOW, MapIds.SRC_ROUTES).withProperties(
+            lineColor(routeColorActive), lineWidth(18f), lineOpacity(0.22f), lineBlur(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+        ).withFilter(eq(get("active"), literal(true))))
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_CASING, MapIds.SRC_ROUTES).withProperties(
-            lineColor("#0B0F14"), lineWidth(10f), lineOpacity(0.6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(routeColorCasing), lineWidth(10f), lineOpacity(0.7f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("active"), literal(true))))
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_INACTIVE, MapIds.SRC_ROUTES).withProperties(
             lineColor(routeColorInactive), lineWidth(5f), lineOpacity(0.85f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
@@ -140,6 +150,8 @@ class MapController(internal val context: Context) {
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
         (style.getLayer(MapIds.LYR_ROUTE_ACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorActive))
+        (style.getLayer(MapIds.LYR_ROUTE_GLOW) as? LineLayer)?.setProperties(lineColor(routeColorActive))
+        (style.getLayer(MapIds.LYR_ROUTE_CASING) as? LineLayer)?.setProperties(lineColor(routeColorCasing))
         (style.getLayer(MapIds.LYR_ROUTE_INACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
@@ -191,12 +203,15 @@ class MapController(internal val context: Context) {
     /** Mémorise la caméra juste avant la destruction de la vue (l'ordre de sortie de composition n'est pas garanti). */
     internal fun captureCamera() { liveCamera()?.let { lastSnapshot = it } }
 
-    fun fitBounds(points: List<GeoPoint>, paddingPx: Int) {
+    fun fitBounds(points: List<GeoPoint>, paddingPx: Int) = fitBounds(points, paddingPx, paddingPx, paddingPx, paddingPx)
+
+    /** Marges distinctes (px) pour laisser le tracé visible sous les panneaux du haut et du bas. */
+    fun fitBounds(points: List<GeoPoint>, left: Int, top: Int, right: Int, bottom: Int) {
         val bbox = BoundingBox.of(points) ?: return
         if (bbox.north == bbox.south && bbox.east == bbox.west) { moveTo(points.first(), 15.0); return }
         val action: (MapLibreMap) -> Unit = { m ->
             val bounds = LatLngBounds.Builder().include(LatLng(bbox.south, bbox.west)).include(LatLng(bbox.north, bbox.east)).build()
-            m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, paddingPx), 600)
+            m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, left, top, right, bottom), 600)
         }
         val m = map
         if (m == null || !styleReady) { pendingCamera = action; return }
