@@ -1,0 +1,70 @@
+package fr.roadly.core.map
+
+import fr.roadly.core.model.LocationFix
+import fr.roadly.core.model.Place
+import fr.roadly.core.model.Route
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
+
+/** Identifiants des sources, calques et images ajoutés au style par Roadly. */
+internal object MapIds {
+    const val SRC_USER = "roadly-user"
+    const val SRC_ROUTES = "roadly-routes"
+    const val SRC_MARKERS = "roadly-markers"
+    const val LYR_ACCURACY = "roadly-accuracy"
+    const val LYR_USER = "roadly-user-arrow"
+    const val LYR_ROUTE_CASING = "roadly-route-casing"
+    const val LYR_ROUTE_INACTIVE = "roadly-route-inactive"
+    const val LYR_ROUTE_ACTIVE = "roadly-route-active"
+    const val LYR_MARKERS = "roadly-markers"
+    const val IMG_ARROW = "roadly-img-arrow"
+    const val IMG_PIN = "roadly-img-pin"
+}
+
+/** GeoJSON FeatureCollection des tracés ; l'itinéraire actif est placé en dernier (dessiné au-dessus). */
+object RouteFeatureBuilder {
+    fun build(routes: List<Route>, activeId: String?): String {
+        val ordered = routes.filter { it.id != activeId } + routes.filter { it.id == activeId }
+        return buildJsonObject {
+            put("type", "FeatureCollection")
+            putJsonArray("features") {
+                ordered.forEach { r ->
+                    add(buildJsonObject {
+                        put("type", "Feature")
+                        putJsonObject("properties") { put("id", r.id); put("active", r.id == activeId) }
+                        putJsonObject("geometry") {
+                            put("type", "LineString")
+                            put("coordinates", JsonArray(r.geometry.map { p -> JsonArray(listOf(JsonPrimitive(p.lon), JsonPrimitive(p.lat))) }))
+                        }
+                    })
+                }
+            }
+        }.toString()
+    }
+}
+
+/** Builders GeoJSON des points : position de l'utilisateur et marqueurs de lieux. */
+internal object PointFeatureBuilder {
+    fun user(fix: LocationFix): String = buildJsonObject {
+        put("type", "Feature")
+        putJsonObject("properties") { put("bearing", (fix.bearingDeg ?: 0f).toDouble()); put("accuracy", fix.accuracyM.toDouble()) }
+        putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(fix.point.lon), JsonPrimitive(fix.point.lat)))) }
+    }.toString()
+
+    fun markers(places: List<Place>): String = buildJsonObject {
+        put("type", "FeatureCollection")
+        putJsonArray("features") {
+            places.forEach { p ->
+                add(buildJsonObject {
+                    put("type", "Feature")
+                    putJsonObject("properties") { put("id", p.id); put("name", p.name) }
+                    putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(p.point.lon), JsonPrimitive(p.point.lat)))) }
+                })
+            }
+        }
+    }.toString()
+}

@@ -27,4 +27,6 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
     api(libs.maplibre)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.serialization.json)
+    testImplementation(libs.junit)
 }
