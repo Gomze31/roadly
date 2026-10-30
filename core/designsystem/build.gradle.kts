@@ -26,5 +26,8 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.androidx.core.ktx)
     androidTestImplementation(libs.compose.ui.test.junit4)
+    // Compose pulls espresso-core 3.5.0, which crashes on Android 16+ (InputManager.getInstance removed).
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.androidx.test.runner)
     debugImplementation(libs.compose.ui.test.manifest)
 }

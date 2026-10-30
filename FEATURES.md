@@ -4,7 +4,7 @@ Référentiel : `docs/SILLAXE-ANALYSE.md` (fonctions vérifiées sur les pages p
 
 Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
 
-État de la Phase 2 : le code est livré et couvert par 218 tests unitaires (JVM) qui passent. **La vérification sur appareil n'a pas eu lieu** (téléphone déconnecté pendant la Task 12) : les statuts « fonctionnelle » de la Phase 2 signifient « code livré et testé en JVM », pas « vérifié en conduite ».
+État de la Phase 2 : code livré, 224 tests unitaires (JVM) et 3 tests instrumentés passent. Vérifié sur HONOR Magic 8 Pro (Android 17) **à l'arrêt** : démarrage du guidage, service de premier plan, notification et son action « Arrêter », voix et focus audio, écran maintenu allumé, refus de `POST_NOTIFICATIONS` sans plantage. **Non vérifié en conduite** : recalcul, paliers d'annonces, arrivée, « GPS perdu ».
 
 ## 1. Navigation et guidage
 
@@ -169,6 +169,6 @@ Mise à jour : 2026-10-30 (Phase 2 guidage, branche `feat/roadly-v1`).
 | APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
 | Tests unitaires | fonctionnelle | 218 tests (JVM) |
 | Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
-| Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; non vérifié sur appareil |
+| Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
 | Widgets, Android Auto | non commencée | Phase 5 |
 | Backend Supabase | non commencée | Phase 3 |

@@ -1,6 +1,6 @@
 # Roadly
 
-Roadly est une application GPS Android native, écrite en Kotlin avec Jetpack Compose. Elle affiche une carte, suit la position de l'utilisateur, recherche des adresses et des lieux, et compare trois itinéraires en voiture (rapide, court, sans péage). La version actuelle est la **v0.1.0** : elle livre la Phase 1 de la feuille de route et le guidage pas à pas de la Phase 2 (code livré et testé en JVM ; la vérification sur appareil reste à faire, voir « Vérification sur appareil »). Pas de trafic.
+Roadly est une application GPS Android native, écrite en Kotlin avec Jetpack Compose. Elle affiche une carte, suit la position de l'utilisateur, recherche des adresses et des lieux, et compare trois itinéraires en voiture (rapide, court, sans péage). La version actuelle est la **v0.1.0** : elle livre la Phase 1 de la feuille de route et le guidage pas à pas de la Phase 2 (testé en JVM et vérifié à l'arrêt sur appareil, voir « Vérification sur appareil »). Pas de trafic.
 
 Le nom « Roadly » est provisoire. Tous les fournisseurs de données de la v1 sont gratuits et sans clé d'API.
 
@@ -30,13 +30,25 @@ Depuis la racine du dépôt (PowerShell sous Windows) :
 .\gradlew.bat connectedDebugAndroidTest
 ```
 
-État de la vérification : **218 tests unitaires passent** (`testDebugUnitTest :core:model:test :core:common:test`, 0 échec). Les tests instrumentés (Room, Compose) existent mais **n'ont pas été exécutés** pour la Phase 2.
+État de la vérification : **224 tests unitaires passent** (`testDebugUnitTest :core:model:test :core:common:test`, 0 échec). Les **3 tests instrumentés passent** sur le HONOR Magic 8 Pro (Android 17) : `FavoriteDaoTest` (2) et `GlassSearchBarTest` (1). Deux correctifs de configuration ont été nécessaires : `core:navigation` déclarait `AndroidJUnitRunner` sans la dépendance `androidx.test:runner` (plantage du processus de test), et `core:designsystem` héritait d'`espresso-core 3.5.0` via Compose, dont `InputManager.getInstance` n'existe plus sur Android 16+ (`espresso-core 3.7.0` forcé).
 
 L'APK de debug pèse environ 116 Mo (121 596 756 octets), car MapLibre embarque ses bibliothèques natives pour toutes les architectures. Un App Bundle ou des découpages par ABI réduiraient fortement cette taille ; ce n'est pas fait.
 
-### Vérification sur appareil (en attente)
+### Vérification sur appareil (faite le 2026-10-30, HONOR Magic 8 Pro, Android 17)
 
-Pendant l'intégration finale de la Phase 2 (Task 12), le HONOR Magic 8 Pro n'était plus visible par ADB (`adb devices` vide). Ne sont donc **pas vérifiés** : l'installation de l'APK de la Phase 2, `connectedDebugAndroidTest`, et le contrôle manuel du guidage (service de premier plan, notification, écran maintenu allumé, voix française et focus audio, bouton Arrêter). À refaire téléphone branché : `adb install -r app\build\outputs\apk\debug\app-debug.apk`, puis `.\gradlew.bat connectedDebugAndroidTest`, puis un guidage réel.
+Vérifié à l'arrêt, position réelle à Toulouse, destination Place du Capitole (6,5 km) :
+
+- Recherche BAN/Photon, fiche lieu, trois itinéraires Valhalla, « Démarrer ».
+- `NavigationService` : `isForeground=true`, `foregroundId=4201`, type `0x00000008` (location) ; notification sur le canal `roadly.navigation` (importance LOW, `ONGOING_EVENT|NO_CLEAR`, action « Arrêter », texte « Serrez à gauche dans … · 20 m · arrivée 23:59 »).
+- Un appui sur la notification ramène à l'écran de guidage ; « Arrêter » depuis la notification arrête le service et retire la notification.
+- Voix : moteur `com.google.android.tts` connecté, focus audio `USAGE_ASSISTANCE_NAVIGATION_GUIDANCE` demandé (`GAIN_TRANSIENT_MAY_DUCK`) puis rendu après l'annonce.
+- `FLAG_KEEP_SCREEN_ON` posé pendant le guidage.
+- `POST_NOTIFICATIONS` refusé : le dialogue système s'affiche, le guidage démarre quand même, aucun plantage.
+- Aucun `FATAL EXCEPTION` dans logcat sur tout le parcours.
+
+**Non vérifié** (demande un trajet réel ou une position simulée) : recalcul hors itinéraire, paliers d'annonces en roulant, arrivée, badge « GPS perdu ».
+
+Défauts d'interface relevés, non corrigés : le tracé est partiellement masqué par les cartes d'itinéraires (`fitBounds` sans marge basse) ; le bouton « Définir comme travail » de la fiche lieu déborde sur une colonne étroite.
 
 ## Structure des modules
 

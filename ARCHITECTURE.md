@@ -59,7 +59,7 @@ Chaque fournisseur renvoie `Outcome.Failure(AppError)` ; aucune exception ne tra
 - `core:location` : `LocationMode.GUIDANCE` (1 Hz) imposé par `setGuidanceActive(true)`, prioritaire sur le mode des écrans.
 - `feature:navigation` : écran de guidage, `RoadlyTheme(drivingMode = true)`, `FLAG_KEEP_SCREEN_ON`, tracé parcouru atténué (`MapController.setTraversed`, seconde source GeoJSON).
 - Doubles de test partagés : `FakeUserPreferencesRepository` (`core:data`), `FakeSpeechService`, `FakeNavigationServiceController`, `TestRoutes` (`core:navigation`).
-- Non vérifié sur appareil : service de premier plan, notification, focus audio, voix française disponible (voir `README.md`).
+- Vérifié sur appareil à l'arrêt (HONOR Magic 8 Pro, Android 17) : service de premier plan `location`, notification et action « Arrêter », focus audio et voix Google TTS, écran maintenu allumé, refus de `POST_NOTIFICATIONS` toléré. Non vérifié en conduite : recalcul, paliers, arrivée (voir `README.md`).
 
 ## 7. Backend (Phase 3+)
 
@@ -67,4 +67,4 @@ Supabase : Auth (pseudonyme d'appareil puis e-mail sans mot de passe), tables `r
 
 ## 8. Qualité
 
-218 tests unitaires (JVM) + 2 tests instrumentés (Room, Compose), non exécutés depuis la Phase 2 (téléphone déconnecté) ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.
+224 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.
