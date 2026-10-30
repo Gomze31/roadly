@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -38,7 +39,9 @@ class SearchViewModel @Inject constructor(
 
     private val query = MutableStateFlow("")
     private val selected = MutableStateFlow<Place?>(null)
-    private val selectedIsFavorite = MutableStateFlow(false)
+    // Dérivés : le statut favori suit la base, la distance suit la dernière position connue.
+    private val selectedIsFavorite = combine(selected, favorites.observeAll()) { s, favs -> s != null && favs.any { it.id == s.id } }
+    private val selectedDistance = selected.map { s -> s?.let { location.lastKnown?.point?.distanceTo(it.point) } }
     private val online = connectivity.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     // Compteur de relance : permet de rejouer la même requête (le distinctUntilChanged l'ignorerait sinon).
@@ -51,7 +54,7 @@ class SearchViewModel @Inject constructor(
         .onStart { emit(SearchResults.Idle) }
 
     val uiState: StateFlow<SearchUiState> = combine(
-        query, results, recents.observe(), favorites.observeAll(), online, selected, selectedIsFavorite,
+        query, results, recents.observe(), favorites.observeAll(), online, selected, selectedIsFavorite, selectedDistance,
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         SearchUiState(
@@ -62,6 +65,7 @@ class SearchViewModel @Inject constructor(
             isOnline = values[4] as Boolean,
             selected = values[5] as Place?,
             selectedIsFavorite = values[6] as Boolean,
+            selectedDistanceMeters = values[7] as Double?,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchUiState())
 
@@ -86,8 +90,8 @@ class SearchViewModel @Inject constructor(
     fun onPlaceSelected(place: Place) {
         selected.value = place
         viewModelScope.launch {
-            recents.record(place)
-            selectedIsFavorite.value = favorites.isFavorite(place.id)
+            // Une erreur de stockage ne doit pas faire planter l'app.
+            runCatching { recents.record(place) }
         }
     }
 
@@ -95,9 +99,9 @@ class SearchViewModel @Inject constructor(
 
     fun onToggleFavorite() {
         val p = selected.value ?: return
-        viewModelScope.launch { favorites.toggle(p); selectedIsFavorite.value = favorites.isFavorite(p.id) }
+        viewModelScope.launch { favorites.toggle(p) }
     }
 
-    fun onSetHome() { val p = selected.value ?: return; viewModelScope.launch { favorites.setHome(p); selectedIsFavorite.value = true } }
-    fun onSetWork() { val p = selected.value ?: return; viewModelScope.launch { favorites.setWork(p); selectedIsFavorite.value = true } }
+    fun onSetHome() { val p = selected.value ?: return; viewModelScope.launch { favorites.setHome(p) } }
+    fun onSetWork() { val p = selected.value ?: return; viewModelScope.launch { favorites.setWork(p) } }
 }

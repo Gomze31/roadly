@@ -37,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import fr.roadly.core.common.AppError
 import fr.roadly.core.designsystem.component.EmptyState
 import fr.roadly.core.designsystem.component.ErrorState
 import fr.roadly.core.designsystem.component.GlassIconButton
@@ -68,7 +69,13 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
         when (val r = state.results) {
             SearchResults.Idle -> SuggestionsList(state, onSelect = vm::onPlaceSelected)
             SearchResults.Loading -> Column(Modifier.fillMaxWidth().padding(RoadlySpacing.xl), horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(color = c.accent) }
-            is SearchResults.Error -> ErrorState(r.error.userMessage(), onRetry = vm::retry)
+            is SearchResults.Error ->
+                if (r.error == AppError.Network) {
+                    // Hors ligne : on garde favoris et récents sous le message d'erreur.
+                    SuggestionsList(state, onSelect = vm::onPlaceSelected, header = { ErrorState(r.error.userMessage(), onRetry = vm::retry) })
+                } else {
+                    ErrorState(r.error.userMessage(), onRetry = vm::retry)
+                }
             is SearchResults.Content -> if (r.places.isEmpty()) {
                 EmptyState(Icons.Default.Search, stringResource(R.string.search_empty_title), stringResource(R.string.search_empty_subtitle))
             } else {
@@ -81,7 +88,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
         PlaceSheet(
             place = place,
             isFavorite = state.selectedIsFavorite,
-            distanceMeters = null,
+            distanceMeters = state.selectedDistanceMeters,
             onDismiss = vm::onDismissPlace,
             onRoute = { vm.onDismissPlace(); onNavigateToRoute(place) },
             onToggleFavorite = vm::onToggleFavorite,
@@ -92,12 +99,14 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
 }
 
 @Composable
-private fun SuggestionsList(state: SearchUiState, onSelect: (Place) -> Unit) {
+private fun SuggestionsList(state: SearchUiState, onSelect: (Place) -> Unit, header: (@Composable () -> Unit)? = null) {
     if (state.recents.isEmpty() && state.favorites.isEmpty()) {
-        EmptyState(Icons.Default.Search, stringResource(R.string.search_idle_title), stringResource(R.string.search_empty_subtitle))
+        if (header != null) header()
+        else EmptyState(Icons.Default.Search, stringResource(R.string.search_idle_title), stringResource(R.string.search_empty_subtitle))
         return
     }
     LazyColumn {
+        if (header != null) item { header() }
         if (state.favorites.isNotEmpty()) {
             item { SectionTitle(stringResource(R.string.search_favorites)) }
             items(state.favorites, key = { "f" + it.id }) { p -> PlaceRow(p, icon = Icons.Default.Star, onClick = { onSelect(p) }) }

@@ -5,6 +5,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +79,17 @@ class SearchViewModelTest {
             assertEquals(0, geocoder.queries.size)
             assertTrue(s.results is SearchResults.Error && (s.results as SearchResults.Error).error == AppError.Network)
             assertEquals(listOf(paris), s.recents)
+        }
+    }
+
+    @Test fun `selected place exposes distance from last known position`() = runTest {
+        val here = GeoPoint(48.85, 2.35)
+        location.lastKnown = LocationFix(here, null, null, 5f, 0L)
+        val vm = vm()
+        vm.uiState.test {
+            vm.onPlaceSelected(paris); advanceTimeBy(10)
+            val s = expectMostRecentItem()
+            assertEquals(here.distanceTo(paris.point), s.selectedDistanceMeters!!, 1.0)
         }
     }
 

@@ -18,4 +18,5 @@ data class SearchUiState(
     val isOnline: Boolean = true,
     val selected: Place? = null,
     val selectedIsFavorite: Boolean = false,
+    val selectedDistanceMeters: Double? = null,
 )
