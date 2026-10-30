@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -77,10 +78,18 @@ class ValhallaTraceSpeedLimitProvider @Inject constructor(
         }
     }
 
+    /**
+     * Limitation de l'arête du fix le plus récent : `edge_index` du dernier `matched_points` s'il désigne une
+     * arête existante, sinon dernière arête de `edges`. Toute valeur absente ou hors de 1..254 donne `null`.
+     */
     private fun parse(text: String): Int? = runCatching {
-        val edges = json.parseToJsonElement(text).jsonObject["edges"]?.jsonArray ?: return null
-        val last = edges.lastOrNull() as? JsonObject ?: return null
-        (last["speed_limit"] as? JsonPrimitive)?.intOrNull?.takeIf { it in 1..254 }
+        val root = json.parseToJsonElement(text).jsonObject
+        val edges = root["edges"]?.jsonArray ?: return null
+        val matchedIndex = ((root["matched_points"] as? JsonArray)?.lastOrNull() as? JsonObject)
+            ?.get("edge_index").let { it as? JsonPrimitive }?.takeIf { !it.isString }?.intOrNull
+        val edge = (if (matchedIndex != null && matchedIndex in edges.indices) edges[matchedIndex] else edges.lastOrNull())
+            as? JsonObject ?: return null
+        (edge["speed_limit"] as? JsonPrimitive)?.intOrNull?.takeIf { it in 1..254 }
     }.getOrNull()
 
     companion object {

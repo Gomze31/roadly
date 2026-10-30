@@ -32,6 +32,8 @@ class ValhallaTraceSpeedLimitProviderTest {
     private var now = 100_000L
     private val cfg = MutableStateFlow(ProviderConfig.DEFAULT)
     private lateinit var provider: ValhallaTraceSpeedLimitProvider
+    private lateinit var dispatchers: DispatcherProvider
+    private lateinit var config: ProviderConfigRepository
     private val fixes = listOf(
         LocationFix(GeoPoint(48.8566, 2.3522), 90f, 13f, 5f, 0L),
         LocationFix(GeoPoint(48.8567, 2.3530), 90f, 13f, 5f, 1_000L),
@@ -39,16 +41,25 @@ class ValhallaTraceSpeedLimitProviderTest {
 
     @Before fun setUp() {
         server.start()
-        val dispatchers = object : DispatcherProvider {
+        dispatchers = object : DispatcherProvider {
             override val io = Dispatchers.Unconfined; override val default = Dispatchers.Unconfined; override val main = Dispatchers.Unconfined
         }
-        val config = object : ProviderConfigRepository {
+        config = object : ProviderConfigRepository {
             override val config = cfg
             override suspend fun override(config: ProviderConfig) = Unit
             override suspend fun reset() = Unit
         }
         provider = ValhallaTraceSpeedLimitProvider(ApiClient(OkHttpClient(), dispatchers), config, json) { now }
     }
+
+    /** Fournisseur dont le client HTTP échoue bruyamment au moindre appel réseau. */
+    private fun tripwireProvider() = ValhallaTraceSpeedLimitProvider(
+        ApiClient(
+            OkHttpClient.Builder().addInterceptor { throw AssertionError("network call on public instance") }.build(),
+            dispatchers,
+        ),
+        config, json,
+    ) { now }
     @After fun tearDown() = server.shutdown()
 
     private fun selfHosted() { cfg.value = ProviderConfig.DEFAULT.copy(valhallaBaseUrl = server.url("/").toString().trimEnd('/')) }
@@ -56,8 +67,13 @@ class ValhallaTraceSpeedLimitProviderTest {
     @Test fun `public FOSSGIS instance is never called`() = runTest {
         assertTrue(ValhallaTraceSpeedLimitProvider.isPublicInstance("https://valhalla1.openstreetmap.de/trace_attributes".toHttpUrl()))
         assertFalse(ValhallaTraceSpeedLimitProvider.isPublicInstance("https://valhalla.exemple.fr/trace_attributes".toHttpUrl()))
-        assertEquals(Outcome.Success(null), provider.speedLimitKmh(fixes))
+        assertEquals(Outcome.Success(null), tripwireProvider().speedLimitKmh(fixes))
         assertEquals(0, server.requestCount)
+    }
+
+    @Test fun `public FOSSGIS instance with a trailing slash is never called`() = runTest {
+        cfg.value = ProviderConfig.DEFAULT.copy(valhallaBaseUrl = "https://valhalla1.openstreetmap.de/")
+        assertEquals(Outcome.Success(null), tripwireProvider().speedLimitKmh(fixes))
     }
 
     @Test fun `self hosted instance returns the last edge limit and sends the required filters`() = runTest {
@@ -74,6 +90,28 @@ class ValhallaTraceSpeedLimitProviderTest {
             listOf("edge.speed_limit", "edge.names", "edge.road_class"),
             body["filters"]!!.jsonObject["attributes"]!!.jsonArray.map { it.jsonPrimitive.content },
         )
+    }
+
+    @Test fun `limit comes from the edge of the last matched point`() = runTest {
+        selfHosted()
+        server.enqueue(
+            MockResponse().setBody(
+                """{"matched_points":[{"edge_index":0},{"edge_index":0}],"edges":[{"speed_limit":30},{"speed_limit":50}]}""",
+            ),
+        )
+        assertEquals(Outcome.Success(30), provider.speedLimitKmh(fixes))
+    }
+
+    @Test fun `without matched points the last edge is used`() = runTest {
+        selfHosted()
+        server.enqueue(MockResponse().setBody("""{"edges":[{"speed_limit":30},{"speed_limit":50}]}"""))
+        assertEquals(Outcome.Success(50), provider.speedLimitKmh(fixes))
+    }
+
+    @Test fun `out of range edge index falls back to the last edge`() = runTest {
+        selfHosted()
+        server.enqueue(MockResponse().setBody("""{"matched_points":[{"edge_index":7}],"edges":[{"speed_limit":30},{"speed_limit":50}]}"""))
+        assertEquals(Outcome.Success(50), provider.speedLimitKmh(fixes))
     }
 
     @Test fun `unknown or unlimited limits give null`() = runTest {

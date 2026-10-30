@@ -11,9 +11,15 @@ class FakeSpeechService : SpeechService {
         private set
     var stops = 0
         private set
+    var muted = false
+        private set
+    var releases = 0
+        private set
 
     override fun speak(text: String, flush: Boolean) { spoken += text }
     override fun setVolume(percent: Int) { volume = percent.coerceIn(0, 100) }
     override fun beep() { beeps++ }
+    override fun setMuted(muted: Boolean) { this.muted = muted }
     override fun stop() { stops++ }
+    override fun release() { releases++ }
 }

@@ -8,6 +8,13 @@ interface SpeechService {
     fun setVolume(percent: Int)
     /** Son court d'alerte de dépassement. */
     fun beep()
+    /**
+     * Sourdine : à `true`, coupe la parole en cours et vide la file ([stop]) ; tant qu'elle est active,
+     * [speak] ne fait rien (ni file, ni focus audio).
+     */
+    fun setMuted(muted: Boolean)
     /** Coupe la parole en cours et vide la file. */
     fun stop()
+    /** Libère le moteur de synthèse (et le focus audio) ; il sera recréé au prochain [speak]. */
+    fun release()
 }
