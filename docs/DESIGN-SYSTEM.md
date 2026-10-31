@@ -15,6 +15,7 @@ Module : `core:designsystem`. Objectif : une interface de cockpit GPS premium (s
 | `brand`, `brandBright`, `onBrand`, `brandSoft` | violet de marque : tracé, sélection, boutons ronds de navigation, tuiles d'icônes |
 | `accent`, `onAccent`, `accentSoft` | orange : appels à l'action (Démarrer, Essayer, Valider), surtitres |
 | `routeActive`, `routeInactive`, `routeCasing` | couleurs du tracé MapLibre (halo + trait, alternatives, liseré) |
+| `buildings3d` | façades des bâtiments en 3D pendant le guidage |
 | `danger`, `dangerSoft`, `warning`, `success` | arrêter / erreurs, vigilance / ralentissements, services / en ligne |
 | `speedRing` | bord rouge du panneau de limitation |
 
