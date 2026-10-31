@@ -10,6 +10,12 @@
     <string name="nav_mute">Couper la voix</string>
     <string name="nav_unmute">Réactiver la voix</string>
     <string name="nav_recenter">Recentrer</string>
+    <string name="nav_recenter_in">Recentrage dans %1$d s</string>
+    <string name="nav_recenter_cancel">Annuler</string>
+    <string name="nav_view_2d">Passer en vue 2D</string>
+    <string name="nav_view_3d">Passer en vue 3D</string>
+    <string name="nav_north_up">Nord en haut</string>
+    <string name="nav_heading_up">Orienter la carte dans le sens de la route</string>
     <string name="nav_change_destination">Changer de destination</string>
     <string name="nav_collapse_banner">Replier le bandeau</string>
     <string name="nav_expand_banner">Déplier le bandeau</string>

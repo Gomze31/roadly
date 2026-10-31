@@ -3,6 +3,7 @@ package fr.roadly.feature.navigation
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.SystemClock
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -24,11 +25,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
@@ -43,6 +48,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.State
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -76,9 +83,10 @@ import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
-import fr.roadly.core.map.GuidanceCamera
-import fr.roadly.core.map.GuidanceCameraInput
-import fr.roadly.core.map.GuidanceCameraPolicy
+import fr.roadly.core.map.CameraMode3D
+import fr.roadly.core.map.MapController
+import fr.roadly.core.map.NavigationCameraController
+import fr.roadly.core.map.NavigationCameraInput
 import fr.roadly.core.map.ManeuverArrowBuilder
 import fr.roadly.core.map.RoadlyMap
 import fr.roadly.core.map.rememberMapController
@@ -86,7 +94,10 @@ import fr.roadly.core.map.rememberPowerSaveMode
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.Route
+import fr.roadly.core.model.RouteProgress
 import java.util.Locale
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}, vm: NavigationViewModel = hiltViewModel()) {
@@ -101,7 +112,9 @@ fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: (
 
 @Composable
 private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit, vm: NavigationViewModel) {
-    val state by vm.uiState.collectAsStateWithLifecycle()
+    // C3 : l'état est lu deux fois — par délégation pour les overlays, par `snapshotFlow` (sans recomposition) pour la carte.
+    val uiState = vm.uiState.collectAsStateWithLifecycle()
+    val state by uiState
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
     var bannerExpanded by rememberSaveable { mutableStateOf(true) }
@@ -121,37 +134,25 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
             map.clearTraversed()
         }
     }
-    val progress = state.progress
-    val following = state.following
-    val threeD by vm.map3d.collectAsStateWithLifecycle()
-    val powerSave by rememberPowerSaveMode()
-    LaunchedEffect(threeD, powerSave, c.buildings3d) { map.setBuildings3d(threeD && !powerSave, c.buildings3d.toHex()) }
-    LaunchedEffect(c.onBrand, c.brand) { map.setArrowColor(c.onBrand.toHex(), c.brand.toHex()) }
-    LaunchedEffect(progress) {
-        if (route != null && progress != null) {
-            map.setUserLocation(LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L))
-            map.setTraversed(route.geometry, progress.segmentIndex, progress.snapped)
-        }
+    val cameraMode = vm.cameraMode.collectAsStateWithLifecycle()
+    val powerSave = rememberPowerSaveMode()
+    // Bâtiments 3D : en mode 3D seulement, et jamais en économie d'énergie.
+    LaunchedEffect(cameraMode.value, powerSave.value, c.buildings3d) {
+        map.setBuildings3d(cameraMode.value == CameraMode3D.FOLLOW_3D && !powerSave.value, c.buildings3d.toHex())
     }
+    LaunchedEffect(c.onBrand, c.brand) { map.setArrowColor(c.onBrand.toHex(), c.brand.toHex()) }
     val approach = state.approach
     LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
         if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
     }
-    // Dernière caméra calculée : le cap y est conservé à l'arrêt et le zoom lissé d'une position à l'autre.
-    val lastCamera = remember { arrayOfNulls<GuidanceCamera>(1) }
+    // Retour depuis la recherche : la dernière caméra du guidage revient avec son inclinaison, sans attendre la prochaine position.
+    DisposableEffect(map) { onDispose { vm.rememberCamera(map.cameraPosition()) } }
+    LaunchedEffect(map) { vm.lastCamera?.let { map.restore(it, keepTilt = true) } }
+    val camera = remember { NavigationCameraController() }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
-        LaunchedEffect(progress, following, approach != null, threeD, powerSave, landscape) {
-            if (route == null || progress == null || !following) return@LaunchedEffect
-            val next = route.maneuvers.getOrNull(progress.nextManeuverIndex) ?: return@LaunchedEffect
-            val cam = GuidanceCameraPolicy.compute(
-                GuidanceCameraInput(state.speedKmh, progress.bearingDeg, progress.distanceToNextManeuverM, next.type, threeD, powerSave, landscape, approaching = approach != null),
-                lastCamera[0],
-            )
-            lastCamera[0] = cam
-            map.applyGuidanceCamera(progress.snapped, cam)
-        }
+        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera)
         // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
         val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
@@ -222,6 +223,7 @@ private fun PortraitOverlay(
             )
             RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
             if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
+            CameraModeButtons(vm)
         }
 
         Column(
@@ -284,6 +286,8 @@ private fun LandscapeOverlay(
         }
         // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges).
         Row(Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm), verticalAlignment = Alignment.Bottom) {
+            CameraModeButtons(vm)
+            Spacer(Modifier.width(RoadlySpacing.s))
             Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.End) {
                 if (state.gpsLost) GpsLostPill()
                 StatusPills(state)
@@ -303,6 +307,8 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
             AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()) {
                 HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
             }
+            val recenterIn by vm.recenterInSeconds.collectAsStateWithLifecycle()
+            recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }
             NavInfoBar(
                 etaClock = state.etaClock, etaLabel = stringResource(R.string.nav_eta_label),
                 minutesValue = state.remainingDurationSplit.value, minutesLabel = state.remainingDurationSplit.unit,
@@ -458,6 +464,94 @@ private fun ReportResultPillNav(message: String?, modifier: Modifier = Modifier)
                 stringResource(when { ok -> R.string.nav_report_sent; message == "error:RateLimited" -> R.string.nav_report_rate_limited; else -> R.string.nav_report_failed }),
                 style = MaterialTheme.typography.labelLarge, color = if (ok) c.success else c.danger,
             )
+        }
+    }
+}
+
+/** Ce que la carte du guidage reflète ; comparé pour n'agir que sur un vrai changement (position, suivi, mode, économie). */
+private data class MapTick(
+    val route: Route?,
+    val progress: RouteProgress?,
+    val speedKmh: Double?,
+    val approaching: Boolean,
+    val following: Boolean,
+    val mode: CameraMode3D,
+    val powerSave: Boolean,
+)
+
+/**
+ * C3 : position, tronçon parcouru et caméra pilotés par un seul `snapshotFlow`, hors recomposition des overlays
+ * (au lieu de `LaunchedEffect` relancés à chaque position). C1 : caméra lissée, transitions, recentrage adouci.
+ */
+@Composable
+private fun GuidanceMapEffects(
+    ui: State<NavigationUiState>,
+    mode: State<CameraMode3D>,
+    powerSave: State<Boolean>,
+    landscape: Boolean,
+    map: MapController,
+    camera: NavigationCameraController,
+) {
+    LaunchedEffect(map, camera, landscape) {
+        var lastProgress: RouteProgress? = null
+        var lastRouteId: String? = null
+        var wasFollowing = true
+        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value) } }
+            .distinctUntilChanged()
+            .collect { t ->
+                val route = t.route ?: return@collect
+                val progress = t.progress ?: return@collect
+                if (route.id != lastRouteId) { lastRouteId = route.id; camera.reset() }
+                if (progress !== lastProgress) {
+                    lastProgress = progress
+                    map.setUserLocation(LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L))
+                    map.setTraversed(route.geometry, progress.segmentIndex, progress.snapped)
+                }
+                if (!t.following) { wasFollowing = false; return@collect }
+                if (!wasFollowing) { wasFollowing = true; camera.requestTransition() }
+                val next = route.maneuvers.getOrNull(progress.nextManeuverIndex) ?: return@collect
+                val frame = camera.update(
+                    NavigationCameraInput(
+                        point = progress.snapped, bearingDeg = progress.bearingDeg, speedKmh = t.speedKmh,
+                        distanceToManeuverM = progress.distanceToNextManeuverM, maneuverType = next.type, approaching = t.approaching,
+                        mode = t.mode, powerSave = t.powerSave, landscape = landscape, nowMs = SystemClock.elapsedRealtime(),
+                    ),
+                )
+                map.applyGuidanceCamera(frame.point, frame.camera, frame.durationMs, frame.eased)
+            }
+    }
+}
+
+/** Boutons 2D / 3D et « nord en haut » (C1), côte à côte pour ne prendre qu'une rangée. */
+@Composable
+private fun CameraModeButtons(vm: NavigationViewModel) {
+    val mode by vm.cameraMode.collectAsStateWithLifecycle()
+    Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
+        val is3d = mode == CameraMode3D.FOLLOW_3D
+        RoundIconButton(
+            if (is3d) Icons.Default.Map else Icons.Default.ViewInAr,
+            stringResource(if (is3d) R.string.nav_view_2d else R.string.nav_view_3d),
+            onClick = vm::toggleCameraMode,
+        )
+        val northUp = mode == CameraMode3D.NORTH_UP
+        RoundIconButton(
+            if (northUp) Icons.Default.Navigation else Icons.Default.Explore,
+            stringResource(if (northUp) R.string.nav_heading_up else R.string.nav_north_up),
+            onClick = vm::toggleNorthUp,
+            style = if (northUp) RoundButtonStyle.Brand else RoundButtonStyle.Glass,
+        )
+    }
+}
+
+/** « Recentrage dans N s · Annuler » au-dessus de la barre d'information, pendant la reprise automatique (C1). */
+@Composable
+private fun RecenterCountdownPill(seconds: Int, onCancel: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    GlassPanel(Modifier.padding(bottom = RoadlySpacing.s), shape = RoadlyShapes.Chip, contentPadding = 8.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.nav_recenter_in, seconds), style = MaterialTheme.typography.labelLarge, color = c.textPrimary)
+            Spacer(Modifier.width(RoadlySpacing.s))
+            GlassButton(stringResource(R.string.nav_recenter_cancel), onClick = onCancel, style = GlassButtonStyle.Ghost)
         }
     }
 }
