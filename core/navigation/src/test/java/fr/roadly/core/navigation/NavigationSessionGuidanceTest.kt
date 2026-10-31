@@ -75,4 +75,17 @@ class NavigationSessionGuidanceTest {
         play(FixScript(route).drive(400.0, 400.0, speedKmh = 30.0))
         assertNull(guiding(s).roundabout)
     }
+
+    @Test fun `announcements carry their priority - now urgent, near normal, far low`() = runTest {
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        // turnAt + 200 : manœuvre passée, arrivée encore au-delà du FAR ; sans ce relais, le saut jusqu'au bout sort de la fenêtre de suivi (recalcul).
+        play(listOf(turnAt - 250.0, turnAt - 70.0, turnAt - 30.0, turnAt + 200.0).map { FixScript(route).drive(it, it, speedKmh = 36.0).single() })
+        play(FixScript(route).drive(RouteTracker(route).totalGeometryM, RouteTracker(route).totalGeometryM, speedKmh = 36.0))
+        assertEquals(
+            listOf(SpeechPriority.NORMAL, SpeechPriority.LOW, SpeechPriority.NORMAL, SpeechPriority.URGENT, SpeechPriority.URGENT),
+            speech.priorities,
+        )
+    }
 }

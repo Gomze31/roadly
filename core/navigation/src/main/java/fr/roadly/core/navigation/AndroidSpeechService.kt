@@ -8,6 +8,7 @@ import android.media.ToneGenerator
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -19,7 +20,8 @@ import javax.inject.Singleton
 
 /**
  * `TextToSpeech` en `Locale.FRANCE`, focus audio transitoire avec atténuation des autres sources
- * (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`), file d'annonces, volume par annonce. Moteur créé au premier usage.
+ * (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`), file d'annonces priorisée (B5 : un URGENT coupe et vide la file, LOW / NORMAL
+ * périment après 8 s), volume par annonce. Une seule annonce est confiée au moteur à la fois. Moteur créé au premier usage.
  */
 @Singleton
 class AndroidSpeechService @Inject constructor(@param:ApplicationContext private val ctx: Context) : SpeechService {
@@ -31,8 +33,9 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK).setAudioAttributes(attributes).build()
     private val main = Handler(Looper.getMainLooper())
     private val lock = Any()
-    private val pending = ArrayDeque<Pair<String, Boolean>>()
-    /** Identifiants des énoncés en cours ou en file côté moteur ; le focus audio est tenu tant qu'il n'est pas vide. */
+    /** Annonces en attente (moteur pas prêt ou occupé). */
+    private val queue = SpeechQueue()
+    /** Énoncés confiés au moteur (un seul, deux le temps d'une interruption) ; le focus audio est tenu tant qu'il n'est pas vide. */
     private val active = mutableSetOf<String>()
     private val ids = AtomicLong(0)
     private var engine: TextToSpeech? = null
@@ -50,17 +53,18 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         override fun onStop(utteranceId: String?, interrupted: Boolean) = finished(utteranceId)
     }
 
-    override fun speak(text: String, flush: Boolean) {
+    override fun speak(text: String, flush: Boolean) = speak(text, flush, SpeechPriority.NORMAL)
+
+    override fun speak(text: String, flush: Boolean, priority: SpeechPriority) {
         if (unavailable || isSilenced() || text.isBlank()) return
         val tts = ensureEngine() ?: return
-        synchronized(lock) {
-            if (!ready) {
-                if (flush) pending.clear()
-                pending.addLast(text to flush)
-                return
-            }
-        }
-        say(tts, text, flush)
+        val start = synchronized(lock) {
+            val interrupt = queue.offer(SpeechQueue.Item(text, priority, SystemClock.elapsedRealtime()), flush)
+            // Moteur pas prêt : onInit videra la file ; moteur occupé sans interruption : finished() prendra la suite.
+            if (!ready || !(interrupt || active.isEmpty())) return
+            nextStart(SystemClock.elapsedRealtime(), flush = interrupt)
+        } ?: return
+        say(tts, start)
     }
 
     override fun setVolume(percent: Int) {
@@ -89,7 +93,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
 
     override fun stop() {
         val tts = synchronized(lock) {
-            pending.clear()
+            queue.clear()
             active.clear()
             engine
         }
@@ -130,29 +134,45 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
             Log.w(TAG, "Voix française indisponible (statut $status, langue $lang)")
             unavailable = true
             synchronized(lock) {
-                pending.clear()
+                queue.clear()
                 engine = null
             }
             tts?.shutdown()
             return
         }
-        val queued = synchronized(lock) { ready = true; pending.toList().also { pending.clear() } }
-        queued.forEach { (text, flush) -> say(tts, text, flush) }
+        // Annonces mises en file avant que le moteur soit prêt : la première encore valable part, les suivantes via finished().
+        val first = synchronized(lock) { ready = true; if (active.isEmpty()) nextStart(SystemClock.elapsedRealtime(), flush = false) else null }
+        first?.let { say(tts, it) }
     }
 
-    private fun say(tts: TextToSpeech, text: String, flush: Boolean) {
-        if (isSilenced()) return
+    private class Start(val text: String, val flush: Boolean, val id: String, val requestFocus: Boolean)
+
+    /** Tête de file encore valable, identifiant réservé dans [active] (appelé sous [lock]) ; null si rien à dire. */
+    private fun nextStart(nowMs: Long, flush: Boolean): Start? {
+        val item = queue.poll(nowMs) ?: return null
         val id = "roadly-${ids.incrementAndGet()}"
-        val firstActive = synchronized(lock) { active.isEmpty().also { active += id } }
-        if (firstActive) audio.requestAudioFocus(focusRequest)
-        val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) }
-        if (tts.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, id) != TextToSpeech.SUCCESS) finished(id)
+        val requestFocus = active.isEmpty()
+        active += id
+        return Start(item.text, flush, id, requestFocus)
     }
 
-    /** Fin d'un énoncé (terminé, en erreur ou interrompu) ; les identifiants inconnus (déjà purgés par [stop]) sont ignorés. */
+    private fun say(tts: TextToSpeech, s: Start) {
+        if (isSilenced()) { finished(s.id); return }
+        if (s.requestFocus) audio.requestAudioFocus(focusRequest)
+        val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) }
+        if (tts.speak(s.text, if (s.flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, s.id) != TextToSpeech.SUCCESS) finished(s.id)
+    }
+
+    /**
+     * Fin d'un énoncé (terminé, en erreur ou interrompu) : enchaîne sur la prochaine annonce encore valable, sinon rend le focus.
+     * Les identifiants inconnus (déjà purgés par [stop]) sont ignorés.
+     */
     private fun finished(utteranceId: String?) {
-        val abandon = synchronized(lock) { utteranceId != null && active.remove(utteranceId) && active.isEmpty() }
-        if (abandon) audio.abandonAudioFocusRequest(focusRequest)
+        val (tts, next) = synchronized(lock) {
+            if (utteranceId == null || !active.remove(utteranceId) || active.isNotEmpty()) return
+            engine to (if (ready) nextStart(SystemClock.elapsedRealtime(), flush = false) else null)
+        }
+        if (tts != null && next != null) say(tts, next) else audio.abandonAudioFocusRequest(focusRequest)
     }
 
     private companion object { const val TAG = "RoadlySpeech" }

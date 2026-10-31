@@ -249,7 +249,7 @@ class NavigationSession @Inject constructor(
             val zone = hazards.firstOrNull { it.kind == HazardKind.VIGILANCE_ZONE && it.contains(progress.distanceAlongM) }
             activeZone = zone
             if (zone != null && zonesAnnounced.add(zone.startAlongM)) {
-                say(SpokenPhrases.vigilanceZone(zone.speedLimitKmh), routeId = progress.routeId)
+                say(SpokenPhrases.vigilanceZone(zone.speedLimitKmh), routeId = progress.routeId, priority = SpeechPriority.LOW)
                 if (prefs.vigilanceSound.first() && !_muted.value && prefs.voiceEnabled.first()) speech.beep()
             }
         }
@@ -281,7 +281,7 @@ class NavigationSession @Inject constructor(
             if (rerouting || progress.routeId != route.id) return
             val a = AnnouncementPolicy.next(progress, route.maneuvers, speedKmh, announced) ?: return
             announced += a.maneuverIndex to a.tier
-            say(a.text, routeId = progress.routeId)
+            say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
         }
 
         private suspend fun arrive() {
@@ -289,7 +289,7 @@ class NavigationSession @Inject constructor(
             if ((last to Tier.NOW) !in announced) {
                 announced += last to Tier.NOW
                 val m = route.maneuvers[last]
-                say(m.verbalPre ?: m.instruction)
+                say(m.verbalPre ?: m.instruction, priority = SpeechPriority.URGENT)
             }
             publish(NavigationState.Arrived(route))
             tripRecorder.end(arrived = true, nowMs = clock.nowMs())
@@ -404,13 +404,14 @@ class NavigationSession @Inject constructor(
             }
         }
 
-        private suspend fun say(text: String, routeId: String? = null) {
+        /** [priority] : NOW et arrivée URGENT, NEAR / départ / recalcul NORMAL, FAR / vigilance LOW (B5). */
+        private suspend fun say(text: String, routeId: String? = null, priority: SpeechPriority = SpeechPriority.NORMAL) {
             if (text.isBlank() || _muted.value || !prefs.voiceEnabled.first()) return
             // Revérifié après la suspension : un arrêt ou un nouveau départ a pu survenir entre-temps.
             if (gen != generation) return
             // Idem pour un recalcul abouti entre-temps : une annonce issue de l'ancien tracé serait fausse.
             if (routeId != null && routeId != route.id) return
-            speech.speak(text)
+            speech.speak(text, priority = priority)
         }
 
         private fun publish(s: NavigationState) {

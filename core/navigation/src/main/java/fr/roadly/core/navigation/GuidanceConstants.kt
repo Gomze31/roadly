@@ -56,4 +56,6 @@ object GuidanceConstants {
     const val BACKTRACK_CONFIRM_M = 30.0
     /** … confirmé par 2 fixes consécutifs. */
     const val BACKTRACK_CONFIRM_FIXES = 2
+    /** B5 : une annonce LOW / NORMAL restée plus de 8 s en file n'est plus dite (palier dépassé). */
+    const val SPEECH_STALE_AFTER_MS = 8_000L
 }

@@ -9,6 +9,13 @@ enum class Tier { FAR, NEAR, NOW }
 
 data class Announcement(val text: String, val tier: Tier, val maneuverIndex: Int)
 
+/** B5 : NOW → URGENT, NEAR → NORMAL, FAR → LOW. */
+internal fun Tier.speechPriority(): SpeechPriority = when (this) {
+    Tier.NOW -> SpeechPriority.URGENT
+    Tier.NEAR -> SpeechPriority.NORMAL
+    Tier.FAR -> SpeechPriority.LOW
+}
+
 /** Seuils d'annonce (m) par classe de vitesse — spec Phase 2 §2. */
 internal enum class SpeedClass(val farM: Double, val nearM: Double, val nowM: Double) {
     HIGHWAY(2000.0, 300.0, 40.0),
