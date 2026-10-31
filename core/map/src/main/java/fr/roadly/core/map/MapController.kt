@@ -95,6 +95,8 @@ class MapController(internal val context: Context) {
     /** C1 : animation en cours du marqueur, et pose affichée (point de départ de la prochaine animation). */
     private var markerAnimator: ValueAnimator? = null
     private var shownPose: MarkerPose? = null
+    /** C3 : écritures du marqueur animé calées sur le plafond de rendu de la carte (voir [setMaximumFps]). */
+    private val markerGate = FrameGate(FrameGate.intervalFor(MapRendering.MAX_FPS))
 
     /** C2 : niveau de détail courant ; visibilité et filtres d'origine des calques touchés (style courant), pour revenir au niveau normal. */
     private var detail = MapDetail.NORMAL
@@ -139,7 +141,12 @@ class MapController(internal val context: Context) {
     /** Couleurs CSS `#RRGGBB` : tracé actif (halo + trait), tracés inactifs et parcourus, liseré sombre/clair sous le tracé actif. */
     fun setRouteColors(active: String, inactive: String, casing: String = routeColorCasing) {
         routeColorActive = active; routeColorInactive = inactive; routeColorCasing = casing
-        if (styleReady) replayState()
+        if (styleReady) map?.style?.let { applyRouteColors(it) }
+    }
+
+    /** C3 : plafond d'images par seconde du rendu (posé avec `MapView.setMaximumFps`) ; le marqueur animé n'écrit pas plus souvent. */
+    fun setMaximumFps(fps: Int) {
+        markerGate.minIntervalMs = FrameGate.intervalFor(fps)
     }
 
     fun setStyle(url: String) {
@@ -230,28 +237,52 @@ class MapController(internal val context: Context) {
         if (firstSymbol != null) style.addLayerBelow(layer, firstSymbol) else style.addLayer(layer)
     }
 
+    /**
+     * Rejoue tout l'état mémorisé dans un style tout juste chargé (seul appelant : `loadStyle`). Les réglages de couleurs et de
+     * bâtiments ne touchent ensuite que leurs calques ; le niveau de détail n'est réappliqué qu'ici ou quand il change.
+     */
     private fun replayState() {
         val style = map?.style ?: return
-        lastFix?.let { shownPose = MarkerInterpolation.pose(it); style.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(it)) }
+        // Le marqueur reprend la pose affichée (pas la cible de l'animation en cours) : aucun saut en avant puis en arrière.
+        markerAnimator?.cancel()
+        markerAnimator = null
+        val pose = shownPose ?: lastFix?.let { MarkerInterpolation.pose(it) }
+        val fix = lastFix
+        if (pose != null && fix != null) {
+            shownPose = pose
+            style.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(pose, fix.accuracyM))
+        }
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ROUTES)?.setGeoJson(RouteFeatureBuilder.build(lastRoutes, lastActiveRouteId))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED_TAIL)?.setGeoJson(lastTraversedTail)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(lastReports))
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
+        applyRouteColors(style)
+        applyArrowColors(style)
+        applyBuildings(style)
+        applyDetailTo(style)
+        map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
+    }
+
+    private fun applyRouteColors(style: Style) {
         (style.getLayer(MapIds.LYR_ROUTE_ACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorActive))
         (style.getLayer(MapIds.LYR_ROUTE_GLOW) as? LineLayer)?.setProperties(lineColor(routeColorActive))
         (style.getLayer(MapIds.LYR_ROUTE_CASING) as? LineLayer)?.setProperties(lineColor(routeColorCasing))
         (style.getLayer(MapIds.LYR_ROUTE_INACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED_TAIL) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
-        style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
+    }
+
+    private fun applyArrowColors(style: Style) {
         (style.getLayer(MapIds.LYR_ARROW_CASING) as? LineLayer)?.setProperties(lineColor(arrowColorCasing))
         (style.getLayer(MapIds.LYR_ARROW) as? LineLayer)?.setProperties(lineColor(arrowColorBody))
+    }
+
+    private fun applyBuildings(style: Style) {
         (style.getLayer(MapIds.LYR_BUILDINGS_3D) as? FillExtrusionLayer)?.setProperties(
             fillExtrusionColor(buildingsColor), visibility(if (buildings3d) Property.VISIBLE else Property.NONE),
         )
-        applyDetailTo(style)
-        map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
     /**
@@ -276,10 +307,13 @@ class MapController(internal val context: Context) {
             src.setGeoJson(PointFeatureBuilder.user(target, fix.accuracyM))
             return
         }
+        markerGate.reset()
         markerAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = animateMs
             interpolator = LinearInterpolator()
             addUpdateListener { a ->
+                // Écran à 90-120 Hz, carte rendue à 60 / 30 i/s : une image trop proche de la précédente n'est pas écrite (la dernière toujours).
+                if (!markerGate.pass(a.currentPlayTime, last = a.animatedFraction >= 1f)) return@addUpdateListener
                 val pose = MarkerInterpolation.lerp(from, target, (a.animatedValue as Float).toDouble())
                 shownPose = pose
                 map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(pose, fix.accuracyM))
@@ -328,13 +362,16 @@ class MapController(internal val context: Context) {
     /** Couleurs CSS de la flèche : trait et liseré propres, contrastés quel que soit le thème du fond de carte. */
     fun setArrowColor(body: String, casing: String) {
         arrowColorBody = body; arrowColorCasing = casing
-        if (styleReady) replayState()
+        if (styleReady) map?.style?.let { applyArrowColors(it) }
     }
 
-    /** Bâtiments extrudés : visibles ou non, couleur CSS des façades. Sans effet si le style n'a pas la source OpenMapTiles. */
+    /**
+     * Bâtiments extrudés : visibles ou non, couleur CSS des façades. Sans effet si le style n'a pas la source OpenMapTiles.
+     * Ne touche que le calque des bâtiments : la bascule 2D / 3D ne renvoie ni le tracé ni le marqueur (pas de clignotement).
+     */
     fun setBuildings3d(enabled: Boolean, colorHex: String) {
         buildings3d = enabled; buildingsColor = colorHex
-        if (styleReady) replayState()
+        if (styleReady) map?.style?.let { applyBuildings(it) }
     }
 
     /**
@@ -342,6 +379,7 @@ class MapController(internal val context: Context) {
      * sont repérés par leur `source-layer` (pas par leur identifiant, propre à chaque style). Rejoué après un changement de style.
      */
     fun applyDetail(level: MapDetail) {
+        if (level == detail) return
         detail = level
         if (styleReady) map?.style?.let { applyDetailTo(it) }
     }

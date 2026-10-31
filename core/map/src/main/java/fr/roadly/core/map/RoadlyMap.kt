@@ -39,7 +39,11 @@ fun RoadlyMap(
     val lifecycleOwner = LocalLifecycleOwner.current
     val mapView = remember { controllerContext(controller).let { ctx -> MapView(ctx, MapRendering.options(ctx)) } }
     // Le moteur de rendu est créé par le constructeur de MapView : le plafond peut être posé tout de suite.
-    LaunchedEffect(mapView, maximumFps) { mapView.setMaximumFps(maximumFps) }
+    // Le marqueur animé du contrôleur suit le même plafond (pas d'écriture pour une image que la carte ne rendra pas).
+    LaunchedEffect(mapView, maximumFps) {
+        mapView.setMaximumFps(maximumFps)
+        controller.setMaximumFps(maximumFps)
+    }
     val currentOnMapClick = rememberUpdatedState(onMapClick)
     val currentOnMapLongClick = rememberUpdatedState(onMapLongClick)
     val currentOnUserGesture = rememberUpdatedState(onUserGesture)

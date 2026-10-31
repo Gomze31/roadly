@@ -28,13 +28,35 @@ class TraversedLineTest {
         assertTrue("queue bornée : $sizes", sizes.max() < 200)
     }
 
-    @Test fun `advancing a segment or switching route rebuilds the prefix`() {
+    @Test fun `the prefix is rebuilt per chunk of segments, on a backtrack or on a new route`() {
+        val chunk = TraversedLine.TRAVERSED_CHUNK
         val line = TraversedLine()
-        line.update(g, 10, g[11])
+        assertEquals(11, coords(line.update(g, 10, g[11]).prefix!!).size)
         assertNull(line.update(g, 10, g[11]).prefix)
-        assertEquals(12, coords(line.update(g, 11, g[12]).prefix!!).size)
+        assertNull("avance d'un segment : la queue suffit", line.update(g, 11, g[12]).prefix)
+        assertNull(line.update(g, 10 + chunk - 1, g[10 + chunk]).prefix)
+        assertEquals(11 + chunk, coords(line.update(g, 10 + chunk, g[11 + chunk]).prefix!!).size)
+        assertEquals("recul : préfixe reconstruit", 6, coords(line.update(g, 5, g[6]).prefix!!).size)
         val other = g.map { GeoPoint(it.lat, 2.1) }
-        assertNotNull(line.update(other, 11, other[12]).prefix)
+        assertNotNull(line.update(other, 5, other[6]).prefix)
+    }
+
+    @Test fun `over 1 000 advances the prefix is rebuilt per chunk, the tail stays bounded and the union is the traversed line`() { // C3
+        val long = (0..1_100).map { GeoPoint(48.0 + it * 0.0001, 2.0) }
+        val chunk = TraversedLine.TRAVERSED_CHUNK
+        val line = TraversedLine()
+        var prefix: JsonArray? = null
+        var rebuilds = 0
+        for (i in 0 until 1_000) {
+            val snapped = GeoPoint(48.0 + i * 0.0001 + 0.00005, 2.0)
+            val u = line.update(long, i, snapped)
+            u.prefix?.let { rebuilds++; prefix = if (it == TraversedFeatureBuilder.EMPTY) JsonArray(emptyList()) else coords(it) }
+            val tail = coords(u.tail)
+            assertTrue("queue de ${tail.size} points à $i", tail.size <= chunk + 2)
+            val union = if (prefix!!.isEmpty()) tail else JsonArray(prefix!! + tail.drop(1))
+            assertEquals("tracé dessiné à $i", coords(TraversedFeatureBuilder.build(long, i, snapped)), union)
+        }
+        assertTrue("$rebuilds reconstructions du préfixe", rebuilds <= 1_000 / chunk + 1)
     }
 
     @Test fun `prefix plus tail draw the same line as the full builder`() {
