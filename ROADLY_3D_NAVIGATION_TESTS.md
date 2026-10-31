@@ -1,6 +1,6 @@
 # Roadly — Plan de tests de la navigation 3D premium
 
-Date : 2026-10-31. Référence : `ROADLY_3D_NAVIGATION_PLAN.md`. État actuel : 303 tests JVM verts, 3 instrumentés, aucune CI.
+Date : 2026-10-31. Référence : `ROADLY_3D_NAVIGATION_PLAN.md`. État actuel (fin d'étape B, `71b5493`) : 374 tests JVM verts, 3 instrumentés, aucune CI.
 
 Commandes : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test --offline -q` ; `.\gradlew.bat :app:assembleDebug --offline -q` ; instrumentés : `.\gradlew.bat connectedDebugAndroidTest --offline` (HONOR `AREE026226000174`).
 
