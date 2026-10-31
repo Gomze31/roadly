@@ -37,7 +37,8 @@ internal object ValhallaLanes {
     fun parse(elements: List<JsonElement>): List<Lane> = elements.mapNotNull { e ->
         val o = e as? JsonObject ?: return@mapNotNull null
         val mask = (o["directions"] as? JsonPrimitive)?.intOrNull ?: return@mapNotNull null
-        Lane(directions(mask), valid = o["valid"].isSet() || o["active"].isSet())
+        // B3 : `active` (voie conseillée) est distinct de `valid` ; une voie active est aussi valide.
+        Lane(directions(mask), valid = o["valid"].isSet() || o["active"].isSet(), active = o["active"].isSet())
     }
 
     private fun JsonElement?.isSet(): Boolean {

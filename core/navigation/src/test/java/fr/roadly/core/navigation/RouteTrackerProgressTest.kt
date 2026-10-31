@@ -109,4 +109,15 @@ class RouteTrackerProgressTest {
         assertEquals(12, nearEnd.nextManeuverIndex)
         assertEquals("seule l'arrivée suit", 1, nearEnd.distancesToManeuversM.size)
     }
+
+    @Test fun `left turn has a negative angle and a stable index under jitter`() { // scénario 3
+        val r = TestRoutes.leftTurn()
+        assertEquals(ManeuverType.TURN_LEFT, r.maneuvers[1].type)
+        assertEquals(-90.0, r.maneuvers[1].turnAngleDeg!!, 0.0)
+        val t = RouteTracker(r)
+        val script = FixScript(r, seed = 5)
+        val turnAt = t.maneuverStartM[1]
+        script.drive(0.0, turnAt - 30.0, speedKmh = 30.0).forEach { t.update(it) }
+        assertEquals(List(10) { 1 }, script.jitter(turnAt, count = 10, amplitudeM = 8.0).map { t.update(it).nextManeuverIndex })
+    }
 }

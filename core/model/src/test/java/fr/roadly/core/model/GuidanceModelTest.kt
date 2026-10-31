@@ -37,4 +37,20 @@ class GuidanceModelTest {
         assertEquals(a, a.copy())
         assertEquals(80.0, a.distanceToNextManeuverM, 0.0)
     }
+
+    @Test fun `turn angle is the signed bearing difference normalised to -180 180`() {
+        fun m(before: Int?, after: Int?) = Maneuver(ManeuverType.TURN_LEFT, "", null, 0.0, 0.0, 0, null, bearingBeforeDeg = before, bearingAfterDeg = after)
+        assertEquals(-90.0, m(90, 0).turnAngleDeg!!, 0.0)
+        assertEquals(90.0, m(350, 80).turnAngleDeg!!, 0.0)
+        assertEquals(-20.0, m(10, 350).turnAngleDeg!!, 0.0)
+        assertEquals(180.0, m(0, 180).turnAngleDeg!!, 0.0)
+        assertNull(m(null, 90).turnAngleDeg)
+    }
+
+    @Test fun `new valhalla fields default to absent and lanes are not active by default`() {
+        val m = Maneuver(ManeuverType.TURN_LEFT, "Tournez à gauche.", "Rue X", 120.0, 30.0, 4, null)
+        assertNull(m.bearingBeforeDeg); assertNull(m.endShapeIndex); assertNull(m.verbalPost); assertNull(m.sideOfStreet)
+        assertTrue(m.streetNames.isEmpty())
+        assertEquals(false, Lane(setOf(LaneDirection.LEFT), true).active)
+    }
 }

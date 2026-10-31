@@ -5,6 +5,7 @@ import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
+import fr.roadly.core.model.StreetSide
 import kotlin.math.PI
 import kotlin.math.cos
 
@@ -38,7 +39,7 @@ object TestRoutes {
     /**
      * Aller 600 m plein est, demi-tour, retour 600 m plein ouest sur une chaussée décalée de ~10 m au nord (2x1 voies séparées).
      * Points 0..12 = aller (pas de 50 m), 13..25 = retour ; le segment 12 est le demi-tour (≈ 10 m).
-     * Manœuvres : DEPART (point 0), UTURN (point 12), ARRIVE (point 25).
+     * Manœuvres : DEPART (point 0), UTURN_LEFT (point 12), ARRIVE (point 25).
      */
     fun outAndBack(id: String = "outAndBack", costing: RouteCosting = RouteCosting.FASTEST): Route {
         val lonPerMeter = 1.0 / (METERS_PER_DEG_LAT * cos(LAT * PI / 180.0))
@@ -51,7 +52,7 @@ object TestRoutes {
         val maneuvers = listOf(
             Maneuver(ManeuverType.DEPART, "Conduisez vers l'est.", null, leg, 60.0, 0, null, verbalPre = "Conduisez vers l'est."),
             Maneuver(
-                ManeuverType.UTURN, "Faites demi-tour.", null, total - leg, 60.0, 12, null,
+                ManeuverType.UTURN_LEFT, "Faites demi-tour.", null, total - leg, 60.0, 12, null,
                 verbalPre = "Faites demi-tour.", verbalAlert = "Faites demi-tour.",
             ),
             Maneuver(
@@ -103,5 +104,25 @@ object TestRoutes {
             ),
         )
         return Route(id, costing, cum.last(), 72.0, pts, maneuvers, hasToll = false, providerId = "test")
+    }
+
+    /** Virage à gauche (scénario 3) : 500 m plein est (pas de 50 m) puis 500 m plein nord ; caps 90° → 0° (angle −90°). */
+    fun leftTurn(id: String = "leftTurn", costing: RouteCosting = RouteCosting.FASTEST): Route {
+        val pts = (0..10).map { xy(it * 50.0, 0.0) } + (1..10).map { xy(500.0, it * 50.0) }
+        val total = (0 until pts.lastIndex).sumOf { pts[it].distanceTo(pts[it + 1]) }
+        val leg = (0 until 10).sumOf { pts[it].distanceTo(pts[it + 1]) }
+        val maneuvers = listOf(
+            Maneuver(ManeuverType.DEPART, "Conduisez vers l'est.", null, leg, 50.0, 0, null, verbalPre = "Conduisez vers l'est.", bearingAfterDeg = 90),
+            Maneuver(
+                ManeuverType.TURN_LEFT, "Tournez à gauche dans Rue du Nord.", "Rue du Nord", total - leg, 50.0, 10, null,
+                verbalPre = "Tournez à gauche dans Rue du Nord.", verbalAlert = "Tournez à gauche dans Rue du Nord.",
+                bearingBeforeDeg = 90, bearingAfterDeg = 0,
+            ),
+            Maneuver(
+                ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 20, null,
+                verbalPre = "Votre destination est sur la gauche.", bearingBeforeDeg = 0, sideOfStreet = StreetSide.LEFT,
+            ),
+        )
+        return Route(id, costing, total, 100.0, pts, maneuvers, hasToll = false, providerId = "test")
     }
 }

@@ -45,10 +45,14 @@ class GuidanceCameraPolicyTest {
     }
 
     @Test fun `motorway exits are approached from 400 m only at speed`() {
-        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT, 100.0))
-        assertFalse(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT, 50.0))
-        assertTrue(GuidanceCameraPolicy.isApproaching(140.0, ManeuverType.EXIT, 50.0))
-        assertFalse(GuidanceCameraPolicy.isApproaching(410.0, ManeuverType.EXIT, 100.0))
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT_RIGHT, 100.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT_RIGHT, 50.0))
+        assertTrue(GuidanceCameraPolicy.isApproaching(140.0, ManeuverType.EXIT_RIGHT, 50.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(410.0, ManeuverType.EXIT_RIGHT, 100.0))
+        // scénario 7 : approche à 400 m pour toute sortie / bretelle, quel que soit le côté
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT_LEFT, 100.0))
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.RAMP_LEFT, 100.0))
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.MERGE_RIGHT, 100.0))
     }
 
     @Test fun `turns and roundabouts are approached from 150 m, departure and arrival never`() {

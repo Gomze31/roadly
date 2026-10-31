@@ -13,6 +13,7 @@ import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.model.StreetSide
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -203,7 +204,7 @@ class ValhallaRoutingProviderTest {
         server.enqueue(MockResponse().setBody(body.toString()))
         val m = (provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST)) as Outcome.Success).value.single().maneuvers[1]
         assertEquals(
-            listOf(Lane(setOf(LaneDirection.LEFT), true), Lane(setOf(LaneDirection.STRAIGHT), false), Lane(setOf(LaneDirection.STRAIGHT, LaneDirection.RIGHT), true)),
+            listOf(Lane(setOf(LaneDirection.LEFT), true), Lane(setOf(LaneDirection.STRAIGHT), false), Lane(setOf(LaneDirection.STRAIGHT, LaneDirection.RIGHT), valid = true, active = true)),
             m.lanes,
         )
         assertEquals("12", m.exitNumber)
@@ -234,5 +235,25 @@ class ValhallaRoutingProviderTest {
         assertEquals("true", auto["shortest"]!!.jsonPrimitive.content)
         assertEquals("0", auto["use_ferry"]!!.jsonPrimitive.content)
         assertNull(auto["use_tolls"])
+    }
+
+    @Test fun `bearings, end index, post instruction, street names and side come from the fixture`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        val r = (provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST)) as Outcome.Success).value.single()
+        rawManeuvers().forEachIndexed { i, raw ->
+            val m = raw.jsonObject
+            assertEquals("bearing_before $i", m["bearing_before"]?.jsonPrimitive?.int, r.maneuvers[i].bearingBeforeDeg)
+            assertEquals("bearing_after $i", m["bearing_after"]?.jsonPrimitive?.int, r.maneuvers[i].bearingAfterDeg)
+            assertEquals("end_shape_index $i", m["end_shape_index"]?.jsonPrimitive?.int, r.maneuvers[i].endShapeIndex)
+            assertEquals("verbal_post $i", m["verbal_post_transition_instruction"]?.jsonPrimitive?.content, r.maneuvers[i].verbalPost)
+            assertEquals("street_names $i", (m["street_names"] as? JsonArray)?.map { it.jsonPrimitive.content }.orEmpty(), r.maneuvers[i].streetNames)
+        }
+        // Relevé dans la fixture Paris : entrée du rond-point des Champs-Élysées (manœuvre 10) et destination à gauche.
+        assertEquals(296, r.maneuvers[10].bearingBeforeDeg)
+        assertEquals(355, r.maneuvers[10].bearingAfterDeg)
+        assertEquals(224, r.maneuvers[10].endShapeIndex)
+        assertNull(r.maneuvers[0].bearingBeforeDeg)
+        assertEquals(StreetSide.LEFT, r.maneuvers.last().sideOfStreet)
+        assertNull(r.maneuvers[5].sideOfStreet)
     }
 }

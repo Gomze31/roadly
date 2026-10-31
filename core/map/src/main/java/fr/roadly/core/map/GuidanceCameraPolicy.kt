@@ -42,7 +42,10 @@ object GuidanceCameraPolicy {
     val PADDING_PORTRAIT = CameraPadding(0f, 0.45f, 0f, 0.12f)
     val PADDING_LANDSCAPE = CameraPadding(0.40f, 0.25f, 0f, 0f)
 
-    private val exitLike = setOf(ManeuverType.EXIT, ManeuverType.RAMP, ManeuverType.MERGE, ManeuverType.KEEP_LEFT, ManeuverType.KEEP_RIGHT)
+    private val exitLike = setOf(
+        ManeuverType.EXIT_LEFT, ManeuverType.EXIT_RIGHT, ManeuverType.RAMP, ManeuverType.RAMP_LEFT, ManeuverType.RAMP_RIGHT,
+        ManeuverType.MERGE, ManeuverType.MERGE_LEFT, ManeuverType.MERGE_RIGHT, ManeuverType.KEEP_LEFT, ManeuverType.KEEP_RIGHT,
+    )
     private val neverApproach = setOf(ManeuverType.DEPART, ManeuverType.ARRIVE, ManeuverType.CONTINUE)
 
     /** (vitesse km/h, zoom) ; interpolation linéaire entre les points, bornée aux extrémités. */

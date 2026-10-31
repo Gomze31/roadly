@@ -11,6 +11,7 @@ import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.model.StreetSide
 import fr.roadly.core.model.VehicleType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -141,11 +142,11 @@ class ValhallaRoutingProvider @Inject constructor(
         val trip = json.decodeFromString(ValhallaResponse.serializer(), body).trip
         val geometry = ArrayList<GeoPoint>()
         val maneuvers = ArrayList<Maneuver>()
-        trip.legs.forEach { leg ->
+        trip.legs.forEachIndexed { legIndex, leg ->
             val pts = Polyline6.decode(leg.shape)
             val offset = if (geometry.isEmpty()) 0 else geometry.size - 1
             if (geometry.isNotEmpty() && pts.isNotEmpty()) geometry.addAll(pts.drop(1)) else geometry.addAll(pts)
-            leg.maneuvers.forEach { m ->
+            leg.maneuvers.forEachIndexed { mi, m ->
                 maneuvers += Maneuver(
                     type = mapType(m.type),
                     instruction = m.instruction,
@@ -160,6 +161,13 @@ class ValhallaRoutingProvider @Inject constructor(
                     exitNumber = m.sign?.exitNumberElements?.firstOrNull { it.text.isNotBlank() }?.text,
                     exitToward = m.sign?.exitTowardElements?.map { it.text.trim() }?.filter { it.isNotEmpty() }?.take(2)?.joinToString(" · ")?.takeIf { it.isNotEmpty() },
                     exitBranch = m.sign?.exitBranchElements?.firstOrNull { it.text.isNotBlank() }?.text?.trim(),
+                    bearingBeforeDeg = m.bearingBefore,
+                    bearingAfterDeg = m.bearingAfter,
+                    endShapeIndex = m.endShapeIndex?.let { offset + it },
+                    verbalPost = m.verbalPost?.takeIf { it.isNotBlank() },
+                    streetNames = m.streetNames.map { it.trim() }.filter { it.isNotEmpty() },
+                    // L'étape `legIndex` se termine au point `locations[legIndex + 1]`.
+                    sideOfStreet = if (mi == leg.maneuvers.lastIndex) streetSide(trip.locations.getOrNull(legIndex + 1)?.sideOfStreet) else null,
                 )
             }
         }
@@ -179,26 +187,11 @@ class ValhallaRoutingProvider @Inject constructor(
         Outcome.Failure(AppError.Parse(e.message ?: "valhalla"))
     }
 
-    internal fun mapType(t: Int): ManeuverType = when (t) {
-        1, 2, 3 -> ManeuverType.DEPART
-        4, 5, 6 -> ManeuverType.ARRIVE
-        7, 8 -> ManeuverType.CONTINUE
-        9 -> ManeuverType.SLIGHT_RIGHT
-        10 -> ManeuverType.TURN_RIGHT
-        11 -> ManeuverType.SHARP_RIGHT
-        12, 13 -> ManeuverType.UTURN
-        14 -> ManeuverType.SHARP_LEFT
-        15 -> ManeuverType.TURN_LEFT
-        16 -> ManeuverType.SLIGHT_LEFT
-        17, 18, 19 -> ManeuverType.RAMP
-        20, 21 -> ManeuverType.EXIT
-        22 -> ManeuverType.CONTINUE
-        23 -> ManeuverType.KEEP_RIGHT
-        24 -> ManeuverType.KEEP_LEFT
-        25, 37, 38 -> ManeuverType.MERGE
-        26 -> ManeuverType.ROUNDABOUT_ENTER
-        27 -> ManeuverType.ROUNDABOUT_EXIT
-        28, 29 -> ManeuverType.FERRY
-        else -> ManeuverType.OTHER
+    internal fun mapType(t: Int): ManeuverType = ValhallaManeuverTypes.of(t)
+
+    private fun streetSide(s: String?): StreetSide? = when (s) {
+        "left" -> StreetSide.LEFT
+        "right" -> StreetSide.RIGHT
+        else -> null
     }
 }
