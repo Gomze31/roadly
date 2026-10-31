@@ -31,6 +31,15 @@ internal object MapIds {
     const val IMG_ARROW = "roadly-img-arrow"
     const val IMG_PIN = "roadly-img-pin"
     const val IMG_REPORT = "roadly-img-report"
+    const val SRC_ARROW = "roadly-arrow"
+    const val LYR_ARROW_CASING = "roadly-arrow-casing"
+    const val LYR_ARROW = "roadly-arrow-line"
+    const val LYR_ARROW_HEAD = "roadly-arrow-head"
+    const val LYR_BUILDINGS_3D = "roadly-buildings-3d"
+    const val IMG_ARROW_HEAD = "roadly-img-arrow-head"
+    /** Source vecteur OpenMapTiles des styles OpenFreeMap ; absente = pas de bâtiments 3D. */
+    const val STYLE_SRC_OPENMAPTILES = "openmaptiles"
+    const val STYLE_LYR_BUILDING = "building"
 }
 
 /** GeoJSON FeatureCollection des tracés ; l'itinéraire actif est placé en dernier (dessiné au-dessus). */

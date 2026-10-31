@@ -16,17 +16,24 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression.coalesce
 import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.literal
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionBase
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionColor
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionHeight
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
@@ -37,6 +44,7 @@ import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 
@@ -60,6 +68,10 @@ class MapController(internal val context: Context) {
     private var routeColorActive = "#B794FF"
     private var routeColorInactive = "#5A5470"
     private var routeColorCasing = "#0E0B14"
+    private var arrowColorBody = "#FFFFFF"
+    private var lastArrow: String = ManeuverArrowBuilder.EMPTY
+    private var buildings3d = false
+    private var buildingsColor = "#2A2236"
 
     /** Commande caméra reçue avant que la carte et son style soient prêts ; la dernière l'emporte, rejouée en fin de `replayState`. */
     private var pendingCamera: ((MapLibreMap) -> Unit)? = null
@@ -113,6 +125,8 @@ class MapController(internal val context: Context) {
         style.addImage(MapIds.IMG_ARROW, drawableToBitmap(R.drawable.ic_user_arrow))
         style.addImage(MapIds.IMG_PIN, drawableToBitmap(R.drawable.ic_place_pin))
         style.addImage(MapIds.IMG_REPORT, drawableToBitmap(R.drawable.ic_report))
+        style.addImage(MapIds.IMG_ARROW_HEAD, drawableToBitmap(R.drawable.ic_arrow_head))
+        style.addSource(GeoJsonSource(MapIds.SRC_ARROW))
         style.addSource(GeoJsonSource(MapIds.SRC_REPORTS))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
@@ -136,6 +150,17 @@ class MapController(internal val context: Context) {
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED, MapIds.SRC_TRAVERSED).withProperties(
             lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ))
+        // Flèche de manœuvre (approche d'une intersection) : liseré, trait clair, tête orientée selon le dernier segment.
+        style.addLayer(LineLayer(MapIds.LYR_ARROW_CASING, MapIds.SRC_ARROW).withProperties(
+            lineColor(routeColorCasing), lineWidth(14f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+        ).withFilter(eq(get("kind"), literal("arrow"))))
+        style.addLayer(LineLayer(MapIds.LYR_ARROW, MapIds.SRC_ARROW).withProperties(
+            lineColor(arrowColorBody), lineWidth(8f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
+        ).withFilter(eq(get("kind"), literal("arrow"))))
+        style.addLayer(SymbolLayer(MapIds.LYR_ARROW_HEAD, MapIds.SRC_ARROW).withProperties(
+            iconImage(MapIds.IMG_ARROW_HEAD), iconRotate(get("bearing")), iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+            iconAnchor(Property.ICON_ANCHOR_CENTER), iconAllowOverlap(true), iconIgnorePlacement(true), iconSize(1f),
+        ).withFilter(eq(get("kind"), literal("head"))))
         style.addLayer(SymbolLayer(MapIds.LYR_MARKERS, MapIds.SRC_MARKERS).withProperties(
             iconImage(MapIds.IMG_PIN), iconAnchor(Property.ICON_ANCHOR_BOTTOM), iconAllowOverlap(true), iconSize(1f),
         ))
@@ -148,6 +173,22 @@ class MapController(internal val context: Context) {
         style.addLayer(SymbolLayer(MapIds.LYR_USER, MapIds.SRC_USER).withProperties(
             iconImage(MapIds.IMG_ARROW), iconRotate(get("bearing")), iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP), iconAllowOverlap(true), iconSize(1f),
         ))
+        installBuildings(style)
+    }
+
+    /** Bâtiments extrudés (guidage 3D) sous le premier calque d'étiquettes ; seulement si le style a la source OpenMapTiles. */
+    private fun installBuildings(style: Style) {
+        if (style.getSource(MapIds.STYLE_SRC_OPENMAPTILES) == null) return
+        val layer = FillExtrusionLayer(MapIds.LYR_BUILDINGS_3D, MapIds.STYLE_SRC_OPENMAPTILES).withSourceLayer(MapIds.STYLE_LYR_BUILDING).withProperties(
+            fillExtrusionHeight(coalesce(get("render_height"), literal(0f))),
+            fillExtrusionBase(coalesce(get("render_min_height"), literal(0f))),
+            fillExtrusionOpacity(0.85f),
+            fillExtrusionColor(buildingsColor),
+            visibility(if (buildings3d) Property.VISIBLE else Property.NONE),
+        )
+        layer.minZoom = 15f
+        val firstSymbol = style.layers.firstOrNull { it is SymbolLayer }?.id
+        if (firstSymbol != null) style.addLayerBelow(layer, firstSymbol) else style.addLayer(layer)
     }
 
     private fun replayState() {
@@ -162,6 +203,12 @@ class MapController(internal val context: Context) {
         (style.getLayer(MapIds.LYR_ROUTE_CASING) as? LineLayer)?.setProperties(lineColor(routeColorCasing))
         (style.getLayer(MapIds.LYR_ROUTE_INACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
+        (style.getLayer(MapIds.LYR_ARROW_CASING) as? LineLayer)?.setProperties(lineColor(routeColorCasing))
+        (style.getLayer(MapIds.LYR_ARROW) as? LineLayer)?.setProperties(lineColor(arrowColorBody))
+        (style.getLayer(MapIds.LYR_BUILDINGS_3D) as? FillExtrusionLayer)?.setProperties(
+            fillExtrusionColor(buildingsColor), visibility(if (buildings3d) Property.VISIBLE else Property.NONE),
+        )
         map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
@@ -196,9 +243,48 @@ class MapController(internal val context: Context) {
 
     fun clearTraversed() = setTraversed(emptyList(), -1, null)
 
+    /** Flèche de manœuvre (GeoJSON de `ManeuverArrowBuilder`) ; vide = aucune flèche. */
+    fun setManeuverArrow(geoJson: String) {
+        lastArrow = geoJson
+        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(geoJson)
+    }
+
+    fun clearManeuverArrow() = setManeuverArrow(ManeuverArrowBuilder.EMPTY)
+
+    /** Couleur CSS du trait de la flèche (le liseré reprend `casing` de [setRouteColors]). */
+    fun setArrowColor(body: String) {
+        arrowColorBody = body
+        if (styleReady) replayState()
+    }
+
+    /** Bâtiments extrudés : visibles ou non, couleur CSS des façades. Sans effet si le style n'a pas la source OpenMapTiles. */
+    fun setBuildings3d(enabled: Boolean, colorHex: String) {
+        buildings3d = enabled; buildingsColor = colorHex
+        if (styleReady) replayState()
+    }
+
+    /**
+     * Caméra de guidage : cible, zoom, cap, inclinaison et marges (fractions de la vue → pixels) ;
+     * transition linéaire de [durationMs] pour suivre le rythme des positions (~1 Hz).
+     */
+    fun applyGuidanceCamera(point: GeoPoint, camera: GuidanceCamera, durationMs: Int = 1000) {
+        val action: (MapLibreMap) -> Unit = { m ->
+            val w = m.width.toDouble(); val h = m.height.toDouble()
+            val p = camera.padding
+            val pos = CameraPosition.Builder()
+                .target(LatLng(point.lat, point.lon)).zoom(camera.zoom).bearing(camera.bearing).tilt(camera.pitch)
+                .padding(p.left * w, p.top * h, p.right * w, p.bottom * h)
+                .build()
+            m.easeCamera(CameraUpdateFactory.newCameraPosition(pos), durationMs, false)
+        }
+        val m = map
+        if (m == null || !styleReady) { pendingCamera = action; return }
+        action(m)
+    }
+
     fun moveTo(point: GeoPoint, zoom: Double, bearing: Double = 0.0, animate: Boolean = true) {
         val action: (MapLibreMap) -> Unit = { m ->
-            val pos = CameraPosition.Builder().target(LatLng(point.lat, point.lon)).zoom(zoom).bearing(bearing).tilt(0.0).build()
+            val pos = CameraPosition.Builder().target(LatLng(point.lat, point.lon)).zoom(zoom).bearing(bearing).tilt(0.0).padding(0.0, 0.0, 0.0, 0.0).build()
             val update = CameraUpdateFactory.newCameraPosition(pos)
             if (animate) m.animateCamera(update, 600) else m.moveCamera(update)
         }
@@ -219,7 +305,7 @@ class MapController(internal val context: Context) {
 
     fun restore(snapshot: CameraSnapshot) = moveTo(GeoPoint(snapshot.lat, snapshot.lon), snapshot.zoom, snapshot.bearing, animate = false)
 
-    private fun liveCamera(): CameraSnapshot? = map?.cameraPosition?.let { CameraSnapshot(it.target?.latitude ?: return null, it.target?.longitude ?: return null, it.zoom, it.bearing) }
+    private fun liveCamera(): CameraSnapshot? = map?.cameraPosition?.let { CameraSnapshot(it.target?.latitude ?: return null, it.target?.longitude ?: return null, it.zoom, it.bearing, it.tilt) }
 
     /** Mémorise la caméra juste avant la destruction de la vue (l'ordre de sortie de composition n'est pas garanti). */
     internal fun captureCamera() { liveCamera()?.let { lastSnapshot = it } }
