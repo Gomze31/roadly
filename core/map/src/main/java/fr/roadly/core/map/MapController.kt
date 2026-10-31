@@ -69,6 +69,7 @@ class MapController(internal val context: Context) {
     private var routeColorInactive = "#5A5470"
     private var routeColorCasing = "#0E0B14"
     private var arrowColorBody = "#FFFFFF"
+    private var arrowColorCasing = "#8B5CF6"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
     private var buildings3d = false
     private var buildingsColor = "#2A2236"
@@ -132,6 +133,8 @@ class MapController(internal val context: Context) {
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
         style.addSource(GeoJsonSource(MapIds.SRC_MARKERS))
         style.addSource(GeoJsonSource(MapIds.SRC_USER))
+        // Bâtiments d'abord : leur ancrage ne voit que les calques du style, et le repli `addLayer` reste sous ceux de Roadly.
+        installBuildings(style)
 
         // Halo lumineux large et translucide sous le tracé actif (lueur), puis liseré, puis trait.
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_GLOW, MapIds.SRC_ROUTES).withProperties(
@@ -152,7 +155,7 @@ class MapController(internal val context: Context) {
         ))
         // Flèche de manœuvre (approche d'une intersection) : liseré, trait clair, tête orientée selon le dernier segment.
         style.addLayer(LineLayer(MapIds.LYR_ARROW_CASING, MapIds.SRC_ARROW).withProperties(
-            lineColor(routeColorCasing), lineWidth(14f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(arrowColorCasing), lineWidth(14f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("kind"), literal("arrow"))))
         style.addLayer(LineLayer(MapIds.LYR_ARROW, MapIds.SRC_ARROW).withProperties(
             lineColor(arrowColorBody), lineWidth(8f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
@@ -173,7 +176,6 @@ class MapController(internal val context: Context) {
         style.addLayer(SymbolLayer(MapIds.LYR_USER, MapIds.SRC_USER).withProperties(
             iconImage(MapIds.IMG_ARROW), iconRotate(get("bearing")), iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP), iconAllowOverlap(true), iconSize(1f),
         ))
-        installBuildings(style)
     }
 
     /** Bâtiments extrudés (guidage 3D) sous le premier calque d'étiquettes ; seulement si le style a la source OpenMapTiles. */
@@ -204,7 +206,7 @@ class MapController(internal val context: Context) {
         (style.getLayer(MapIds.LYR_ROUTE_INACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
-        (style.getLayer(MapIds.LYR_ARROW_CASING) as? LineLayer)?.setProperties(lineColor(routeColorCasing))
+        (style.getLayer(MapIds.LYR_ARROW_CASING) as? LineLayer)?.setProperties(lineColor(arrowColorCasing))
         (style.getLayer(MapIds.LYR_ARROW) as? LineLayer)?.setProperties(lineColor(arrowColorBody))
         (style.getLayer(MapIds.LYR_BUILDINGS_3D) as? FillExtrusionLayer)?.setProperties(
             fillExtrusionColor(buildingsColor), visibility(if (buildings3d) Property.VISIBLE else Property.NONE),
@@ -251,9 +253,9 @@ class MapController(internal val context: Context) {
 
     fun clearManeuverArrow() = setManeuverArrow(ManeuverArrowBuilder.EMPTY)
 
-    /** Couleur CSS du trait de la flèche (le liseré reprend `casing` de [setRouteColors]). */
-    fun setArrowColor(body: String) {
-        arrowColorBody = body
+    /** Couleurs CSS de la flèche : trait et liseré propres, contrastés quel que soit le thème du fond de carte. */
+    fun setArrowColor(body: String, casing: String) {
+        arrowColorBody = body; arrowColorCasing = casing
         if (styleReady) replayState()
     }
 
@@ -275,7 +277,9 @@ class MapController(internal val context: Context) {
                 .target(LatLng(point.lat, point.lon)).zoom(camera.zoom).bearing(camera.bearing).tilt(camera.pitch)
                 .padding(p.left * w, p.top * h, p.right * w, p.bottom * h)
                 .build()
-            m.easeCamera(CameraUpdateFactory.newCameraPosition(pos), durationMs, false)
+            val update = CameraUpdateFactory.newCameraPosition(pos)
+            // `easeCamera` refuse une durée nulle ou négative : déplacement immédiat dans ce cas.
+            if (durationMs > 0) m.easeCamera(update, durationMs, false) else m.moveCamera(update)
         }
         val m = map
         if (m == null || !styleReady) { pendingCamera = action; return }

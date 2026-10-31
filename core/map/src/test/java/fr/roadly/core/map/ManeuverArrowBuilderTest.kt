@@ -47,4 +47,17 @@ class ManeuverArrowBuilderTest {
         assertEquals(ManeuverArrowBuilder.EMPTY, ManeuverArrowBuilder.build(line, -1))
         assertEquals(ManeuverArrowBuilder.EMPTY, ManeuverArrowBuilder.build(line, 25))
     }
+
+    @Test fun `u-turn keeps the way back and the head points backwards`() {
+        // Aller-retour plein est puis plein ouest, pas de 5 m : points 0..4 puis 3..0 ; demi-tour au point 4.
+        val out = (0..4).map { GeoPoint(48.85, 2.3 + it * 5.0 * lonPerM) }
+        val geometry = out + out.dropLast(1).asReversed()
+        val f = features(ManeuverArrowBuilder.build(geometry, 4))
+        val coords = f[0].jsonObject["geometry"]!!.jsonObject["coordinates"]!!.jsonArray
+        val pts = coords.map { GeoPoint(it.jsonArray[1].jsonPrimitive.double, it.jsonArray[0].jsonPrimitive.double) }
+        assertEquals(9, pts.size)
+        assertEquals(out[4], pts[4])
+        assertEquals(0.0, pts.last().distanceTo(out[0]), 0.1)
+        assertEquals(270.0, f[1].jsonObject["properties"]!!.jsonObject["bearing"]!!.jsonPrimitive.double, 0.5)
+    }
 }

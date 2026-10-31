@@ -37,7 +37,7 @@ object GuidanceCameraPolicy {
     const val EXIT_APPROACH_MIN_KMH = 70.0
     const val TURN_APPROACH_M = 150.0
 
-    val PADDING_PORTRAIT = CameraPadding(0f, 0.45f, 0f, 0f)
+    val PADDING_PORTRAIT = CameraPadding(0f, 0.45f, 0f, 0.12f)
     val PADDING_LANDSCAPE = CameraPadding(0.40f, 0.25f, 0f, 0f)
 
     private val exitLike = setOf(ManeuverType.EXIT, ManeuverType.RAMP, ManeuverType.MERGE, ManeuverType.KEEP_LEFT, ManeuverType.KEEP_RIGHT)

@@ -25,7 +25,9 @@ object ManeuverArrowBuilder {
         if (geometry.size < 2 || maneuverShapeIndex !in geometry.indices) return EMPTY
         val before = walk(geometry, maneuverShapeIndex, -1, BEFORE_M).asReversed()
         val after = walk(geometry, maneuverShapeIndex, +1, AFTER_M)
-        val pts = (before + geometry[maneuverShapeIndex] + after).distinct()
+        // Dédoublonnage des seuls points consécutifs : un demi-tour repasse par les mêmes points.
+        val pts = (before + geometry[maneuverShapeIndex] + after)
+            .fold(mutableListOf<GeoPoint>()) { acc, p -> if (acc.lastOrNull() != p) acc += p; acc }
         if (pts.size < 2) return EMPTY
         val bearing = bearingDeg(pts[pts.size - 2], pts.last())
         return buildJsonObject {

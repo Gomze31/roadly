@@ -26,7 +26,7 @@ class GuidanceCameraPolicyTest {
         val cam = GuidanceCameraPolicy.compute(input(), null)
         assertEquals(58.0, cam.pitch, 1e-9)
         assertEquals(90.0, cam.bearing, 1e-9)
-        assertEquals(CameraPadding(0f, 0.45f, 0f, 0f), cam.padding)
+        assertEquals(CameraPadding(0f, 0.45f, 0f, 0.12f), cam.padding)
     }
 
     @Test fun `landscape pads the left side for the overlay column`() {

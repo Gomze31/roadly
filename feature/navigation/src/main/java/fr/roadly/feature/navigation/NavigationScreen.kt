@@ -126,7 +126,7 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     val threeD by vm.map3d.collectAsStateWithLifecycle()
     val powerSave by rememberPowerSaveMode()
     LaunchedEffect(threeD, powerSave, c.buildings3d) { map.setBuildings3d(threeD && !powerSave, c.buildings3d.toHex()) }
-    LaunchedEffect(c.onBrand) { map.setArrowColor(c.onBrand.toHex()) }
+    LaunchedEffect(c.onBrand, c.brand) { map.setArrowColor(c.onBrand.toHex(), c.brand.toHex()) }
     LaunchedEffect(progress) {
         if (route != null && progress != null) {
             map.setUserLocation(LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L))
