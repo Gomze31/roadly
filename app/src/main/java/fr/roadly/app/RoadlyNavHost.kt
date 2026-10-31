@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import fr.roadly.core.navigation.NavRequest
 import fr.roadly.feature.home.HomeRoute
 import fr.roadly.feature.home.homeScreen
 import fr.roadly.feature.navigation.NavigationRoute
@@ -12,6 +13,8 @@ import fr.roadly.feature.navigation.navigationScreen
 import fr.roadly.core.model.Place
 import fr.roadly.feature.route.PICKED_STOP_KEY
 import fr.roadly.feature.route.RouteRoute
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.json.Json
 import fr.roadly.feature.route.routeScreen
 import fr.roadly.feature.search.SearchRoute
@@ -38,6 +41,7 @@ fun RoadlyNavHost(
     withNotificationPermission: (() -> Unit) -> Unit,
     openNavigationRequested: Boolean,
     onOpenNavigationHandled: () -> Unit,
+    navRequests: Flow<NavRequest> = emptyFlow(),
 ) {
     val nav = rememberNavController()
     NavHost(navController = nav, startDestination = HomeRoute) {
@@ -98,6 +102,16 @@ fun RoadlyNavHost(
         if (openNavigationRequested) {
             nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
             onOpenNavigationHandled()
+        }
+    }
+    // Demandes de l'assistant (ouvrir la recherche filtrée, le guidage, les réglages).
+    LaunchedEffect(navRequests) {
+        navRequests.collect { r ->
+            when (r) {
+                is NavRequest.OpenSearch -> nav.navigate(SearchRoute(category = r.category))
+                NavRequest.OpenGuidance -> nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
+                NavRequest.OpenSettings -> nav.navigate(SettingsRoute) { launchSingleTop = true }
+            }
         }
     }
 }
