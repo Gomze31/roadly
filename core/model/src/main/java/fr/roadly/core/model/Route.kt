@@ -29,6 +29,10 @@ data class Maneuver(
     val lanes: List<Lane> = emptyList(),
     /** Numéro de sortie signalisé (`sign.exit_number_elements[0].text`), p. ex. « 12 ». */
     val exitNumber: String? = null,
+    /** Directions signalées sur le panneau de sortie (`sign.exit_toward_elements`, 2 premières jointes par « · »), p. ex. « Toulouse-Centre · Blagnac ». */
+    val exitToward: String? = null,
+    /** Route signalée sur le panneau de sortie (`sign.exit_branch_elements[0]`), p. ex. « A62 ». */
+    val exitBranch: String? = null,
 )
 
 /** Préférences d'itinéraire appliquées aux trois variantes et au recalcul (`costing_options.auto.use_* = 0`). */

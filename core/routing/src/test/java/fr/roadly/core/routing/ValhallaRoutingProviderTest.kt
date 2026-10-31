@@ -196,7 +196,7 @@ class ValhallaRoutingProviderTest {
         val maneuvers = leg["maneuvers"]!!.jsonArray
         val enriched = JsonObject(maneuvers[1].jsonObject + mapOf(
             "lanes" to json.parseToJsonElement("""[{"directions":8,"valid":8},{"directions":2},{"directions":66,"active":64}]"""),
-            "sign" to json.parseToJsonElement("""{"exit_number_elements":[{"text":"12"}],"exit_toward_elements":[{"text":"Lyon"}]}"""),
+            "sign" to json.parseToJsonElement("""{"exit_number_elements":[{"text":"12"}],"exit_branch_elements":[{"text":"A62"}],"exit_toward_elements":[{"text":"Toulouse-Centre"},{"text":"Blagnac"},{"text":"Aéroport"}]}"""),
         ))
         val newLeg = JsonObject(leg + ("maneuvers" to JsonArray(maneuvers.toMutableList().also { it[1] = enriched })))
         val body = JsonObject(root + ("trip" to JsonObject(trip + ("legs" to JsonArray(listOf(newLeg))))))
@@ -207,6 +207,8 @@ class ValhallaRoutingProviderTest {
             m.lanes,
         )
         assertEquals("12", m.exitNumber)
+        assertEquals("Toulouse-Centre · Blagnac", m.exitToward)
+        assertEquals("A62", m.exitBranch)
     }
 
     @Test fun `route preferences map to valhalla use flags`() = runTest {

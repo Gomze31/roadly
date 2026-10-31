@@ -158,6 +158,8 @@ class ValhallaRoutingProvider @Inject constructor(
                     verbalAlert = m.verbalAlert?.takeIf { it.isNotBlank() },
                     lanes = ValhallaLanes.parse(m.lanes),
                     exitNumber = m.sign?.exitNumberElements?.firstOrNull { it.text.isNotBlank() }?.text,
+                    exitToward = m.sign?.exitTowardElements?.map { it.text.trim() }?.filter { it.isNotEmpty() }?.take(2)?.joinToString(" · ")?.takeIf { it.isNotEmpty() },
+                    exitBranch = m.sign?.exitBranchElements?.firstOrNull { it.text.isNotBlank() }?.text?.trim(),
                 )
             }
         }

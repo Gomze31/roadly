@@ -25,6 +25,10 @@ import kotlinx.serialization.json.JsonElement
     val lanes: List<JsonElement> = emptyList(),
     val sign: ValhallaSign? = null,
 )
-@Serializable internal data class ValhallaSign(@SerialName("exit_number_elements") val exitNumberElements: List<ValhallaSignElement> = emptyList())
+@Serializable internal data class ValhallaSign(
+    @SerialName("exit_number_elements") val exitNumberElements: List<ValhallaSignElement> = emptyList(),
+    @SerialName("exit_branch_elements") val exitBranchElements: List<ValhallaSignElement> = emptyList(),
+    @SerialName("exit_toward_elements") val exitTowardElements: List<ValhallaSignElement> = emptyList(),
+)
 @Serializable internal data class ValhallaSignElement(val text: String = "")
 @Serializable internal data class ValhallaError(@SerialName("error_code") val errorCode: Int = 0, val error: String = "")
