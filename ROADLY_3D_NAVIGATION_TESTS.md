@@ -7,7 +7,8 @@ Commandes : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test 
 ## Jeux de données
 - `TestRoutes.straight` (1 464 m, virage à droite) ; `TestRoutes.outAndBack` (demi-tour) — existants.
 - `ParisRoute` (fixture FOSSGIS réelle, 2 ronds-points) — existante.
-- **À créer** : `TestRoutes.leftTurn`, `TestRoutes.twoRoundabouts` (synthétique, 120 m d'écart), `TestRoutes.parallelRoads` (voie de desserte à 25 m), fixture FOSSGIS réelle **autoroute** avec sortie numérotée + échangeur (ex. périphérique de Toulouse) enregistrée depuis le serveur public — données réelles, jamais fabriquées.
+- Créés (Étape B) : `TestRoutes.leftTurn`, `TestRoutes.twoRoundabouts` (120 m d'écart) ; fixture FOSSGIS réelle `valhalla_motorway.json` (Toulouse 43.6300,1.4100 → 43.5540,1.5000, enregistrée le 2026-10-31 : sorties 31b et 19 avec panneaux, échangeur A620, 4 ronds-points). LIMITE : aucune voie (`lanes`) renvoyée par le serveur public sur ce trajet.
+- **À créer** : `TestRoutes.parallelRoads` (desserte à 25 m), `TestRoutes.overpass` (passage supérieur).
 - Positions GPS simulées : générateur `FixScript` (vitesse, bruit gaussien, précision, trous) dans `core/navigation/testing`.
 
 ## Matrice des 20 scénarios
