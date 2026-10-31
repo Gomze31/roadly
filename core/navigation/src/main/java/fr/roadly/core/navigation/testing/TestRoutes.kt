@@ -64,4 +64,44 @@ object TestRoutes {
 
     /** [p] décalé de [meters] vers le nord (perpendiculaire à [straight]). */
     fun north(p: GeoPoint, meters: Double) = GeoPoint(p.lat + meters / METERS_PER_DEG_LAT, p.lon)
+
+    /** Point à [eastM] m à l'est et [northM] m au nord de (LAT, 2,300). */
+    fun xy(eastM: Double, northM: Double): GeoPoint {
+        val lonPerMeter = 1.0 / (METERS_PER_DEG_LAT * cos(LAT * PI / 180.0))
+        return GeoPoint(LAT + northM / METERS_PER_DEG_LAT, 2.300 + eastM * lonPerMeter)
+    }
+
+    /**
+     * Deux ronds-points rapprochés (scénario 6) : 600 m plein est (61 points, pas de 10 m) ; entrée 1 au point 20 (200 m), sortie au point 23,
+     * entrée 2 au point 35 (350 m, 120 m après la sortie 1), sortie au point 38, arrivée au point 60.
+     */
+    fun twoRoundabouts(id: String = "twoRoundabouts", costing: RouteCosting = RouteCosting.FASTEST): Route {
+        val pts = (0..60).map { xy(it * 10.0, 0.0) }
+        val cum = DoubleArray(pts.size).also { c -> for (i in 1 until pts.size) c[i] = c[i - 1] + pts[i - 1].distanceTo(pts[i]) }
+        fun len(a: Int, b: Int) = cum[b] - cum[a]
+        val maneuvers = listOf(
+            Maneuver(ManeuverType.DEPART, "Conduisez vers l'est.", null, len(0, 20), 24.0, 0, null, verbalPre = "Conduisez vers l'est."),
+            Maneuver(
+                ManeuverType.ROUNDABOUT_ENTER, "Entrez dans le rond-point et prenez la 2e sortie.", "Rond-point Nord", len(20, 23), 4.0, 20, 2,
+                verbalPre = "Entrez dans le rond-point et prenez la 2e sortie.", verbalAlert = "Entrez dans le rond-point et prenez la 2e sortie.",
+            ),
+            Maneuver(
+                ManeuverType.ROUNDABOUT_EXIT, "Quittez le rond-point dans Rue Médiane.", "Rue Médiane", len(23, 35), 14.0, 23, null,
+                verbalPre = "Quittez le rond-point dans Rue Médiane.",
+            ),
+            Maneuver(
+                ManeuverType.ROUNDABOUT_ENTER, "Entrez dans le rond-point et prenez la 1re sortie.", "Rond-point Sud", len(35, 38), 4.0, 35, 1,
+                verbalPre = "Entrez dans le rond-point et prenez la 1re sortie.", verbalAlert = "Entrez dans le rond-point et prenez la 1re sortie.",
+            ),
+            Maneuver(
+                ManeuverType.ROUNDABOUT_EXIT, "Quittez le rond-point dans Rue Finale.", "Rue Finale", len(38, 60), 26.0, 38, null,
+                verbalPre = "Quittez le rond-point dans Rue Finale.",
+            ),
+            Maneuver(
+                ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 60, null,
+                verbalPre = "Votre destination est sur la droite.", verbalAlert = "Votre destination sera sur la droite.",
+            ),
+        )
+        return Route(id, costing, cum.last(), 72.0, pts, maneuvers, hasToll = false, providerId = "test")
+    }
 }
