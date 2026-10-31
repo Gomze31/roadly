@@ -28,18 +28,21 @@ private fun guiding(session: NavigationSession) = session.state.value as? Naviga
 private val NO_GUIDANCE = ToolOutput.Done(ToolJson.unavailable("Aucun guidage en cours."))
 private const val NO_TRAFFIC_NOTE = "Estimation sans trafic prédictif : Roadly n'a pas de source de trafic."
 
-/** `avoidTolls` / `avoidHighways` : enregistre la préférence ; en guidage, recalcule et compare. */
+/** `avoidTolls` / `avoidHighways` : enregistre la préférence ; en guidage, recalcule et compare le temps restant avant/après. */
 class AvoidOptionTool(
     name: String,
     description: String,
     private val update: (RoutePreferences, Boolean) -> RoutePreferences,
     private val prefs: UserPreferencesRepository,
     private val guidance: GuidanceActions,
+    private val session: NavigationSession,
 ) : AssistantTool {
     override val schema = ToolSchema(name, description, listOf(ToolParam("enabled", ParamType.BOOLEAN, "true pour éviter, false pour autoriser de nouveau.", required = false)))
     override suspend fun run(args: JsonObject, ctx: ToolContext): ToolOutput {
         val enabled = args.bool("enabled") ?: true
         val next = update(prefs.routePreferences.first(), enabled)
+        // Temps restant avant le recalcul : `before.route` est la durée complète de l'ancien itinéraire, pas comparable au restant de `after`.
+        val remainingBeforeS = guiding(session)?.progress?.remainingDurationS?.toDouble()
         return ToolOutput.Done(when (val r = guidance.applyPreferences(next)) {
             is Outcome.Failure -> ToolJson.error("route_failed", "Préférence enregistrée mais recalcul impossible : ${ToolFormat.describe(r.error)}.")
             is Outcome.Success -> {
@@ -47,7 +50,7 @@ class AvoidOptionTool(
                 if (before == null || after == null) ToolJson.ok { put("guiding", false); put("saved", true) }
                 else ToolJson.ok {
                     put("guiding", true)
-                    put("before_min", ToolFormat.minutes(before.route.durationSeconds))
+                    put("before_min", ToolFormat.minutes(remainingBeforeS ?: before.route.durationSeconds))
                     put("after_min", ToolFormat.minutes(after.route.durationSeconds))
                     put("before_arrival", ToolFormat.clock(before.arrivalEpochMs, ctx.zone))
                     put("after_arrival", ToolFormat.clock(after.arrivalEpochMs, ctx.zone))

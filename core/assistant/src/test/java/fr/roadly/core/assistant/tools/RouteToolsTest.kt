@@ -25,16 +25,23 @@ import java.time.ZonedDateTime
 class RouteToolsTest {
     private fun JsonObject.str(k: String) = this[k]!!.jsonPrimitive.content
     private fun ToolOutput.data() = (this as ToolOutput.Done).data
-    private fun avoidTolls(f: GuidingFixture) = AvoidOptionTool("avoidTolls", "Éviter les péages", { p, on -> p.copy(avoidTolls = on) }, f.prefs, f.guidance)
+    private fun avoidTolls(f: GuidingFixture) = AvoidOptionTool("avoidTolls", "Éviter les péages", { p, on -> p.copy(avoidTolls = on) }, f.prefs, f.guidance, f.session)
 
-    @Test fun `avoiding tolls while guiding persists, reroutes and compares durations`() = runTest {
+    @Test fun `avoiding tolls while guiding persists, reroutes and compares remaining durations`() = runTest {
         val f = GuidingFixture(this)
-        f.guideAt(300.0)
-        f.durationFor = { r -> if (r.preferences.avoidTolls) f.route.durationSeconds + 600 else f.route.durationSeconds }
+        f.guideAt(1000.0)
+        // Valeurs capturées avant : le recalcul redémarre la session (progress remis à zéro jusqu'au prochain fix).
+        val remainingS = (f.session.state.value as NavigationState.Guiding).progress.remainingDurationS
+        val fullS = f.route.durationSeconds
+        val reroutedS = fullS - 20 // plus court que la durée complète, plus long que le restant
+        assertTrue(remainingS < reroutedS && reroutedS < fullS)
+        f.durationFor = { reroutedS }
         val out = avoidTolls(f).run(buildJsonObject { put("enabled", true) }, f.ctx()).data()
         assertEquals("ok", out.str("status"))
         assertTrue(f.prefs.routePreferences.first().avoidTolls)
         assertTrue(f.requests.last().preferences.avoidTolls)
+        assertEquals(ToolFormat.minutes(remainingS.toDouble()).toString(), out.str("before_min"))
+        assertEquals(ToolFormat.minutes(reroutedS).toString(), out.str("after_min"))
         assertTrue(out.str("after_min").toInt() > out.str("before_min").toInt())
         assertTrue("after_arrival" in out)
     }
