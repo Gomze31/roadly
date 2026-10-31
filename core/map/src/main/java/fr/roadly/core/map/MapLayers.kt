@@ -66,10 +66,13 @@ object RouteFeatureBuilder {
 
 /** Builders GeoJSON des points : position de l'utilisateur et marqueurs de lieux. */
 internal object PointFeatureBuilder {
-    fun user(fix: LocationFix): String = buildJsonObject {
+    fun user(fix: LocationFix): String = user(MarkerInterpolation.pose(fix), fix.accuracyM)
+
+    /** Marqueur à une pose interpolée (C1). */
+    fun user(pose: MarkerPose, accuracyM: Float): String = buildJsonObject {
         put("type", "Feature")
-        putJsonObject("properties") { put("bearing", (fix.bearingDeg ?: 0f).toDouble()); put("accuracy", fix.accuracyM.toDouble()) }
-        putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(fix.point.lon), JsonPrimitive(fix.point.lat)))) }
+        putJsonObject("properties") { put("bearing", pose.bearingDeg); put("accuracy", accuracyM.toDouble()) }
+        putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(pose.lon), JsonPrimitive(pose.lat)))) }
     }.toString()
 
     fun reports(reports: List<CommunityReport>): String = buildJsonObject {

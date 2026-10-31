@@ -1,8 +1,10 @@
 package fr.roadly.core.map
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.view.animation.LinearInterpolator
 import androidx.core.content.ContextCompat
 import fr.roadly.core.model.BoundingBox
 import fr.roadly.core.model.CommunityReport
@@ -79,10 +81,16 @@ class MapController(internal val context: Context) {
 
     private var lastSnapshot: CameraSnapshot? = null
 
+    /** C1 : animation en cours du marqueur, et pose affichée (point de départ de la prochaine animation). */
+    private var markerAnimator: ValueAnimator? = null
+    private var shownPose: MarkerPose? = null
+
     var onRouteClick: ((String) -> Unit)? = null
 
     /** Détache la carte (la vue est détruite) ; l'état mémorisé reste pour un futur `attach`. */
     internal fun detach() {
+        markerAnimator?.cancel()
+        markerAnimator = null
         map = null
         styleReady = false
         onRouteClick = null
@@ -195,7 +203,7 @@ class MapController(internal val context: Context) {
 
     private fun replayState() {
         val style = map?.style ?: return
-        lastFix?.let { style.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(it)) }
+        lastFix?.let { shownPose = MarkerInterpolation.pose(it); style.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(it)) }
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ROUTES)?.setGeoJson(RouteFeatureBuilder.build(lastRoutes, lastActiveRouteId))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
@@ -214,11 +222,38 @@ class MapController(internal val context: Context) {
         map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
-    fun setUserLocation(fix: LocationFix?) {
+    /**
+     * Position de l'utilisateur. C1 : le marqueur glisse de la pose affichée vers [fix] en [animateMs] (linéaire, comme `easeCamera`)
+     * pour avancer avec la caméra ; 0 = pose immédiate ; un saut de plus de 200 m est posé directement.
+     */
+    fun setUserLocation(fix: LocationFix?, animateMs: Long = USER_ANIMATION_MS) {
         lastFix = fix
-        if (!styleReady) return
+        markerAnimator?.cancel()
+        markerAnimator = null
+        val target = fix?.let { MarkerInterpolation.pose(it) }
+        if (!styleReady) { shownPose = target; return }
         val src = map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_USER) ?: return
-        if (fix == null) src.setGeoJson("""{"type":"FeatureCollection","features":[]}""") else src.setGeoJson(PointFeatureBuilder.user(fix))
+        if (fix == null || target == null) {
+            shownPose = null
+            src.setGeoJson("""{"type":"FeatureCollection","features":[]}""")
+            return
+        }
+        val from = shownPose
+        if (from == null || !MarkerInterpolation.shouldAnimate(from, target, animateMs)) {
+            shownPose = target
+            src.setGeoJson(PointFeatureBuilder.user(target, fix.accuracyM))
+            return
+        }
+        markerAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = animateMs
+            interpolator = LinearInterpolator()
+            addUpdateListener { a ->
+                val pose = MarkerInterpolation.lerp(from, target, (a.animatedValue as Float).toDouble())
+                shownPose = pose
+                map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(pose, fix.accuracyM))
+            }
+            start()
+        }
     }
 
     fun setRoutes(routes: List<Route>, activeId: String?) {
@@ -267,9 +302,9 @@ class MapController(internal val context: Context) {
 
     /**
      * Caméra de guidage : cible, zoom, cap, inclinaison et marges (fractions de la vue → pixels) ;
-     * transition linéaire de [durationMs] pour suivre le rythme des positions (~1 Hz).
+     * transition de [durationMs], linéaire pour suivre le rythme des positions (~1 Hz), adoucie si [eased] (bascule 2D/3D, recentrage).
      */
-    fun applyGuidanceCamera(point: GeoPoint, camera: GuidanceCamera, durationMs: Int = 1000) {
+    fun applyGuidanceCamera(point: GeoPoint, camera: GuidanceCamera, durationMs: Int = 1000, eased: Boolean = false) {
         val action: (MapLibreMap) -> Unit = { m ->
             val w = m.width.toDouble(); val h = m.height.toDouble()
             val p = camera.padding
@@ -279,16 +314,16 @@ class MapController(internal val context: Context) {
                 .build()
             val update = CameraUpdateFactory.newCameraPosition(pos)
             // `easeCamera` refuse une durée nulle ou négative : déplacement immédiat dans ce cas.
-            if (durationMs > 0) m.easeCamera(update, durationMs, false) else m.moveCamera(update)
+            if (durationMs > 0) m.easeCamera(update, durationMs, eased) else m.moveCamera(update)
         }
         val m = map
         if (m == null || !styleReady) { pendingCamera = action; return }
         action(m)
     }
 
-    fun moveTo(point: GeoPoint, zoom: Double, bearing: Double = 0.0, animate: Boolean = true) {
+    fun moveTo(point: GeoPoint, zoom: Double, bearing: Double = 0.0, animate: Boolean = true, tilt: Double = 0.0) {
         val action: (MapLibreMap) -> Unit = { m ->
-            val pos = CameraPosition.Builder().target(LatLng(point.lat, point.lon)).zoom(zoom).bearing(bearing).tilt(0.0).padding(0.0, 0.0, 0.0, 0.0).build()
+            val pos = CameraPosition.Builder().target(LatLng(point.lat, point.lon)).zoom(zoom).bearing(bearing).tilt(tilt).padding(0.0, 0.0, 0.0, 0.0).build()
             val update = CameraUpdateFactory.newCameraPosition(pos)
             if (animate) m.animateCamera(update, 600) else m.moveCamera(update)
         }
@@ -307,7 +342,9 @@ class MapController(internal val context: Context) {
     /** Caméra courante, ou le dernier instantané pris au détachement ; null si aucune carte n'a jamais existé. */
     fun cameraPosition(): CameraSnapshot? = liveCamera() ?: lastSnapshot
 
-    fun restore(snapshot: CameraSnapshot) = moveTo(GeoPoint(snapshot.lat, snapshot.lon), snapshot.zoom, snapshot.bearing, animate = false)
+    /** Restaure [snapshot] ; l'inclinaison n'est reprise que si [keepTilt] (écran de guidage) — l'accueil reste à plat. */
+    fun restore(snapshot: CameraSnapshot, keepTilt: Boolean = false) =
+        moveTo(GeoPoint(snapshot.lat, snapshot.lon), snapshot.zoom, snapshot.bearing, animate = false, tilt = if (keepTilt) snapshot.tilt else 0.0)
 
     private fun liveCamera(): CameraSnapshot? = map?.cameraPosition?.let { CameraSnapshot(it.target?.latitude ?: return null, it.target?.longitude ?: return null, it.zoom, it.bearing, it.tilt) }
 
@@ -343,5 +380,10 @@ class MapController(internal val context: Context) {
         val bmp = Bitmap.createBitmap(d.intrinsicWidth.coerceAtLeast(1), d.intrinsicHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp); d.setBounds(0, 0, c.width, c.height); d.draw(c)
         return bmp
+    }
+
+    companion object {
+        /** Durée (ms) du glissement du marqueur entre deux positions, égale à celle de la caméra (C1). */
+        const val USER_ANIMATION_MS = 1_000L
     }
 }

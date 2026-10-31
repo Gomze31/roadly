@@ -79,7 +79,8 @@ fun ReplayScreen(isDark: Boolean, onBack: () -> Unit, onNavigateTo: (Place) -> U
         }
     }
     val frame = state.frame
-    LaunchedEffect(frame) { if (frame != null) map.setUserLocation(LocationFix(frame.point, frame.bearingDeg, null, 5f, 0L)) }
+    // Relecture : positions rapprochées, le marqueur suit chaque image sans glisser.
+    LaunchedEffect(frame) { if (frame != null) map.setUserLocation(LocationFix(frame.point, frame.bearingDeg, null, 5f, 0L), animateMs = 0L) }
 
     Box(Modifier.fillMaxSize()) {
         if (state.styleUrl.isNotEmpty()) RoadlyMap(styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize())
