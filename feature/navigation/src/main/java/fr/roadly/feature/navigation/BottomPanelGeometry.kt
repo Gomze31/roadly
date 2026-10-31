@@ -11,8 +11,9 @@ internal object BottomPanelGeometry {
 
     /** Fraction couverte sous [panelTopPx] (haut du bloc dans la racine), arrondie au-dessus ; null si la hauteur est inconnue. */
     fun fraction(panelTopPx: Float, rootHeightPx: Float): Float? {
-        if (rootHeightPx <= 0f || panelTopPx.isNaN()) return null
+        if (rootHeightPx.isNaN() || rootHeightPx <= 0f || panelTopPx.isNaN()) return null
         val raw = ((rootHeightPx - panelTopPx) / rootHeightPx).coerceIn(0f, MAX_FRACTION)
-        return (ceil(raw / STEP - 1e-3f) * STEP).coerceIn(0f, MAX_FRACTION)
+        // `maxOf` ramène −0 (plafond d'un petit négatif) à +0 ; `coerceIn` le laisserait passer, car −0 n'est pas < 0.
+        return maxOf(0f, ceil(raw / STEP - 1e-3f) * STEP).coerceAtMost(MAX_FRACTION)
     }
 }

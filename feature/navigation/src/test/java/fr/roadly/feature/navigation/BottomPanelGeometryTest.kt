@@ -17,4 +17,11 @@ class BottomPanelGeometryTest {
         assertEquals(0f, BottomPanelGeometry.fraction(1000f, 1000f)!!, 1e-4f)
         assertNull(BottomPanelGeometry.fraction(500f, 0f))
     }
+
+    @Test fun `an empty panel gives a positive zero and a NaN height gives nothing`() {
+        assertEquals("+0, pas −0", 0f.toRawBits(), BottomPanelGeometry.fraction(1000f, 1000f)!!.toRawBits())
+        assertEquals("panneau sous l'écran : +0", 0f.toRawBits(), BottomPanelGeometry.fraction(1200f, 1000f)!!.toRawBits())
+        assertNull(BottomPanelGeometry.fraction(500f, Float.NaN))
+        assertNull(BottomPanelGeometry.fraction(Float.NaN, 1000f))
+    }
 }
