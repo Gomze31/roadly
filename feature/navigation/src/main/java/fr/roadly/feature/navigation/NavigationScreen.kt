@@ -40,6 +40,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,9 +76,13 @@ import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
-import fr.roadly.core.map.CameraMode
+import fr.roadly.core.map.GuidanceCamera
+import fr.roadly.core.map.GuidanceCameraInput
+import fr.roadly.core.map.GuidanceCameraPolicy
+import fr.roadly.core.map.ManeuverArrowBuilder
 import fr.roadly.core.map.RoadlyMap
 import fr.roadly.core.map.rememberMapController
+import fr.roadly.core.map.rememberPowerSaveMode
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.ManeuverType
@@ -118,18 +123,35 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     }
     val progress = state.progress
     val following = state.following
-    LaunchedEffect(progress, following) {
+    val threeD by vm.map3d.collectAsStateWithLifecycle()
+    val powerSave by rememberPowerSaveMode()
+    LaunchedEffect(threeD, powerSave, c.buildings3d) { map.setBuildings3d(threeD && !powerSave, c.buildings3d.toHex()) }
+    LaunchedEffect(c.onBrand) { map.setArrowColor(c.onBrand.toHex()) }
+    LaunchedEffect(progress) {
         if (route != null && progress != null) {
-            val fix = LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L)
-            map.setUserLocation(fix)
+            map.setUserLocation(LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L))
             map.setTraversed(route.geometry, progress.segmentIndex, progress.snapped)
-            // Suivi : zoom 17, cap, inclinaison 0 (CameraMode.FOLLOW de la v1).
-            if (following) map.applyCameraMode(CameraMode.FOLLOW, fix)
         }
     }
+    val approach = state.approach
+    LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
+        if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
+    }
+    // Dernière caméra calculée : le cap y est conservé à l'arrêt et le zoom lissé d'une position à l'autre.
+    val lastCamera = remember { arrayOfNulls<GuidanceCamera>(1) }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
+        LaunchedEffect(progress, following, approach != null, threeD, powerSave, landscape) {
+            if (route == null || progress == null || !following) return@LaunchedEffect
+            val next = route.maneuvers.getOrNull(progress.nextManeuverIndex) ?: return@LaunchedEffect
+            val cam = GuidanceCameraPolicy.compute(
+                GuidanceCameraInput(state.speedKmh, progress.bearingDeg, progress.distanceToNextManeuverM, next.type, threeD, powerSave, landscape),
+                lastCamera[0],
+            )
+            lastCamera[0] = cam
+            map.applyGuidanceCamera(progress.snapped, cam)
+        }
         // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
         val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
@@ -172,7 +194,7 @@ private fun PortraitOverlay(
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                     state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                    if (state.lanes.isNotEmpty() && bannerExpanded) LaneStrip(state.lanes)
+                    if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneStrip(state.lanes, emphasized = state.approach != null)
                     if (state.rerouting) ReroutingPill()
                 }
                 Spacer(Modifier.width(RoadlySpacing.s))
@@ -234,7 +256,7 @@ private fun LandscapeOverlay(
         Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
             Column(Modifier.align(Alignment.TopStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                if (state.lanes.isNotEmpty() && bannerExpanded) LaneStrip(state.lanes)
+                if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneStrip(state.lanes, emphasized = state.approach != null)
                 if (state.rerouting) ReroutingPill()
             }
             Column(Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
