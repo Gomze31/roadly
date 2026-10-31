@@ -96,11 +96,11 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         val tts = synchronized(lock) {
             pending.clear()
             active.clear()
+            _speaking.value = false
             engine
         }
         tts?.stop()
         audio.abandonAudioFocusRequest(focusRequest)
-        _speaking.value = false
     }
 
     override fun release() {
@@ -149,20 +149,20 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     private fun say(tts: TextToSpeech, text: String, flush: Boolean) {
         if (isSilenced()) return
         val id = "roadly-${ids.incrementAndGet()}"
-        val firstActive = synchronized(lock) { active.isEmpty().also { active += id } }
+        val firstActive = synchronized(lock) { active.isEmpty().also { active += id; _speaking.value = true } }
         if (firstActive) audio.requestAudioFocus(focusRequest)
-        _speaking.value = true
         val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) }
         if (tts.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, id) != TextToSpeech.SUCCESS) finished(id)
     }
 
     /** Fin d'un énoncé (terminé, en erreur ou interrompu) ; les identifiants inconnus (déjà purgés par [stop]) sont ignorés. */
     private fun finished(utteranceId: String?) {
-        val abandon = synchronized(lock) { utteranceId != null && active.remove(utteranceId) && active.isEmpty() }
-        if (abandon) {
-            audio.abandonAudioFocusRequest(focusRequest)
-            _speaking.value = false
+        val abandon = synchronized(lock) {
+            val last = utteranceId != null && active.remove(utteranceId) && active.isEmpty()
+            _speaking.value = active.isNotEmpty()
+            last
         }
+        if (abandon) audio.abandonAudioFocusRequest(focusRequest)
     }
 
     private companion object { const val TAG = "RoadlySpeech" }
