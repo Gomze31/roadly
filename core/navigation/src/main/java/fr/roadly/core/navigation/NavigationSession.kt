@@ -166,6 +166,8 @@ class NavigationSession @Inject constructor(
         private var hazards: List<RouteHazard> = emptyList()
         private var activeZone: RouteHazard? = null
         private val zonesAnnounced = mutableSetOf<Double>()
+        /** B4 : ronds-points du tracé courant, calculés une fois par tracé. */
+        private var roundabouts: Map<Int, RoundaboutInfo> = RoundaboutResolver.resolveAll(route)
         private var vigilanceOn = GuidanceDefaults.VIGILANCE_ENABLED
         private var raining: Boolean? = null
         private var rainLowersLimit = GuidanceDefaults.RAIN_LOWERS_LIMIT
@@ -340,6 +342,7 @@ class NavigationSession @Inject constructor(
                 if (fresh != null && freshTracker != null) {
                     route = fresh
                     tracker = freshTracker
+                    roundabouts = RoundaboutResolver.resolveAll(fresh)
                     announced.clear()
                     announced += 0 to Tier.NOW
                     freshTracker.update(fix)
@@ -432,6 +435,7 @@ class NavigationSession @Inject constructor(
                 etaEpochMs = now + (progress.remainingDurationS * 1000).roundToLong(),
                 gpsLost = gpsLost,
                 rerouting = rerouting,
+                roundabout = RoundaboutResolver.current(roundabouts, next),
             )
         }
     }

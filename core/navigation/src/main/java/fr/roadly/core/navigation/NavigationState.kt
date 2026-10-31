@@ -30,6 +30,8 @@ sealed interface NavigationState {
         val raining: Boolean? = null,
         /** `speedLimitKmh` a été abaissé pour la pluie (option). */
         val limitLoweredByRain: Boolean = false,
+        /** B4 : rond-point de la prochaine manœuvre, ou dans lequel on se trouve ; null sinon. */
+        val roundabout: RoundaboutInfo? = null,
     ) : NavigationState
 
     data class Arrived(val route: Route) : NavigationState
