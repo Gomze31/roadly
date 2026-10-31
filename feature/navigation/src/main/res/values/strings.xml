@@ -46,6 +46,12 @@
     <string name="nav_roundabout_desc_unknown">Rond-point</string>
     <string name="nav_roundabout_desc_street">%1$s, vers %2$s</string>
     <string name="nav_lanes_desc">Voies conseillées : %1$s sur %2$d</string>
+    <string name="nav_then">puis</string>
+    <string name="nav_preview_title">Aperçu de la manœuvre</string>
+    <string name="nav_preview_next">Ensuite</string>
+    <string name="nav_close">Fermer</string>
+    <string name="nav_sign_next">Prochaine sortie</string>
+    <string name="nav_sign_following">Sortie suivante</string>
 
     <string name="alt_overline">En cours de trajet</string>
     <string name="alt_title">Changer d\'itinéraire</string>

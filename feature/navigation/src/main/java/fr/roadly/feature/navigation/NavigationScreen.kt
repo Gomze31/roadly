@@ -180,6 +180,7 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     if (showReport) ReportSheet(onDismiss = { showReport = false }, enabled = communityEnabled, onSelect = vm::report)
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
     if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives, onAddStop = { vm.dismissAlternatives(); onAddStop() })
+    GuidanceSheets(state, vm)
 }
 
 /** Portrait : bandeau en haut (replier à droite), actions à droite, compteur + Horizon + barre d'information en bas. */
@@ -200,8 +201,7 @@ private fun PortraitOverlay(
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                    state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                    if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneGuidanceView(state.lanes, emphasized = state.approach != null)
+                    BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
                     if (state.rerouting) ReroutingPill()
                 }
                 Spacer(Modifier.width(RoadlySpacing.s))
@@ -263,8 +263,7 @@ private fun LandscapeOverlay(
         // Colonne gauche : bandeau en haut, Horizon + barre d'information calés en bas (pas de défilement : tout doit rester visible en conduite).
         Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
             Column(Modifier.align(Alignment.TopStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneGuidanceView(state.lanes, emphasized = state.approach != null)
+                BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
                 if (state.rerouting) ReroutingPill()
             }
             Column(Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
@@ -564,3 +563,22 @@ private fun RecenterCountdownPill(seconds: Int, onCancel: () -> Unit) {
         }
     }
 }
+
+/** D1 / D5 : feuilles ouvertes depuis le bandeau ou le panneau du bas ; le contenu suit l'état en direct, la carte continue derrière. */
+@Composable
+internal fun GuidanceSheets(state: NavigationUiState, vm: NavigationViewModel) {
+    val sheet by vm.guidanceSheet.collectAsStateWithLifecycle()
+    // Fin du guidage (arrivée, échec, arrêt) : la feuille est refermée dans le ViewModel, pas seulement masquée, pour ne pas rouvrir au guidage suivant.
+    LaunchedEffect(state.phase) { if (closesGuidanceSheet(state.phase)) vm.closeSheet() }
+    when (visibleSheet(state.phase, sheet)) {
+        GuidanceSheet.MANEUVER_PREVIEW -> ManeuverPreviewSheet(state, onDismiss = vm::closeSheet)
+        GuidanceSheet.TRIP_DETAILS, GuidanceSheet.NONE -> Unit
+    }
+}
+
+/** Feuille affichée : aucune hors guidage (chargement, arrivée, échec, arrêt). */
+internal fun visibleSheet(phase: NavigationPhase, sheet: GuidanceSheet): GuidanceSheet = if (phase == NavigationPhase.GUIDING) sheet else GuidanceSheet.NONE
+
+/** La feuille ouverte est refermée quand le guidage s'arrête ; pas pendant le chargement, qui précède le premier état. */
+internal fun closesGuidanceSheet(phase: NavigationPhase): Boolean =
+    phase == NavigationPhase.ARRIVED || phase == NavigationPhase.FAILED || phase == NavigationPhase.IDLE
