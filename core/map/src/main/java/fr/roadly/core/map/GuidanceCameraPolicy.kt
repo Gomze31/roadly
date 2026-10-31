@@ -19,6 +19,8 @@ data class GuidanceCameraInput(
     /** Économiseur de batterie Android actif. */
     val powerSave: Boolean,
     val landscape: Boolean,
+    /** Approche décidée par l'écran (hystérésis B1) ; null = règle de distance [GuidanceCameraPolicy.isApproaching]. */
+    val approaching: Boolean? = null,
 )
 
 /**
@@ -59,7 +61,7 @@ object GuidanceCameraPolicy {
             else -> input.bearingDeg.toDouble()
         }
         if (!input.threeD) return GuidanceCamera(ZOOM_2D, 0.0, bearing, CameraPadding.NONE)
-        val approaching = isApproaching(input.distanceToManeuverM, input.maneuverType, input.speedKmh)
+        val approaching = input.approaching ?: isApproaching(input.distanceToManeuverM, input.maneuverType, input.speedKmh)
         val pitch = when {
             input.powerSave -> PITCH_POWER_SAVE
             approaching -> PITCH_APPROACH

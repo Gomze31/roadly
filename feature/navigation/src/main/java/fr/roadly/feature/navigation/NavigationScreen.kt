@@ -146,7 +146,7 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
             if (route == null || progress == null || !following) return@LaunchedEffect
             val next = route.maneuvers.getOrNull(progress.nextManeuverIndex) ?: return@LaunchedEffect
             val cam = GuidanceCameraPolicy.compute(
-                GuidanceCameraInput(state.speedKmh, progress.bearingDeg, progress.distanceToNextManeuverM, next.type, threeD, powerSave, landscape),
+                GuidanceCameraInput(state.speedKmh, progress.bearingDeg, progress.distanceToNextManeuverM, next.type, threeD, powerSave, landscape, approaching = approach != null),
                 lastCamera[0],
             )
             lastCamera[0] = cam

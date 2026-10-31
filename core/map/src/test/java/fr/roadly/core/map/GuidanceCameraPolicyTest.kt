@@ -79,4 +79,9 @@ class GuidanceCameraPolicyTest {
         assertEquals(135.0, GuidanceCameraPolicy.compute(input(bearing = null), previous).bearing, 1e-9)
         assertEquals(0.0, GuidanceCameraPolicy.compute(input(bearing = null), null).bearing, 1e-9)
     }
+
+    @Test fun `an approach decided by the screen overrides the distance rule`() {
+        assertEquals(GuidanceCameraPolicy.PITCH_APPROACH, GuidanceCameraPolicy.compute(input(distance = 160.0).copy(approaching = true), null).pitch, 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(approaching = false), null).pitch, 1e-9)
+    }
 }

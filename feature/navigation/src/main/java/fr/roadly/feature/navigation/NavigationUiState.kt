@@ -97,8 +97,15 @@ internal fun hazardsAhead(hazards: List<RouteHazard>, alongM: Double): List<Haza
         }
         .sortedBy { it.distanceM }
 
-/** Formatage pur (testé via le ViewModel) : distances et durées par `Formatters`, comme la v1. */
-internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean, toleranceKmh: Int, styleUrl: String, zone: ZoneId): NavigationUiState {
+/** B1 : une approche reste active jusqu'au changement de manœuvre visée (pas de clignotement au seuil des 150 / 400 m). */
+internal fun approachLatched(previous: NavigationUiState?, routeId: String, nextIndex: Int, approachingNow: Boolean): Boolean {
+    if (approachingNow) return true
+    val prev = previous ?: return false
+    return prev.approach != null && prev.route?.id == routeId && prev.progress?.nextManeuverIndex == nextIndex
+}
+
+/** Formatage pur (testé via le ViewModel) ; [previous] = dernier état produit (hystérésis de l'approche, B1). */
+internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean, toleranceKmh: Int, styleUrl: String, zone: ZoneId, previous: NavigationUiState? = null): NavigationUiState {
     val base = NavigationUiState(styleUrl = styleUrl, muted = muted, following = following, toleranceKmh = toleranceKmh)
     return when (s) {
         NavigationState.Idle -> base.copy(phase = NavigationPhase.IDLE)
@@ -120,7 +127,9 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 route = s.route,
                 progress = p,
                 banner = BannerUi(m.type, Formatters.distance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit, m.exitToward),
-                approach = if (GuidanceCameraPolicy.isApproaching(p.distanceToNextManeuverM, m.type, s.speedKmh)) ApproachUi(m.type, m.exitNumber, m.exitToward, m.beginShapeIndex) else null,
+                approach = if (approachLatched(previous, s.route.id, p.nextManeuverIndex, GuidanceCameraPolicy.isApproaching(p.distanceToNextManeuverM, m.type, s.speedKmh))) {
+                    ApproachUi(m.type, m.exitNumber, m.exitToward, m.beginShapeIndex)
+                } else null,
                 lanes = s.lanes,
                 upcoming = upcoming,
                 hazards = hazardsAhead(s.hazards, p.distanceAlongM),

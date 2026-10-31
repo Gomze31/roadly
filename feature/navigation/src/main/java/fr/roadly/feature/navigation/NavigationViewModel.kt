@@ -95,8 +95,11 @@ class NavigationViewModel @Inject constructor(
     /** Réglage « Carte 3D en guidage » (l'écran y ajoute l'économiseur de batterie). */
     val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_3D)
 
+    /** Dernier état produit : hystérésis de l'approche (B1). */
+    private var lastUi: NavigationUiState? = null
+
     val uiState: StateFlow<NavigationUiState> = combine(session.state, session.muted, following, prefs.speedAlertToleranceKmh, styleUrl) { s, muted, follow, tolerance, style ->
-        buildUiState(s, muted = muted, following = follow, toleranceKmh = tolerance, styleUrl = style, zone = ZoneId.systemDefault())
+        buildUiState(s, muted = muted, following = follow, toleranceKmh = tolerance, styleUrl = style, zone = ZoneId.systemDefault(), previous = lastUi).also { lastUi = it }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NavigationUiState())
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
