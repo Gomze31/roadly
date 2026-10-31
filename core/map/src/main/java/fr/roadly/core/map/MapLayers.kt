@@ -40,6 +40,9 @@ internal object MapIds {
     /** Source vecteur OpenMapTiles des styles OpenFreeMap ; absente = pas de bâtiments 3D. */
     const val STYLE_SRC_OPENMAPTILES = "openmaptiles"
     const val STYLE_LYR_BUILDING = "building"
+    /** Calques de points d'intérêt et de noms de rues des tuiles OpenMapTiles (niveau de détail, C2). */
+    const val STYLE_LYR_POI = "poi"
+    const val STYLE_LYR_TRANSPORTATION_NAME = "transportation_name"
 }
 
 /** GeoJSON FeatureCollection des tracés ; l'itinéraire actif est placé en dernier (dessiné au-dessus). */

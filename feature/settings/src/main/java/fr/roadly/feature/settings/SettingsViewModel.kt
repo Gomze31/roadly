@@ -19,6 +19,7 @@ import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.data.vigilance.VigilanceRepository
 import fr.roadly.core.model.CritAir
 import fr.roadly.core.model.FuelType
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.VehicleDimensions
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
@@ -89,6 +90,8 @@ class SettingsViewModel @Inject constructor(
 
     /** Carte 3D pendant le guidage. */
     val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_3D)
+    /** Niveau de détail de la carte en guidage (Normal / Réduit). */
+    val mapDetail: StateFlow<MapDetail> = prefs.mapDetail.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_DETAIL)
 
     private val voice = combine(prefs.voiceEnabled, prefs.voiceVolume, prefs.speedAlertToleranceKmh, prefs.speedAlertSound) { e, v, t, s -> VoiceSettings(e, v, t, s) }
 
@@ -135,6 +138,7 @@ class SettingsViewModel @Inject constructor(
     fun setVigilanceEnabled(value: Boolean) { viewModelScope.launch { prefs.setVigilanceEnabled(value) } }
     fun setVigilanceSound(value: Boolean) { viewModelScope.launch { prefs.setVigilanceSound(value) } }
     fun setMap3d(value: Boolean) { viewModelScope.launch { prefs.setMap3dEnabled(value) } }
+    fun setMapDetail(value: MapDetail) { viewModelScope.launch { prefs.setMapDetail(value) } }
     fun setRainLowersLimit(value: Boolean) { viewModelScope.launch { prefs.setRainLowersLimit(value) } }
     fun refreshVigilance() {
         if (_vigilanceRefresh.value == RefreshState.Loading) return

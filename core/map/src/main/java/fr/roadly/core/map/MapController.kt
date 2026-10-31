@@ -10,6 +10,7 @@ import fr.roadly.core.model.BoundingBox
 import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.Route
 import org.maplibre.android.camera.CameraPosition
@@ -18,10 +19,14 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.expressions.Expression.all
 import org.maplibre.android.style.expressions.Expression.coalesce
 import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.literal
+import org.maplibre.android.style.expressions.Expression.match
+import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -85,6 +90,11 @@ class MapController(internal val context: Context) {
     private var markerAnimator: ValueAnimator? = null
     private var shownPose: MarkerPose? = null
 
+    /** C2 : niveau de détail courant ; visibilité et filtres d'origine des calques touchés (style courant), pour revenir au niveau normal. */
+    private var detail = MapDetail.NORMAL
+    private val baseVisibility = mutableMapOf<String, String>()
+    private val baseNameFilters = mutableMapOf<String, Expression?>()
+
     var onRouteClick: ((String) -> Unit)? = null
 
     /** Détache la carte (la vue est détruite) ; l'état mémorisé reste pour un futur `attach`. */
@@ -127,6 +137,8 @@ class MapController(internal val context: Context) {
 
     private fun loadStyle(url: String) {
         styleReady = false
+        baseVisibility.clear()
+        baseNameFilters.clear()
         map?.setStyle(Style.Builder().fromUri(url)) { style -> installLayers(style); styleReady = true; replayState() }
     }
 
@@ -219,6 +231,7 @@ class MapController(internal val context: Context) {
         (style.getLayer(MapIds.LYR_BUILDINGS_3D) as? FillExtrusionLayer)?.setProperties(
             fillExtrusionColor(buildingsColor), visibility(if (buildings3d) Property.VISIBLE else Property.NONE),
         )
+        applyDetailTo(style)
         map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
@@ -298,6 +311,38 @@ class MapController(internal val context: Context) {
     fun setBuildings3d(enabled: Boolean, colorHex: String) {
         buildings3d = enabled; buildingsColor = colorHex
         if (styleReady) replayState()
+    }
+
+    /**
+     * C2 : niveau de détail. REDUCED masque les points d'intérêt et les noms des rues `minor` / `service` / `track` ; les calques
+     * sont repérés par leur `source-layer` (pas par leur identifiant, propre à chaque style). Rejoué après un changement de style.
+     */
+    fun applyDetail(level: MapDetail) {
+        detail = level
+        if (styleReady) map?.style?.let { applyDetailTo(it) }
+    }
+
+    private fun applyDetailTo(style: Style) {
+        val reduced = detail == MapDetail.REDUCED
+        for (layer in style.layers) {
+            if (layer !is SymbolLayer) continue
+            when (layer.sourceLayer) {
+                MapIds.STYLE_LYR_POI -> {
+                    val base = baseVisibility.getOrPut(layer.id) { layer.visibility.value ?: Property.VISIBLE }
+                    layer.setProperties(visibility(if (reduced) Property.NONE else base))
+                }
+                MapIds.STYLE_LYR_TRANSPORTATION_NAME -> {
+                    if (layer.id !in baseNameFilters) baseNameFilters[layer.id] = layer.filter
+                    val base = baseNameFilters[layer.id]
+                    layer.setFilter(if (reduced) withoutMinorStreets(base) else base ?: literal(true))
+                }
+            }
+        }
+    }
+
+    private fun withoutMinorStreets(base: Expression?): Expression {
+        val notMinor = match(get("class"), literal(true), stop("minor", false), stop("service", false), stop("track", false))
+        return if (base == null) notMinor else all(base, notMinor)
     }
 
     /**

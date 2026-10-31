@@ -145,6 +145,8 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
         if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
     }
+    val mapDetail by vm.mapDetail.collectAsStateWithLifecycle()
+    LaunchedEffect(mapDetail) { map.applyDetail(mapDetail) }
     // Retour depuis la recherche : la dernière caméra du guidage revient avec son inclinaison, sans attendre la prochaine position.
     DisposableEffect(map) { onDispose { vm.rememberCamera(map.cameraPosition()) } }
     LaunchedEffect(map) { vm.lastCamera?.let { map.restore(it, keepTilt = true) } }

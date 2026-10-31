@@ -2,8 +2,11 @@ package fr.roadly.core.data.repository
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +31,8 @@ private class InMemoryPreferencesDataStore : DataStore<Preferences> {
 }
 
 class DataStoreUserPreferencesRepositoryTest {
-    private val repo = DataStoreUserPreferencesRepository(InMemoryPreferencesDataStore())
+    private val store = InMemoryPreferencesDataStore()
+    private val repo = DataStoreUserPreferencesRepository(store)
 
     @Test fun `guidance defaults`() = runTest {
         assertEquals(RoutePreferences(), repo.routePreferences.first())
@@ -70,5 +74,13 @@ class DataStoreUserPreferencesRepositoryTest {
         assertEquals(null, repo.lastGuidance.first()!!.destinationName)
         repo.setLastGuidance(null)
         assertNull(repo.lastGuidance.first())
+    }
+
+    @Test fun `map detail defaults to normal, persists and ignores unknown values`() = runTest {
+        assertEquals(MapDetail.NORMAL, repo.mapDetail.first())
+        repo.setMapDetail(MapDetail.REDUCED)
+        assertEquals(MapDetail.REDUCED, repo.mapDetail.first())
+        store.edit { it[stringPreferencesKey("map.detail")] = "ULTRA" }
+        assertEquals(MapDetail.NORMAL, repo.mapDetail.first())
     }
 }

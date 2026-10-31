@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -30,6 +31,8 @@ object GuidanceDefaults {
     const val RAIN_LOWERS_LIMIT = false
     /** Carte inclinée + bâtiments 3D pendant le guidage. */
     const val MAP_3D = true
+    /** Niveau de détail de la carte en guidage. */
+    val MAP_DETAIL = MapDetail.NORMAL
 }
 
 /** B6 : course de guidage en cours ou interrompue (mort du processus) — base du « Reprendre le guidage » de l'Étape E3. */
@@ -69,6 +72,9 @@ interface UserPreferencesRepository {
     /** Perspective 3D et bâtiments extrudés pendant le guidage. */
     val map3dEnabled: Flow<Boolean>
     suspend fun setMap3dEnabled(value: Boolean)
+    /** C2 : niveau de détail de la carte en guidage (REDUCED : sans points d'intérêt ni noms des petites rues). */
+    val mapDetail: Flow<MapDetail>
+    suspend fun setMapDetail(value: MapDetail)
     /** Teinte du cockpit (nom de `CockpitTint`) ; null = violet par défaut. */
     val cockpitTint: Flow<String?>
     suspend fun setCockpitTint(name: String?)
@@ -93,6 +99,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kVigilanceSound = booleanPreferencesKey("vigilance.sound")
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
     private val kMap3d = booleanPreferencesKey("map.3d")
+    private val kMapDetail = stringPreferencesKey("map.detail")
     private val kTint = stringPreferencesKey("cockpit.tint")
     private val kLastLat = doublePreferencesKey("guidance.last.lat")
     private val kLastLon = doublePreferencesKey("guidance.last.lon")
@@ -134,6 +141,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setRainLowersLimit(value: Boolean) { store.edit { it[kRainLimit] = value } }
     override val map3dEnabled: Flow<Boolean> = store.data.map { it[kMap3d] ?: GuidanceDefaults.MAP_3D }
     override suspend fun setMap3dEnabled(value: Boolean) { store.edit { it[kMap3d] = value } }
+    override val mapDetail: Flow<MapDetail> = store.data.map { p -> p[kMapDetail]?.let { runCatching { MapDetail.valueOf(it) }.getOrNull() } ?: GuidanceDefaults.MAP_DETAIL }
+    override suspend fun setMapDetail(value: MapDetail) { store.edit { it[kMapDetail] = value.name } }
     override val cockpitTint: Flow<String?> = store.data.map { it[kTint] }
     override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
     override val lastGuidance: Flow<LastGuidance?> = store.data.map { p ->

@@ -13,6 +13,7 @@ import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.model.FuelType
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
@@ -157,5 +158,15 @@ class SettingsViewModelTest {
         vm.testVoice("Essai de voix."); advanceUntilIdle()
         assertEquals(40, speech.volume)
         assertEquals(listOf("Essai de voix."), speech.spoken)
+    }
+
+    @Test fun `map detail level is exposed and persisted`() = runTest {
+        val vm = vm()
+        vm.mapDetail.test {
+            assertEquals(MapDetail.NORMAL, awaitItem())
+            vm.setMapDetail(MapDetail.REDUCED); advanceUntilIdle()
+            assertEquals(MapDetail.REDUCED, expectMostRecentItem())
+            assertEquals(MapDetail.REDUCED, prefs.detail.value)
+        }
     }
 }

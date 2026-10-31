@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SupportAgent
@@ -106,6 +107,7 @@ import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.model.CritAir
 import fr.roadly.core.model.FuelType
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.VehicleDimensions
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
@@ -142,7 +144,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
                 ListRow(stringResource(R.string.settings_assistance), subtitle = stringResource(R.string.settings_assistance_subtitle), icon = Icons.Default.SupportAgent, onClick = onOpenAssistance, divider = false)
             }
             val map3d by vm.map3d.collectAsStateWithLifecycle()
-            AppearanceGroup(state.themeMode, onSelect = vm::setTheme, map3d = map3d, onMap3d = vm::setMap3d)
+            val mapDetail by vm.mapDetail.collectAsStateWithLifecycle()
+            AppearanceGroup(state.themeMode, onSelect = vm::setTheme, map3d = map3d, onMap3d = vm::setMap3d, mapDetail = mapDetail, onMapDetail = vm::setMapDetail)
             TintGroup(tint, onSelect = vm::setTint)
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
@@ -288,7 +291,10 @@ private fun VehicleProfile.summary(): String {
 // ── Apparence : thème ───────────────────────────────────────────────────────
 
 @Composable
-private fun AppearanceGroup(current: ThemeMode, onSelect: (ThemeMode) -> Unit, map3d: Boolean, onMap3d: (Boolean) -> Unit) {
+private fun AppearanceGroup(
+    current: ThemeMode, onSelect: (ThemeMode) -> Unit, map3d: Boolean, onMap3d: (Boolean) -> Unit,
+    mapDetail: MapDetail, onMapDetail: (MapDetail) -> Unit,
+) {
     SettingsGroup(stringResource(R.string.settings_group_appearance)) {
         ToggleRow(
             stringResource(R.string.settings_map_3d),
@@ -296,6 +302,18 @@ private fun AppearanceGroup(current: ThemeMode, onSelect: (ThemeMode) -> Unit, m
             subtitle = stringResource(R.string.settings_map_3d_subtitle),
             icon = Icons.Default.ViewInAr,
         )
+        ListRow(
+            stringResource(R.string.settings_map_detail),
+            subtitle = stringResource(R.string.settings_map_detail_subtitle),
+            icon = Icons.Default.Layers,
+            divider = false,
+        )
+        val detailLabels = MapDetail.entries.associateWith { it.label() }
+        SegmentedControl(
+            options = MapDetail.entries, selected = mapDetail, onSelect = onMapDetail, label = { detailLabels.getValue(it) },
+            modifier = Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m),
+        )
+        RowDivider(inset = RowContentInset)
         ListRow(
             stringResource(R.string.settings_theme),
             subtitle = stringResource(R.string.settings_theme_auto),
@@ -605,6 +623,14 @@ private fun ThemeMode.shortLabel(): String = stringResource(
         ThemeMode.LIGHT -> R.string.settings_theme_light
         ThemeMode.DARK -> R.string.settings_theme_dark
         ThemeMode.AUTO_SOLAR -> R.string.settings_theme_auto_short
+    },
+)
+
+@Composable
+private fun MapDetail.label(): String = stringResource(
+    when (this) {
+        MapDetail.NORMAL -> R.string.settings_map_detail_normal
+        MapDetail.REDUCED -> R.string.settings_map_detail_reduced
     },
 )
 

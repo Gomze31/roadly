@@ -16,6 +16,7 @@ import fr.roadly.core.model.Lane
 import fr.roadly.core.model.LaneDirection
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
@@ -273,6 +274,23 @@ class NavigationViewModelTest {
             assertFalse("annulé : la carte reste libre", vm.uiState.value.following)
             vm.recenter(); runCurrent()
             assertTrue(vm.uiState.value.following)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `map detail follows the setting and is reduced above 90 km per h`() = runTest {
+        val s = session()
+        val vm = NavigationViewModel(s, prefs, config)
+        vm.mapDetail.test {
+            s.start(option, RoutePreferences()); runCurrent()
+            location.emit(LocationFix(tracker.pointAt(300.0), 90f, 10f, 5f, 0L)); runCurrent()   // 36 km/h
+            assertEquals(MapDetail.NORMAL, vm.mapDetail.value)
+            prefs.setMapDetail(MapDetail.REDUCED); runCurrent()
+            assertEquals(MapDetail.REDUCED, vm.mapDetail.value)
+            prefs.setMapDetail(MapDetail.NORMAL); runCurrent()
+            assertEquals(MapDetail.NORMAL, vm.mapDetail.value)
+            location.emit(LocationFix(tracker.pointAt(330.0), 90f, (100 / 3.6).toFloat(), 5f, 0L)); runCurrent()   // 100 km/h
+            assertEquals(MapDetail.REDUCED, vm.mapDetail.value)
             cancelAndIgnoreRemainingEvents()
         }
     }

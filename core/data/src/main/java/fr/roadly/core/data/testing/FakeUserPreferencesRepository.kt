@@ -4,6 +4,7 @@ import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.UserPreferencesRepository
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +48,9 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val map3d = MutableStateFlow(GuidanceDefaults.MAP_3D)
     override val map3dEnabled: Flow<Boolean> = map3d
     override suspend fun setMap3dEnabled(value: Boolean) { map3d.value = value }
+    val detail = MutableStateFlow(GuidanceDefaults.MAP_DETAIL)
+    override val mapDetail: Flow<MapDetail> = detail
+    override suspend fun setMapDetail(value: MapDetail) { detail.value = value }
     val tint = MutableStateFlow<String?>(null)
     override val cockpitTint: Flow<String?> = tint
     override suspend fun setCockpitTint(name: String?) { tint.value = name }

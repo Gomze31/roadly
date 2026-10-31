@@ -14,7 +14,9 @@ import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.map.CameraMode3D
 import fr.roadly.core.map.CameraSnapshot
+import fr.roadly.core.map.MapDetailPolicy
 import fr.roadly.core.model.CommunityReport
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.ReportKind
 import fr.roadly.core.model.RoutePreferences
@@ -31,6 +33,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -122,6 +126,12 @@ class NavigationViewModel @Inject constructor(
         private set
 
     fun rememberCamera(snapshot: CameraSnapshot?) { if (snapshot != null) lastCamera = snapshot }
+
+    /** C2 : niveau de détail de la carte — réglage, réduit automatiquement au-delà de 90 km/h (retour sous 80 km/h). */
+    val mapDetail: StateFlow<MapDetail> = combine(prefs.mapDetail, session.state) { setting, s -> setting to (s as? NavigationState.Guiding)?.speedKmh }
+        .scan(MapDetail.NORMAL) { current, (setting, speed) -> MapDetailPolicy.effective(setting, speed, current) }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapDetail.NORMAL)
 
     /** Dernier état produit : hystérésis de l'approche (B1). */
     private var lastUi: NavigationUiState? = null
