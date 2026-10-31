@@ -16,6 +16,9 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * `TextToSpeech` en `Locale.FRANCE`, focus audio transitoire avec atténuation des autres sources
@@ -34,6 +37,8 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     private val pending = ArrayDeque<Pair<String, Boolean>>()
     /** Identifiants des énoncés en cours ou en file côté moteur ; le focus audio est tenu tant qu'il n'est pas vide. */
     private val active = mutableSetOf<String>()
+    private val _speaking = MutableStateFlow(false)
+    override val speaking: StateFlow<Boolean> = _speaking.asStateFlow()
     private val ids = AtomicLong(0)
     private var engine: TextToSpeech? = null
     @Volatile private var ready = false
@@ -95,6 +100,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         }
         tts?.stop()
         audio.abandonAudioFocusRequest(focusRequest)
+        _speaking.value = false
     }
 
     override fun release() {
@@ -145,6 +151,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         val id = "roadly-${ids.incrementAndGet()}"
         val firstActive = synchronized(lock) { active.isEmpty().also { active += id } }
         if (firstActive) audio.requestAudioFocus(focusRequest)
+        _speaking.value = true
         val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) }
         if (tts.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, id) != TextToSpeech.SUCCESS) finished(id)
     }
@@ -152,7 +159,10 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     /** Fin d'un énoncé (terminé, en erreur ou interrompu) ; les identifiants inconnus (déjà purgés par [stop]) sont ignorés. */
     private fun finished(utteranceId: String?) {
         val abandon = synchronized(lock) { utteranceId != null && active.remove(utteranceId) && active.isEmpty() }
-        if (abandon) audio.abandonAudioFocusRequest(focusRequest)
+        if (abandon) {
+            audio.abandonAudioFocusRequest(focusRequest)
+            _speaking.value = false
+        }
     }
 
     private companion object { const val TAG = "RoadlySpeech" }
