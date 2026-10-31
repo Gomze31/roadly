@@ -5,7 +5,10 @@ import fr.roadly.core.assistant.provider.AssistantEvent
 import fr.roadly.core.assistant.provider.Connection
 import fr.roadly.core.assistant.provider.SessionConfig
 import fr.roadly.core.assistant.provider.ToolResult
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -67,6 +70,23 @@ class GeminiLiveProviderTest {
         provider.setupTimeoutMs = 300
         serve(onText = { _, _ -> })
         assertEquals(Connection.Refused(AssistantError.TIMEOUT), provider.connect(config))
+    }
+
+    @Test fun `cancelling connect closes the socket`() = runBlocking {
+        val setupSeen = CompletableDeferred<Unit>()
+        val gone = CompletableDeferred<Unit>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) { setupSeen.complete(Unit) }
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(1000, null); gone.complete(Unit) }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { gone.complete(Unit) }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { gone.complete(Unit) }
+        }))
+        val job = launch(Dispatchers.IO) { provider.connect(config) }
+        withTimeout(5_000) { setupSeen.await() }
+        job.cancel()
+        withTimeout(5_000) { gone.await() }
+        job.join()
+        assertTrue(job.isCancelled)
     }
 
     @Test fun `close reasons and HTTP failures are classified`() {

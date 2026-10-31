@@ -7,6 +7,7 @@ import fr.roadly.core.assistant.provider.SessionConfig
 import fr.roadly.core.assistant.provider.ToolResult
 import fr.roadly.core.assistant.provider.VoiceAssistantProvider
 import fr.roadly.core.assistant.provider.VoiceSession
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
@@ -46,8 +47,12 @@ class GeminiLiveProvider @Inject constructor(private val json: Json) : VoiceAssi
             withTimeout(setupTimeoutMs) { session.ready.await() }
         } catch (e: TimeoutCancellationException) {
             AssistantError.TIMEOUT
+        } catch (e: CancellationException) {
+            // Appelant annulé pendant l'attente : ne pas laisser la socket (et la clé) ouverte.
+            session.abort()
+            throw e
         }
-        return if (error == null) Connection.Open(session) else { session.close(); Connection.Refused(error) }
+        return if (error == null) Connection.Open(session) else { session.abort(); Connection.Refused(error) }
     }
 
     companion object {
@@ -98,6 +103,13 @@ internal class GeminiVoiceSession(private val json: Json) : VoiceSession {
     override fun close() {
         if (closed) return
         socket.close(1000, null)
+        finish(null)
+    }
+
+    /** Coupe la socket sans attendre le serveur : connexion refusée, expirée ou annulée avant l'ouverture. */
+    fun abort() {
+        if (closed) return
+        socket.cancel()
         finish(null)
     }
 }
