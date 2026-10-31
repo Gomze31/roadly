@@ -88,4 +88,50 @@ class NavigationSessionGuidanceTest {
             speech.priorities,
         )
     }
+
+    @Test fun `straight drive - distances decrease and no announcement is repeated`() = runTest { // scénario 1
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        val distances = mutableListOf<Pair<Int, Double>>()
+        play(FixScript(route).drive(0.0, route.distanceMeters - 30.0, speedKmh = 50.0)) {
+            val p = guiding(s).progress
+            distances += p.nextManeuverIndex to p.distanceToNextManeuverM
+        }
+        assertEquals(speech.spoken.distinct(), speech.spoken)
+        distances.groupBy { it.first }.values.forEach { d -> assertTrue(d.map { it.second }.zipWithNext().all { (a, b) -> b <= a }) }
+    }
+
+    @Test fun `130 km h at 1 Hz - the now announcement comes at least 3 s ahead, once`() = runTest {
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val now = route.maneuvers[1].verbalPre!!
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        var nowSpokenAt: Double? = null
+        play(FixScript(route).drive(0.0, turnAt + 30.0, speedKmh = 130.0)) {
+            if (nowSpokenAt == null && now in speech.spoken) nowSpokenAt = turnAt - guiding(s).progress.distanceAlongM
+        }
+        assertNotNull(nowSpokenAt)
+        assertTrue("NOW à $nowSpokenAt m", nowSpokenAt!! >= 3 * 130 / 3.6)
+        assertEquals(1, speech.spoken.count { it == now })
+    }
+
+    @Test fun `jitter at the turn never repeats an announcement over 10 fixes`() = runTest {
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(turnAt - 200.0, turnAt - 20.0, speedKmh = 30.0))
+        play(FixScript(route, seed = 4).jitter(turnAt, count = 10, amplitudeM = 8.0))
+        assertEquals(speech.spoken.distinct(), speech.spoken)
+    }
+
+    @Test fun `two close roundabouts - each entry said once, exit chained with puis, no doubled far`() = runTest { // scénario 6
+        val route = TestRoutes.twoRoundabouts()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route, seed = 9).drive(0.0, route.distanceMeters - 40.0, speedKmh = 30.0, noiseM = 2.0))
+        assertEquals(speech.spoken.distinct(), speech.spoken)
+        assertEquals(1, speech.spoken.count { it == "Entrez dans le rond-point et prenez la 2e sortie." })
+        assertEquals(1, speech.spoken.count { it == "Entrez dans le rond-point et prenez la 1re sortie." })
+        assertTrue(speech.spoken.any { it == "Quittez le rond-point dans Rue Médiane, puis entrez dans le rond-point et prenez la 1re sortie." })
+        assertTrue("pas de FAR pour le 2e rond-point (moins de 10 s après la sortie du 1er)", speech.spoken.none { it.startsWith("Dans 100 mètres, entrez") || it.startsWith("Dans 150 mètres, entrez") })
+    }
 }

@@ -168,6 +168,9 @@ class NavigationSession @Inject constructor(
         private val zonesAnnounced = mutableSetOf<Double>()
         /** B4 : ronds-points du tracé courant, calculés une fois par tracé. */
         private var roundabouts: Map<Int, RoundaboutInfo> = RoundaboutResolver.resolveAll(route)
+        /** B5 : dernier indice de manœuvre vu et instant de son changement (passage d'une manœuvre). */
+        private var lastNextIndex: Int? = null
+        private var indexChangedAtMs: Long? = null
         private var vigilanceOn = GuidanceDefaults.VIGILANCE_ENABLED
         private var raining: Boolean? = null
         private var rainLowersLimit = GuidanceDefaults.RAIN_LOWERS_LIMIT
@@ -279,7 +282,12 @@ class NavigationSession @Inject constructor(
 
         private suspend fun announce(progress: RouteProgress) {
             if (rerouting || progress.routeId != route.id) return
-            val a = AnnouncementPolicy.next(progress, route.maneuvers, speedKmh, announced) ?: return
+            val now = clock.nowMs()
+            if (progress.nextManeuverIndex != lastNextIndex) {
+                if (lastNextIndex != null) indexChangedAtMs = now
+                lastNextIndex = progress.nextManeuverIndex
+            }
+            val a = AnnouncementPolicy.next(progress, route.maneuvers, speedKmh, announced, indexChangedAtMs?.let { now - it }) ?: return
             announced += a.maneuverIndex to a.tier
             say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
         }
@@ -345,6 +353,7 @@ class NavigationSession @Inject constructor(
                     roundabouts = RoundaboutResolver.resolveAll(fresh)
                     announced.clear()
                     announced += 0 to Tier.NOW
+                    lastNextIndex = null; indexChangedAtMs = null
                     freshTracker.update(fix)
                     rerouteAnnounced = false
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.

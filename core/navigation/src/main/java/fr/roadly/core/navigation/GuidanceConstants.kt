@@ -58,4 +58,11 @@ object GuidanceConstants {
     const val BACKTRACK_CONFIRM_FIXES = 2
     /** B5 : une annonce LOW / NORMAL restée plus de 8 s en file n'est plus dite (palier dépassé). */
     const val SPEECH_STALE_AFTER_MS = 8_000L
+    /** B5 : l'annonce « maintenant » part à max(40 m, 4 s de trajet à la vitesse lissée). */
+    const val NOW_MIN_M = 40.0
+    const val NOW_LEAD_S = 4.0
+    /** B5 : une manœuvre suivante à moins de 200 m est annoncée avec la courante (« …, puis … »). */
+    const val COMBINE_NEXT_MANEUVER_M = 200.0
+    /** B5 : pas d'annonce lointaine (FAR) dans les 10 s qui suivent le passage d'une manœuvre. */
+    const val FAR_QUIET_AFTER_MANEUVER_MS = 10_000L
 }
