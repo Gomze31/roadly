@@ -10,6 +10,7 @@ import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.NoiseSuppressor
+import android.util.Log
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,6 +96,9 @@ class AndroidMicCapture @Inject constructor(@param:ApplicationContext private va
                     if (n < 0) break
                     if (n > 0) { _level.value = Pcm.rms(buf, n); onFrame(buf.copyOf(n)) }
                 }
+            } catch (e: Exception) {
+                // Une erreur de l'assistant ne doit jamais faire tomber le process (le GPS doit rester utilisable).
+                Log.w(LOG_TAG, "Capture interrompue", e)
             } finally {
                 running = false
                 runCatching { record.stop() }
@@ -111,5 +115,6 @@ class AndroidMicCapture @Inject constructor(@param:ApplicationContext private va
         const val FRAME_BYTES = RATE * 2 * 40 / 1000
         /** Attente maximale de la libération du micro lors d'un arrêt ou d'un redémarrage. */
         const val JOIN_MS = 500L
+        const val LOG_TAG = "RoadlyAI"
     }
 }
