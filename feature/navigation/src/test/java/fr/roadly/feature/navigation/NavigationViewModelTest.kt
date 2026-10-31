@@ -7,11 +7,13 @@ import fr.roadly.core.common.Formatters
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
+import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.map.CameraMode3D
 import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.location.testing.FakeLocationRepository
+import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Lane
 import fr.roadly.core.model.LaneDirection
 import fr.roadly.core.model.LocationFix
@@ -319,6 +321,34 @@ class NavigationViewModelTest {
         val snap = CameraSnapshot(48.8, 2.3, 17.0, 90.0, tilt = 58.0)
         vm.rememberCamera(snap)
         assertEquals(snap, vm.lastCamera)
+    }
+
+    @Test fun `sheets, the bottom panel and its measured height are kept by the view model`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(GuidanceSheet.NONE, vm.guidanceSheet.value)
+        vm.openManeuverPreview()
+        assertEquals(GuidanceSheet.MANEUVER_PREVIEW, vm.guidanceSheet.value)
+        vm.openTripDetails()
+        assertEquals(GuidanceSheet.TRIP_DETAILS, vm.guidanceSheet.value)
+        vm.closeSheet()
+        assertEquals(GuidanceSheet.NONE, vm.guidanceSheet.value)
+        assertFalse(vm.bottomPanelExpanded.value)
+        vm.toggleBottomPanel(); assertTrue(vm.bottomPanelExpanded.value)
+        vm.toggleBottomPanel(); assertFalse(vm.bottomPanelExpanded.value)
+        assertNull(vm.bottomPanelFraction.value)
+        vm.setBottomPanelFraction(0.3f)
+        assertEquals(0.3f, vm.bottomPanelFraction.value!!, 0f)
+    }
+
+    @Test fun `the destination name comes from the remembered guidance`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config)
+        vm.destinationName.test {
+            assertNull(awaitItem())
+            prefs.setLastGuidance(LastGuidance(GeoPoint(43.6045, 1.4440), "Capitole", "r1", 0L))
+            assertEquals("Capitole", awaitItem())
+            prefs.setLastGuidance(null)
+            assertNull(awaitItem())
+        }
     }
 }
 

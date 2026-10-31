@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -127,6 +128,33 @@ class NavigationViewModel @Inject constructor(
         .scan(MapDetail.NORMAL) { current, (setting, speed) -> MapDetailPolicy.effective(setting, speed, current) }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapDetail.NORMAL)
+
+    private val _sheet = MutableStateFlow(GuidanceSheet.NONE)
+    /**
+     * D1 / D5 : feuille ouverte au-dessus du guidage. Elle est dans le ViewModel, pas en `rememberSaveable` : les overlays, à signature figée,
+     * n'ont que `vm` pour l'ouvrir. Elle est gardée à la rotation.
+     */
+    val guidanceSheet: StateFlow<GuidanceSheet> = _sheet
+
+    fun openManeuverPreview() { _sheet.value = GuidanceSheet.MANEUVER_PREVIEW }
+    fun openTripDetails() { _sheet.value = GuidanceSheet.TRIP_DETAILS }
+    fun closeSheet() { _sheet.value = GuidanceSheet.NONE }
+
+    private val _panelExpanded = MutableStateFlow(false)
+    /** D5 : panneau du bas déplié (destination, « Trajet complet », « Itinéraires ») ; gardé à la rotation. */
+    val bottomPanelExpanded: StateFlow<Boolean> = _panelExpanded
+
+    fun toggleBottomPanel() { _panelExpanded.value = !_panelExpanded.value }
+
+    private val _panelFraction = MutableStateFlow<Float?>(null)
+    /** D5 : part de l'écran couverte par le bloc du bas, mesurée par l'écran (`BottomPanelGeometry`) → marge basse de la caméra. */
+    val bottomPanelFraction: StateFlow<Float?> = _panelFraction
+
+    fun setBottomPanelFraction(fraction: Float?) { _panelFraction.value = fraction }
+
+    /** D5 : nom de la destination mémorisé par la session (B6, `lastGuidance`) ; null si la course a démarré sans nom. */
+    val destinationName: StateFlow<String?> = prefs.lastGuidance.map { it?.destinationName }.distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Dernier état produit : hystérésis de l'approche (B1). */
     private var lastUi: NavigationUiState? = null
