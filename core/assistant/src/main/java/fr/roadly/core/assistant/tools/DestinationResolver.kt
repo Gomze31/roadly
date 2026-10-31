@@ -1,6 +1,6 @@
 package fr.roadly.core.assistant.tools
 
-import fr.roadly.core.common.getOrNull
+import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.geocoding.GeocodingProvider
@@ -19,21 +19,29 @@ class DestinationResolver @Inject constructor(
     private val location: LocationRepository,
     private val places: ToolPlaces,
 ) {
-    suspend fun resolve(query: String?, placeId: String?): List<Place> {
-        placeId?.let { places[it] }?.let { return listOf(it) }
-        val raw = query?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+    /** Succès (éventuellement vide) pour tous les chemins ; échec seulement si la recherche de lieu échoue. */
+    suspend fun resolve(query: String?, placeId: String?): Outcome<List<Place>> {
+        placeId?.let { places[it] }?.let { return Outcome.Success(listOf(it)) }
+        val raw = query?.trim()?.takeIf { it.isNotEmpty() } ?: return Outcome.Success(emptyList())
         val q = normalize(raw)
-        if (HOME.any { q.contains(it) }) favorites.observeHome().first()?.let { return listOf(it) }
-        if (WORK.any { q.contains(it) }) favorites.observeWork().first()?.let { return listOf(it) }
-        (favorites.observeAll().first() + recents.observe().first()).firstOrNull { normalize(it.name) == q }?.let { places.remember(it); return listOf(it) }
-        return geocoder.search(raw, location.lastKnown?.point, 3).getOrNull().orEmpty().take(3).onEach { places.remember(it) }
+        if (HOME.matches(q)) favorites.observeHome().first()?.let { return Outcome.Success(listOf(it.also(places::remember))) }
+        if (WORK.matches(q)) favorites.observeWork().first()?.let { return Outcome.Success(listOf(it.also(places::remember))) }
+        (favorites.observeAll().first() + recents.observe().first()).firstOrNull { normalize(it.name) == q }?.let {
+            places.remember(it)
+            return Outcome.Success(listOf(it))
+        }
+        return when (val r = geocoder.search(raw, location.lastKnown?.point, 3)) {
+            is Outcome.Success -> Outcome.Success(r.value.take(3).onEach { places.remember(it) })
+            is Outcome.Failure -> r
+        }
     }
 
     private fun normalize(s: String): String = Normalizer.normalize(s.lowercase(Locale.FRENCH), Normalizer.Form.NFD)
         .replace(Regex("\\p{Mn}+"), "").replace(Regex("[^a-z0-9 ]"), " ").replace(Regex("\\s+"), " ").trim()
 
     private companion object {
-        val HOME = listOf("maison", "domicile", "chez moi")
-        val WORK = listOf("travail", "boulot", "bureau")
+        /** Requête normalisée entière : « maison », « à la maison », « chez moi »… mais pas « Maison Carrée ». */
+        val HOME = Regex("^((a |au )?(la |ma |mon |le )?(maison|domicile)|chez moi)$")
+        val WORK = Regex("^(a |au )?(la |ma |mon |le )?(travail|boulot|bureau)$")
     }
 }

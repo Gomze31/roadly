@@ -103,9 +103,13 @@ internal class GuidingFixture(private val scope: TestScope) {
     fun place(id: String, p: GeoPoint, name: String = id) = Place(id, name, "$name, Toulouse", p, PlaceKind.POI, "test")
 }
 
-internal class FakeGeocoder(private val results: Map<String, List<Place>>) : GeocodingProvider {
+internal class FakeGeocoder(private val results: Map<String, List<Place>>, var failure: AppError? = null) : GeocodingProvider {
     override val id = "fake"
-    override suspend fun search(query: String, near: GeoPoint?, limit: Int) = Outcome.Success(results[query].orEmpty())
+    val queries = mutableListOf<String>()
+    override suspend fun search(query: String, near: GeoPoint?, limit: Int): Outcome<List<Place>> {
+        queries += query
+        return failure?.let { Outcome.Failure(it) } ?: Outcome.Success(results[query].orEmpty())
+    }
     override suspend fun reverse(point: GeoPoint) = Outcome.Success<Place?>(null)
 }
 
@@ -126,7 +130,7 @@ internal class FakeRecents(var places: List<Place> = emptyList()) : RecentSearch
     override suspend fun clear() = Unit
 }
 
-internal class FakeCommunity(configured: Boolean = false, var reports: List<CommunityReport> = emptyList()) : CommunityRepository {
+internal class FakeCommunity(configured: Boolean = false, var reports: List<CommunityReport> = emptyList(), var nearbyFailure: AppError? = null) : CommunityRepository {
     override val isConfigured = MutableStateFlow(configured)
     val sent = mutableListOf<ReportKind>()
     val votes = mutableListOf<String>()
@@ -134,7 +138,8 @@ internal class FakeCommunity(configured: Boolean = false, var reports: List<Comm
         sent += kind
         return reports.firstOrNull()?.let { Outcome.Success(it) } ?: Outcome.Failure(AppError.NoResult)
     }
-    override suspend fun nearby(box: BoundingBox) = Outcome.Success(reports)
+    override suspend fun nearby(box: BoundingBox): Outcome<List<CommunityReport>> =
+        nearbyFailure?.let { Outcome.Failure(it) } ?: Outcome.Success(reports)
     override suspend fun vote(reportId: String, confirm: Boolean): Outcome<CommunityReport> {
         votes += reportId
         return reports.firstOrNull { it.id == reportId }?.let { Outcome.Success(it) } ?: Outcome.Failure(AppError.NoResult)

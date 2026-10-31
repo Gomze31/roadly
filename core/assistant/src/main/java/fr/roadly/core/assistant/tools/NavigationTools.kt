@@ -4,7 +4,7 @@ import fr.roadly.core.assistant.provider.ParamType
 import fr.roadly.core.assistant.provider.ToolParam
 import fr.roadly.core.assistant.provider.ToolSchema
 import fr.roadly.core.common.Outcome
-import fr.roadly.core.common.getOrNull
+import fr.roadly.core.common.map
 import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.box
 import fr.roadly.core.model.HazardKind
@@ -13,6 +13,7 @@ import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.navigation.NavRequest
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.navigation.ReportAhead
 import fr.roadly.core.navigation.reportsAhead
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
@@ -35,7 +36,8 @@ class GetNavigationStatusTool @Inject constructor(
     override val schema = ToolSchema("getNavigationStatus", "État réel du guidage : destination, distance et durée restantes, heure d'arrivée, prochaine instruction, arrêts, virages et zones de vigilance à venir, pluie, signalements à venir (avec report_id). Le trafic est inconnu.", NO_ARGS)
     override suspend fun run(args: JsonObject, ctx: ToolContext): ToolOutput {
         val g = guiding(session) ?: return ToolOutput.Done(notGuiding(session.state.value))
-        val reports = if (community.isConfigured.first()) community.nearby(g.progress.snapped.box()).getOrNull()?.let { reportsAhead(g, it) }.orEmpty() else null
+        // null = service non configuré ; Failure = service configuré mais injoignable (jamais présenté comme « aucun signalement »).
+        val reports: Outcome<List<ReportAhead>>? = if (community.isConfigured.first()) community.nearby(g.progress.snapped.box()).map { reportsAhead(g, it) } else null
         return ToolOutput.Done(ToolJson.ok {
             put("guiding", true)
             guidance.destinationName?.let { put("destination", it) }
@@ -53,8 +55,11 @@ class GetNavigationStatusTool @Inject constructor(
                 }
             }
             g.raining?.let { put("raining", it) }
-            if (reports == null) put("community_reports", "non configuré")
-            else putJsonArray("reports_ahead") { reports.take(5).forEach { r -> addJsonObject { put("report_id", r.report.id); put("kind", r.report.kind.name); put("in_m", r.distanceM.roundToInt()) } } }
+            when (reports) {
+                null -> put("community_reports", "non configuré")
+                is Outcome.Failure -> put("community_reports", "indisponible (${ToolFormat.describe(reports.error)})")
+                is Outcome.Success -> putJsonArray("reports_ahead") { reports.value.take(5).forEach { r -> addJsonObject { put("report_id", r.report.id); put("kind", r.report.kind.name); put("in_m", r.distanceM.roundToInt()) } } }
+            }
             put("traffic", "inconnu (Roadly n'a pas de source de trafic)")
         })
     }
@@ -113,7 +118,10 @@ class DestinationTool(
 
     override suspend fun run(args: JsonObject, ctx: ToolContext): ToolOutput {
         val query = args.string("destination")
-        val candidates = resolver.resolve(query, args.string("placeId"))
+        val candidates = when (val r = resolver.resolve(query, args.string("placeId"))) {
+            is Outcome.Success -> r.value
+            is Outcome.Failure -> return ToolOutput.Done(ToolJson.error("search_unavailable", "Recherche de lieu indisponible : ${ToolFormat.describe(r.error)}."))
+        }
         val place = candidates.firstOrNull()
             ?: return ToolOutput.Done(ToolJson.error("not_found", "Aucun lieu trouvé pour « ${query.orEmpty()} » ; demandez une précision (ville, adresse)."))
         val details = buildJsonObject {
