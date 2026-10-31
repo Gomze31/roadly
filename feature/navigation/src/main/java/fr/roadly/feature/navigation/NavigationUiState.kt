@@ -88,7 +88,7 @@ internal fun splitDistance(meters: Double): SplitValue = when {
 /** Portée de l'Horizon (m) : au-delà, les événements ne sont pas listés. */
 internal const val HORIZON_RANGE_M = 5_000.0
 
-/** Événements dont le début est devant la position (ou en cours), à moins de [HORIZON_RANGE_M]. */
+/** Événements dont le début est devant la position (ou en cours), à moins de [HORIZON_RANGE_M] ; limite : virages et zones gardent les abscisses de la géométrie brute, écart < 2 % avec les manœuvres (0,06 % sur Paris, `RouteTrackerTest`). */
 internal fun hazardsAhead(hazards: List<RouteHazard>, alongM: Double): List<HazardUi> =
     hazards.filter { it.endAlongM >= alongM && it.startAlongM - alongM <= HORIZON_RANGE_M }
         .map { h ->
@@ -116,17 +116,16 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
             val ms = s.route.maneuvers
             val next = p.nextManeuverIndex.coerceIn(0, ms.lastIndex)
             val m = ms[next]
-            // Distance jusqu'à la manœuvre next+1+i = distance à next + longueurs Valhalla de next … next+i.
-            var acc = p.distanceToNextManeuverM
-            val upcoming = s.upcoming.mapIndexed { i, u ->
-                acc += ms[next + i].lengthMeters
-                UpcomingUi(u.type, Formatters.distance(acc), u.streetName, acc)
+            // B2 : distances aux manœuvres suivantes fournies par le suivi, sur la même abscisse que le bandeau ; sans distance, pas d'élément.
+            val upcoming = s.upcoming.mapIndexedNotNull { i, u ->
+                val d = p.distancesToManeuversM.getOrNull(i) ?: return@mapIndexedNotNull null
+                UpcomingUi(u.type, Formatters.maneuverDistance(d), u.streetName, d)
             }
             base.copy(
                 phase = NavigationPhase.GUIDING,
                 route = s.route,
                 progress = p,
-                banner = BannerUi(m.type, Formatters.distance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit, m.exitToward),
+                banner = BannerUi(m.type, Formatters.maneuverDistance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit, m.exitToward),
                 approach = if (approachLatched(previous, s.route.id, p.nextManeuverIndex, GuidanceCameraPolicy.isApproaching(p.distanceToNextManeuverM, m.type, s.speedKmh))) {
                     ApproachUi(m.type, m.exitNumber, m.exitToward, m.beginShapeIndex)
                 } else null,

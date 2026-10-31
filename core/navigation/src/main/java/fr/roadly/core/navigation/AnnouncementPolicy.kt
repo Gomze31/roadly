@@ -1,9 +1,9 @@
 package fr.roadly.core.navigation
 
+import fr.roadly.core.common.Formatters
 import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.RouteProgress
 import java.util.Locale
-import kotlin.math.roundToInt
 
 enum class Tier { FAR, NEAR, NOW }
 
@@ -61,11 +61,11 @@ internal object SpokenPhrases {
     fun inDistance(meters: Double, instruction: String): String =
         "Dans ${distance(meters)}, ${instruction.replaceFirstChar { it.lowercase(Locale.FRANCE) }}"
 
-    /** < 100 m : arrondi à 10 m (min. 10) ; sinon à 50 m ; ≥ 1 km : kilomètres à 0,1 près. */
+    /** Arrondi partagé avec l'écran (`Formatters.roundManeuverMeters`, B2) ; ≥ 1 km : kilomètres à 0,1 près. */
     fun distance(meters: Double): String {
-        val rounded = if (meters < 100.0) ((meters / 10.0).roundToInt() * 10).coerceAtLeast(10) else (meters / 50.0).roundToInt() * 50
+        val rounded = Formatters.roundManeuverMeters(meters)
         if (rounded < 1000) return "$rounded mètres"
-        val km = (meters / 100.0).roundToInt() / 10.0
+        val km = rounded / 1000.0
         val text = if (km % 1.0 == 0.0) km.toInt().toString() else String.format(Locale.FRANCE, "%.1f", km)
         return "$text ${if (km < 2.0) "kilomètre" else "kilomètres"}"
     }

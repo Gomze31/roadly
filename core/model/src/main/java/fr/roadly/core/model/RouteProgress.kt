@@ -17,4 +17,6 @@ data class RouteProgress(
     val bearingDeg: Float?,
     /** `true` si la position est extrapolée le long du tracé (perte de fix GPS) plutôt que mesurée. */
     val extrapolated: Boolean = false,
+    /** B2 : distances (m) aux manœuvres next+1 … next+3 (alignées sur `Guiding.upcoming`), même base que [distanceToNextManeuverM]. */
+    val distancesToManeuversM: List<Double> = emptyList(),
 )

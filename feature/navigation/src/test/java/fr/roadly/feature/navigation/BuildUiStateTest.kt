@@ -1,5 +1,6 @@
 package fr.roadly.feature.navigation
 
+import fr.roadly.core.common.Formatters
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Route
 import fr.roadly.core.navigation.NavigationState
@@ -49,5 +50,18 @@ class BuildUiStateTest {
         val turnAt = tracker.maneuverStartM[1]
         val near = ui(guiding(turnAt - 140.0))
         assertNull(ui(guiding(turnAt - 160.0, TestRoutes.straight("rerouted")), previous = near).approach)
+    }
+
+    @Test fun `horizon and banner use the same base and ignore Valhalla lengths`() {
+        val skewed = route.copy(maneuvers = route.maneuvers.mapIndexed { i, m -> if (i == 1) m.copy(lengthMeters = 9_999.0) else m })
+        val ui = ui(guiding(300.0, skewed))
+        val t = RouteTracker(skewed)
+        assertEquals(t.maneuverStartM[2] - t.maneuverStartM[1], ui.upcoming[0].distanceM - ui.progress!!.distanceToNextManeuverM, 1.0)
+        assertEquals(Formatters.maneuverDistance(ui.progress!!.distanceToNextManeuverM), ui.banner!!.distanceText)
+        assertEquals(Formatters.maneuverDistance(ui.upcoming[0].distanceM), ui.upcoming[0].distanceText)
+    }
+
+    @Test fun `430 m reads 450 m on the banner`() {
+        assertEquals("450 m", ui(guiding(tracker.maneuverStartM[1] - 430.0)).banner!!.distanceText)
     }
 }

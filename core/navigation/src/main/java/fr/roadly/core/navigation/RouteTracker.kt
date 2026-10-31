@@ -197,13 +197,17 @@ class RouteTracker(private val route: Route) {
             distanceAlongM = along,
             offRouteM = off,
             nextManeuverIndex = next,
-            distanceToNextManeuverM = (maneuverStartM[next] - along).coerceAtLeast(0.0),
+            distanceToNextManeuverM = distanceTo(next, along),
+            distancesToManeuversM = (next + 1..min(next + GuidanceConstants.UPCOMING_COUNT, lastManeuver)).map { distanceTo(it, along) },
             remainingDistanceM = (totalGeometryM - along).coerceAtLeast(0.0) * distScale,
             remainingDurationS = maneuvers[c].durationSeconds * frac + suffixDurS[c + 1],
             snapped = snapped,
             bearingDeg = heading,
         )
     }
+
+    /** B2 : distance (m) de [along] au début de la manœuvre [k], le long du tracé mis à l'échelle de la longueur Valhalla (`distScale`). */
+    private fun distanceTo(k: Int, along: Double): Double = (maneuverStartM[k] - along).coerceAtLeast(0.0) * distScale
 
     private class Hit(val segment: Int, val alongM: Double, val offM: Double, val snapped: GeoPoint)
 

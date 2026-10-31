@@ -95,4 +95,18 @@ class RouteTrackerProgressTest {
         assertEquals("indices visités dans l'ordre, sans saut", listOf(1, 2, 3, 4, 5), seen.distinct())
         assertTrue("jamais de retour en arrière", seen.zipWithNext().all { (a, b) -> b >= a })
     }
+
+    @Test fun `distances to the following maneuvers share the banner base`() {
+        val paris = ParisRoute.route()
+        val t = RouteTracker(paris)
+        val scale = paris.distanceMeters / t.totalGeometryM
+        val p = t.update(LocationFix(paris.geometry[100], null, null, 5f, 0L))
+        assertEquals(7, p.nextManeuverIndex)
+        assertEquals((t.maneuverStartM[7] - p.distanceAlongM) * scale, p.distanceToNextManeuverM, 1e-6)
+        assertEquals(3, p.distancesToManeuversM.size)
+        p.distancesToManeuversM.forEachIndexed { i, d -> assertEquals((t.maneuverStartM[8 + i] - p.distanceAlongM) * scale, d, 1e-6) }
+        val nearEnd = RouteTracker(paris).update(LocationFix(paris.geometry[290], null, null, 5f, 0L))
+        assertEquals(12, nearEnd.nextManeuverIndex)
+        assertEquals("seule l'arrivée suit", 1, nearEnd.distancesToManeuversM.size)
+    }
 }
