@@ -70,6 +70,27 @@ class RouteTrackerProgressTest {
         assertEquals("le second fix réel confirme le recul", 1, t.update(fixAt(t, turnAt - 15.0)).nextManeuverIndex)
     }
 
+    @Test fun `an index advanced by extrapolation is provisional and reverted by the next real fix`() {
+        val t = RouteTracker(route)
+        val turnAt = t.maneuverStartM[1]
+        val mps = 50 / 3.6
+        // 50 km/h jusqu'à 58 m du virage, puis 5 s sans fix : l'extrapolation (vitesse lissée, en retard au freinage) dépasse le virage de 11 m.
+        FixScript(route).drive(turnAt - 200.0, turnAt - 58.0, speedKmh = 50.0).forEach { t.update(it) }
+        assertEquals(1, t.lastProgress!!.nextManeuverIndex)
+        t.extrapolate(4 * mps, 4_000L)
+        assertEquals("avance provisoire par l'extrapolation", 2, t.extrapolate(mps, 5_000L).nextManeuverIndex)
+        // Le conducteur a freiné : le fix réel revient 5 m avant le virage, moins de 30 m sous l'abscisse extrapolée.
+        assertEquals("le virage redevient la cible", 1, t.update(fixAt(t, turnAt - 5.0)).nextManeuverIndex)
+    }
+
+    @Test fun `a provisional advance confirmed by a real fix beyond the margin is kept`() {
+        val t = RouteTracker(route)
+        val turnAt = t.maneuverStartM[1]
+        t.update(fixAt(t, turnAt - 58.0))
+        assertEquals(2, t.extrapolate(70.0, 4_000L).nextManeuverIndex)
+        assertEquals(2, t.update(fixAt(t, turnAt + 15.0)).nextManeuverIndex)
+    }
+
     @Test fun `a final leg shorter than the passing margin still arrives`() {
         val pts = listOf(TestRoutes.xy(0.0, 0.0), TestRoutes.xy(200.0, 0.0), TestRoutes.xy(200.0, -15.0))
         val leg1 = pts[0].distanceTo(pts[1])

@@ -58,8 +58,9 @@ object AnnouncementPolicy {
             d <= c.farM -> Tier.FAR
             else -> return null
         }
-        // Position extrapolée (GPS perdu) : jamais d'annonce « maintenant », trop risquée sans fix réel.
-        if (tier == Tier.NOW && progress.extrapolated) return null
+        // Position extrapolée (GPS perdu) ou fix imprécis (> 30 m, B6) : jamais d'annonce « maintenant ». Le NEAR a déjà été dit ;
+        // un NOW faux et précoce serait pire qu'un NOW manquant.
+        if (tier == Tier.NOW && (progress.extrapolated || progress.accuracyM > GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M)) return null
         if (tier == Tier.FAR && sincePreviousManeuverMs != null && sincePreviousManeuverMs < GuidanceConstants.FAR_QUIET_AFTER_MANEUVER_MS) return null
         if (already.any { (i, t) -> i == k && t.ordinal >= tier.ordinal }) return null
         val text = when (tier) {

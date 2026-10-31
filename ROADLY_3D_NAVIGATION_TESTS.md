@@ -24,7 +24,7 @@ Commandes : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test 
 | 7 | Sortie d'autoroute | JVM fixture autoroute : `exitNumber`, `exitToward`, approche 400 m, panneau | oui | B3, D3 |
 | 8 | Échangeur plusieurs bretelles | JVM fixture : côté de la bretelle, manœuvre suivante affichée sans masquer l'actuelle | oui | B3, D3 |
 | 9 | Deux routes parallèles | JVM `parallelRoads` : 8 s à 25 m → pas de recalcul | oui | B6 |
-| 10 | GPS imprécis | JVM : précision 60 m → pas de hors-itinéraire, pas de NOW | simulé | B6 |
+| 10 | GPS imprécis | JVM : fix à 120 m du tracé avec précision 60 m → pas de hors-itinéraire (témoin précis : hors itinéraire) ; jitter de 80 à 100 m avant le virage → index inchangé ; précision > 30 m → pas de NOW. LIMITE : sur fixes imprécis, le NOW n'est pas dit (le NEAR l'a précédé) — un NOW faux et précoce serait pire qu'un NOW manquant | simulé | B6 |
 | 11 | Perte temporaire de GPS | JVM existant (`NavigationSessionTest`) + extrapolation puis reprise | tunnel réel | — |
 | 12 | Recalcul après erreur | JVM existant + nouvelle route → index et annonces réinitialisés | oui | B6 |
 | 13 | Arrivée | JVM existant | oui | — |

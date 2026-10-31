@@ -19,4 +19,6 @@ data class RouteProgress(
     val extrapolated: Boolean = false,
     /** B2 : distances (m) aux manœuvres next+1 … next+3 (alignées sur `Guiding.upcoming`), même base que [distanceToNextManeuverM]. */
     val distancesToManeuversM: List<Double> = emptyList(),
+    /** Précision (m) du fix réel à l'origine de cette position (le dernier, si [extrapolated]) ; 0 = inconnue (position initiale). */
+    val accuracyM: Float = 0f,
 )

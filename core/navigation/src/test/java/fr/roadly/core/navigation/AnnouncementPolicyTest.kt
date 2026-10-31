@@ -96,6 +96,11 @@ class AnnouncementPolicyTest {
         assertEquals(Tier.NOW, next(1, 30.0, 30.0, extrapolated = false)!!.tier)
     }
 
+    @Test fun `now tier is suppressed when the fix is imprecise`() { // scénario 10
+        assertNull("précision 60 m à 30 m du virage : pas de NOW", AnnouncementPolicy.next(progress(1, 30.0).copy(accuracyM = 60f), maneuvers, 30.0, setOf(1 to Tier.NEAR)))
+        assertEquals(Tier.NOW, AnnouncementPolicy.next(progress(1, 30.0).copy(accuracyM = 10f), maneuvers, 30.0, setOf(1 to Tier.NEAR))!!.tier)
+    }
+
     @Test fun `far and near tiers are still announced while extrapolated`() {
         assertEquals(Tier.FAR, next(1, 250.0, 30.0, extrapolated = true)!!.tier)
         assertEquals(Tier.NEAR, next(1, 70.0, 30.0, extrapolated = true)!!.tier)

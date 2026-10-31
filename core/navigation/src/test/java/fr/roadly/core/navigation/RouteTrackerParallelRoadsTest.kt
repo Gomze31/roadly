@@ -5,6 +5,7 @@ import fr.roadly.core.navigation.testing.FixScript
 import fr.roadly.core.navigation.testing.TestRoutes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,13 +31,25 @@ class RouteTrackerParallelRoadsTest {
 
     @Test fun `imprecise fixes decide neither off route nor a now announcement`() { // scénario 10
         val r = TestRoutes.straight()
+        val turnAt = RouteTracker(r).maneuverStartM[1]
+        fun lateral(accuracyM: Float) = FixScript(r).drive(turnAt - 120.0, turnAt - 120.0, speedKmh = 30.0, lateralM = 120.0, accuracyM = accuracyM).single()
+        val precise = RouteTracker(r)
+        precise.update(LocationFix(precise.pointAt(turnAt - 150.0), null, null, 5f, 0L))
+        precise.update(lateral(5f))
+        assertTrue("témoin : le même écart de 120 m avec un fix précis est hors itinéraire", precise.isOffRoute)
         val t = RouteTracker(r)
-        t.update(LocationFix(t.pointAt(280.0), null, null, 5f, 0L))
-        FixScript(r, seed = 21).jitter(300.0, count = 20, amplitudeM = 50.0, accuracyM = 60f).forEach { f ->
-            val p = t.update(f)
+        t.update(LocationFix(t.pointAt(turnAt - 150.0), null, null, 5f, 0L))
+        t.update(lateral(60f))
+        assertFalse("fix à 120 m mais précision 60 m : filtré", t.isOffRoute)
+        // Jitter de 80 à 100 m avant le virage, précision 60 m : indice inchangé, jamais hors itinéraire.
+        FixScript(r, seed = 21).jitter(turnAt - 90.0, count = 10, amplitudeM = 10.0, accuracyM = 60f).forEach { f ->
+            assertEquals(1, t.update(f).nextManeuverIndex)
             assertFalse(t.isOffRoute)
-            assertTrue(AnnouncementPolicy.next(p, r.maneuvers, 30.0, setOf(1 to Tier.FAR))?.tier != Tier.NOW)
         }
+        // À 30 m du virage, la précision du fix est transmise à la politique : pas de NOW sur un fix imprécis.
+        val close = t.update(LocationFix(t.pointAt(turnAt - 30.0), null, null, 60f, 0L))
+        assertEquals(60f, close.accuracyM)
+        assertNull(AnnouncementPolicy.next(close, r.maneuvers, 30.0, setOf(1 to Tier.NEAR)))
     }
 
     @Test fun `a bridge over an earlier part of the route keeps the along and the index`() {
