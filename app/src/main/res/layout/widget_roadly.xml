@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/widget_bg"
+    android:padding="8dp">
+
+    <LinearLayout android:id="@+id/widget_home" style="@style/Widget.Roadly.Action">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_shortcut_home" android:contentDescription="@string/shortcut_home" android:tint="@color/widget_accent" />
+        <TextView style="@style/Widget.Roadly.Label" android:text="@string/shortcut_home" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/widget_work" style="@style/Widget.Roadly.Action">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_shortcut_work" android:contentDescription="@string/shortcut_work" android:tint="@color/widget_accent" />
+        <TextView style="@style/Widget.Roadly.Label" android:text="@string/shortcut_work" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/widget_search" style="@style/Widget.Roadly.Action">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_shortcut_search" android:contentDescription="@string/shortcut_search" android:tint="@color/widget_accent" />
+        <TextView style="@style/Widget.Roadly.Label" android:text="@string/shortcut_search" />
+    </LinearLayout>
+</LinearLayout>

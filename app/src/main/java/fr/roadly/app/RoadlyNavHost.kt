@@ -1,7 +1,10 @@
 package fr.roadly.app
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
@@ -38,8 +41,12 @@ fun RoadlyNavHost(
     withNotificationPermission: (() -> Unit) -> Unit,
     openNavigationRequested: Boolean,
     onOpenNavigationHandled: () -> Unit,
+    externalRequest: ExternalRequest? = null,
+    onExternalHandled: () -> Unit = {},
+    launch: LaunchViewModel = hiltViewModel(),
 ) {
     val nav = rememberNavController()
+    val context = LocalContext.current
     NavHost(navController = nav, startDestination = HomeRoute) {
         homeScreen(
             isDark = isDark,
@@ -99,5 +106,21 @@ fun RoadlyNavHost(
             nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
             onOpenNavigationHandled()
         }
+    }
+    // Raccourcis, widget, intents geo: / google.navigation: : résolus ici, après le graphe. Domicile / travail non définis → recherche + message.
+    LaunchedEffect(externalRequest) {
+        val r = externalRequest ?: return@LaunchedEffect
+        fun toRoute(p: Place) = nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) { popUpTo(HomeRoute); launchSingleTop = true }
+        fun toSearch(query: String? = null, message: Int? = null) {
+            message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+            nav.navigate(SearchRoute(query = query)) { popUpTo(HomeRoute); launchSingleTop = true }
+        }
+        when (r) {
+            ExternalRequest.Home -> launch.home()?.let(::toRoute) ?: toSearch(message = R.string.external_home_undefined)
+            ExternalRequest.Work -> launch.work()?.let(::toRoute) ?: toSearch(message = R.string.external_work_undefined)
+            is ExternalRequest.Search -> toSearch(query = r.query)
+            is ExternalRequest.Destination -> nav.navigate(RouteRoute(r.lat, r.lon, r.label ?: context.getString(R.string.external_destination))) { popUpTo(HomeRoute); launchSingleTop = true }
+        }
+        onExternalHandled()
     }
 }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="home" android:enabled="true" android:icon="@drawable/ic_shortcut_home"
+        android:shortcutShortLabel="@string/shortcut_home" android:shortcutLongLabel="@string/shortcut_home_long">
+        <intent android:action="fr.roadly.action.NAVIGATE_HOME" android:targetPackage="fr.roadly" android:targetClass="fr.roadly.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="work" android:enabled="true" android:icon="@drawable/ic_shortcut_work"
+        android:shortcutShortLabel="@string/shortcut_work" android:shortcutLongLabel="@string/shortcut_work_long">
+        <intent android:action="fr.roadly.action.NAVIGATE_WORK" android:targetPackage="fr.roadly" android:targetClass="fr.roadly.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="search" android:enabled="true" android:icon="@drawable/ic_shortcut_search"
+        android:shortcutShortLabel="@string/shortcut_search" android:shortcutLongLabel="@string/shortcut_search_long">
+        <intent android:action="fr.roadly.action.SEARCH" android:targetPackage="fr.roadly" android:targetClass="fr.roadly.app.MainActivity" />
+    </shortcut>
+</shortcuts>

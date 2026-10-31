@@ -60,7 +60,7 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Catégories à proximité (stations, bornes, parkings, aires, restaurants) | G | fonctionnelle | 1 | Photon `reverse` + `osm_tag`, triées par distance ; sans prix ni disponibilité (LOT 2) |
 | Horaires d'ouverture des lieux | G | non commencée | 3 | OSM `opening_hours` via Photon/Overpass |
 | Adresses des contacts, lieux de rendez-vous | G | non commencée | 4 | Permissions contacts/calendrier |
-| Commande vocale (Assistant / App Actions) | G | non commencée | 5 | |
+| Commande vocale (Assistant / App Actions) | G | en cours | 5 | « Navigue vers X » reçu par `google.navigation:q=` → recherche pré-remplie ou itinéraire (LOT 12) ; capacités App Actions : non déclarées |
 | Favoris synchronisés (web, multi-appareils) | + | non commencée | 4 | Supabase |
 
 ## 4. Itinéraires et coûts
@@ -174,8 +174,10 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Fonction | Statut | Notes |
 |---|---|---|
 | APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
-| Tests unitaires | fonctionnelle | 287 tests (JVM) |
+| Tests unitaires | fonctionnelle | 291 tests (JVM) |
 | Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
 | Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
-| Widgets, Android Auto | non commencée | Phase 5 |
+| Widget (domicile, travail, rechercher) | fonctionnelle | 4×1, jour / nuit (LOT 12) |
+| Raccourcis statiques, intents geo: / google.navigation: | fonctionnelle | `ExternalIntents`, 4 tests (LOT 12) |
+| Android Auto | non commencée | `androidx.car.app` absent hors ligne ; `docs/ANDROID.md` |
 | Backend Supabase | fonctionnelle | Schéma + client (LOT 8) ; projet à créer par l'exploitant |

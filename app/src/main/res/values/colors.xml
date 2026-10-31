@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#0E0B14</color>
+    <!-- Widget (jour) : RemoteViews ne lit pas les jetons Compose ; valeurs alignées sur RoadlyColors.Day, nuit dans values-night. -->
+    <color name="widget_bg">#F2FFFFFF</color>
+    <color name="widget_border">#22000000</color>
+    <color name="widget_action">#0F000000</color>
+    <color name="widget_ripple">#406C4CF0</color>
+    <color name="widget_accent">#6C4CF0</color>
+    <color name="widget_text">#1B1730</color>
 </resources>

@@ -21,6 +21,32 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Autres applications et Assistant : « geo:lat,lon?q=… » ; les coordonnées 0,0 avec q= ouvrent la recherche. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="geo" />
+            </intent-filter>
+            <!-- Assistant « Navigue vers … » et applications tierces : « google.navigation:q=… ». -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="google.navigation" />
+            </intent-filter>
+            <!-- Raccourcis statiques (appui long sur l'icône) : domicile, travail, recherche. -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Widget d'écran d'accueil : domicile, travail, recherche. -->
+        <receiver
+            android:name=".RoadlyWidgetProvider"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_roadly_info" />
+        </receiver>
     </application>
 </manifest>

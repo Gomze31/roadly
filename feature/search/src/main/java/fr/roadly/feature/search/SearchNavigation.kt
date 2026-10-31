@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
  * [category] = nom d'une `PoiCategory` pour ouvrir directement une recherche « à proximité » (puces de l'accueil).
  * [pick] = mode « choisir un arrêt » : le lieu choisi est rendu à l'écran appelant via [onPick] au lieu d'ouvrir la fiche.
  */
-@Serializable data class SearchRoute(val category: String? = null, val pick: Boolean = false)
+@Serializable data class SearchRoute(val category: String? = null, val pick: Boolean = false, val query: String? = null)
 
 fun NavGraphBuilder.searchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, onPick: (Place) -> Unit = {}) {
     composable<SearchRoute> { entry ->

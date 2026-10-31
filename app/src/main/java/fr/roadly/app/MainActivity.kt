@@ -33,6 +33,8 @@ class MainActivity : ComponentActivity() {
 
     /** Ouverture de l'écran de guidage demandée par la notification. */
     private val openNavigation = MutableStateFlow(false)
+    /** Demande externe (raccourci, widget, intent geo: / google.navigation:) à traiter une fois le graphe posé. */
+    private val external = MutableStateFlow<ExternalRequest?>(null)
     private var afterNotificationPermission: (() -> Unit)? = null
 
     // Demande FINE + COARSE ; refus sans rationale = « refusé définitivement ».
@@ -51,11 +53,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null && intent?.action == NavigationService.ACTION_OPEN_NAVIGATION) openNavigation.value = true
+        if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val mode by themeVm.themeMode.collectAsStateWithLifecycle()
             val now by themeVm.nowTick.collectAsStateWithLifecycle()
             val openNav by openNavigation.collectAsStateWithLifecycle()
+            val externalRequest by external.collectAsStateWithLifecycle()
             val tint by themeVm.tint.collectAsStateWithLifecycle()
             val p = location.lastKnown?.point
             val isDark = ThemeResolver.isDark(mode, isSystemInDarkTheme(), p?.lat, p?.lon, now)
@@ -67,6 +70,8 @@ class MainActivity : ComponentActivity() {
                     withNotificationPermission = ::withNotificationPermission,
                     openNavigationRequested = openNav,
                     onOpenNavigationHandled = { openNavigation.value = false },
+                    externalRequest = externalRequest,
+                    onExternalHandled = { external.value = null },
                 )
             }
         }
@@ -76,7 +81,13 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == NavigationService.ACTION_OPEN_NAVIGATION) openNavigation.value = true
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        if (intent.action == NavigationService.ACTION_OPEN_NAVIGATION) { openNavigation.value = true; return }
+        ExternalIntents.parse(intent.action, intent.dataString)?.let { external.value = it }
     }
 
     /** API 33+ : POST_NOTIFICATIONS demandée au premier démarrage du guidage, puis [block] dans tous les cas. */

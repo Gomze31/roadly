@@ -49,7 +49,8 @@ class SearchViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
 
-    private val query = MutableStateFlow("")
+    // Requête initiale passée par la route (intent geo: / google.navigation: sans coordonnée).
+    private val query = MutableStateFlow(savedStateHandle.get<String>("query") ?: "")
     // Catégorie initiale passée par la route (puces de l'accueil) ; valeur inconnue ignorée.
     private val category = MutableStateFlow(savedStateHandle.get<String>("category")?.let { name -> PoiCategory.entries.firstOrNull { it.name == name } })
     private val selected = MutableStateFlow<Place?>(null)

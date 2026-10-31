@@ -37,7 +37,7 @@ Constats de l'audit (écarts avec Sillaxe) :
 3. Écran d'itinéraires : liste de cartes au lieu du panneau « Votre choix » (durée en grand, arrivée, distance, alternatives compactes, « Ajouter un arrêt », bouton « Rouler »).
 4. Aucun des écrans 6 à 25 de la mission n'existe (Horizon, signalements, stations, bornes, parkings, planificateur, arrêts, profil, classements, ligues, défis, trophées, historique, replay, personnalisation, profils véhicules multiples, abonnement, notifications, assistance).
 5. Pas de backend, pas de compte, pas de stockage des trajets.
-6. Pas de mode paysage vérifié, pas d'Android Auto, pas de widgets, pas de raccourcis, pas de commandes vocales.
+6. Pas de mode paysage vérifié, pas d'Android Auto, pas de widgets, pas de raccourcis, pas de commandes vocales. *(Depuis : paysage L3, widget / raccourcis / intents L12 ; Android Auto toujours ⬜.)*
 
 ---
 
@@ -189,12 +189,12 @@ Constats de l'audit (écarts avec Sillaxe) :
 
 | Fonction | Lot | Statut |
 |---|---|---|
-| Android Auto (catégorie navigation) | L12 | ⬜ |
-| App Shortcuts (domicile, travail, rechercher, signaler) | L12 | ⬜ |
-| Widgets | L12 | ⬜ |
+| Android Auto (catégorie navigation) | L12 | ⬜ | `androidx.car.app` absent du cache Gradle hors ligne ; marche à suivre dans `docs/ANDROID.md` (service `CarAppService`, `NavigationTemplate`, déclaration `com.google.android.gms.car.application`) |
+| App Shortcuts (domicile, travail, rechercher, signaler) | L12 | 🟡 | **Raccourcis statiques domicile / travail / rechercher (L12)** ; domicile ou travail non défini → recherche + message. « Signaler » : ⬜ (exige le service communautaire et une position) |
+| Widgets | L12 | ✅ | Widget 4×1 « Roadly » (domicile, travail, rechercher), jour / nuit, `RoadlyWidgetProvider` (L12) |
 | Notifications (guidage) | — | ✅ |
-| Commandes vocales (App Actions : maison, travail, adresse, accident, destination) | L12 | ⬜ |
-| Intents (geo:, google.navigation:, partage) | L12 | ⬜ |
+| Commandes vocales (App Actions : maison, travail, adresse, accident, destination) | L12 | 🟡 | « Navigue vers X » de l'Assistant arrive par `google.navigation:q=X` → recherche pré-remplie ou itinéraire direct si coordonnées (L12). Pas de capacités App Actions déclarées (exigent une fiche Play) |
+| Intents (geo:, google.navigation:, partage) | L12 | ✅ | `geo:lat,lon`, `geo:lat,lon?q=`, `geo:0,0?q=`, `google.navigation:q=` (`ExternalIntents`, 4 tests) ; partage sortant ✅ (fiche lieu, position, assistance) |
 | Partage natif | L2 | ✅ (fiche lieu : copier l'adresse, partager) |
 | Mode paysage | L3 | 🟡 (accueil, itinéraires, guidage disposés en deux colonnes ; guidage vérifié sur appareil) |
 | Permissions | — | ✅ |
@@ -236,3 +236,4 @@ Constats de l'audit (écarts avec Sillaxe) :
 - 2026-10-31 — **LOT 9 (historique, Replay) livré, compte reporté** : `TripRecorder` branché sur la course (début, fixes échantillonnés 20 m, fin arrivée/arrêt, trajets < 200 m ignorés), Room v4 (`trips`, migration 3→4), `TripRepository` + codec des points (2 tests), coût d'après le profil ; module `feature:trips` : « Mes trajets » (bilan du mois, totaux, liste, suppression) et Replay (tracé, marqueur interpolé, timeline, ×1–×8, « Y retourner » ; 2 tests), entrée Réglages → Trajets. Compte / synchronisation : ⬜ (exige le backend L8 configuré ; à faire en L10/L11). 276 tests verts. Non vérifié sur appareil avec un vrai trajet (exige de rouler).
 - 2026-10-31 — **LOT 10 livré** (gamification, personnalisation) : teinte du cockpit (5 teintes `CockpitTint`, préférence DataStore, appliquée au thème de l'app et au guidage, Réglages → Personnalisation) ; modèle `CommunityProfile` / `LeaderboardEntry` / `Trophies` (8 trophées locaux calculés depuis l'historique, 2 tests) ; `CommunityRepository.profile()` / `leaderboard()` (rpc `get_profile`, `leaderboard` ajoutées au schéma Supabase, 1 test) ; écran « Mon profil » (bouton sur l'accueil + Réglages) : stats locales, trophées avec progression, points et classement serveur seulement si le service est configuré, sinon mention explicite. Ligues, défis, avatars, profil public : ⬜ (serveur). 282 tests verts ; vérifié sur HONOR (profil, trophées, classement inactif sans backend). Réparation de l'encodage de ce fichier (mojibake accumulé depuis le LOT 3, rangées de la matrice remises en place).
 - 2026-10-31 — **LOT 11 livré** (abonnement, premium, assistance) : modèle `Feature` / `Tier` / `Entitlements` (règle : tout inclus tant qu'aucune boutique n'est configurée ; les fonctions `plus` exigent `PLUS` dès qu'une boutique existe ; 3 tests), `BillingProvider` (`store`, `tier`, `purchase`, `restore`) avec `NoBillingProvider` livré et `DefaultEntitlementsRepository` (2 tests) ; écran « Roadly+ » (palier, fonctions incluses / Roadly+, boutique : « Achat indisponible — Google Play Billing non intégré », boutons d'achat et de restauration rendus seulement quand la boutique est prête) ; écran « Assistance » (bug / idée / autre → partage Android d'un rapport pré-rempli ; fil des demandes « Bientôt » sans action) ; groupe Réglages → « Roadly+ et assistance ». Centre de notifications : ⬜ sans objet (aucune source de notification). Intégration Play : `docs/PREMIUM.md`. 287 tests verts ; vérifié sur HONOR (Réglages, Roadly+, Assistance, feuille de partage).
+- 2026-10-31 — **LOT 12 livré** (Android) : `ExternalIntents` (actions domicile / travail / recherche, `geo:` et `google.navigation:` → destination directe si coordonnées, sinon recherche pré-remplie ; 4 tests) traitées par `MainActivity` → `RoadlyNavHost` (`LaunchViewModel` lit domicile / travail ; non défini → recherche + message) ; filtres d'intent `geo` et `google.navigation` (Assistant « Navigue vers… ») ; raccourcis statiques `res/xml/shortcuts.xml` ; widget 4×1 `RoadlyWidgetProvider` (RemoteViews, jour / nuit) ; `SearchRoute.query`. Android Auto : ⬜ — `androidx.car.app` indisponible hors ligne, marche à suivre `docs/ANDROID.md`. 291 tests verts ; vérifié sur HONOR : `geo:43.6045,1.444?q=Capitole` → itinéraire « Capitole », `google.navigation:q=Gare Matabiau` → recherche pré-remplie avec résultats BAN, raccourci Domicile sans domicile → recherche + message ; 3 raccourcis et le fournisseur de widget enregistrés par le système.

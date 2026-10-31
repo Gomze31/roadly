@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Roadly</string>
+    <string name="shortcut_home">Domicile</string>
+    <string name="shortcut_home_long">Aller au domicile</string>
+    <string name="shortcut_work">Travail</string>
+    <string name="shortcut_work_long">Aller au travail</string>
+    <string name="shortcut_search">Rechercher</string>
+    <string name="shortcut_search_long">Rechercher une destination</string>
+    <string name="widget_description">Domicile, travail et recherche en un geste.</string>
+    <string name="external_home_undefined">Domicile non défini : choisissez un lieu puis « Définir comme domicile ».</string>
+    <string name="external_work_undefined">Travail non défini : choisissez un lieu puis « Définir comme travail ».</string>
+    <string name="external_destination">Destination</string>
 </resources>
