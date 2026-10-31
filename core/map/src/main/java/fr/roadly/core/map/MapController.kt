@@ -303,9 +303,11 @@ class MapController(internal val context: Context) {
     /**
      * Caméra de guidage : cible, zoom, cap, inclinaison et marges (fractions de la vue → pixels) ;
      * transition de [durationMs], linéaire pour suivre le rythme des positions (~1 Hz), adoucie si [eased] (bascule 2D/3D, recentrage).
+     * Carte ou style pas encore prêts : la commande attend et sera rejouée sans transition (`moveCamera`), quelle que soit
+     * [durationMs] — sinon, au retour sur l'écran, la caméra glisserait 1 s depuis la position par défaut de la vue.
      */
     fun applyGuidanceCamera(point: GeoPoint, camera: GuidanceCamera, durationMs: Int = 1000, eased: Boolean = false) {
-        val action: (MapLibreMap) -> Unit = { m ->
+        fun action(ms: Int): (MapLibreMap) -> Unit = { m ->
             val w = m.width.toDouble(); val h = m.height.toDouble()
             val p = camera.padding
             val pos = CameraPosition.Builder()
@@ -314,11 +316,11 @@ class MapController(internal val context: Context) {
                 .build()
             val update = CameraUpdateFactory.newCameraPosition(pos)
             // `easeCamera` refuse une durée nulle ou négative : déplacement immédiat dans ce cas.
-            if (durationMs > 0) m.easeCamera(update, durationMs, eased) else m.moveCamera(update)
+            if (ms > 0) m.easeCamera(update, ms, eased) else m.moveCamera(update)
         }
         val m = map
-        if (m == null || !styleReady) { pendingCamera = action; return }
-        action(m)
+        if (m == null || !styleReady) { pendingCamera = action(0); return }
+        action(durationMs)(m)
     }
 
     fun moveTo(point: GeoPoint, zoom: Double, bearing: Double = 0.0, animate: Boolean = true, tilt: Double = 0.0) {

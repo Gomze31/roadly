@@ -117,6 +117,19 @@ class NavigationCameraControllerTest {
         assertEquals(0, c.update(input(nowMs = 4_000)).durationMs)
     }
 
+    @Test fun `a rotation without reset is a plain 1 s reframe that keeps the filtered heading`() {
+        // Contrat dont dépend l'écran : une rotation ne remet pas le contrôleur à zéro, elle change seulement les marges.
+        val c = NavigationCameraController()
+        c.update(input(bearing = 0f, nowMs = 0))
+        c.update(input(bearing = 90f, nowMs = 1_500))
+        val before = c.bearing!!
+        val rotated = c.update(input(bearing = 90f, nowMs = 1_500, landscape = true))
+        assertEquals(NavigationCameraController.TICK_MS, rotated.durationMs)
+        assertFalse(rotated.eased)
+        assertEquals("cap filtré conservé", before, c.bearing!!, 1e-9)
+        assertPadding(GuidanceCameraPolicy.PADDING_LANDSCAPE, rotated.camera.padding)
+    }
+
     @Test fun `the bottom panel pushes the car up, in portrait only`() {
         assertPadding(CameraPadding(0f, 0.45f, 0f, 0.30f), NavigationCameraController().update(input(bottomPanel = 0.30f)).camera.padding)
         assertPadding(CameraPadding(0f, 0.35f, 0f, 0.50f), NavigationCameraController().update(input(bottomPanel = 0.50f)).camera.padding)

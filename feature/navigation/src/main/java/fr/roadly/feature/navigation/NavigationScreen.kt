@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.State
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,7 +98,6 @@ import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteProgress
 import java.util.Locale
-import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}, vm: NavigationViewModel = hiltViewModel()) {
@@ -468,7 +468,7 @@ private fun ReportResultPillNav(message: String?, modifier: Modifier = Modifier)
     }
 }
 
-/** Ce que la carte du guidage reflète ; comparé pour n'agir que sur un vrai changement (position, suivi, mode, économie). */
+/** Ce que la carte du guidage reflète ; comparé pour n'agir que sur un vrai changement (position, suivi, mode, économie, orientation). */
 private data class MapTick(
     val route: Route?,
     val progress: RouteProgress?,
@@ -477,6 +477,7 @@ private data class MapTick(
     val following: Boolean,
     val mode: CameraMode3D,
     val powerSave: Boolean,
+    val landscape: Boolean,
 )
 
 /**
@@ -492,16 +493,19 @@ private fun GuidanceMapEffects(
     map: MapController,
     camera: NavigationCameraController,
 ) {
-    LaunchedEffect(map, camera, landscape) {
+    // Rotation (l'activité gère `orientation|screenSize`) : pas de relance de l'effet, juste une image de recadrage ordinaire.
+    val isLandscape = rememberUpdatedState(landscape)
+    // Tracé déjà vu, gardé hors de l'effet : seul un vrai changement de tracé remet la caméra à zéro.
+    val lastRouteId = remember(camera) { arrayOfNulls<String>(1) }
+    LaunchedEffect(map, camera) {
         var lastProgress: RouteProgress? = null
-        var lastRouteId: String? = null
         var wasFollowing = true
-        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value) } }
-            .distinctUntilChanged()
+        // `snapshotFlow` n'émet que si la valeur change (égalité) : pas besoin de `distinctUntilChanged`.
+        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value) } }
             .collect { t ->
                 val route = t.route ?: return@collect
                 val progress = t.progress ?: return@collect
-                if (route.id != lastRouteId) { lastRouteId = route.id; camera.reset() }
+                if (route.id != lastRouteId[0]) { lastRouteId[0] = route.id; camera.reset() }
                 if (progress !== lastProgress) {
                     lastProgress = progress
                     map.setUserLocation(LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L))
@@ -514,7 +518,7 @@ private fun GuidanceMapEffects(
                     NavigationCameraInput(
                         point = progress.snapped, bearingDeg = progress.bearingDeg, speedKmh = t.speedKmh,
                         distanceToManeuverM = progress.distanceToNextManeuverM, maneuverType = next.type, approaching = t.approaching,
-                        mode = t.mode, powerSave = t.powerSave, landscape = landscape, nowMs = SystemClock.elapsedRealtime(),
+                        mode = t.mode, powerSave = t.powerSave, landscape = t.landscape, nowMs = SystemClock.elapsedRealtime(),
                     ),
                 )
                 map.applyGuidanceCamera(frame.point, frame.camera, frame.durationMs, frame.eased)
