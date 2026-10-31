@@ -17,6 +17,12 @@
     <string name="search_nearby_footer">Lieux OpenStreetMap, du plus proche au plus éloigné. Prix, puissance et disponibilité : pas encore disponibles.</string>
     <string name="search_nearby_empty_title">Aucun lieu « %1$s »</string>
     <string name="search_nearby_empty_subtitle">Rien de référencé à moins de %1$d km de votre position.</string>
+    <string name="search_fuel_sort_price">Tri : prix</string>
+    <string name="search_fuel_sort_distance">Tri : distance</string>
+    <string name="search_fuel_footer">Prix publiés par les stations (ministère de l\'Économie, Licence Ouverte), mis à jour toutes les 10 min environ. « — » = prix non publié.</string>
+    <string name="place_fuel_no_price">Aucun prix publié actuellement pour cette station.</string>
+    <string name="place_fuel_24h">Automate 24h/24</string>
+    <string name="place_fuel_source">Source : Prix des carburants · data.economie.gouv.fr</string>
     <string name="search_no_position_title">Position inconnue</string>
     <string name="search_no_position_subtitle">Les catégories cherchent autour de vous : attendez le signal GPS ou tapez une adresse.</string>
     <string name="place_route">Itinéraire</string>

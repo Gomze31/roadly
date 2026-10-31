@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalGasStation
@@ -57,8 +58,11 @@ import fr.roadly.core.designsystem.component.SurfaceCard
 import fr.roadly.core.designsystem.component.userMessage
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.geocoding.PoiCategory
+import fr.roadly.core.model.FuelStation
+import fr.roadly.core.model.FuelType
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Place
+import java.util.Locale
 import fr.roadly.core.model.PlaceKind
 
 @Composable
@@ -99,7 +103,14 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
                 if (r.category != null) EmptyState(r.category.icon(), stringResource(R.string.search_nearby_empty_title, stringResource(r.category.labelRes())), stringResource(R.string.search_nearby_empty_subtitle, r.category.radiusKm))
                 else EmptyState(Icons.Default.Search, stringResource(R.string.search_empty_title), stringResource(R.string.search_empty_subtitle))
             } else {
-                ResultsList(r.places, here, onSelect = vm::onPlaceSelected, header = r.category?.let { stringResource(R.string.search_nearby_header, stringResource(it.labelRes()), it.radiusKm) })
+                val fuelMode = r.category == PoiCategory.FUEL && r.stations.isNotEmpty()
+                if (fuelMode) FuelControls(state.fuel, state.fuelSort, onFuel = vm::onFuel, onSort = vm::onFuelSort)
+                ResultsList(
+                    r.places, here, onSelect = vm::onPlaceSelected,
+                    header = r.category?.let { stringResource(R.string.search_nearby_header, stringResource(it.labelRes()), it.radiusKm) },
+                    footer = if (fuelMode) stringResource(R.string.search_fuel_footer) else null,
+                    value = if (fuelMode) ({ p -> r.stations[p.id]?.let { s -> fuelPriceText(s, state.fuel) } }) else null,
+                )
             }
         }
     }
@@ -107,6 +118,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
     state.selected?.let { place ->
         PlaceSheet(
             place = place,
+            station = vm.stationFor(place),
             isFavorite = state.selectedIsFavorite,
             distanceMeters = state.selectedDistanceMeters,
             onDismiss = vm::onDismissPlace,
@@ -114,6 +126,32 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
             onToggleFavorite = vm::onToggleFavorite,
             onSetHome = vm::onSetHome,
             onSetWork = vm::onSetWork,
+        )
+    }
+}
+
+/** Prix du carburant choisi, ou « — » si la station ne le publie pas (jamais un prix inventé). */
+private fun fuelPriceText(s: FuelStation, fuel: FuelType): String = s.price(fuel)?.let { String.format(Locale.FRANCE, "%.3f €", it.eurPerLitre) } ?: "—"
+
+internal fun FuelType.shortLabel(): String = when (this) {
+    FuelType.SP95 -> "SP95"; FuelType.SP98 -> "SP98"; FuelType.E10 -> "E10"; FuelType.E85 -> "E85"
+    FuelType.DIESEL -> "Gazole"; FuelType.LPG -> "GPL"; FuelType.ELECTRIC -> "Élec."
+}
+
+/** Carburant mis en avant et tri (distance / prix) des stations-service. */
+@Composable
+private fun FuelControls(fuel: FuelType, sort: FuelSort, onFuel: (FuelType) -> Unit, onSort: (FuelSort) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
+    ) {
+        FuelType.entries.filter { it != FuelType.ELECTRIC }.forEach { f ->
+            GlassChip(f.shortLabel(), onClick = { onFuel(f) }, selected = fuel == f, compact = true)
+        }
+        GlassChip(
+            stringResource(if (sort == FuelSort.PRICE) R.string.search_fuel_sort_price else R.string.search_fuel_sort_distance),
+            onClick = { onSort(if (sort == FuelSort.PRICE) FuelSort.DISTANCE else FuelSort.PRICE) },
+            icon = Icons.AutoMirrored.Filled.Sort, compact = true,
         )
     }
 }
@@ -149,18 +187,24 @@ private fun CategoryChips(selected: PoiCategory?, onSelect: (PoiCategory) -> Uni
 
 private val listPadding = PaddingValues(start = RoadlySpacing.m, end = RoadlySpacing.m, top = RoadlySpacing.sm, bottom = RoadlySpacing.l)
 
+/** [value] : texte de droite par lieu (prix) ; à défaut, la distance depuis [here]. */
 @Composable
-private fun ResultsList(places: List<Place>, here: GeoPoint?, onSelect: (Place) -> Unit, header: String? = null) {
+private fun ResultsList(places: List<Place>, here: GeoPoint?, onSelect: (Place) -> Unit, header: String? = null, footer: String? = null, value: ((Place) -> String?)? = null) {
+    val rightText: (Place) -> String? = { p -> value?.invoke(p) ?: here?.let { Formatters.distance(it.distanceTo(p.point)) } }
+    val subtitle: (Place) -> String? = { p ->
+        val d = if (value != null) here?.let { Formatters.distance(it.distanceTo(p.point)) } else null
+        listOfNotNull(p.address, d).joinToString(" · ").ifBlank { null }
+    }
     LazyColumn(contentPadding = listPadding) {
         item {
             if (header != null) {
-                SettingsGroup(header, footer = stringResource(R.string.search_nearby_footer)) {
-                    places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = here?.let { Formatters.distance(it.distanceTo(p.point)) }) }
+                SettingsGroup(header, footer = footer ?: stringResource(R.string.search_nearby_footer)) {
+                    places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = rightText(p), subtitle = subtitle(p)) }
                 }
             } else {
                 SurfaceCard(Modifier.fillMaxWidth()) {
                     Column {
-                        places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = here?.let { Formatters.distance(it.distanceTo(p.point)) }) }
+                        places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = rightText(p)) }
                     }
                 }
             }
@@ -207,11 +251,13 @@ internal fun PlaceRow(
     iconStyle: IconTileStyle = IconTileStyle.Brand,
     divider: Boolean = true,
     distance: String? = null,
+    subtitle: String? = place.address,
 ) {
-    val leading = icon ?: when (place.kind) {
-        PlaceKind.CITY -> Icons.Default.LocationCity
-        PlaceKind.COORDINATES -> Icons.Default.MyLocation
+    val leading = icon ?: when {
+        place.source == "prix-carburants" -> Icons.Default.LocalGasStation
+        place.kind == PlaceKind.CITY -> Icons.Default.LocationCity
+        place.kind == PlaceKind.COORDINATES -> Icons.Default.MyLocation
         else -> Icons.Default.Place
     }
-    ListRow(title = place.name, subtitle = place.address, icon = leading, iconStyle = iconStyle, value = distance, onClick = onClick, chevron = false, divider = divider)
+    ListRow(title = place.name, subtitle = subtitle, icon = leading, iconStyle = iconStyle, value = distance, onClick = onClick, chevron = false, divider = divider)
 }

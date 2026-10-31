@@ -2,7 +2,11 @@ package fr.roadly.feature.search
 
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.connectivity.ConnectivityObserver
+import fr.roadly.core.data.fuel.FuelStationProvider
 import fr.roadly.core.data.repository.FavoritesRepository
+import fr.roadly.core.data.repository.VehicleProfileRepository
+import fr.roadly.core.model.FuelStation
+import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.geocoding.GeocodingProvider
 import fr.roadly.core.geocoding.NearbyPoiProvider
@@ -25,6 +29,20 @@ class FakeNearby : NearbyPoiProvider {
     var next: Outcome<List<Place>> = Outcome.Success(emptyList())
     val calls = mutableListOf<PoiCategory>()
     override suspend fun nearby(category: PoiCategory, near: GeoPoint, limit: Int): Outcome<List<Place>> { calls += category; return next }
+}
+
+class FakeFuel : FuelStationProvider {
+    override val id = "fake-fuel"
+    var next: Outcome<List<FuelStation>> = Outcome.Success(emptyList())
+    var calls = 0
+    override suspend fun nearby(near: GeoPoint, radiusKm: Int, limit: Int): Outcome<List<FuelStation>> { calls++; return next }
+}
+
+class FakeVehicle : VehicleProfileRepository {
+    val p = MutableStateFlow<VehicleProfile?>(null)
+    override val profile = p
+    override suspend fun save(profile: VehicleProfile) { p.value = profile }
+    override suspend fun clear() { p.value = null }
 }
 
 class FakeRecents : RecentSearchRepository {

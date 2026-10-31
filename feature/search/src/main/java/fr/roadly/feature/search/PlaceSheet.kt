@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -46,12 +47,15 @@ import fr.roadly.core.designsystem.component.IconTileStyle
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
+import fr.roadly.core.model.FuelStation
 import fr.roadly.core.model.Place
+import java.util.Locale
 
 @Composable
 fun PlaceSheet(
     place: Place,
     isFavorite: Boolean,
+    station: FuelStation? = null,
     distanceMeters: Double?,
     onDismiss: () -> Unit,
     onRoute: () -> Unit,
@@ -66,7 +70,7 @@ fun PlaceSheet(
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = RoadlySpacing.l).navigationBarsPadding()) {
             // En-tête : tuile + nom, adresse, distance.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconTile(Icons.Default.Place, style = IconTileStyle.BrandFilled, size = 44.dp)
+                IconTile(if (station != null) Icons.Default.LocalGasStation else Icons.Default.Place, style = IconTileStyle.BrandFilled, size = 44.dp)
                 Spacer(Modifier.width(RoadlySpacing.sm))
                 Column(Modifier.weight(1f)) {
                     Text(place.name, style = MaterialTheme.typography.titleLarge, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -74,6 +78,7 @@ fun PlaceSheet(
                     if (distanceMeters != null) Text(stringResource(R.string.place_distance, Formatters.distance(distanceMeters)), style = MaterialTheme.typography.labelMedium, color = c.textTertiary)
                 }
             }
+            if (station != null) { Spacer(Modifier.height(RoadlySpacing.sm)); FuelPrices(station) }
             Spacer(Modifier.height(RoadlySpacing.m))
             GlassButton(stringResource(R.string.place_route), onClick = onRoute, icon = Icons.Default.Directions, style = GlassButtonStyle.Brand, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(RoadlySpacing.sm))
@@ -107,6 +112,41 @@ fun PlaceSheet(
                 )
             }
         }
+    }
+}
+
+/** Prix publiés (jamais inventés) avec leur date, 24h/24 et services ; source affichée. */
+@Composable
+private fun FuelPrices(station: FuelStation) {
+    val c = LocalRoadlyColors.current
+    val now = System.currentTimeMillis()
+    Column(Modifier.fillMaxWidth().clip(RoadlyShapes.Tile).background(c.glassBorder).padding(RoadlySpacing.sm), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (station.prices.isEmpty()) {
+            Text(stringResource(R.string.place_fuel_no_price), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                station.prices.forEach { p ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(p.fuel.shortLabel(), style = MaterialTheme.typography.labelSmall, color = c.textTertiary)
+                        Text(String.format(Locale.FRANCE, "%.3f", p.eurPerLitre), style = MaterialTheme.typography.titleMedium, color = c.textPrimary)
+                        Text(p.updatedAtEpochMs?.let { ageText(now - it) } ?: "", style = MaterialTheme.typography.labelSmall, color = c.textTertiary, maxLines = 1)
+                    }
+                }
+            }
+        }
+        val extras = listOfNotNull(if (station.open24h) stringResource(R.string.place_fuel_24h) else null) + station.services.take(3)
+        if (extras.isNotEmpty()) Text(extras.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(stringResource(R.string.place_fuel_source), style = MaterialTheme.typography.labelSmall, color = c.textTertiary)
+    }
+}
+
+/** « il y a 3 h », « il y a 2 j » : fraîcheur du prix telle que publiée par la source. */
+private fun ageText(ageMs: Long): String {
+    val min = ageMs / 60_000
+    return when {
+        min < 60 -> "il y a ${min.coerceAtLeast(1)} min"
+        min < 48 * 60 -> "il y a ${min / 60} h"
+        else -> "il y a ${min / (24 * 60)} j"
     }
 }
 
