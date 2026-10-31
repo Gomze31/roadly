@@ -36,12 +36,16 @@ object GuidanceConstants {
     /** Filtre de cap : au-delà de 2,5 m/s, les segments à plus de 90° du cap GPS sont écartés. */
     const val HEADING_FILTER_MIN_SPEED_MPS = 2.5f
     const val HEADING_MAX_DIFF_DEG = 90.0
+    /** B1 : l'indice de manœuvre ne recule que sur un recul de plus de 30 m sous l'abscisse maximale atteinte… */
+    const val BACKTRACK_CONFIRM_M = 30.0
+    /** … confirmé par 2 fixes consécutifs. */
+    const val BACKTRACK_CONFIRM_FIXES = 2
     /** B6 : à écart perpendiculaire quasi égal (≤ 15 m), un autre passage du tracé proche de la dernière abscisse l'emporte (pont, échangeur)… */
     const val CONTINUITY_TIE_M = 15.0
     /** … s'il est à plus de 50 m le long du tracé (en deçà : simple angle du même passage)… */
     const val CONTINUITY_MIN_GAP_M = 50.0
     /** … et ne recule pas de plus de 30 m (même valeur que le recul confirmé de B1). */
-    const val CONTINUITY_BACK_M = 30.0
+    const val CONTINUITY_BACK_M = BACKTRACK_CONFIRM_M
     /** Un saut global de plus de 100 m le long du tracé doit être confirmé par un second fix (à 50 m près). */
     const val GLOBAL_JUMP_M = 100.0
     const val GLOBAL_CONFIRM_RADIUS_M = 50.0
@@ -59,12 +63,14 @@ object GuidanceConstants {
     const val MANEUVER_PASSED_ACCURACY_FACTOR = 2.0
     /** B1 : plafond de la marge de passage, elle-même bornée à la moitié du tronçon de la manœuvre (un dernier tronçon court doit pouvoir arriver). */
     const val MANEUVER_PASSED_MAX_M = 60.0
-    /** B1 : l'indice de manœuvre ne recule que sur un recul de plus de 30 m sous l'abscisse maximale atteinte… */
-    const val BACKTRACK_CONFIRM_M = 30.0
-    /** … confirmé par 2 fixes consécutifs. */
-    const val BACKTRACK_CONFIRM_FIXES = 2
     /** B5 : une annonce LOW / NORMAL restée plus de 8 s en file n'est plus dite (palier dépassé). */
     const val SPEECH_STALE_AFTER_MS = 8_000L
+    /**
+     * Garde-fou du moteur de synthèse : un énoncé dont le rappel de fin (`onDone` / `onStop` / `onError`) n'arrive pas est réputé fini
+     * au bout de 3 s + 100 ms par caractère ; sans cela la file resterait bloquée et le focus audio tenu.
+     */
+    const val SPEECH_UTTERANCE_TIMEOUT_MS = 3_000L
+    const val SPEECH_MS_PER_CHAR = 100L
     /** B5 : l'annonce « maintenant » part à max(40 m, 4 s de trajet à la vitesse lissée). */
     const val NOW_MIN_M = 40.0
     const val NOW_LEAD_S = 4.0
