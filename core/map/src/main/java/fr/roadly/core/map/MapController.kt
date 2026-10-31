@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.SystemClock
 import android.util.Log
+import android.view.Gravity
 import android.view.animation.LinearInterpolator
 import androidx.core.content.ContextCompat
 import fr.roadly.core.model.BoundingBox
@@ -105,6 +106,11 @@ class MapController(internal val context: Context) {
 
     var onRouteClick: ((String) -> Unit)? = null
 
+    /** D5 : coin et marges (px) de l'icône d'attribution, appliqués à l'attache et à chaque changement. */
+    private var attributionTop = false
+    private var attributionEnd = false
+    private var attributionMargins = intArrayOf(0, 0, 0, 0)
+
     /** Détache la carte (la vue est détruite) ; l'état mémorisé reste pour un futur `attach`. */
     internal fun detach() {
         markerAnimator?.cancel()
@@ -121,6 +127,7 @@ class MapController(internal val context: Context) {
         map.uiSettings.isLogoEnabled = false
         map.uiSettings.isRotateGesturesEnabled = true
         map.uiSettings.isTiltGesturesEnabled = false
+        applyAttribution(map)
         if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
             // C3 : mesure du rendu de la carte (SurfaceView, invisible pour `dumpsys gfxinfo`), builds débogables : adb logcat -s RoadlyFps
             val window = FpsWindow()
@@ -147,6 +154,20 @@ class MapController(internal val context: Context) {
     /** C3 : plafond d'images par seconde du rendu (posé avec `MapView.setMaximumFps`) ; le marqueur animé n'écrit pas plus souvent. */
     fun setMaximumFps(fps: Int) {
         markerGate.minIntervalMs = FrameGate.intervalFor(fps)
+    }
+
+    /** D5 : place l'icône d'attribution ([top] / [end] = coin ; marges en px depuis les bords de la carte, barres système comprises). */
+    fun setAttribution(top: Boolean, end: Boolean, verticalPx: Int, sidePx: Int) {
+        attributionTop = top
+        attributionEnd = end
+        attributionMargins = AttributionMargins.of(top, end, verticalPx, sidePx)
+        map?.let { applyAttribution(it) }
+    }
+
+    private fun applyAttribution(m: MapLibreMap) {
+        m.uiSettings.attributionGravity = (if (attributionTop) Gravity.TOP else Gravity.BOTTOM) or (if (attributionEnd) Gravity.END else Gravity.START)
+        val (left, top, right, bottom) = attributionMargins
+        m.uiSettings.setAttributionMargins(left, top, right, bottom)
     }
 
     fun setStyle(url: String) {

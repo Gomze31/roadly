@@ -14,11 +14,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -60,6 +64,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -86,6 +91,7 @@ import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
+import fr.roadly.core.map.AttributionPlacement
 import fr.roadly.core.map.CameraMode3D
 import fr.roadly.core.map.MapController
 import fr.roadly.core.map.NavigationCameraController
@@ -158,6 +164,18 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
+        // D5 : icône d'attribution toujours accessible. Portrait : sous le bouton « replier » (en haut à droite), zone libre que le panneau
+        // du bas soit replié ou déplié. Paysage : en bas, juste à droite de la colonne gauche.
+        val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val navInsets = WindowInsets.navigationBars.asPaddingValues()
+        val attribution = if (landscape) {
+            AttributionPlacement(
+                top = false, end = false, vertical = navInsets.calculateBottomPadding() + RoadlySpacing.xs,
+                side = navInsets.calculateLeftPadding(LayoutDirection.Ltr) + maxWidth * LANDSCAPE_LEFT_COLUMN + RoadlySpacing.s,
+            )
+        } else {
+            AttributionPlacement(top = true, end = true, vertical = statusTop + RoadlySpacing.screenEdge + BANNER_TOGGLE_SIZE + RoadlySpacing.s, side = RoadlySpacing.screenEdge + RoadlySpacing.sm)
+        }
         GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera, bottomPanel)
         // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
         val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
@@ -167,6 +185,7 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
             RoadlyMap(
                 styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture,
                 maximumFps = if (powerSave.value) MapRendering.MAX_FPS_POWER_SAVE else MapRendering.MAX_FPS,
+                attribution = attribution,
             )
         }
         if (landscape) {
@@ -599,3 +618,9 @@ internal fun visibleSheet(phase: NavigationPhase, sheet: GuidanceSheet): Guidanc
 /** La feuille ouverte est refermée quand le guidage s'arrête ; pas pendant le chargement, qui précède le premier état. */
 internal fun closesGuidanceSheet(phase: NavigationPhase): Boolean =
     phase == NavigationPhase.ARRIVED || phase == NavigationPhase.FAILED || phase == NavigationPhase.IDLE
+
+/** Part de la largeur occupée par la colonne gauche de `LandscapeOverlay` (même valeur que `fillMaxWidth(0.46f)`). */
+private const val LANDSCAPE_LEFT_COLUMN = 0.46f
+
+/** Taille du bouton « replier le bandeau » des overlays (`size = 44.dp`) : l'attribution se place dessous en portrait. */
+private val BANNER_TOGGLE_SIZE = 44.dp
