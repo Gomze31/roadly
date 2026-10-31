@@ -33,6 +33,12 @@ data class VehicleProfileEntity(
     val consumptionPer100: Double,
     val fuelPriceEur: Double?,
     val updatedAt: Long,
+    val heightM: Double? = null,
+    val widthM: Double? = null,
+    val lengthM: Double? = null,
+    val weightT: Double? = null,
+    val axles: Int? = null,
+    val critAir: String? = null,
 )
 
 @Entity(tableName = "saved_routes")

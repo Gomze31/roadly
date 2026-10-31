@@ -84,6 +84,30 @@ class ValhallaRoutingProviderTest {
         assertEquals(2, body["locations"]!!.let { it as kotlinx.serialization.json.JsonArray }.size)
     }
 
+    @Test fun `a truck profile switches to truck costing with only the entered dimensions`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        val truck = fr.roadly.core.model.VehicleProfile(
+            fr.roadly.core.model.VehicleType.TRUCK, fr.roadly.core.model.FuelType.DIESEL, 28.0, null,
+            fr.roadly.core.model.VehicleDimensions(heightM = 3.9, weightT = 38.0, axles = 5),
+        )
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, vehicle = truck, preferences = RoutePreferences(avoidTolls = true)))
+        val body = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals("truck", body["costing"]!!.jsonPrimitive.content)
+        val opts = body["costing_options"]!!.jsonObject["truck"]!!.jsonObject
+        assertEquals("3.9", opts["height"]!!.jsonPrimitive.content)
+        assertEquals("38.0", opts["weight"]!!.jsonPrimitive.content)
+        assertEquals("5", opts["axle_count"]!!.jsonPrimitive.content)
+        assertEquals("0", opts["use_tolls"]!!.jsonPrimitive.content)
+        assertTrue("largeur non saisie → absente", opts["width"] == null)
+    }
+
+    @Test fun `motorcycle and taxi use their own costing, cars stay auto`() {
+        assertEquals("motorcycle", provider.costingFor(fr.roadly.core.model.VehicleType.MOTORCYCLE))
+        assertEquals("taxi", provider.costingFor(fr.roadly.core.model.VehicleType.TAXI))
+        assertEquals("auto", provider.costingFor(fr.roadly.core.model.VehicleType.SUV))
+        assertEquals("auto", provider.costingFor(null))
+    }
+
     @Test fun `origin heading is sent on the first location only`() = runTest {
         server.enqueue(MockResponse().setBody(fixture()))
         provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, originHeadingDeg = 90.4f))

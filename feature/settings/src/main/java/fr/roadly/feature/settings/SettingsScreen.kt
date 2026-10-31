@@ -88,7 +88,9 @@ import fr.roadly.core.designsystem.component.ToggleRow
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
+import fr.roadly.core.model.CritAir
 import fr.roadly.core.model.FuelType
+import fr.roadly.core.model.VehicleDimensions
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
@@ -184,6 +186,13 @@ private fun DrivingGroup(state: SettingsUiState, vm: SettingsViewModel) {
     var fuel by remember(state.vehicle) { mutableStateOf(state.vehicle?.fuel ?: FuelType.SP95) }
     var consumption by remember(state.vehicle) { mutableStateOf(state.vehicle?.consumptionPer100?.toString().orEmpty()) }
     var price by remember(state.vehicle) { mutableStateOf(state.vehicle?.fuelPriceEur?.toString().orEmpty()) }
+    val dims = state.vehicle?.dimensions
+    var height by remember(state.vehicle) { mutableStateOf(dims?.heightM?.toString().orEmpty()) }
+    var width by remember(state.vehicle) { mutableStateOf(dims?.widthM?.toString().orEmpty()) }
+    var length by remember(state.vehicle) { mutableStateOf(dims?.lengthM?.toString().orEmpty()) }
+    var weight by remember(state.vehicle) { mutableStateOf(dims?.weightT?.toString().orEmpty()) }
+    var axles by remember(state.vehicle) { mutableStateOf(dims?.axles?.toString().orEmpty()) }
+    var critAir by remember(state.vehicle) { mutableStateOf(state.vehicle?.critAir) }
     val consumptionValid = consumption.trim().replace(',', '.').toDoubleOrNull()?.let { it > 0 } == true
     // Éditeur replié par défaut ; la ligne résume le profil enregistré.
     var editing by remember { mutableStateOf(false) }
@@ -209,10 +218,28 @@ private fun DrivingGroup(state: SettingsUiState, vm: SettingsViewModel) {
             }
             SettingsField(stringResource(R.string.settings_consumption), consumption, { consumption = it }, KeyboardType.Decimal)
             SettingsField(stringResource(R.string.settings_price), price, { price = it }, KeyboardType.Decimal)
+            // Gabarit : poids lourd et utilitaire seulement ; influence réelle sur le routage en costing poids lourd (Valhalla `truck`).
+            if (type.isHeavy || type == VehicleType.VAN) {
+                FieldCaption(stringResource(R.string.settings_dimensions))
+                SettingsField(stringResource(R.string.settings_height), height, { height = it }, KeyboardType.Decimal)
+                SettingsField(stringResource(R.string.settings_width), width, { width = it }, KeyboardType.Decimal)
+                SettingsField(stringResource(R.string.settings_length), length, { length = it }, KeyboardType.Decimal)
+                SettingsField(stringResource(R.string.settings_weight), weight, { weight = it }, KeyboardType.Decimal)
+                if (type.isHeavy) SettingsField(stringResource(R.string.settings_axles), axles, { axles = it }, KeyboardType.Number)
+                Text(stringResource(if (type.isHeavy) R.string.settings_dimensions_note_truck else R.string.settings_dimensions_note_van), style = MaterialTheme.typography.bodySmall, color = LocalRoadlyColors.current.textTertiary)
+            }
+            FieldCaption(stringResource(R.string.settings_critair))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                CritAir.entries.forEach { GlassChip(it.label(), onClick = { critAir = if (critAir == it) null else it }, selected = critAir == it, compact = true) }
+            }
+            Text(stringResource(R.string.settings_critair_note), style = MaterialTheme.typography.bodySmall, color = LocalRoadlyColors.current.textTertiary)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 GlassButton(
                     stringResource(R.string.settings_save),
-                    onClick = { vm.saveVehicle(type, fuel, consumption, price) },
+                    onClick = {
+                        val d = VehicleDimensions(height.toFrDoubleOrNull(), width.toFrDoubleOrNull(), length.toFrDoubleOrNull(), weight.toFrDoubleOrNull(), axles.trim().toIntOrNull())
+                        vm.saveVehicle(type, fuel, consumption, price, d, critAir)
+                    },
                     enabled = consumptionValid,
                 )
                 if (state.vehicle != null) GlassButton(stringResource(R.string.settings_clear_vehicle), onClick = vm::clearVehicle, style = GlassButtonStyle.Danger)
@@ -467,6 +494,9 @@ internal fun VehicleType.label(): String = stringResource(
         VehicleType.SEDAN -> R.string.settings_vehicle_sedan
         VehicleType.SUV -> R.string.settings_vehicle_suv
         VehicleType.VAN -> R.string.settings_vehicle_van
+        VehicleType.MOTORCYCLE -> R.string.settings_vehicle_motorcycle
+        VehicleType.TAXI -> R.string.settings_vehicle_taxi
+        VehicleType.TRUCK -> R.string.settings_vehicle_truck
     },
 )
 
@@ -493,3 +523,11 @@ private fun ThemeMode.shortLabel(): String = stringResource(
         ThemeMode.AUTO_SOLAR -> R.string.settings_theme_auto_short
     },
 )
+
+@Composable
+internal fun CritAir.label(): String = when (this) {
+    CritAir.ZERO -> "Crit'Air 0"; CritAir.C1 -> "1"; CritAir.C2 -> "2"; CritAir.C3 -> "3"; CritAir.C4 -> "4"; CritAir.C5 -> "5"
+    CritAir.NONE -> stringResource(R.string.settings_critair_none)
+}
+
+private fun String.toFrDoubleOrNull(): Double? = trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }

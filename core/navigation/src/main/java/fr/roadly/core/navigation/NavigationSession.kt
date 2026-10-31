@@ -16,6 +16,7 @@ import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteProgress
 import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CancellationException
@@ -72,12 +73,15 @@ class NavigationSession @Inject constructor(
     @Volatile private var generation = 0
     private var lastOption: RouteOption? = null
     private var lastPreferences = RoutePreferences()
+    private var lastVehicle: VehicleProfile? = null
 
     /** Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs. */
-    fun start(option: RouteOption, preferences: RoutePreferences) {
+    /** [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto. */
+    fun start(option: RouteOption, preferences: RoutePreferences, vehicle: VehicleProfile? = null) {
         cancelRun(null)
         lastOption = option
         lastPreferences = preferences
+        lastVehicle = vehicle
         if (location.permissionState.value != LocationPermissionState.GRANTED) {
             publishFailure(NavigationState.Failed(AppError.PermissionDenied))
             return
@@ -89,7 +93,7 @@ class NavigationSession @Inject constructor(
             return
         }
         val run = synchronized(stateLock) {
-            Run(++generation, option.route, tracker, preferences).also {
+            Run(++generation, option.route, tracker, preferences, vehicle).also {
                 _state.value = it.guiding(tracker.initialProgress(), it.startedAtMs, gpsLost = false)
             }
         }
@@ -106,7 +110,7 @@ class NavigationSession @Inject constructor(
 
     /** Relance la dernière course demandée (après un `Failed`, par exemple). */
     fun retry() {
-        lastOption?.let { start(it, lastPreferences) }
+        lastOption?.let { start(it, lastPreferences, lastVehicle) }
     }
 
     fun setMuted(muted: Boolean) {
@@ -133,7 +137,7 @@ class NavigationSession @Inject constructor(
     }
 
     /** Une course : son état n'est lu et écrit que sur [confined]. */
-    private inner class Run(val gen: Int, var route: Route, var tracker: RouteTracker, val routePreferences: RoutePreferences) {
+    private inner class Run(val gen: Int, var route: Route, var tracker: RouteTracker, val routePreferences: RoutePreferences, val vehicle: VehicleProfile?) {
         private val destination: GeoPoint = route.geometry.last()
         private val costing = route.costing
         private val announced = mutableSetOf<Pair<Int, Tier>>()
@@ -313,7 +317,7 @@ class NavigationSession @Inject constructor(
                         routing.route(
                             RouteRequest(
                                 origin = fix.point, destination = destination, costing = costing,
-                                preferences = routePreferences, originHeadingDeg = heading,
+                                preferences = routePreferences, originHeadingDeg = heading, vehicle = vehicle,
                             ),
                         )
                     }

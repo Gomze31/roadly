@@ -61,6 +61,7 @@ class RouteViewModel @Inject constructor(
     private val reload = MutableStateFlow(0)
     /** Préférences du dernier calcul affiché : transmises à la session (et donc au recalcul). */
     private var computedWith = RoutePreferences()
+    private var computedVehicle: VehicleProfile? = null
 
     private data class Params(val origin: GeoPoint?, val departAt: Long, val arriveAt: Long?, val vehicle: VehicleProfile?, val preferences: RoutePreferences, val stops: List<Place>)
 
@@ -78,6 +79,7 @@ class RouteViewModel @Inject constructor(
                         // L'option active doit toujours exister dans la liste affichée.
                         if (activeId.value == null || options.none { it.route.id == activeId.value }) activeId.value = options.first().route.id
                         computedWith = p
+                        computedVehicle = v
                         computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, effectiveDepart, a, p, s)
                     }
                     is Outcome.Failure -> computed.value = RouteUiState.Error(r.error)
@@ -133,7 +135,7 @@ class RouteViewModel @Inject constructor(
         val content = computed.value as? RouteUiState.Content ?: return false
         val id = activeId.value ?: content.activeId
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
-        session.start(option, computedWith)
+        session.start(option, computedWith, computedVehicle)
         return true
     }
 

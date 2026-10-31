@@ -15,7 +15,9 @@ import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.data.vigilance.VigilanceRepository
+import fr.roadly.core.model.CritAir
 import fr.roadly.core.model.FuelType
+import fr.roadly.core.model.VehicleDimensions
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
@@ -86,10 +88,12 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     /** [consumption] et [price] sont des saisies libres ("7,5", "1.89", ""). Prix vide = inconnu (aucun défaut inventé). */
-    fun saveVehicle(type: VehicleType, fuel: FuelType, consumption: String, price: String) {
+    fun saveVehicle(type: VehicleType, fuel: FuelType, consumption: String, price: String, dimensions: VehicleDimensions = VehicleDimensions(), critAir: CritAir? = null) {
         val cons = consumption.toFrDouble() ?: return
         val pr = price.toFrDouble()?.takeIf { it > 0 }
-        viewModelScope.launch { vehicleRepo.save(VehicleProfile(type, fuel, cons, pr)) }
+        // Le gabarit n'est gardé que pour les véhicules lourds (il n'influence le routage que là).
+        val dims = if (type.isHeavy || type == VehicleType.VAN) dimensions else VehicleDimensions()
+        viewModelScope.launch { vehicleRepo.save(VehicleProfile(type, fuel, cons, pr, dims, critAir)) }
     }
 
     fun clearVehicle() { viewModelScope.launch { vehicleRepo.clear() } }

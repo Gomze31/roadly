@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [FavoritePlaceEntity::class, RecentSearchEntity::class, VehicleProfileEntity::class, SavedRouteEntity::class, VigilanceZoneEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class RoadlyDatabase : RoomDatabase() {
@@ -24,6 +24,13 @@ abstract class RoadlyDatabase : RoomDatabase() {
                     "CREATE TABLE IF NOT EXISTS `vigilance_zones` (`id` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, " +
                         "`direction` TEXT, `type` TEXT, `road` TEXT, `limitKmh` INTEGER, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
                 )
+            }
+        }
+
+        /** v2 → v3 : gabarit et Crit'Air du profil véhicule (LOT 7). */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("heightM REAL", "widthM REAL", "lengthM REAL", "weightT REAL", "axles INTEGER", "critAir TEXT").forEach { column -> db.execSQL("ALTER TABLE `vehicle_profile` ADD COLUMN $column") }
             }
         }
     }

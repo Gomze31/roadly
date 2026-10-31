@@ -77,10 +77,16 @@ class NavigationViewModelTest {
         return NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), dispatchers, backgroundScope)
     }
 
+    private val fakeVehicle = object : fr.roadly.core.data.repository.VehicleProfileRepository {
+        override val profile = flowOf<fr.roadly.core.model.VehicleProfile?>(null)
+        override suspend fun save(profile: fr.roadly.core.model.VehicleProfile) = Unit
+        override suspend fun clear() = Unit
+    }
+
     private fun fixAt(along: Double) = LocationFix(tracker.pointAt(along), 90f, 10f, 5f, 0L)
 
     private fun NavigationViewModel(s: NavigationSession, p: FakeUserPreferencesRepository, c: ProviderConfigRepository) =
-        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing), routing)
+        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing), routing, fakeVehicle)
 
     @Test fun `alternatives are computed from the snapped position and switching restarts guidance on the chosen route`() = runTest {
         val okRouting = object : RoutingProvider {
@@ -89,7 +95,7 @@ class NavigationViewModelTest {
             override suspend fun route(request: RouteRequest): Outcome<List<Route>> { origins += request.origin; return Outcome.Success(listOf(route.copy(id = "alt-" + request.costing.name))) }
         }
         val s = session()
-        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting), okRouting)
+        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting), okRouting, fakeVehicle)
         vm.uiState.test {
             s.start(option, RoutePreferences()); runCurrent()
             location.emit(fixAt(300.0)); runCurrent()

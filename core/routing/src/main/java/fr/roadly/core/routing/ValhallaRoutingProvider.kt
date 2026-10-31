@@ -11,6 +11,7 @@ import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.model.VehicleType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
@@ -58,15 +59,25 @@ class ValhallaRoutingProvider @Inject constructor(
                     }
                 }
             }
-            put("costing", "auto")
+            val costingName = costingFor(request.vehicle?.type)
+            put("costing", costingName)
             putJsonObject("costing_options") {
-                putJsonObject("auto") {
+                putJsonObject(costingName) {
                     val prefs = request.preferences
                     if (request.costing == RouteCosting.SHORTEST) put("shortest", true)
                     // 0 = éviter autant que possible (sémantique Valhalla) ; appliqué aux 3 variantes et au recalcul.
                     if (request.costing == RouteCosting.NO_TOLL || prefs.avoidTolls) put("use_tolls", 0)
                     if (prefs.avoidHighways) put("use_highways", 0)
                     if (prefs.avoidFerries) put("use_ferry", 0)
+                    // Gabarit : seulement en costing poids lourd, et seulement les valeurs saisies (Valhalla garde ses défauts sinon).
+                    val d = request.vehicle?.dimensions
+                    if (costingName == "truck" && d != null) {
+                        d.heightM?.let { put("height", it) }
+                        d.widthM?.let { put("width", it) }
+                        d.lengthM?.let { put("length", it) }
+                        d.weightT?.let { put("weight", it) }
+                        d.axles?.let { put("axle_count", it) }
+                    }
                 }
             }
             put("units", "kilometers")
@@ -76,6 +87,14 @@ class ValhallaRoutingProvider @Inject constructor(
             is Outcome.Success -> parse(r.value, request.costing)
             is Outcome.Failure -> Outcome.Failure(mapError(r.error))
         }
+    }
+
+    /** Costing Valhalla selon le type de véhicule : poids lourd (gabarit, interdictions PL), moto, taxi (voies réservées si taguées), sinon auto. */
+    internal fun costingFor(type: VehicleType?): String = when (type) {
+        VehicleType.TRUCK -> "truck"
+        VehicleType.MOTORCYCLE -> "motorcycle"
+        VehicleType.TAXI -> "taxi"
+        else -> "auto"
     }
 
     /** `/optimized_route` : l'ordre renvoyé (`original_index`) garde le premier et le dernier point fixes. */

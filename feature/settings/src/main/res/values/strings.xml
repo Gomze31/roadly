@@ -89,6 +89,20 @@
     <string name="settings_vehicle_sedan">Berline</string>
     <string name="settings_vehicle_suv">SUV</string>
     <string name="settings_vehicle_van">Utilitaire</string>
+    <string name="settings_vehicle_motorcycle">Moto</string>
+    <string name="settings_vehicle_taxi">Taxi</string>
+    <string name="settings_vehicle_truck">Poids lourd</string>
+    <string name="settings_dimensions">Gabarit</string>
+    <string name="settings_height">Hauteur (m)</string>
+    <string name="settings_width">Largeur (m)</string>
+    <string name="settings_length">Longueur (m)</string>
+    <string name="settings_weight">Poids (t)</string>
+    <string name="settings_axles">Nombre d\'essieux</string>
+    <string name="settings_dimensions_note_truck">Poids lourd : le gabarit est transmis au routage (ponts bas, limites de poids, interdictions PL) là où les données OpenStreetMap existent. Les péages PL ne sont pas calculés (aucune source).</string>
+    <string name="settings_dimensions_note_van">Utilitaire : gabarit mémorisé à titre indicatif ; le routage reste celui d\'une voiture.</string>
+    <string name="settings_critair">Vignette Crit\'Air</string>
+    <string name="settings_critair_none">Non classé</string>
+    <string name="settings_critair_note">Mémorisée pour les futures alertes ZFE (zones à faibles émissions) ; aucune restriction n\'est encore appliquée au routage.</string>
 
     <string name="settings_fuel_sp95">SP95</string>
     <string name="settings_fuel_sp98">SP98</string>

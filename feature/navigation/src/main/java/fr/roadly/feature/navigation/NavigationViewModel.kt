@@ -7,6 +7,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.UserPreferencesRepository
+import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
@@ -41,7 +42,9 @@ class NavigationViewModel @Inject constructor(
     config: ProviderConfigRepository,
     private val alternatives: RouteAlternativesUseCase,
     private val routing: RoutingProvider,
+    vehicleRepo: VehicleProfileRepository,
 ) : ViewModel() {
+    private val vehicle = vehicleRepo.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val isDark = MutableStateFlow(true)
     private val following = MutableStateFlow(true)
     private var refollowJob: Job? = null
@@ -82,7 +85,7 @@ class NavigationViewModel @Inject constructor(
         alternativesJob?.cancel()
         _alternatives.value = AlternativesUi.Loading
         alternativesJob = viewModelScope.launch {
-            when (val r = alternatives(g.progress.snapped, g.route.geometry.last(), null, System.currentTimeMillis(), routePreferences.value)) {
+            when (val r = alternatives(g.progress.snapped, g.route.geometry.last(), vehicle.value, System.currentTimeMillis(), routePreferences.value)) {
                 is Outcome.Success -> _alternatives.value = AlternativesUi.Content(r.value, g.route.id)
                 is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
             }
@@ -103,11 +106,11 @@ class NavigationViewModel @Inject constructor(
             _addingStop.value = true
             val request = RouteRequest(
                 origin = g.progress.snapped, destination = g.route.geometry.last(), waypoints = listOf(place.point),
-                costing = g.route.costing, preferences = routePreferences.value, originHeadingDeg = g.progress.bearingDeg,
+                costing = g.route.costing, preferences = routePreferences.value, originHeadingDeg = g.progress.bearingDeg, vehicle = vehicle.value,
             )
             when (val r = routing.route(request)) {
                 is Outcome.Success -> r.value.firstOrNull()?.let { route ->
-                    session.start(RouteOption(route.copy(costing = g.route.costing), "Via ${place.name}", System.currentTimeMillis() + (route.durationSeconds * 1000).toLong(), null, sameAsFastest = false), routePreferences.value)
+                    session.start(RouteOption(route.copy(costing = g.route.costing), "Via ${place.name}", System.currentTimeMillis() + (route.durationSeconds * 1000).toLong(), null, sameAsFastest = false), routePreferences.value, vehicle.value)
                 }
                 is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
             }
@@ -117,7 +120,7 @@ class NavigationViewModel @Inject constructor(
 
     /** Bascule le guidage sur [option] : la course est remplacée, la voix et le service continuent. */
     fun switchTo(option: RouteOption) {
-        session.start(option, routePreferences.value)
+        session.start(option, routePreferences.value, vehicle.value)
         dismissAlternatives()
     }
 
