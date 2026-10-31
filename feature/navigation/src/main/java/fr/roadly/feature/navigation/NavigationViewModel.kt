@@ -12,6 +12,8 @@ import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
+import fr.roadly.core.map.CameraMode3D
+import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.ReportKind
@@ -92,8 +94,34 @@ class NavigationViewModel @Inject constructor(
     private val _alternatives = MutableStateFlow<AlternativesUi>(AlternativesUi.Hidden)
     val alternativesUi: StateFlow<AlternativesUi> = _alternatives
 
-    /** Réglage « Carte 3D en guidage » (l'écran y ajoute l'économiseur de batterie). */
-    val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_3D)
+    /** Réglage « Carte 3D en guidage » : mode de départ de la caméra (lu sans attendre par les boutons, d'où `Eagerly`). */
+    val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.MAP_3D)
+
+    /** C1 : mode choisi par les boutons pour cette session ; null = mode du réglage. */
+    private val cameraChoice = MutableStateFlow<CameraMode3D?>(null)
+    /** Mode quitté en passant « nord en haut », rétabli au second appui. */
+    private var modeBeforeNorthUp: CameraMode3D = CameraMode3D.FOLLOW_3D
+
+    /** C1 : mode de caméra du guidage (3D, 2D, nord en haut), pour la session seulement. */
+    val cameraMode: StateFlow<CameraMode3D> = combine(map3d, cameraChoice) { on, choice -> choice ?: CameraMode3D.default(on) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, CameraMode3D.default(GuidanceDefaults.MAP_3D))
+
+    private fun currentMode(): CameraMode3D = cameraChoice.value ?: CameraMode3D.default(map3d.value)
+
+    /** Bouton 2D / 3D. */
+    fun toggleCameraMode() { cameraChoice.value = currentMode().toggled3d() }
+
+    /** Bouton « nord en haut » : bascule, puis retour au mode d'avant. */
+    fun toggleNorthUp() {
+        val current = currentMode()
+        cameraChoice.value = if (current == CameraMode3D.NORTH_UP) modeBeforeNorthUp else { modeBeforeNorthUp = current; CameraMode3D.NORTH_UP }
+    }
+
+    /** Dernière caméra de l'écran de guidage, restaurée avec son inclinaison au retour sur l'écran. */
+    var lastCamera: CameraSnapshot? = null
+        private set
+
+    fun rememberCamera(snapshot: CameraSnapshot?) { if (snapshot != null) lastCamera = snapshot }
 
     /** Dernier état produit : hystérésis de l'approche (B1). */
     private var lastUi: NavigationUiState? = null
@@ -107,18 +135,33 @@ class NavigationViewModel @Inject constructor(
     fun stop() = session.stop()
     fun retry() = session.retry()
 
-    /** L'utilisateur a déplacé la carte : suivi suspendu, repris automatiquement après 8 s (spec §5). */
+    private val _recenterIn = MutableStateFlow<Int?>(null)
+    /** C1 : secondes avant la reprise automatique du suivi après un geste ; null = aucun compte à rebours. */
+    val recenterInSeconds: StateFlow<Int?> = _recenterIn
+
+    /** L'utilisateur a déplacé la carte : suivi suspendu, repris automatiquement après 8 s (spec §5), compte à rebours affiché. */
     fun onUserGesture() {
         following.value = false
         refollowJob?.cancel()
         refollowJob = viewModelScope.launch {
-            delay(RECENTER_AFTER_MS)
+            for (s in (RECENTER_AFTER_MS / 1_000).toInt() downTo 1) {
+                _recenterIn.value = s
+                delay(1_000)
+            }
+            _recenterIn.value = null
             following.value = true
         }
     }
 
+    /** « Annuler » : pas de reprise automatique, la carte reste libre jusqu'à « Recentrer ». */
+    fun cancelAutoRecenter() {
+        refollowJob?.cancel()
+        _recenterIn.value = null
+    }
+
     fun recenter() {
         refollowJob?.cancel()
+        _recenterIn.value = null
         following.value = true
     }
 

@@ -9,6 +9,8 @@ import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
+import fr.roadly.core.map.CameraMode3D
+import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.Lane
 import fr.roadly.core.model.LaneDirection
@@ -245,6 +247,60 @@ class NavigationViewModelTest {
             assertEquals(10, vm.uiState.value.toleranceKmh)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test fun `the auto recenter countdown ticks every second and can be cancelled`() = runTest {
+        val s = session()
+        val vm = NavigationViewModel(s, prefs, config)
+        vm.uiState.test {
+            s.start(option, RoutePreferences()); runCurrent()
+            assertNull(vm.recenterInSeconds.value)
+            vm.onUserGesture(); runCurrent()
+            assertEquals(8, vm.recenterInSeconds.value)
+            advanceTimeBy(1_000); runCurrent()
+            assertEquals(7, vm.recenterInSeconds.value)
+            advanceTimeBy(6_000); runCurrent()
+            assertEquals(1, vm.recenterInSeconds.value)
+            advanceTimeBy(1_000); runCurrent()
+            assertNull(vm.recenterInSeconds.value)
+            assertTrue(vm.uiState.value.following)
+            vm.onUserGesture(); runCurrent()
+            advanceTimeBy(3_000); runCurrent()
+            assertEquals(5, vm.recenterInSeconds.value)
+            vm.cancelAutoRecenter(); runCurrent()
+            assertNull(vm.recenterInSeconds.value)
+            advanceTimeBy(10_000); runCurrent()
+            assertFalse("annulé : la carte reste libre", vm.uiState.value.following)
+            vm.recenter(); runCurrent()
+            assertTrue(vm.uiState.value.following)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `the camera mode starts from the 3d setting and the buttons change it for the session`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_3D, vm.cameraMode.value)
+        vm.toggleCameraMode(); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        vm.toggleNorthUp(); runCurrent()
+        assertEquals(CameraMode3D.NORTH_UP, vm.cameraMode.value)
+        vm.toggleNorthUp(); runCurrent()
+        assertEquals("retour au mode d'avant", CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        vm.toggleNorthUp(); vm.toggleCameraMode(); runCurrent()
+        assertEquals("depuis le nord en haut, le bouton 3D repasse en 3D", CameraMode3D.FOLLOW_3D, vm.cameraMode.value)
+        prefs.setMap3dEnabled(false); runCurrent()
+        assertEquals("le choix de la session prime sur le réglage", CameraMode3D.FOLLOW_3D, vm.cameraMode.value)
+    }
+
+    @Test fun `with the 3d setting off the session starts in 2d, and the last camera is remembered`() = runTest {
+        prefs.setMap3dEnabled(false)
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        vm.rememberCamera(null)
+        assertNull(vm.lastCamera)
+        val snap = CameraSnapshot(48.8, 2.3, 17.0, 90.0, tilt = 58.0)
+        vm.rememberCamera(snap)
+        assertEquals(snap, vm.lastCamera)
     }
 }
 
