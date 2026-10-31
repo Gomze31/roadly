@@ -25,7 +25,7 @@
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_theme_auto">Auto (jour/nuit solaire)</string>
     <string name="settings_map_3d">Carte 3D en guidage</string>
-    <string name="settings_map_3d_subtitle">Perspective et bâtiments pendant la navigation. Désactivée automatiquement en économie d\'énergie.</string>
+    <string name="settings_map_3d_subtitle">Perspective et bâtiments pendant la navigation. Allégée en économie d\'énergie (sans bâtiments, inclinaison réduite).</string>
     <string name="settings_theme_auto_short">Auto</string>
 
     <string name="settings_voice">Voix et sons</string>
