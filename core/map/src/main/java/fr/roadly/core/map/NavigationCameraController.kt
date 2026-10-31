@@ -47,6 +47,8 @@ class NavigationCameraController {
     private var previous: GuidanceCamera? = null
     private var lastMode: CameraMode3D? = null
     private var transitionRequested = false
+    /** Identifiant du tracé suivi (voir [onRouteChanged]) ; null avant le premier tracé de la session. */
+    private var routeId: String? = null
 
     /** Cap filtré courant (degrés), null avant le premier cap connu. */
     val bearing: Double? get() = filteredBearing
@@ -81,7 +83,19 @@ class NavigationCameraController {
     /** Prochaine image en transition douce (recentrage après un geste). */
     fun requestTransition() { transitionRequested = true }
 
-    /** Nouveau tracé : cap, zoom et mode oubliés ; la prochaine image est immédiate. */
+    /**
+     * Tracé suivi, signalé à chaque image (sans effet tant que l'identifiant ne change pas). Premier tracé de la session :
+     * remise à zéro, image immédiate. Tracé suivant (recalcul, bascule sur une alternative) : cap filtré et zoom gardés,
+     * transition douce de [TRANSITION_MS] — pas de coupure de caméra pendant que le marqueur glisse.
+     */
+    fun onRouteChanged(routeId: String) {
+        val previousId = this.routeId
+        if (routeId == previousId) return
+        this.routeId = routeId
+        if (previousId == null) reset() else requestTransition()
+    }
+
+    /** Cap, zoom et mode oubliés ; la prochaine image est immédiate. */
     fun reset() {
         filteredBearing = null; lastNowMs = null; previous = null; lastMode = null; transitionRequested = false
     }

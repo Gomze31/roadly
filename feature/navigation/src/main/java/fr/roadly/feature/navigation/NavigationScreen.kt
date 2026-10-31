@@ -501,8 +501,6 @@ private fun GuidanceMapEffects(
 ) {
     // Rotation (l'activité gère `orientation|screenSize`) : pas de relance de l'effet, juste une image de recadrage ordinaire.
     val isLandscape = rememberUpdatedState(landscape)
-    // Tracé déjà vu, gardé hors de l'effet : seul un vrai changement de tracé remet la caméra à zéro.
-    val lastRouteId = remember(camera) { arrayOfNulls<String>(1) }
     LaunchedEffect(map, camera) {
         var lastProgress: RouteProgress? = null
         var wasFollowing = true
@@ -511,7 +509,8 @@ private fun GuidanceMapEffects(
             .collect { t ->
                 val route = t.route ?: return@collect
                 val progress = t.progress ?: return@collect
-                if (route.id != lastRouteId[0]) { lastRouteId[0] = route.id; camera.reset() }
+                // Premier tracé : image immédiate ; recalcul ou alternative : transition douce, cap et zoom gardés (règle du contrôleur).
+                camera.onRouteChanged(route.id)
                 if (progress !== lastProgress) {
                     lastProgress = progress
                     map.setUserLocation(LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L))

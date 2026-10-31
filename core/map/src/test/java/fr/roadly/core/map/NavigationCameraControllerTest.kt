@@ -117,6 +117,23 @@ class NavigationCameraControllerTest {
         assertEquals(0, c.update(input(nowMs = 4_000)).durationMs)
     }
 
+    @Test fun `the first route jumps, a later route (reroute, alternative) eases 600 ms and keeps heading and zoom`() {
+        val c = NavigationCameraController()
+        c.onRouteChanged("r1")
+        assertEquals("premier tracé : image immédiate", 0, c.update(input(bearing = 0f, nowMs = 0)).durationMs)
+        c.onRouteChanged("r1")
+        val tick = c.update(input(bearing = 90f, nowMs = 1_500))
+        assertEquals("même tracé : glissement ordinaire", NavigationCameraController.TICK_MS, tick.durationMs)
+        val bearing = c.bearing!!
+        c.onRouteChanged("r2")
+        val rerouted = c.update(input(bearing = 90f, nowMs = 1_500))
+        assertEquals(NavigationCameraController.TRANSITION_MS, rerouted.durationMs)
+        assertTrue(rerouted.eased)
+        assertEquals("cap filtré conservé", bearing, c.bearing!!, 1e-9)
+        assertEquals("zoom conservé", tick.camera.zoom, rerouted.camera.zoom, 1e-9)
+        assertEquals(NavigationCameraController.TICK_MS, c.update(input(bearing = 90f, nowMs = 2_500)).durationMs)
+    }
+
     @Test fun `a rotation without reset is a plain 1 s reframe that keeps the filtered heading`() {
         // Contrat dont dépend l'écran : une rotation ne remet pas le contrôleur à zéro, elle change seulement les marges.
         val c = NavigationCameraController()
