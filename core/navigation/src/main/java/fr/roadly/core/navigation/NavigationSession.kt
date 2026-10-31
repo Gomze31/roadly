@@ -79,22 +79,32 @@ class NavigationSession @Inject constructor(
     /** Nom de destination de la dernière course demandée : repris par [retry] pour ne pas l'effacer de `lastGuidance`. */
     private var lastDestinationName: String? = null
 
-    /** Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs. */
-    /** [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto. [destinationName] : nom mémorisé (B6). */
+    /**
+     * Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs.
+     * [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto. [destinationName] : nom mémorisé (B6) ;
+     * absent (alternative, étape ajoutée), le nom précédent est gardé si la destination est la même (à moins de 25 m).
+     * Un démarrage en échec efface la course mémorisée.
+     */
     fun start(option: RouteOption, preferences: RoutePreferences, vehicle: VehicleProfile? = null, destinationName: String? = null) {
         cancelRun(null)
+        val previousDestination = lastOption?.route?.geometry?.lastOrNull()
+        val sameDestination = previousDestination != null &&
+            option.route.geometry.lastOrNull()?.let { it.distanceTo(previousDestination) <= GuidanceConstants.ARRIVAL_RADIUS_M } == true
+        val name = destinationName ?: lastDestinationName.takeIf { sameDestination }
         lastOption = option
         lastPreferences = preferences
         lastVehicle = vehicle
-        lastDestinationName = destinationName
+        lastDestinationName = name
         if (location.permissionState.value != LocationPermissionState.GRANTED) {
             publishFailure(NavigationState.Failed(AppError.PermissionDenied))
+            persistLastGuidance(null)
             return
         }
         val tracker = try {
             RouteTracker(option.route)
         } catch (e: IllegalArgumentException) {
             publishFailure(NavigationState.Failed(AppError.NoResult))
+            persistLastGuidance(null)
             return
         }
         val run = synchronized(stateLock) {
@@ -107,7 +117,7 @@ class NavigationSession @Inject constructor(
         serviceController.start()
         job = scope.launch(confined) { run.execute() }
         // B6 : course mémorisée pour être proposée à la reprise après la mort du processus (bouton : Étape E3).
-        persistLastGuidance(LastGuidance(option.route.geometry.last(), destinationName, option.route.id, clock.nowMs()))
+        persistLastGuidance(LastGuidance(option.route.geometry.last(), name, option.route.id, clock.nowMs()))
     }
 
     /** Arrête la course : `Idle`, GPS relâché, parole coupée et moteur de synthèse libéré. */
@@ -320,10 +330,10 @@ class NavigationSession @Inject constructor(
                 say(m.verbalPre ?: m.instruction, priority = SpeechPriority.URGENT)
             }
             publish(NavigationState.Arrived(route))
-            persistLastGuidance(null)
             tripRecorder.end(arrived = true, nowMs = clock.nowMs())
             val current = synchronized(stateLock) {
-                (gen == generation).also { if (it) location.setGuidanceActive(false) }
+                // Course encore courante seulement : un nouveau départ survenu entre-temps a mémorisé sa propre course.
+                (gen == generation).also { if (it) { location.setGuidanceActive(false); persistLastGuidance(null) } }
             }
             if (current) {
                 // Le moteur vocal n'est libéré qu'après un délai : la phrase d'arrivée doit pouvoir se terminer.

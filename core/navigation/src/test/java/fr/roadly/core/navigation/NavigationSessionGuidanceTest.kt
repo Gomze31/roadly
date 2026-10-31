@@ -135,7 +135,44 @@ class NavigationSessionGuidanceTest {
         assertEquals(1, speech.spoken.count { it == "Entrez dans le rond-point et prenez la 2e sortie." })
         assertEquals(1, speech.spoken.count { it == "Entrez dans le rond-point et prenez la 1re sortie." })
         assertTrue(speech.spoken.any { it == "Quittez le rond-point dans Rue Médiane, puis entrez dans le rond-point et prenez la 1re sortie." })
-        assertTrue("pas de FAR pour le 2e rond-point (moins de 10 s après la sortie du 1er)", speech.spoken.none { it.startsWith("Dans 100 mètres, entrez") || it.startsWith("Dans 150 mètres, entrez") })
+        val second = route.maneuvers[3].verbalAlert!!.replaceFirstChar { it.lowercase() }
+        assertTrue(
+            "pas de FAR (LOW) pour le 2e rond-point, manœuvre 3 (moins de 10 s après la sortie du 1er)",
+            speech.spoken.zip(speech.priorities).none { (text, p) -> p == SpeechPriority.LOW && text.endsWith(second) },
+        )
+    }
+
+    @Test fun `a turn crossed only by extrapolation still gets its now announcement`() = runTest { // revue finale B : extrapolation × indice monotone
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val now = route.maneuvers[1].verbalPre!!
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(turnAt - 200.0, turnAt - 58.0, speedKmh = 50.0))
+        assertTrue("NEAR dit, pas encore de NOW", now !in speech.spoken)
+        // 5 s sans fix : l'extrapolation à la vitesse lissée (50 km/h) passe le virage alors que le conducteur freine.
+        advanceTimeBy(5_000); runCurrent()
+        assertEquals("avance provisoire", 2, guiding(s).progress.nextManeuverIndex)
+        val back = FixScript(route).drive(turnAt - 5.0, turnAt - 5.0, speedKmh = 20.0).single()
+        location.emit(back.copy(timestampMs = testScheduler.currentTime)); runCurrent()
+        assertEquals(1, guiding(s).progress.nextManeuverIndex)
+        assertEquals(1, speech.spoken.count { it == now })
+    }
+
+    @Test fun `an alternative to the same destination without a name keeps the remembered name`() = runTest {
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        // Alternative ou étape ajoutée : NavigationViewModel relance sans nom, vers la même destination.
+        val alternative = TestRoutes.straight("alternative")
+        s.start(option(alternative), RoutePreferences()); runCurrent()
+        assertEquals(LastGuidance(alternative.geometry.last(), "Maison", "alternative", 0L), prefs.lastGuidance.first())
+    }
+
+    @Test fun `a failed replacement start forgets the previous run`() = runTest {
+        val s = session(); s.start(option(TestRoutes.straight()), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
+        location.permission.value = LocationPermissionState.DENIED
+        s.start(option(TestRoutes.straight("other")), RoutePreferences()); runCurrent()
+        assertNull(prefs.lastGuidance.first())
     }
 
     @Test fun `8 s on a parallel road 45 m away do not trigger a reroute`() = runTest { // scénario 9
