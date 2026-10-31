@@ -50,6 +50,9 @@ fun ManeuverBanner(banner: BannerUi, modifier: Modifier = Modifier, expanded: Bo
                     Column {
                         Text(banner.instruction, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         banner.street?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        banner.exitToward?.let {
+                            Text(stringResource(R.string.nav_exit_toward, it), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -72,7 +75,7 @@ private fun exitLabel(b: BannerUi): String? {
 @Composable
 private fun ExitPill(label: String) {
     val c = LocalRoadlyColors.current
-    Box(Modifier.background(c.accent, RoadlyShapes.Chip).padding(horizontal = 9.dp, vertical = 3.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = c.onAccent)
+    Box(Modifier.background(c.accent, RoadlyShapes.Chip).padding(horizontal = 10.dp, vertical = 4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = c.onAccent)
     }
 }

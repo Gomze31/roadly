@@ -28,16 +28,18 @@ import fr.roadly.core.model.LaneDirection
 
 /** Voies sous la manœuvre courante (si Valhalla les fournit) : flèches, voie valide en accent. */
 @Composable
-fun LaneStrip(lanes: List<Lane>, modifier: Modifier = Modifier) {
+fun LaneStrip(lanes: List<Lane>, modifier: Modifier = Modifier, emphasized: Boolean = false) {
     val c = LocalRoadlyColors.current
+    val cell = if (emphasized) 40.dp else 32.dp
+    val icon = if (emphasized) 34.dp else 28.dp
     val description = stringResource(R.string.nav_lanes)
     GlassPanel(modifier.semantics { contentDescription = description }, contentPadding = 8.dp) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             lanes.forEach { lane ->
-                val tint = if (lane.valid) c.brandBright else c.textTertiary
-                Box(Modifier.size(width = 32.dp, height = 40.dp), contentAlignment = Alignment.Center) {
+                val tint = if (lane.valid) c.brandBright else if (emphasized) c.textTertiary.copy(alpha = 0.6f) else c.textTertiary
+                Box(Modifier.size(width = cell, height = cell + 8.dp), contentAlignment = Alignment.Center) {
                     lane.directions.sortedBy { it.ordinal }.ifEmpty { listOf(LaneDirection.STRAIGHT) }.forEach { d ->
-                        Icon(d.icon(), contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
+                        Icon(d.icon(), contentDescription = null, tint = tint, modifier = Modifier.size(icon))
                     }
                 }
             }

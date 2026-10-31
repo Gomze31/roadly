@@ -25,7 +25,8 @@
     <string name="nav_zone_active">Zone de vigilance</string>
     <string name="nav_rain">Pluie</string>
     <string name="nav_rain_lowered">Limitation abaissée (pluie)</string>
-    <string name="nav_exit_number">Sortie %1$s</string>
+    <string name="nav_exit_number">SORTIE %1$s</string>
+    <string name="nav_exit_toward">Direction %1$s</string>
     <string name="nav_roundabout_exit_first">1re sortie</string>
     <string name="nav_roundabout_exit_n">%1$de sortie</string>
     <string name="nav_lanes">Voies conseillées</string>
