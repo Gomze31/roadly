@@ -1,6 +1,10 @@
 package fr.roadly.core.navigation
 
 import fr.roadly.core.model.LocationFix
+import fr.roadly.core.model.Maneuver
+import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.Route
+import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.navigation.testing.FixScript
 import fr.roadly.core.navigation.testing.TestRoutes
 import org.junit.Assert.assertEquals
@@ -54,6 +58,33 @@ class RouteTrackerProgressTest {
         assertEquals(2, t.lastProgress!!.nextManeuverIndex)
         assertEquals("un seul fix en arrière ne suffit pas", 2, t.update(fixAt(t, turnAt - 15.0)).nextManeuverIndex)
         assertEquals(1, t.update(fixAt(t, turnAt - 20.0)).nextManeuverIndex)
+    }
+
+    @Test fun `an extrapolated position does not count as a backtrack confirmation`() {
+        val t = RouteTracker(route)
+        val turnAt = t.maneuverStartM[1]
+        t.update(fixAt(t, turnAt - 20.0))
+        t.update(fixAt(t, turnAt + 20.0))
+        assertEquals(2, t.update(fixAt(t, turnAt - 15.0)).nextManeuverIndex)
+        assertEquals("l'extrapolation ne confirme pas le recul", 2, t.extrapolate(2.0).nextManeuverIndex)
+        assertEquals("le second fix réel confirme le recul", 1, t.update(fixAt(t, turnAt - 15.0)).nextManeuverIndex)
+    }
+
+    @Test fun `a final leg shorter than the passing margin still arrives`() {
+        val pts = listOf(TestRoutes.xy(0.0, 0.0), TestRoutes.xy(200.0, 0.0), TestRoutes.xy(200.0, -15.0))
+        val leg1 = pts[0].distanceTo(pts[1])
+        val leg2 = pts[1].distanceTo(pts[2])
+        val maneuvers = listOf(
+            Maneuver(ManeuverType.DEPART, "Conduisez vers l'est.", null, leg1, 24.0, 0, null),
+            Maneuver(ManeuverType.TURN_RIGHT, "Tournez à droite.", null, leg2, 6.0, 1, null),
+            Maneuver(ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 2, null),
+        )
+        val r = Route("shortLastLeg", RouteCosting.FASTEST, leg1 + leg2, 30.0, pts, maneuvers, hasToll = false, providerId = "test")
+        val t = RouteTracker(r)
+        t.update(fixAt(t, 150.0, accuracyM = 10f))
+        val p = t.update(fixAt(t, t.totalGeometryM, accuracyM = 10f))
+        assertEquals(r.maneuvers.lastIndex, p.nextManeuverIndex)
+        assertTrue("arrivée malgré un dernier tronçon de 15 m", t.hasArrived)
     }
 
     @Test fun `two roundabouts 120 m apart are two distinct targets, none skipped`() {

@@ -51,8 +51,8 @@ class FixScript(route: Route, seed: Int = 42) {
     /** [count] fixes immobiles autour de l'abscisse [alongM] : bruit uniforme borné à ±[amplitudeM] le long du tracé et en travers. */
     fun jitter(alongM: Double, count: Int, amplitudeM: Double, accuracyM: Float = 5f, startMs: Long = 0L, periodMs: Long = 1_000L): List<LocationFix> =
         (0 until count).map { i ->
-            val a = alongM + random.nextDouble(-amplitudeM, amplitudeM)
-            val side = random.nextDouble(-amplitudeM, amplitudeM)
+            val a = alongM + if (amplitudeM <= 0.0) 0.0 else random.nextDouble(-amplitudeM, amplitudeM)
+            val side = if (amplitudeM <= 0.0) 0.0 else random.nextDouble(-amplitudeM, amplitudeM)
             LocationFix(offset(tracker.pointAt(a), routeBearing(a) - 90.0, side), null, 0f, accuracyM, startMs + i * periodMs)
         }
 

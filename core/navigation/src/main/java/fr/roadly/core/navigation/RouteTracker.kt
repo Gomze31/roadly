@@ -63,6 +63,7 @@ class RouteTracker(private val route: Route) {
     private var committedNext = firstTarget
     /** Plus grande abscisse atteinte depuis le dernier changement d'indice : référence du recul confirmé. */
     private var peakAlong = 0.0
+    /** Fixes réels consécutifs sous `peakAlong` − 30 m : le recul de l'indice est confirmé à 2. */
     private var backtrackFixes = 0
     /** Précision du dernier fix réel : marge de passage reprise par l'extrapolation. */
     private var lastAccuracyM = 0f
@@ -109,7 +110,7 @@ class RouteTracker(private val route: Route) {
         val moving = (fix.speedMps ?: 0f) >= 1f
         val heading = fix.bearingDeg?.takeIf { moving } ?: bearing(pts[best.segment], pts[best.segment + 1]).toFloat()
         lastAccuracyM = fix.accuracyM
-        val p = progressAt(best.segment, best.alongM, best.offM, best.snapped, heading, advanceIndex(best.alongM, fix.accuracyM))
+        val p = progressAt(best.segment, best.alongM, best.offM, best.snapped, heading, advanceIndex(best.alongM, fix.accuracyM, real = true))
         val onLast = p.nextManeuverIndex == lastManeuver
         val nearDestination = fix.point.distanceTo(pts[segCount]) < GuidanceConstants.ARRIVAL_RADIUS_M
         val alongTheEnd = p.distanceAlongM >= totalGeometryM - GuidanceConstants.ARRIVAL_RADIUS_M &&
@@ -132,7 +133,7 @@ class RouteTracker(private val route: Route) {
         val along = ((prev?.distanceAlongM ?: 0.0) + distanceM.coerceAtLeast(0.0)).coerceAtMost(cap)
         if (prev != null && prev.extrapolated && along <= prev.distanceAlongM) return prev
         val seg = segmentAt(along)
-        val p = progressAt(seg, along, 0.0, pointAt(along), prev?.bearingDeg ?: bearing(pts[seg], pts[seg + 1]).toFloat(), advanceIndex(along, lastAccuracyM))
+        val p = progressAt(seg, along, 0.0, pointAt(along), prev?.bearingDeg ?: bearing(pts[seg], pts[seg + 1]).toFloat(), advanceIndex(along, lastAccuracyM, real = false))
             .copy(extrapolated = true)
         lastProgress = p
         return p
@@ -159,15 +160,16 @@ class RouteTracker(private val route: Route) {
     }
 
     /**
-     * B1 : prochaine manœuvre, monotone. Elle avance quand `along` dépasse son début de max(10 m, 2 × précision) ; elle ne recule que sur
-     * un recul confirmé (> 30 m sous l'abscisse maximale atteinte, 2 fixes consécutifs). Un recalcul crée un nouveau suivi (index remis à zéro).
+     * B1 : prochaine manœuvre, monotone. Elle avance quand `along` dépasse son début de [passingMarginM] ; elle ne recule que sur un recul
+     * confirmé (> 30 m sous l'abscisse maximale atteinte, 2 fixes réels consécutifs). Une position extrapolée ([real] faux) ne peut que faire
+     * avancer l'indice et ne touche pas au compteur de recul. Un recalcul crée un nouveau suivi (l'indice repart de la première cible).
      */
-    private fun advanceIndex(along: Double, accuracyM: Float): Int {
-        val margin = max(GuidanceConstants.MANEUVER_PASSED_MIN_M, 2.0 * accuracyM)
+    private fun advanceIndex(along: Double, accuracyM: Float, real: Boolean): Int {
         var raw = firstTarget
-        while (raw < lastManeuver && along > maneuverStartM[raw] + margin) raw++
+        while (raw < lastManeuver && along > maneuverStartM[raw] + passingMarginM(raw, accuracyM)) raw++
         when {
             raw > committedNext -> { committedNext = raw; peakAlong = along; backtrackFixes = 0 }
+            !real -> Unit
             raw < committedNext && along < peakAlong - GuidanceConstants.BACKTRACK_CONFIRM_M -> {
                 backtrackFixes++
                 if (backtrackFixes >= GuidanceConstants.BACKTRACK_CONFIRM_FIXES) { committedNext = raw; peakAlong = along; backtrackFixes = 0 }
@@ -177,6 +179,13 @@ class RouteTracker(private val route: Route) {
         peakAlong = max(peakAlong, along)
         return committedNext
     }
+
+    /** Marge de passage de la manœuvre [k] : max(10 m, 2 × précision), plafonnée à 60 m et à la moitié de son tronçon (jusqu'à la suivante ou la fin du tracé). */
+    private fun passingMarginM(k: Int, accuracyM: Float): Double = minOf(
+        max(GuidanceConstants.MANEUVER_PASSED_MIN_M, GuidanceConstants.MANEUVER_PASSED_ACCURACY_FACTOR * accuracyM),
+        GuidanceConstants.MANEUVER_PASSED_MAX_M,
+        (maneuverEndM[k] - maneuverStartM[k]) / 2.0,
+    )
 
     private fun progressAt(segment: Int, along: Double, off: Double, snapped: GeoPoint, heading: Float?, next: Int): RouteProgress {
         val c = (next - 1).coerceAtLeast(0)

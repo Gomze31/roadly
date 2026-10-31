@@ -46,8 +46,12 @@ object GuidanceConstants {
     const val STALE_FIX_TOLERANCE_MS = 2_000L
     /** Pluie (Open-Meteo) : au plus une requête toutes les 10 min. */
     const val RAIN_CHECK_INTERVAL_MS = 600_000L
-    /** B1 : une manœuvre est passée quand `along` dépasse son début de max(10 m, 2 × précision du fix). */
+    /** B1 : une manœuvre est passée quand `along` dépasse son début de max(10 m, 2 × précision du fix), marge plafonnée (voir ci-dessous). */
     const val MANEUVER_PASSED_MIN_M = 10.0
+    /** B1 : facteur appliqué à la précision du fix dans la marge de passage. */
+    const val MANEUVER_PASSED_ACCURACY_FACTOR = 2.0
+    /** B1 : plafond de la marge de passage, elle-même bornée à la moitié du tronçon de la manœuvre (un dernier tronçon court doit pouvoir arriver). */
+    const val MANEUVER_PASSED_MAX_M = 60.0
     /** B1 : l'indice de manœuvre ne recule que sur un recul de plus de 30 m sous l'abscisse maximale atteinte… */
     const val BACKTRACK_CONFIRM_M = 30.0
     /** … confirmé par 2 fixes consécutifs. */
