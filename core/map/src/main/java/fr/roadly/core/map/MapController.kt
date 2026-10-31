@@ -2,8 +2,11 @@ package fr.roadly.core.map
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.os.SystemClock
+import android.util.Log
 import android.view.animation.LinearInterpolator
 import androidx.core.content.ContextCompat
 import fr.roadly.core.model.BoundingBox
@@ -54,6 +57,7 @@ import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
+import java.util.Locale
 
 enum class CameraMode { FREE, CENTERED, FOLLOW }
 
@@ -72,6 +76,8 @@ class MapController(internal val context: Context) {
     private var lastMarkers: List<Place> = emptyList()
     private var lastReports: List<CommunityReport> = emptyList()
     private var lastTraversed: String = TraversedFeatureBuilder.EMPTY
+    private var lastTraversedTail: String = TraversedFeatureBuilder.EMPTY
+    private val traversed = TraversedLine()
     private var routeColorActive = "#B794FF"
     private var routeColorInactive = "#5A5470"
     private var routeColorCasing = "#0E0B14"
@@ -113,6 +119,13 @@ class MapController(internal val context: Context) {
         map.uiSettings.isLogoEnabled = false
         map.uiSettings.isRotateGesturesEnabled = true
         map.uiSettings.isTiltGesturesEnabled = false
+        if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            // C3 : mesure du rendu de la carte (SurfaceView, invisible pour `dumpsys gfxinfo`), builds débogables : adb logcat -s RoadlyFps
+            val window = FpsWindow()
+            map.setOnFpsChangedListener { fps ->
+                window.add(fps, SystemClock.elapsedRealtime())?.let { Log.d(FPS_TAG, String.format(Locale.ROOT, "carte %.1f i/s (moyenne 5 s)", it)) }
+            }
+        }
         map.addOnMapClickListener { latLng ->
             val m = this.map ?: return@addOnMapClickListener false
             val pt = m.projection.toScreenLocation(latLng)
@@ -151,6 +164,7 @@ class MapController(internal val context: Context) {
         style.addSource(GeoJsonSource(MapIds.SRC_REPORTS))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
+        style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED_TAIL))
         style.addSource(GeoJsonSource(MapIds.SRC_MARKERS))
         style.addSource(GeoJsonSource(MapIds.SRC_USER))
         // Bâtiments d'abord : leur ancrage ne voit que les calques du style, et le repli `addLayer` reste sous ceux de Roadly.
@@ -171,6 +185,9 @@ class MapController(internal val context: Context) {
         ).withFilter(eq(get("active"), literal(true))))
         // Tronçon déjà parcouru, dessiné par-dessus le tracé actif (spec §5 : « tracé parcouru atténué »).
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED, MapIds.SRC_TRAVERSED).withProperties(
+            lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+        ))
+        style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED_TAIL, MapIds.SRC_TRAVERSED_TAIL).withProperties(
             lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ))
         // Flèche de manœuvre (approche d'une intersection) : liseré, trait clair, tête orientée selon le dernier segment.
@@ -218,6 +235,7 @@ class MapController(internal val context: Context) {
         lastFix?.let { shownPose = MarkerInterpolation.pose(it); style.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(it)) }
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ROUTES)?.setGeoJson(RouteFeatureBuilder.build(lastRoutes, lastActiveRouteId))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED_TAIL)?.setGeoJson(lastTraversedTail)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(lastReports))
         (style.getLayer(MapIds.LYR_ROUTE_ACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorActive))
@@ -225,6 +243,7 @@ class MapController(internal val context: Context) {
         (style.getLayer(MapIds.LYR_ROUTE_CASING) as? LineLayer)?.setProperties(lineColor(routeColorCasing))
         (style.getLayer(MapIds.LYR_ROUTE_INACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
+        (style.getLayer(MapIds.LYR_ROUTE_TRAVERSED_TAIL) as? LineLayer)?.setProperties(lineColor(routeColorInactive))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
         (style.getLayer(MapIds.LYR_ARROW_CASING) as? LineLayer)?.setProperties(lineColor(arrowColorCasing))
         (style.getLayer(MapIds.LYR_ARROW) as? LineLayer)?.setProperties(lineColor(arrowColorBody))
@@ -285,10 +304,15 @@ class MapController(internal val context: Context) {
         if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(places))
     }
 
-    /** Atténue la portion parcourue de l'itinéraire actif (écran de guidage). */
+    /** Atténue la portion parcourue de l'itinéraire actif (écran de guidage). C3 : préfixe renvoyé seulement s'il change, queue à chaque position. */
     fun setTraversed(geometry: List<GeoPoint>, segmentIndex: Int, snapped: GeoPoint?) {
-        lastTraversed = TraversedFeatureBuilder.build(geometry, segmentIndex, snapped)
-        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
+        val u = traversed.update(geometry, segmentIndex, snapped)
+        u.prefix?.let { lastTraversed = it }
+        lastTraversedTail = u.tail
+        if (!styleReady) return
+        val style = map?.style ?: return
+        u.prefix?.let { style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(it) }
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED_TAIL)?.setGeoJson(u.tail)
     }
 
     fun clearTraversed() = setTraversed(emptyList(), -1, null)
@@ -432,5 +456,7 @@ class MapController(internal val context: Context) {
     companion object {
         /** Durée (ms) du glissement du marqueur entre deux positions, égale à celle de la caméra (C1). */
         const val USER_ANIMATION_MS = 1_000L
+        /** Étiquette logcat du journal des images par seconde de la carte (builds débogables). */
+        const val FPS_TAG = "RoadlyFps"
     }
 }

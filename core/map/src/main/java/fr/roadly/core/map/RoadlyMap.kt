@@ -33,9 +33,13 @@ fun RoadlyMap(
     onRouteClick: ((String) -> Unit)? = null,
     /** Caméra immobile : cap de la carte en degrés (0 = nord en haut) pour la boussole. */
     onCameraIdle: ((bearingDeg: Double) -> Unit)? = null,
+    /** C3 : plafond d'images par seconde du rendu ([MapRendering.MAX_FPS] ; 30 en économie d'énergie). */
+    maximumFps: Int = MapRendering.MAX_FPS,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
-    val mapView = remember { MapView(controllerContext(controller)) }
+    val mapView = remember { controllerContext(controller).let { ctx -> MapView(ctx, MapRendering.options(ctx)) } }
+    // Le moteur de rendu est créé par le constructeur de MapView : le plafond peut être posé tout de suite.
+    LaunchedEffect(mapView, maximumFps) { mapView.setMaximumFps(maximumFps) }
     val currentOnMapClick = rememberUpdatedState(onMapClick)
     val currentOnMapLongClick = rememberUpdatedState(onMapLongClick)
     val currentOnUserGesture = rememberUpdatedState(onUserGesture)

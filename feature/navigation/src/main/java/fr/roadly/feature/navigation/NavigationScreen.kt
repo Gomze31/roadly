@@ -89,6 +89,7 @@ import fr.roadly.core.map.MapController
 import fr.roadly.core.map.NavigationCameraController
 import fr.roadly.core.map.NavigationCameraInput
 import fr.roadly.core.map.ManeuverArrowBuilder
+import fr.roadly.core.map.MapRendering
 import fr.roadly.core.map.RoadlyMap
 import fr.roadly.core.map.rememberMapController
 import fr.roadly.core.map.rememberPowerSaveMode
@@ -160,7 +161,10 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
         val full = state.copy(communityAhead = reportsAhead)
         if (state.styleUrl.isNotEmpty()) {
-            RoadlyMap(styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture)
+            RoadlyMap(
+                styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture,
+                maximumFps = if (powerSave.value) MapRendering.MAX_FPS_POWER_SAVE else MapRendering.MAX_FPS,
+            )
         }
         if (landscape) {
             LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)

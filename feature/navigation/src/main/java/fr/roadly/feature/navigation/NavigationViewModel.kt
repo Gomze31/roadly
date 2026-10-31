@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
-import fr.roadly.core.common.Formatters
 import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.pollNearby
 import fr.roadly.core.data.config.ProviderConfigRepository
@@ -23,7 +22,6 @@ import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
-import fr.roadly.core.navigation.RouteGeometry
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
@@ -77,15 +75,12 @@ class NavigationViewModel @Inject constructor(
         }
     }
 
-    /** Signalements projetés sur le tracé courant, devant soi (≤ 60 m du tracé, ≤ 5 km) : alimentent l'Horizon. */
+    private val reportsProjector = ReportsAheadProjector()
+
+    /** Signalements projetés sur le tracé courant, devant soi (≤ 60 m du tracé, ≤ 5 km) : alimentent l'Horizon. C3 : projection en cache par tracé. */
     val reportsAhead: StateFlow<List<ReportAheadUi>> = combine(reports, session.state) { list, s ->
         val g = s as? NavigationState.Guiding ?: return@combine emptyList()
-        val geo = RouteGeometry(g.route.geometry)
-        list.mapNotNull { r ->
-            val p = geo.project(r.point) ?: return@mapNotNull null
-            val d = p.alongM - g.progress.distanceAlongM
-            if (p.offsetM > 60.0 || d < -50.0 || d > 5_000.0) null else ReportAheadUi(r, d.coerceAtLeast(0.0), Formatters.distance(d.coerceAtLeast(0.0)))
-        }.sortedBy { it.distanceM }
+        reportsProjector.ahead(g.route, g.progress.distanceAlongM, list)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val vehicle = vehicleRepo.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val isDark = MutableStateFlow(true)

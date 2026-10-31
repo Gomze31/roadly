@@ -19,6 +19,9 @@ internal object MapIds {
     const val SRC_MARKERS = "roadly-markers"
     const val SRC_REPORTS = "roadly-reports"
     const val SRC_TRAVERSED = "roadly-traversed"
+    /** C3 : queue du tronçon parcouru (dernier point du tracé → position projetée), seule mise à jour à chaque position. */
+    const val SRC_TRAVERSED_TAIL = "roadly-traversed-tail"
+    const val LYR_ROUTE_TRAVERSED_TAIL = "roadly-route-traversed-tail"
     const val LYR_ACCURACY = "roadly-accuracy"
     const val LYR_USER = "roadly-user-arrow"
     const val LYR_ROUTE_GLOW = "roadly-route-glow"
