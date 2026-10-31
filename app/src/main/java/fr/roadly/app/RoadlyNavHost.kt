@@ -1,7 +1,11 @@
 package fr.roadly.app
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import fr.roadly.feature.assistant.AssistantMicButton
+import fr.roadly.feature.assistant.AssistantOverlay
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
@@ -55,6 +59,8 @@ fun RoadlyNavHost(
             onResumeGuidance = { nav.navigate(NavigationRoute) { launchSingleTop = true } },
             onSearchCategory = { cat -> nav.navigate(SearchRoute(category = cat.name)) },
             onOpenProfile = { nav.navigate(ProfileRoute) },
+            assistantButton = { AssistantMicButton() },
+            assistantPanel = { AssistantOverlay(Modifier.fillMaxWidth()) },
         )
         searchScreen(
             onBack = { nav.popBackStack() },
@@ -95,6 +101,8 @@ fun RoadlyNavHost(
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
             onChangeDestination = { nav.navigate(SearchRoute()) },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
+            assistantButton = { AssistantMicButton() },
+            assistantPanel = { AssistantOverlay(Modifier.fillMaxWidth()) },
         )
     }
     // Après NavHost : le graphe est posé avant de traiter une ouverture demandée par la notification.

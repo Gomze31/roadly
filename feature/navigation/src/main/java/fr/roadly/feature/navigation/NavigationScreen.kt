@@ -84,18 +84,34 @@ import fr.roadly.core.model.ManeuverType
 import java.util.Locale
 
 @Composable
-fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}, vm: NavigationViewModel = hiltViewModel()) {
+fun NavigationScreen(
+    isDark: Boolean,
+    onExit: () -> Unit,
+    onChangeDestination: () -> Unit,
+    onAddStop: () -> Unit = {},
+    assistantButton: @Composable () -> Unit = {},
+    assistantPanel: @Composable () -> Unit = {},
+    vm: NavigationViewModel = hiltViewModel(),
+) {
     // Mode conduite (spec §2) : typographie ×1,3 et cibles 56 dp via LocalDrivingMode = true.
     // Même teinte que le reste de l'app : le thème conduite est recomposé avec la teinte courante.
     val tint = LocalRoadlyColors.current.brand
     val cockpit = CockpitTint.entries.firstOrNull { (if (isDark) it.night else it.day).first == tint } ?: CockpitTint.VIOLET
     RoadlyTheme(darkTheme = isDark, drivingMode = true, tint = cockpit) {
-        NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm)
+        NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm, assistantButton, assistantPanel)
     }
 }
 
 @Composable
-private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit, vm: NavigationViewModel) {
+private fun NavigationContent(
+    isDark: Boolean,
+    onExit: () -> Unit,
+    onChangeDestination: () -> Unit,
+    onAddStop: () -> Unit,
+    vm: NavigationViewModel,
+    assistantButton: @Composable () -> Unit,
+    assistantPanel: @Composable () -> Unit,
+) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
@@ -138,9 +154,9 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
             RoadlyMap(styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture)
         }
         if (landscape) {
-            LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
+            LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel)
         } else {
-            PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
+            PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel)
         }
         ReportResultPillNav(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp))
     }
@@ -162,6 +178,8 @@ private fun PortraitOverlay(
     onReport: () -> Unit,
     onChangeDestination: () -> Unit,
     vm: NavigationViewModel,
+    assistantButton: @Composable () -> Unit,
+    assistantPanel: @Composable () -> Unit,
 ) {
     val c = LocalRoadlyColors.current
     Box(Modifier.fillMaxSize()) {
@@ -186,12 +204,13 @@ private fun PortraitOverlay(
             }
         }
 
-        // Colonne d'actions à droite : signaler, voix, changer de destination.
+        // Colonne d'actions à droite : Roadly AI, signaler, voix, changer de destination.
         Column(
             Modifier.align(Alignment.CenterEnd).padding(end = RoadlySpacing.screenEdge),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
+            assistantButton()
             ReportButton(onReport)
             RoundIconButton(
                 if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
@@ -206,6 +225,7 @@ private fun PortraitOverlay(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.screenEdge),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
         ) {
+            assistantPanel()
             Row(verticalAlignment = Alignment.Bottom) {
                 SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
                 Spacer(Modifier.width(RoadlySpacing.s))
@@ -228,6 +248,8 @@ private fun LandscapeOverlay(
     onReport: () -> Unit,
     onChangeDestination: () -> Unit,
     vm: NavigationViewModel,
+    assistantButton: @Composable () -> Unit,
+    assistantPanel: @Composable () -> Unit,
 ) {
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         // Colonne gauche : bandeau en haut, Horizon + barre d'information calés en bas (pas de défilement : tout doit rester visible en conduite).
@@ -238,6 +260,7 @@ private fun LandscapeOverlay(
                 if (state.rerouting) ReroutingPill()
             }
             Column(Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                assistantPanel()
                 BottomBlock(state, vm, onChangeDestination)
             }
         }
@@ -246,6 +269,7 @@ private fun LandscapeOverlay(
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
+            assistantButton()
             RoundIconButton(
                 if (bannerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 stringResource(if (bannerExpanded) R.string.nav_collapse_banner else R.string.nav_expand_banner),

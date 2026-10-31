@@ -1,5 +1,6 @@
 package fr.roadly.feature.home
 
+import androidx.compose.runtime.Composable
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import fr.roadly.core.geocoding.PoiCategory
@@ -19,8 +20,10 @@ fun NavGraphBuilder.homeScreen(
     onResumeGuidance: () -> Unit,
     onSearchCategory: (PoiCategory) -> Unit,
     onOpenProfile: () -> Unit,
+    assistantButton: @Composable () -> Unit = {},
+    assistantPanel: @Composable () -> Unit = {},
 ) {
     composable<HomeRoute> {
-        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance, onSearchCategory, onOpenProfile)
+        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance, onSearchCategory, onOpenProfile, assistantButton, assistantPanel)
     }
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="assistant_mic">Roadly AI</string>
+    <string name="assistant_mic_stop">Fermer Roadly AI</string>
+    <string name="assistant_phase_connecting">Connexion…</string>
+    <string name="assistant_phase_listening">Je vous écoute</string>
+    <string name="assistant_phase_thinking">Je regarde…</string>
+    <string name="assistant_phase_speaking">Roadly AI</string>
+    <string name="assistant_phase_paused">Pause : instruction GPS</string>
+    <string name="assistant_confirm">Confirmer</string>
+    <string name="assistant_cancel">Annuler</string>
+    <string name="assistant_consent_title">Roadly AI et vos données</string>
+    <string name="assistant_consent_text">Pour répondre, Roadly AI envoie à Google Gemini votre voix et, seulement quand c\'est nécessaire, votre position, votre destination, votre itinéraire et votre profil véhicule. Modifiable dans Réglages → Roadly AI.</string>
+    <string name="assistant_consent_accept">Accepter</string>
+    <string name="assistant_consent_refuse">Plus tard</string>
+</resources>

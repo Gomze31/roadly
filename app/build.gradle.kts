@@ -42,6 +42,8 @@ dependencies {
     implementation(project(":core:routing"))
     implementation(project(":core:navigation"))
     implementation(project(":core:assistant"))
+    implementation(project(":feature:assistant"))
+    implementation(libs.androidx.lifecycle.process)
     implementation(project(":feature:home"))
     implementation(project(":feature:search"))
     implementation(project(":feature:route"))
