@@ -69,6 +69,28 @@ class RoadlyStyleAssetTest {
         assertTrue(n, ids.none { it == "highway_minor" || it == "highway_motorway_inner" || it == "tunnel_motorway_inner" })
     }
 
+    /** MapController ancre l'extrusion des bâtiments sous le premier calque symbole : tout calque à plat doit être en dessous. */
+    @Test fun `every flat layer sits below the first symbol layer`() = names.forEach { n ->
+        val layers = style(n).layers()
+        val ids = layers.map { it.str("id") }
+        val firstSymbol = layers.indexOfFirst { it.str("type") == "symbol" }
+        assertTrue(n, firstSymbol > ids.indexOf("roadly_road_motorway") && firstSymbol > ids.indexOf("building"))
+        assertTrue(n, layers.drop(firstSymbol).all { it.str("type") == "symbol" })
+    }
+
+    @Test fun `paths and piers are drawn below the Roadly roads`() = names.forEach { n ->
+        val ids = style(n).layers().map { it.str("id") }
+        val minor = ids.indexOf("roadly_road_minor")
+        listOf("highway_path", "road_pier", "road_area_pier").forEach { id ->
+            assertTrue("$n $id", ids.indexOf(id) in 0 until minor)
+        }
+    }
+
+    @Test fun `motorway tunnels stay visible from zoom 6 like the motorways`() = names.forEach { n ->
+        val t = style(n).layers().byId("roadly_road_tunnel")
+        assertEquals(n, 6.0, t.getValue("minzoom").jsonPrimitive.double, 1e-9)
+    }
+
     @Test fun `tunnels are dashed and translucent`() = names.forEach { n ->
         val t = style(n).layers().byId("roadly_road_tunnel")
         assertTrue(n, t.getValue("filter").toString().contains("\"tunnel\""))

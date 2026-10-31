@@ -8,7 +8,10 @@
   1. calques routiers amont remplacés par une pile Roadly (tunnels, rues, liseré des ponts, routes principales, autoroutes) ;
   2. tunnels en pointillé à 60 %, ponts avec un liseré plus sombre ; 3. bretelles (ramp = 1) à 75 % de leur classe ;
   4. noms de rues espacés (400) et 1 px plus petits dès le zoom 15 ; points d'intérêt majeurs dès le zoom 14, autres dès 16 ;
-  5. eau et parcs teintés vers la palette Roadly ; 6. bâtiments conservés (extrusion ajoutée à l'exécution par MapController).
+  5. eau et parcs teintés vers la palette Roadly ; 6. bâtiments conservés (extrusion ajoutée à l'exécution par MapController) ;
+  7. pile routière insérée à la place de highway_minor (au-dessus des chemins et des jetées) ; calques symboles regroupés
+     au-dessus de tous les calques à plat (ordre relatif conservé), car MapController ancre l'extrusion des bâtiments
+     sous le premier calque symbole.
   Lancer depuis la racine du dépôt : powershell -NoProfile -ExecutionPolicy Bypass -File core\map\tools\build-roadly-styles.ps1
 #>
 $ErrorActionPreference = 'Stop'
@@ -68,9 +71,12 @@ function New-RoadLayers($p) {
     $majorColor = @('match', @('get', 'class'), 'trunk', $p.trunk, 'primary', $p.primary, 'secondary', $p.secondary, $p.tertiary)
     $layers = New-Object System.Collections.ArrayList
 
+    # Tunnels dès le zoom 6, comme les autoroutes (sinon les tunnels autoroutiers disparaissent entre 6 et 10) ;
+    # au zoom 6, 1,3 × 1,3 ≈ 1,7 px pour une autoroute, la largeur de roadly_road_motorway. Les tuiles des bas zooms
+    # ne contiennent que les grands axes : aucune rue en tunnel n'apparaît avant son zoom d'origine.
     $f = @('all', $isLine, $isTunnel, @('match', @('get', 'class'), $allClasses, $true, $false))
-    $w = @('interpolate', @('exponential', 1.3), @('zoom'), 10, @('*', 2, $classFactor), 20, @('*', 20, $classFactor))
-    $l = New-RoadLine 'roadly_road_tunnel' 10 'butt' $f $p.tunnel $w
+    $w = @('interpolate', @('exponential', 1.3), @('zoom'), 6, @('*', 1.3, $classFactor), 10, @('*', 2, $classFactor), 20, @('*', 20, $classFactor))
+    $l = New-RoadLine 'roadly_road_tunnel' 6 'butt' $f $p.tunnel $w
     $l.paint['line-dasharray'] = @(2, 2)
     $l.paint['line-opacity'] = 0.6
     [void]$layers.Add($l)
@@ -133,7 +139,8 @@ foreach ($v in $variants) {
     foreach ($l in $style.layers) {
         if ($roadIds -contains $l.id) {
             $removed++
-            if (-not $roadsAdded) { foreach ($r in (New-RoadLayers $p)) { [void]$out.Add($r) }; $roadsAdded = $true }
+            # La pile prend la place de highway_minor : chemins (highway_path) et jetées restent dessous dans les deux styles.
+            if ($l.id -eq 'highway_minor') { foreach ($r in (New-RoadLayers $p)) { [void]$out.Add($r) }; $roadsAdded = $true }
             continue
         }
         if (-not $poiAdded -and $l.'source-layer' -eq 'place') { foreach ($r in (New-PoiLayers $p)) { [void]$out.Add($r) }; $poiAdded = $true }
@@ -157,11 +164,19 @@ foreach ($v in $variants) {
     if ($removed -lt 5 -or -not $roadsAdded -or -not $poiAdded) {
         throw "Style amont $($v.upstream) inattendu : $removed calques routiers retirés, points d'intérêt ajoutés : $poiAdded"
     }
-    $style.layers = $out.ToArray()
+    # Calques à plat d'abord, symboles ensuite (ordre relatif conservé dans chaque groupe) : l'extrusion des bâtiments,
+    # ancrée par MapController sous le premier symbole, passe ainsi au-dessus des routes, des voies ferrées et des limites.
+    $lastFlat = -1
+    for ($i = 0; $i -lt $out.Count; $i++) { if ($out[$i].type -ne 'symbol') { $lastFlat = $i } }
+    $layers = New-Object System.Collections.ArrayList
+    $movedSymbols = 0
+    for ($i = 0; $i -lt $out.Count; $i++) { if ($out[$i].type -ne 'symbol') { [void]$layers.Add($out[$i]) } elseif ($i -lt $lastFlat) { $movedSymbols++ } }
+    foreach ($l in $out) { if ($l.type -eq 'symbol') { [void]$layers.Add($l) } }
+    $style.layers = $layers.ToArray()
     $style | Add-Member -Force -NotePropertyName name -NotePropertyValue $v.name
     $meta = [ordered]@{ roadly = [ordered]@{ version = $RoadlyStyleVersion; base = "openfreemap/$($v.upstream)"; generator = 'core/map/tools/build-roadly-styles.ps1' } }
     $style | Add-Member -Force -NotePropertyName metadata -NotePropertyValue $meta
     $json = $style | ConvertTo-Json -Depth 50 -Compress
     [System.IO.File]::WriteAllText((Join-Path $assetsDir $v.asset), $json, (New-Object System.Text.UTF8Encoding($false)))
-    '{0} : {1} calques, {2} calques routiers remplacés par 7, 2 calques de points d''intérêt ajoutés' -f $v.asset, $out.Count, $removed
+    '{0} : {1} calques, {2} calques routiers remplacés par 7, 2 calques de points d''intérêt ajoutés, {3} calques symboles remontés' -f $v.asset, $layers.Count, $removed, $movedSymbols
 }
