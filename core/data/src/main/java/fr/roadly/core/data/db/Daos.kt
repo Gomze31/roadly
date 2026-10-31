@@ -66,3 +66,12 @@ interface VigilanceZoneDao {
     @Transaction
     suspend fun replaceAll(rows: List<VigilanceZoneEntity>) { clear(); rows.chunked(500).forEach { insertAll(it) } }
 }
+
+@Dao
+interface TripDao {
+    @Query("SELECT * FROM trips ORDER BY startedAt DESC") fun observeAll(): Flow<List<TripEntity>>
+    @Query("SELECT * FROM trips WHERE id = :id") suspend fun byId(id: Long): TripEntity?
+    @Insert suspend fun insert(trip: TripEntity): Long
+    @Query("DELETE FROM trips WHERE id = :id") suspend fun delete(id: Long)
+    @Query("DELETE FROM trips") suspend fun clear()
+}

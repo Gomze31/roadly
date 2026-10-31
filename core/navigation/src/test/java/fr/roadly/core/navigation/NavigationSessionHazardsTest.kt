@@ -54,7 +54,7 @@ class NavigationSessionHazardsTest {
         }
         val vigilance = object : VigilanceZoneProvider { override suspend fun zonesAlong(route: Route) = zones }
         val rain = object : RainProvider { override suspend fun isRaining(at: GeoPoint): Outcome<Boolean?> = Outcome.Success(raining) }
-        return NavigationSession(location, routing, speedLimits, speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, vigilance, rain, dispatchers, backgroundScope)
+        return NavigationSession(location, routing, speedLimits, speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, vigilance, rain, NoopTripRecorder(), dispatchers, backgroundScope)
     }
 
     private fun fixAt(along: Double) = LocationFix(tracker.pointAt(along), 90f, 10f, 5f, 0L)

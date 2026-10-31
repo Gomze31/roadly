@@ -55,6 +55,7 @@ class NavigationSession @Inject constructor(
     private val clock: NavigationClock,
     private val vigilance: VigilanceZoneProvider,
     private val rain: RainProvider,
+    private val tripRecorder: TripRecorder,
     dispatchers: DispatcherProvider,
     @param:ApplicationScope private val scope: CoroutineScope,
 ) {
@@ -97,6 +98,7 @@ class NavigationSession @Inject constructor(
                 _state.value = it.guiding(tracker.initialProgress(), it.startedAtMs, gpsLost = false)
             }
         }
+        tripRecorder.begin(option.label, clock.nowMs())
         location.setGuidanceActive(true)
         serviceController.start()
         job = scope.launch(confined) { run.execute() }
@@ -104,8 +106,10 @@ class NavigationSession @Inject constructor(
 
     /** Arrête la course : `Idle`, GPS relâché, parole coupée et moteur de synthèse libéré. */
     fun stop() {
+        val wasGuiding = _state.value is NavigationState.Guiding
         cancelRun(NavigationState.Idle)
         speech.release()
+        if (wasGuiding) scope.launch { tripRecorder.end(arrived = false, nowMs = clock.nowMs()) }
     }
 
     /** Relance la dernière course demandée (après un `Failed`, par exemple). */
@@ -208,6 +212,7 @@ class NavigationSession @Inject constructor(
             // Premier fix après une longue coupure (tunnel) : le suivi peut le voir hors itinéraire à tort, on attend le suivant.
             val afterLongGap = hadFix && now - lastFixAtMs > GuidanceConstants.REROUTE_MIN_INTERVAL_MS
             hadFix = true
+            tripRecorder.onFix(fix, now)
             lastFixAtMs = now
             lastAdvanceAtMs = now
             recent.addLast(fix)
@@ -285,6 +290,7 @@ class NavigationSession @Inject constructor(
                 say(m.verbalPre ?: m.instruction)
             }
             publish(NavigationState.Arrived(route))
+            tripRecorder.end(arrived = true, nowMs = clock.nowMs())
             val current = synchronized(stateLock) {
                 (gen == generation).also { if (it) location.setGuidanceActive(false) }
             }

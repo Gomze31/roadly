@@ -28,7 +28,8 @@ feature:home        carte, position, badge vitesse, recentrage, panneau inférie
 feature:search      recherche, récents, favoris, fiche lieu
 feature:route       comparaison 3 itinéraires, heure de départ, coût, préférences d'itinéraire, « Démarrer »
 feature:settings    véhicule, thème, voix et sons, alertes de vitesse, préférences d'itinéraire, données, fournisseurs, à propos
-feature:navigation  écran de guidage en mode conduite : bandeau, voies, « à venir », ETA, vitesse/limitation, arrivée
+feature:navigation  écran de guidage en mode conduite : bandeau, voies, Horizon, ETA, vitesse/limitation, arrivée
+feature:trips       historique des trajets (bilan, liste) et Replay (timeline, vitesse de lecture)
 ```
 
 ## 3. Flux principaux
@@ -68,4 +69,4 @@ Supabase : Auth (pseudonyme d'appareil puis e-mail sans mot de passe), tables `r
 
 ## 8. Qualité
 
-272 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.
+276 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.

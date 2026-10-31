@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable object SettingsRoute
 
-fun NavGraphBuilder.settingsScreen(onBack: () -> Unit) {
-    composable<SettingsRoute> { SettingsScreen(onBack = onBack) }
+/** [onOpenTrips] : historique des trajets et Replay (feature:trips). */
+fun NavGraphBuilder.settingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}) {
+    composable<SettingsRoute> { SettingsScreen(onBack = onBack, onOpenTrips = onOpenTrips) }
 }

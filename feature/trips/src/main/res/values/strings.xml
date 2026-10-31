@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="trips_title">Mes trajets</string>
+    <string name="trips_back">Retour</string>
+    <string name="trips_month">Ce mois-ci</string>
+    <string name="trips_all">Depuis le début</string>
+    <string name="trips_count">%1$d trajet(s)</string>
+    <string name="trips_stat_trips">trajets</string>
+    <string name="trips_stat_km">km</string>
+    <string name="trips_stat_time">temps</string>
+    <string name="trips_stat_cost">carburant</string>
+    <string name="trips_empty_title">Aucun trajet enregistré</string>
+    <string name="trips_empty_subtitle">Les trajets guidés de plus de 200 m sont enregistrés sur cet appareil, jamais sur un serveur.</string>
+    <string name="trips_list">Historique</string>
+    <string name="trips_arrived">Arrivé</string>
+    <string name="trips_stopped">Interrompu</string>
+    <string name="trips_delete">Supprimer</string>
+    <string name="trips_footer">Stockage local uniquement. Coût estimé d\'après le profil véhicule au moment du trajet.</string>
+
+    <string name="replay_overline">Roadly Replay</string>
+    <string name="replay_back">Retour</string>
+    <string name="replay_elapsed">écoulé</string>
+    <string name="replay_speed">vitesse</string>
+    <string name="replay_distance">distance</string>
+    <string name="replay_play">Lecture</string>
+    <string name="replay_pause">Pause</string>
+    <string name="replay_rate">×%1$d</string>
+    <string name="replay_loading">Chargement du trajet…</string>
+    <string name="replay_return">Y retourner</string>
+    <string name="replay_summary">%1$s · %2$s · max %3$d km/h</string>
+</resources>

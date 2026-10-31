@@ -104,7 +104,7 @@ import kotlin.math.roundToInt
 private val RowContentInset = 64.dp
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
     val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
@@ -119,6 +119,9 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             DrivingGroup(state, vm)
+            SettingsGroup(stringResource(R.string.settings_group_trips)) {
+                ListRow(stringResource(R.string.settings_trips), subtitle = stringResource(R.string.settings_trips_subtitle), icon = Icons.Default.History, onClick = onOpenTrips, divider = false)
+            }
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)

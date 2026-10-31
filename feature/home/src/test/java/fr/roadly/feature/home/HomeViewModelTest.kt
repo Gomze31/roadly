@@ -24,6 +24,7 @@ import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NoopRainProvider
 import fr.roadly.core.navigation.NoopSpeedLimitProvider
+import fr.roadly.core.navigation.NoopTripRecorder
 import fr.roadly.core.navigation.NoopVigilanceZoneProvider
 import fr.roadly.core.navigation.testing.FakeNavigationServiceController
 import fr.roadly.core.navigation.testing.FakeSpeechService
@@ -91,7 +92,7 @@ class HomeViewModelTest {
         }
         return NavigationSession(
             location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), FakeUserPreferencesRepository(),
-            FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), dispatchers, backgroundScope,
+            FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope,
         )
     }
 

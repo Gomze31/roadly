@@ -16,4 +16,5 @@ abstract class NavigationModule {
     @Binds abstract fun clock(impl: SystemNavigationClock): NavigationClock
     @Binds abstract fun vigilance(impl: RepositoryVigilanceZoneProvider): VigilanceZoneProvider
     @Binds abstract fun rain(impl: OpenMeteoRainProvider): RainProvider
+    @Binds abstract fun tripRecorder(impl: RoomTripRecorder): TripRecorder
 }

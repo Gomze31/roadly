@@ -30,4 +30,5 @@ abstract class RepositoryModule {
     @Binds abstract fun fuel(impl: OpenDataFuelStationProvider): FuelStationProvider
     @Binds abstract fun communityConfig(impl: DataStoreCommunityConfigRepository): CommunityConfigRepository
     @Binds abstract fun community(impl: SupabaseCommunityRepository): CommunityRepository
+    @Binds abstract fun trips(impl: RoomTripRepository): TripRepository
 }

@@ -64,3 +64,19 @@ data class VigilanceZoneEntity(
     val limitKmh: Int?,
     val updatedAt: Long,
 )
+
+/** Trajet guidé terminé (historique, Replay) ; coût estimé d'après le profil véhicule au moment du trajet, null sans profil. */
+@Entity(tableName = "trips")
+data class TripEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val startedAt: Long,
+    val endedAt: Long,
+    val destinationName: String,
+    val distanceM: Double,
+    val durationS: Long,
+    val maxSpeedKmh: Double,
+    val costEur: Double?,
+    val arrived: Boolean,
+    /** Points `t,lat,lon,speedKmh` séparés par `;` (échantillonnés tous les ≥ 20 m). */
+    val pointsCsv: String,
+)

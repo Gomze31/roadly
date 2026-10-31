@@ -18,6 +18,10 @@ import fr.roadly.feature.search.SearchRoute
 import fr.roadly.feature.search.searchScreen
 import fr.roadly.feature.settings.SettingsRoute
 import fr.roadly.feature.settings.settingsScreen
+import fr.roadly.feature.trips.ReplayRoute
+import fr.roadly.feature.trips.TripsRoute
+import fr.roadly.feature.trips.replayScreen
+import fr.roadly.feature.trips.tripsScreen
 
 /** Graphe de navigation typé : Accueil → Recherche → Itinéraire → Guidage, Réglages. */
 @Composable
@@ -69,7 +73,9 @@ fun RoadlyNavHost(
             },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
         )
-        settingsScreen(onBack = { nav.popBackStack() })
+        settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) })
+        tripsScreen(onBack = { nav.popBackStack() }, onOpenTrip = { id -> nav.navigate(ReplayRoute(id)) })
+        replayScreen(isDark = isDark, onBack = { nav.popBackStack() }, onNavigateTo = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) { popUpTo(HomeRoute) } })
         navigationScreen(
             isDark = isDark,
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
