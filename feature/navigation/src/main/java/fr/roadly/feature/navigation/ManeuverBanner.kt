@@ -29,7 +29,7 @@ import fr.roadly.core.designsystem.theme.RoadlyShapes
 
 /**
  * Bandeau de manœuvre : tuile de manœuvre (marque), distance en grand, rue et pastille de sortie.
- * [expanded] = false réduit le bandeau à la tuile et à la distance (bouton « replier »).
+ * [expanded] = false réduit le bandeau à la tuile, à la distance et à la direction de sortie (bouton « replier »).
  */
 @Composable
 fun ManeuverBanner(banner: BannerUi, modifier: Modifier = Modifier, expanded: Boolean = true) {
@@ -46,13 +46,14 @@ fun ManeuverBanner(banner: BannerUi, modifier: Modifier = Modifier, expanded: Bo
                         ExitPill(label)
                     }
                 }
+                // Direction de sortie toujours visible, bandeau replié ou non (spec §3 : « SORTIE n · direction »).
+                banner.exitToward?.let {
+                    Text(stringResource(R.string.nav_exit_toward, it), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 AnimatedVisibility(expanded) {
                     Column {
                         Text(banner.instruction, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         banner.street?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                        banner.exitToward?.let {
-                            Text(stringResource(R.string.nav_exit_toward, it), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
                     }
                 }
             }

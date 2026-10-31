@@ -9,6 +9,7 @@ import fr.roadly.core.common.Formatters
 import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.pollNearby
 import fr.roadly.core.data.config.ProviderConfigRepository
+import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.model.CommunityReport
@@ -92,7 +93,7 @@ class NavigationViewModel @Inject constructor(
     val alternativesUi: StateFlow<AlternativesUi> = _alternatives
 
     /** Réglage « Carte 3D en guidage » (l'écran y ajoute l'économiseur de batterie). */
-    val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_3D)
 
     val uiState: StateFlow<NavigationUiState> = combine(session.state, session.muted, following, prefs.speedAlertToleranceKmh, styleUrl) { s, muted, follow, tolerance, style ->
         buildUiState(s, muted = muted, following = follow, toleranceKmh = tolerance, styleUrl = style, zone = ZoneId.systemDefault())
