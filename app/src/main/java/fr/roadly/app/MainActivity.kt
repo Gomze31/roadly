@@ -56,9 +56,10 @@ class MainActivity : ComponentActivity() {
             val mode by themeVm.themeMode.collectAsStateWithLifecycle()
             val now by themeVm.nowTick.collectAsStateWithLifecycle()
             val openNav by openNavigation.collectAsStateWithLifecycle()
+            val tint by themeVm.tint.collectAsStateWithLifecycle()
             val p = location.lastKnown?.point
             val isDark = ThemeResolver.isDark(mode, isSystemInDarkTheme(), p?.lat, p?.lon, now)
-            RoadlyTheme(darkTheme = isDark) {
+            RoadlyTheme(darkTheme = isDark, tint = tint) {
                 RoadlyNavHost(
                     isDark = isDark,
                     onRequestLocationPermission = { permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },

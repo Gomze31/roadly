@@ -105,6 +105,9 @@ class SettingsViewModel @Inject constructor(
 
     fun clearVehicle() { viewModelScope.launch { vehicleRepo.clear() } }
     fun setTheme(mode: ThemeMode) { viewModelScope.launch { prefs.setThemeMode(mode) } }
+    /** Teinte du cockpit (personnalisation) ; VIOLET = défaut (clé retirée). */
+    val tint: StateFlow<String?> = prefs.cockpitTint.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun setTint(name: String?) { viewModelScope.launch { prefs.setCockpitTint(name) } }
     fun clearHistory() { viewModelScope.launch { recents.clear() } }
     fun clearFavorites() { viewModelScope.launch { favorites.clear() } }
 

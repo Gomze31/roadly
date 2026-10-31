@@ -6,6 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.common.SunTimes
 import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.UserPreferencesRepository
+import fr.roadly.core.designsystem.theme.CockpitTint
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +37,8 @@ object ThemeResolver {
 @HiltViewModel
 class ThemeViewModel @Inject constructor(prefs: UserPreferencesRepository) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = prefs.themeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.AUTO_SOLAR)
+    /** Teinte du cockpit choisie dans Réglages → Personnalisation. */
+    val tint: StateFlow<CockpitTint> = prefs.cockpitTint.map { name -> CockpitTint.entries.firstOrNull { it.name == name } ?: CockpitTint.VIOLET }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CockpitTint.VIOLET)
 
     /** Horloge à la minute pour réévaluer le mode solaire. */
     val nowTick: StateFlow<Long> = flow { while (true) { emit(System.currentTimeMillis()); delay(60_000) } }

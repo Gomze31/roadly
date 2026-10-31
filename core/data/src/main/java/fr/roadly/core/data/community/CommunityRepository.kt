@@ -4,7 +4,9 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.network.ApiClient
 import fr.roadly.core.model.BoundingBox
+import fr.roadly.core.model.CommunityProfile
 import fr.roadly.core.model.CommunityReport
+import fr.roadly.core.model.LeaderboardEntry
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.ReportKind
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +35,10 @@ interface CommunityRepository {
     suspend fun report(kind: ReportKind, at: GeoPoint, headingDeg: Float?): Outcome<CommunityReport>
     suspend fun nearby(box: BoundingBox): Outcome<List<CommunityReport>>
     suspend fun vote(reportId: String, confirm: Boolean): Outcome<CommunityReport>
+    /** Profil de cet appareil (pseudonyme, points serveur). */
+    suspend fun profile(): Outcome<CommunityProfile>
+    /** Classement public par points (≤ 100). */
+    suspend fun leaderboard(limit: Int = 50): Outcome<List<LeaderboardEntry>>
 }
 
 /** PostgREST `rest/v1/rpc/<fonction>` du schéma `backend/supabase/schema.sql` ; en-têtes `apikey` + `Authorization: Bearer <anon>`. */
@@ -80,6 +86,33 @@ class SupabaseCommunityRepository @Inject constructor(
         return when (val r = rpc("vote_report", body)) {
             is Outcome.Failure -> Outcome.Failure(mapError(r.error))
             is Outcome.Success -> parseOne(r.value, device)
+        }
+    }
+
+    override suspend fun profile(): Outcome<CommunityProfile> {
+        val body = buildJsonObject { put("p_device", configRepo.deviceId()) }
+        return when (val r = rpc("get_profile", body)) {
+            is Outcome.Failure -> Outcome.Failure(mapError(r.error))
+            is Outcome.Success -> try {
+                val el = json.parseToJsonElement(r.value)
+                val o = if (el is JsonArray) el.firstOrNull()?.jsonObject else el.jsonObject
+                val name = o?.get("pseudonym")?.jsonPrimitive?.contentOrNull
+                if (o == null || name == null) Outcome.Failure(AppError.Parse(SERVICE)) else Outcome.Success(CommunityProfile(name, o["points"]?.jsonPrimitive?.intOrNull ?: 0))
+            } catch (e: Exception) { Outcome.Failure(AppError.Parse(e.message ?: SERVICE)) }
+        }
+    }
+
+    override suspend fun leaderboard(limit: Int): Outcome<List<LeaderboardEntry>> {
+        val body = buildJsonObject { put("p_limit", limit.coerceIn(1, 100)) }
+        return when (val r = rpc("leaderboard", body)) {
+            is Outcome.Failure -> Outcome.Failure(mapError(r.error))
+            is Outcome.Success -> try {
+                Outcome.Success(json.parseToJsonElement(r.value).jsonArray.mapNotNull { e ->
+                    val o = e.jsonObject
+                    val name = o["pseudonym"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    LeaderboardEntry(name, o["points"]?.jsonPrimitive?.intOrNull ?: 0, o["rank"]?.jsonPrimitive?.intOrNull ?: 0)
+                })
+            } catch (e: Exception) { Outcome.Failure(AppError.Parse(e.message ?: SERVICE)) }
         }
     }
 

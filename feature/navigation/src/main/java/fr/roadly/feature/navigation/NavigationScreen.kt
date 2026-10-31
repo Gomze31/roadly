@@ -73,6 +73,7 @@ import fr.roadly.core.designsystem.component.userMessage
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
+import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.map.CameraMode
 import fr.roadly.core.map.RoadlyMap
@@ -85,7 +86,10 @@ import java.util.Locale
 @Composable
 fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}, vm: NavigationViewModel = hiltViewModel()) {
     // Mode conduite (spec §2) : typographie ×1,3 et cibles 56 dp via LocalDrivingMode = true.
-    RoadlyTheme(darkTheme = isDark, drivingMode = true) {
+    // Même teinte que le reste de l'app : le thème conduite est recomposé avec la teinte courante.
+    val tint = LocalRoadlyColors.current.brand
+    val cockpit = CockpitTint.entries.firstOrNull { (if (isDark) it.night else it.day).first == tint } ?: CockpitTint.VIOLET
+    RoadlyTheme(darkTheme = isDark, drivingMode = true, tint = cockpit) {
         NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm)
     }
 }

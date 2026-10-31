@@ -15,3 +15,9 @@ fun NavGraphBuilder.tripsScreen(onBack: () -> Unit, onOpenTrip: (Long) -> Unit) 
 fun NavGraphBuilder.replayScreen(isDark: Boolean, onBack: () -> Unit, onNavigateTo: (Place) -> Unit) {
     composable<ReplayRoute> { ReplayScreen(isDark = isDark, onBack = onBack, onNavigateTo = onNavigateTo) }
 }
+
+@Serializable object ProfileRoute
+
+fun NavGraphBuilder.profileScreen(onBack: () -> Unit, onOpenTrips: () -> Unit) {
+    composable<ProfileRoute> { ProfileScreen(onBack = onBack, onOpenTrips = onOpenTrips) }
+}

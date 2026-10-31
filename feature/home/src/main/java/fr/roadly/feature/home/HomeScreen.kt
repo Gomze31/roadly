@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Work
@@ -111,6 +112,7 @@ fun HomeScreen(
     onOpenAppSettings: () -> Unit,
     onResumeGuidance: () -> Unit,
     onSearchCategory: (PoiCategory) -> Unit,
+    onOpenProfile: () -> Unit = {},
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -178,6 +180,8 @@ fun HomeScreen(
                     onClick = onSearch,
                     modifier = Modifier.weight(1f),
                 )
+                Spacer(Modifier.width(RoadlySpacing.s))
+                GlassIconButton(Icons.Default.Person, stringResource(R.string.home_profile), onClick = onOpenProfile)
                 Spacer(Modifier.width(RoadlySpacing.s))
                 GlassIconButton(Icons.Default.Settings, stringResource(R.string.home_settings), onClick = onSettings)
             }

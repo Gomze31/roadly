@@ -154,4 +154,6 @@ private object NoopCommunity : fr.roadly.core.data.community.CommunityRepository
     override suspend fun report(kind: fr.roadly.core.model.ReportKind, at: GeoPoint, headingDeg: Float?) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
     override suspend fun nearby(box: fr.roadly.core.model.BoundingBox) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
     override suspend fun vote(reportId: String, confirm: Boolean) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
+    override suspend fun profile() = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
+    override suspend fun leaderboard(limit: Int) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
 }

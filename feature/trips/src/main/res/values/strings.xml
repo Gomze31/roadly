@@ -17,6 +17,27 @@
     <string name="trips_delete">Supprimer</string>
     <string name="trips_footer">Stockage local uniquement. Coût estimé d\'après le profil véhicule au moment du trajet.</string>
 
+    <string name="profile_title">Mon profil</string>
+    <string name="profile_refresh">Actualiser</string>
+    <string name="profile_local_only">Conducteur Roadly</string>
+    <string name="profile_points">%1$d points</string>
+    <string name="profile_loading">Chargement…</string>
+    <string name="profile_unconfigured">Points et classement : service communautaire non configuré (Réglages → Communauté)</string>
+    <string name="profile_open_trips">Mes trajets et Replay</string>
+    <string name="profile_trophies">Trophées</string>
+    <string name="profile_trophies_footer">Calculés sur cet appareil d\'après vos trajets enregistrés.</string>
+    <string name="profile_leaderboard">Classement</string>
+    <string name="profile_leaderboard_footer">Points attribués par le serveur pour les signalements confirmés ; pseudonymes d\'appareil, jamais de position. Ligues et défis hebdomadaires : à venir.</string>
+    <string name="profile_leaderboard_unconfigured">Disponible une fois le service communautaire configuré</string>
+    <string name="profile_leaderboard_empty">Personne n\'a encore de points</string>
+    <string name="trophy_km_10">10 km parcourus</string>
+    <string name="trophy_km_100">100 km parcourus</string>
+    <string name="trophy_km_1000">1 000 km parcourus</string>
+    <string name="trophy_trips_1">Premier trajet</string>
+    <string name="trophy_trips_10">10 trajets</string>
+    <string name="trophy_trips_100">100 trajets</string>
+    <string name="trophy_longest_50">Un trajet de 50 km</string>
+    <string name="trophy_longest_200">Un trajet de 200 km</string>
     <string name="replay_overline">Roadly Replay</string>
     <string name="replay_back">Retour</string>
     <string name="replay_elapsed">écoulé</string>

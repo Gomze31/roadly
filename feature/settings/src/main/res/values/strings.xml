@@ -40,8 +40,14 @@
     <string name="settings_speed_limit_note">La limitation n\'est connue qu\'avec un serveur Valhalla auto-hébergé (Fournisseurs). Sinon le badge affiche « — » et aucune alerte n\'est émise.</string>
 
     <string name="settings_group_trips">Trajets</string>
+    <string name="settings_profile">Mon profil</string>
+    <string name="settings_profile_subtitle">Trophées, points communautaires, classement</string>
     <string name="settings_trips">Mes trajets et Replay</string>
     <string name="settings_trips_subtitle">Historique local, bilan du mois, rejeu sur la carte</string>
+    <string name="settings_group_personalization">Personnalisation</string>
+    <string name="settings_tint">Teinte du cockpit</string>
+    <string name="settings_tint_subtitle">Couleur du tracé, des boutons et des sélections</string>
+    <string name="settings_tint_footer">Violet, océan, menthe, corail, ambre. Appliquée immédiatement à toute l\'application, y compris le guidage.</string>
     <string name="settings_group_alerts">Alertes</string>
     <string name="settings_vigilance">Zones de vigilance</string>
     <string name="settings_vigilance_subtitle">Annoncées à l\'entrée de la zone, affichées dans Horizon. Jamais un emplacement exact.</string>

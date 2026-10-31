@@ -110,3 +110,21 @@ alter table public.reports enable row level security;
 alter table public.report_votes enable row level security;
 revoke all on public.profiles, public.reports, public.report_votes from anon;
 grant execute on function public.create_report, public.vote_report, public.reports_in_box to anon;
+
+-- LOT 10 : profil et classement. Points cumulés côté serveur ; classement public par pseudonyme (jamais de position).
+create or replace function public.get_profile(p_device uuid)
+returns public.profiles language plpgsql security definer as $$
+declare r public.profiles;
+begin
+  insert into public.profiles(device_id) values (p_device) on conflict (device_id) do update set last_seen_at = now();
+  select * into r from public.profiles where device_id = p_device;
+  return r;
+end $$;
+
+create or replace function public.leaderboard(p_limit integer default 50)
+returns table(pseudonym text, points integer, rank bigint) language sql stable as $$
+  select pseudonym, points, rank() over (order by points desc) as rank
+  from public.profiles where points > 0 order by points desc limit least(p_limit, 100)
+$$;
+
+grant execute on function public.get_profile, public.leaderboard to anon;

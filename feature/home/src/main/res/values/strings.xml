@@ -2,6 +2,7 @@
     <string name="home_search_placeholder">Où allez-vous ?</string>
     <string name="home_recenter">Recentrer</string>
     <string name="home_settings">Réglages</string>
+    <string name="home_profile">Mon profil</string>
     <string name="home_home">Domicile</string>
     <string name="home_work">Travail</string>
     <string name="home_define">Définir</string>

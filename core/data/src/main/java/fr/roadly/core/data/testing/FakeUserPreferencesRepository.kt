@@ -43,4 +43,7 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     override suspend fun setVigilanceSound(value: Boolean) { vigilanceBeep.value = value }
     override val rainLowersLimit: Flow<Boolean> = rainLimit
     override suspend fun setRainLowersLimit(value: Boolean) { rainLimit.value = value }
+    val tint = MutableStateFlow<String?>(null)
+    override val cockpitTint: Flow<String?> = tint
+    override suspend fun setCockpitTint(name: String?) { tint.value = name }
 }

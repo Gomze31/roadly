@@ -88,4 +88,15 @@ class SupabaseCommunityRepositoryTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"code":"P0001","message":"rate_limited"}"""))
         assertEquals(AppError.RateLimited, (repo.report(ReportKind.HAZARD, GeoPoint(1.0, 1.0), null) as Outcome.Failure).error)
     }
+    @Test fun `profile and leaderboard parse server rows`() = runTest {
+        configure()
+        server.enqueue(MockResponse().setBody("""{"device_id":"$device","pseudonym":"conducteur-ab12","points":7}"""))
+        val p = (repo.profile() as Outcome.Success).value
+        assertEquals("conducteur-ab12", p.pseudonym); assertEquals(7, p.points)
+        assertEquals("/rest/v1/rpc/get_profile", server.takeRequest().path)
+        server.enqueue(MockResponse().setBody("""[{"pseudonym":"a","points":10,"rank":1},{"pseudonym":"b","points":3,"rank":2}]"""))
+        val lb = (repo.leaderboard(10) as Outcome.Success).value
+        assertEquals(listOf(1, 2), lb.map { it.rank })
+        assertEquals("/rest/v1/rpc/leaderboard", server.takeRequest().path)
+    }
 }

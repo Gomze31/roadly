@@ -18,8 +18,9 @@ fun NavGraphBuilder.homeScreen(
     onOpenAppSettings: () -> Unit,
     onResumeGuidance: () -> Unit,
     onSearchCategory: (PoiCategory) -> Unit,
+    onOpenProfile: () -> Unit,
 ) {
     composable<HomeRoute> {
-        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance, onSearchCategory)
+        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance, onSearchCategory, onOpenProfile)
     }
 }

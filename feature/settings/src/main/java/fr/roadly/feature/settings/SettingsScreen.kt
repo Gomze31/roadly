@@ -9,6 +9,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -26,6 +31,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Dns
@@ -34,6 +41,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -66,6 +74,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -88,6 +97,7 @@ import fr.roadly.core.designsystem.component.SettingsGroup
 import fr.roadly.core.designsystem.component.StatRow
 import fr.roadly.core.designsystem.component.StatusDot
 import fr.roadly.core.designsystem.component.ToggleRow
+import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
@@ -104,11 +114,12 @@ import kotlin.math.roundToInt
 private val RowContentInset = 64.dp
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
     val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
     val community by vm.community.collectAsStateWithLifecycle()
+    val tint by vm.tint.collectAsStateWithLifecycle()
 
     RoadlyScreen {
         RoadlyTopBar(title = stringResource(R.string.settings_title), onBack = onBack, backDescription = stringResource(R.string.settings_back))
@@ -120,9 +131,11 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, vm: Setting
         ) {
             DrivingGroup(state, vm)
             SettingsGroup(stringResource(R.string.settings_group_trips)) {
+                ListRow(stringResource(R.string.settings_profile), subtitle = stringResource(R.string.settings_profile_subtitle), icon = Icons.Default.Person, onClick = onOpenProfile)
                 ListRow(stringResource(R.string.settings_trips), subtitle = stringResource(R.string.settings_trips_subtitle), icon = Icons.Default.History, onClick = onOpenTrips, divider = false)
             }
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
+            TintGroup(tint, onSelect = vm::setTint)
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
             AlertsGroup(state.alerts, vigilanceRefresh, onVigilance = vm::setVigilanceEnabled, onSound = vm::setVigilanceSound, onRain = vm::setRainLowersLimit, onRefresh = vm::refreshVigilance)
@@ -412,6 +425,28 @@ private fun PrivacyGroup() {
             IconTile(Icons.Default.Shield, size = 36.dp)
             Spacer(Modifier.width(RoadlySpacing.sm))
             Text(stringResource(R.string.settings_privacy_body), style = MaterialTheme.typography.bodyMedium, color = LocalRoadlyColors.current.textSecondary)
+        }
+    }
+}
+
+// ── Personnalisation : teinte du cockpit ────────────────────────────────────
+
+@Composable
+private fun TintGroup(current: String?, onSelect: (String?) -> Unit) {
+    val c = LocalRoadlyColors.current
+    SettingsGroup(stringResource(R.string.settings_group_personalization), footer = stringResource(R.string.settings_tint_footer)) {
+        ListRow(stringResource(R.string.settings_tint), subtitle = stringResource(R.string.settings_tint_subtitle), icon = Icons.Default.ColorLens, chevron = false, divider = false)
+        Row(Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
+            CockpitTint.entries.forEach { t ->
+                val color = if (c.isDark) t.night.second else t.day.first
+                val selected = (current ?: CockpitTint.VIOLET.name) == t.name
+                Box(
+                    Modifier.size(44.dp).clip(RoadlyShapes.Pill).background(color)
+                        .border(if (selected) 3.dp else 0.dp, if (selected) c.textPrimary else androidx.compose.ui.graphics.Color.Transparent, RoadlyShapes.Pill)
+                        .clickable(role = Role.RadioButton) { onSelect(if (t == CockpitTint.VIOLET) null else t.name) },
+                    contentAlignment = Alignment.Center,
+                ) { if (selected) Icon(Icons.Default.Check, contentDescription = t.name, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp)) }
+            }
         }
     }
 }

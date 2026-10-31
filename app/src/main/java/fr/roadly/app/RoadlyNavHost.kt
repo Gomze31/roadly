@@ -18,7 +18,9 @@ import fr.roadly.feature.search.SearchRoute
 import fr.roadly.feature.search.searchScreen
 import fr.roadly.feature.settings.SettingsRoute
 import fr.roadly.feature.settings.settingsScreen
+import fr.roadly.feature.trips.ProfileRoute
 import fr.roadly.feature.trips.ReplayRoute
+import fr.roadly.feature.trips.profileScreen
 import fr.roadly.feature.trips.TripsRoute
 import fr.roadly.feature.trips.replayScreen
 import fr.roadly.feature.trips.tripsScreen
@@ -44,6 +46,7 @@ fun RoadlyNavHost(
             onOpenAppSettings = onOpenAppSettings,
             onResumeGuidance = { nav.navigate(NavigationRoute) { launchSingleTop = true } },
             onSearchCategory = { cat -> nav.navigate(SearchRoute(category = cat.name)) },
+            onOpenProfile = { nav.navigate(ProfileRoute) },
         )
         searchScreen(
             onBack = { nav.popBackStack() },
@@ -73,8 +76,9 @@ fun RoadlyNavHost(
             },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
         )
-        settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) })
+        settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) }, onOpenProfile = { nav.navigate(ProfileRoute) })
         tripsScreen(onBack = { nav.popBackStack() }, onOpenTrip = { id -> nav.navigate(ReplayRoute(id)) })
+        profileScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) })
         replayScreen(isDark = isDark, onBack = { nav.popBackStack() }, onNavigateTo = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) { popUpTo(HomeRoute) } })
         navigationScreen(
             isDark = isDark,

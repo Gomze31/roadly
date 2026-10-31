@@ -58,6 +58,9 @@ interface UserPreferencesRepository {
     /** Limitation abaissée par temps de pluie (R413-2) quand une limitation est connue. */
     val rainLowersLimit: Flow<Boolean>
     suspend fun setRainLowersLimit(value: Boolean)
+    /** Teinte du cockpit (nom de `CockpitTint`) ; null = violet par défaut. */
+    val cockpitTint: Flow<String?>
+    suspend fun setCockpitTint(name: String?)
 }
 
 @Singleton
@@ -75,6 +78,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kVigilance = booleanPreferencesKey("vigilance.enabled")
     private val kVigilanceSound = booleanPreferencesKey("vigilance.sound")
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
+    private val kTint = stringPreferencesKey("cockpit.tint")
 
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
     override suspend fun setThemeMode(mode: ThemeMode) { store.edit { it[kTheme] = mode.name } }
@@ -108,4 +112,6 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setVigilanceSound(value: Boolean) { store.edit { it[kVigilanceSound] = value } }
     override val rainLowersLimit: Flow<Boolean> = store.data.map { it[kRainLimit] ?: GuidanceDefaults.RAIN_LOWERS_LIMIT }
     override suspend fun setRainLowersLimit(value: Boolean) { store.edit { it[kRainLimit] = value } }
+    override val cockpitTint: Flow<String?> = store.data.map { it[kTint] }
+    override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
 }
