@@ -40,4 +40,5 @@
     <string name="alt_toll">péage</string>
     <string name="alt_note">Calculé depuis votre position actuelle, sans trafic. Choisir un itinéraire relance le guidage dessus.</string>
     <string name="alt_keep">Garder l\'itinéraire actuel</string>
+    <string name="alt_add_stop">Ajouter un arrêt</string>
 </resources>

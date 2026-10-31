@@ -80,7 +80,7 @@ class NavigationViewModelTest {
     private fun fixAt(along: Double) = LocationFix(tracker.pointAt(along), 90f, 10f, 5f, 0L)
 
     private fun NavigationViewModel(s: NavigationSession, p: FakeUserPreferencesRepository, c: ProviderConfigRepository) =
-        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing))
+        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing), routing)
 
     @Test fun `alternatives are computed from the snapped position and switching restarts guidance on the chosen route`() = runTest {
         val okRouting = object : RoutingProvider {
@@ -89,7 +89,7 @@ class NavigationViewModelTest {
             override suspend fun route(request: RouteRequest): Outcome<List<Route>> { origins += request.origin; return Outcome.Success(listOf(route.copy(id = "alt-" + request.costing.name))) }
         }
         val s = session()
-        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting))
+        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting), okRouting)
         vm.uiState.test {
             s.start(option, RoutePreferences()); runCurrent()
             location.emit(fixAt(300.0)); runCurrent()

@@ -32,10 +32,11 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         vehicle: VehicleProfile?,
         departAtEpochMs: Long,
         preferences: RoutePreferences = RoutePreferences(),
+        waypoints: List<GeoPoint> = emptyList(),
     ): Outcome<List<RouteOption>> {
         val results = coroutineScope {
             order.map { c ->
-                async { c to safely { routing.route(RouteRequest(origin, destination, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) } }
+                async { c to safely { routing.route(RouteRequest(origin, destination, waypoints = waypoints, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) } }
             }.map { it.await() }
         }
         val routes = results.mapNotNull { (c, r) -> (r as? Outcome.Success)?.value?.firstOrNull()?.copy(costing = c) }

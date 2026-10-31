@@ -20,7 +20,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -52,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.roadly.core.common.Formatters
-import fr.roadly.core.designsystem.component.ComingSoonTag
 import fr.roadly.core.designsystem.component.ErrorState
 import fr.roadly.core.designsystem.component.GlassButton
 import fr.roadly.core.designsystem.component.GlassButtonStyle
@@ -87,6 +85,7 @@ fun RouteScreen(
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartNavigation: (begin: () -> Boolean) -> Unit,
+    onAddStop: () -> Unit,
     vm: RouteViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -156,6 +155,7 @@ fun RouteScreen(
                 is RouteUiState.Content -> ChoicePanel(
                     s, onSelect = vm::selectRoute, onPickTime = { showTimePicker = true }, onOpenSettings = onOpenSettings,
                     onStart = { onStartNavigation(vm::startGuidance) }, onPreferences = vm::setPreferences,
+                    onAddStop = onAddStop, onMoveStop = vm::moveStop, onRemoveStop = vm::removeStop, onOptimize = vm::optimizeStops,
                 )
             }
         }
@@ -229,6 +229,10 @@ private fun ChoicePanel(
     onOpenSettings: () -> Unit,
     onStart: () -> Unit,
     onPreferences: (RoutePreferences) -> Unit,
+    onAddStop: () -> Unit,
+    onMoveStop: (Int, Int) -> Unit,
+    onRemoveStop: (Int) -> Unit,
+    onOptimize: () -> Unit,
 ) {
     val c = LocalRoadlyColors.current
     val active = s.options.firstOrNull { it.route.id == s.activeId } ?: s.options.first()
@@ -267,8 +271,8 @@ private fun ChoicePanel(
             }
             Spacer(Modifier.height(RoadlySpacing.xs))
             RowDivider(inset = 0.dp)
-            // Arrêts intermédiaires : LOT 6 (planificateur) ; visible mais désactivé tant que rien n'est branché.
-            GlassChip(stringResource(R.string.route_add_stop), onClick = {}, icon = Icons.Default.AddLocationAlt, enabled = false, compact = true, trailing = { ComingSoonTag() }, modifier = Modifier.padding(vertical = RoadlySpacing.s))
+            // Arrêts intermédiaires (≤ 10), réordonnables, optimisables (mode tournée).
+            StopsList(s.stops, s.optimizing, onAdd = onAddStop, onMove = onMoveStop, onRemove = onRemoveStop, onOptimize = onOptimize, modifier = Modifier.padding(vertical = RoadlySpacing.s))
             GlassButton(stringResource(R.string.route_start), onClick = onStart, style = GlassButtonStyle.Brand, trailingIcon = Icons.AutoMirrored.Filled.ArrowForward, modifier = Modifier.fillMaxWidth())
         }
     }

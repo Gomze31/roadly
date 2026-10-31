@@ -2,6 +2,7 @@ package fr.roadly.feature.route
 
 import fr.roadly.core.common.AppError
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.Place
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.routing.RouteOption
 
@@ -22,6 +23,10 @@ sealed interface RouteUiState {
         val departAtEpochMs: Long,
         val arriveAtEpochMs: Long? = null,
         val preferences: RoutePreferences = RoutePreferences(),
+        /** Arrêts intermédiaires dans l'ordre de passage (≤ 10). */
+        val stops: List<Place> = emptyList(),
+        /** Optimisation de l'ordre (mode tournée) en cours. */
+        val optimizing: Boolean = false,
     ) : RouteUiState
 }
 

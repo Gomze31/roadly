@@ -66,9 +66,11 @@ import java.util.Locale
 import fr.roadly.core.model.PlaceKind
 
 @Composable
-fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: SearchViewModel = hiltViewModel()) {
+fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, onPick: ((Place) -> Unit)? = null, vm: SearchViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
+    // Mode « choisir un arrêt » : un lieu touché est rendu tout de suite (pas de fiche), après enregistrement dans les récents.
+    val select: (Place) -> Unit = if (onPick != null) ({ p -> vm.onPlaceSelected(p); vm.onDismissPlace(); onPick(p) }) else vm::onPlaceSelected
     // Ouverture directe sur une catégorie (puce de l'accueil) : pas de clavier.
     LaunchedEffect(Unit) { if (vm.uiState.value.category == null) focus.requestFocus() }
 
@@ -78,7 +80,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
             GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.search_back), onClick = onBack)
             Spacer(Modifier.width(RoadlySpacing.s))
             GlassSearchBar(
-                value = state.query, onValueChange = vm::onQueryChange, placeholder = stringResource(R.string.search_placeholder),
+                value = state.query, onValueChange = vm::onQueryChange, placeholder = stringResource(if (onPick != null) R.string.search_placeholder_stop else R.string.search_placeholder),
                 onClear = vm::onClear, focusRequester = focus, modifier = Modifier.weight(1f),
             )
         }
@@ -88,13 +90,13 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
         val lon = state.hereLon
         val here = if (lat != null && lon != null) GeoPoint(lat, lon) else null
         when (val r = state.results) {
-            SearchResults.Idle -> SuggestionsList(state, onSelect = vm::onPlaceSelected)
+            SearchResults.Idle -> SuggestionsList(state, onSelect = select)
             SearchResults.Loading -> Box(Modifier.fillMaxWidth().padding(RoadlySpacing.xl), contentAlignment = Alignment.Center) {
                 LoadingRow(stringResource(if (state.category != null) R.string.search_loading_nearby else R.string.search_loading), Modifier.width(IntrinsicSize.Min))
             }
             is SearchResults.Error -> when {
                 // Hors ligne : on garde favoris et récents sous le message d'erreur.
-                r.error == AppError.Network -> SuggestionsList(state, onSelect = vm::onPlaceSelected, header = { ErrorState(r.error.userMessage(), onRetry = vm::retry) })
+                r.error == AppError.Network -> SuggestionsList(state, onSelect = select, header = { ErrorState(r.error.userMessage(), onRetry = vm::retry) })
                 // Catégorie sans position connue : le GPS n'a pas encore donné de fix.
                 r.error == AppError.NoResult && state.category != null -> EmptyState(Icons.Default.MyLocation, stringResource(R.string.search_no_position_title), stringResource(R.string.search_no_position_subtitle))
                 else -> ErrorState(r.error.userMessage(), onRetry = vm::retry)
@@ -106,7 +108,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, vm: Sea
                 val fuelMode = r.category == PoiCategory.FUEL && r.stations.isNotEmpty()
                 if (fuelMode) FuelControls(state.fuel, state.fuelSort, onFuel = vm::onFuel, onSort = vm::onFuelSort)
                 ResultsList(
-                    r.places, here, onSelect = vm::onPlaceSelected,
+                    r.places, here, onSelect = select,
                     header = r.category?.let { stringResource(R.string.search_nearby_header, stringResource(it.labelRes()), it.radiusKm) },
                     footer = if (fuelMode) stringResource(R.string.search_fuel_footer) else null,
                     value = if (fuelMode) ({ p -> r.stations[p.id]?.let { s -> fuelPriceText(s, state.fuel) } }) else null,

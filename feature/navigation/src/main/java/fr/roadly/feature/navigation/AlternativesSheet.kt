@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +30,7 @@ import java.time.ZoneId
 
 /** Feuille « Itinéraires » pendant le guidage : alternatives depuis la position actuelle, bascule sans quitter l'écran. */
 @Composable
-fun AlternativesSheet(ui: AlternativesUi, onSelect: (RouteOption) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit) {
+fun AlternativesSheet(ui: AlternativesUi, onSelect: (RouteOption) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit, onAddStop: () -> Unit = {}) {
     val c = LocalRoadlyColors.current
     GlassBottomSheet(onDismiss = onDismiss) {
         Column(Modifier.padding(horizontal = RoadlySpacing.l).padding(bottom = RoadlySpacing.l).navigationBarsPadding()) {
@@ -54,6 +56,9 @@ fun AlternativesSheet(ui: AlternativesUi, onSelect: (RouteOption) -> Unit, onRet
                     }
                     Spacer(Modifier.height(RoadlySpacing.s))
                     Text(stringResource(R.string.alt_note), style = MaterialTheme.typography.bodySmall, color = c.textTertiary)
+                    Spacer(Modifier.height(RoadlySpacing.sm))
+                    GlassButton(stringResource(R.string.alt_add_stop), onClick = onAddStop, icon = Icons.Default.AddLocationAlt, style = GlassButtonStyle.Brand, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(RoadlySpacing.s))
                     Spacer(Modifier.height(RoadlySpacing.sm))
                     GlassButton(stringResource(R.string.alt_keep), onClick = onDismiss, style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth())
                 }

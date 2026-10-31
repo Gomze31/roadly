@@ -9,7 +9,10 @@ import fr.roadly.feature.home.HomeRoute
 import fr.roadly.feature.home.homeScreen
 import fr.roadly.feature.navigation.NavigationRoute
 import fr.roadly.feature.navigation.navigationScreen
+import fr.roadly.core.model.Place
+import fr.roadly.feature.route.PICKED_STOP_KEY
 import fr.roadly.feature.route.RouteRoute
+import kotlinx.serialization.json.Json
 import fr.roadly.feature.route.routeScreen
 import fr.roadly.feature.search.SearchRoute
 import fr.roadly.feature.search.searchScreen
@@ -48,6 +51,11 @@ fun RoadlyNavHost(
                     if (guidanceInStack) popUpTo(NavigationRoute) { inclusive = false } else popUpTo(HomeRoute)
                 }
             },
+            // Mode « choisir un arrêt » : le lieu est rendu à l'écran appelant (itinéraires ou guidage) par son SavedStateHandle.
+            onPick = { p ->
+                nav.previousBackStackEntry?.savedStateHandle?.set(PICKED_STOP_KEY, Json.encodeToString(Place.serializer(), p))
+                nav.popBackStack()
+            },
         )
         routeScreen(
             isDark = isDark,
@@ -59,12 +67,14 @@ fun RoadlyNavHost(
                     if (begin()) nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
                 }
             },
+            onAddStop = { nav.navigate(SearchRoute(pick = true)) },
         )
         settingsScreen(onBack = { nav.popBackStack() })
         navigationScreen(
             isDark = isDark,
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
             onChangeDestination = { nav.navigate(SearchRoute()) },
+            onAddStop = { nav.navigate(SearchRoute(pick = true)) },
         )
     }
     // Après NavHost : le graphe est posé avant de traiter une ouverture demandée par la notification.

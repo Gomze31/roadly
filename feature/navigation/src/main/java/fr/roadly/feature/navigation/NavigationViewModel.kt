@@ -7,11 +7,14 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.UserPreferencesRepository
+import fr.roadly.core.model.Place
 import fr.roadly.core.model.RoutePreferences
+import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
+import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +40,7 @@ class NavigationViewModel @Inject constructor(
     prefs: UserPreferencesRepository,
     config: ProviderConfigRepository,
     private val alternatives: RouteAlternativesUseCase,
+    private val routing: RoutingProvider,
 ) : ViewModel() {
     private val isDark = MutableStateFlow(true)
     private val following = MutableStateFlow(true)
@@ -86,6 +90,30 @@ class NavigationViewModel @Inject constructor(
     }
 
     fun dismissAlternatives() { alternativesJob?.cancel(); _alternatives.value = AlternativesUi.Hidden }
+
+    private val _addingStop = MutableStateFlow(false)
+    /** Calcul en cours d'un itinéraire via l'arrêt ajouté. */
+    val addingStop: StateFlow<Boolean> = _addingStop
+
+    /** Ajoute un arrêt en cours de trajet : position projetée → arrêt → destination courante, puis bascule du guidage. */
+    fun addStop(place: Place) {
+        val g = session.state.value as? NavigationState.Guiding ?: return
+        if (_addingStop.value) return
+        viewModelScope.launch {
+            _addingStop.value = true
+            val request = RouteRequest(
+                origin = g.progress.snapped, destination = g.route.geometry.last(), waypoints = listOf(place.point),
+                costing = g.route.costing, preferences = routePreferences.value, originHeadingDeg = g.progress.bearingDeg,
+            )
+            when (val r = routing.route(request)) {
+                is Outcome.Success -> r.value.firstOrNull()?.let { route ->
+                    session.start(RouteOption(route.copy(costing = g.route.costing), "Via ${place.name}", System.currentTimeMillis() + (route.durationSeconds * 1000).toLong(), null, sameAsFastest = false), routePreferences.value)
+                }
+                is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
+            }
+            _addingStop.value = false
+        }
+    }
 
     /** Bascule le guidage sur [option] : la course est remplacée, la voix et le service continuent. */
     fun switchTo(option: RouteOption) {

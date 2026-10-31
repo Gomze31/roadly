@@ -10,12 +10,15 @@ import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.Place
 import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
+import fr.roadly.core.routing.RoutingProvider
+import fr.roadly.core.routing.StopOrdering
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +26,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/** Clé du `savedStateHandle` de l'entrée de pile par laquelle la recherche (mode « choisir un arrêt ») renvoie un lieu (JSON). */
+const val PICKED_STOP_KEY = "pickedStop"
 
 @HiltViewModel
 class RouteViewModel @Inject constructor(
@@ -33,6 +39,7 @@ class RouteViewModel @Inject constructor(
     private val config: ProviderConfigRepository,
     private val prefs: UserPreferencesRepository,
     private val session: NavigationSession,
+    private val routing: RoutingProvider,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -46,6 +53,8 @@ class RouteViewModel @Inject constructor(
     private val departAt = MutableStateFlow(System.currentTimeMillis())
     /** Heure d'arrivée souhaitée ; null = mode « Partir à ». */
     private val arriveAt = MutableStateFlow<Long?>(null)
+    private val stops = MutableStateFlow<List<Place>>(emptyList())
+    private val optimizing = MutableStateFlow(false)
     private val activeId = MutableStateFlow<String?>(null)
     private val isDark = MutableStateFlow(true)
     private val computed = MutableStateFlow<RouteUiState>(RouteUiState.Loading)
@@ -53,22 +62,23 @@ class RouteViewModel @Inject constructor(
     /** Préférences du dernier calcul affiché : transmises à la session (et donc au recalcul). */
     private var computedWith = RoutePreferences()
 
-    private data class Params(val origin: GeoPoint?, val departAt: Long, val arriveAt: Long?, val vehicle: VehicleProfile?, val preferences: RoutePreferences)
+    private data class Params(val origin: GeoPoint?, val departAt: Long, val arriveAt: Long?, val vehicle: VehicleProfile?, val preferences: RoutePreferences, val stops: List<Place>)
 
     init {
         viewModelScope.launch {
-            combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, reload) { values ->
-                Params(values[0] as GeoPoint?, values[1] as Long, values[2] as Long?, values[3] as VehicleProfile?, values[4] as RoutePreferences)
-            }.collect { (o, d, a, v, p) ->
+            combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, stops, reload) { values ->
+                @Suppress("UNCHECKED_CAST")
+                Params(values[0] as GeoPoint?, values[1] as Long, values[2] as Long?, values[3] as VehicleProfile?, values[4] as RoutePreferences, values[5] as List<Place>)
+            }.collect { (o, d, a, v, p, s) ->
                 if (o == null) { computed.value = RouteUiState.NoOrigin(destName); return@collect }
                 computed.value = RouteUiState.Loading
-                when (val r = alternatives(o, destination, v, d, p)) {
+                when (val r = alternatives(o, destination, v, d, p, s.map { it.point })) {
                     is Outcome.Success -> {
                         val (options, effectiveDepart) = if (a != null) shiftToArrival(r.value, a) else r.value to d
                         // L'option active doit toujours exister dans la liste affichée.
                         if (activeId.value == null || options.none { it.route.id == activeId.value }) activeId.value = options.first().route.id
                         computedWith = p
-                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, effectiveDepart, a, p)
+                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, effectiveDepart, a, p, s)
                     }
                     is Outcome.Failure -> computed.value = RouteUiState.Error(r.error)
                 }
@@ -76,8 +86,8 @@ class RouteViewModel @Inject constructor(
         }
     }
 
-    val uiState: StateFlow<RouteScreenState> = combine(computed, activeId, isDark, config.config) { s, id, dark, cfg ->
-        val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId) else s
+    val uiState: StateFlow<RouteScreenState> = combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
+        val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())
 
@@ -92,6 +102,31 @@ class RouteViewModel @Inject constructor(
     /** Origine choisie par appui long sur la carte quand la position est inconnue. */
     fun setOrigin(point: GeoPoint) { origin.value = point }
     val destinationPoint: GeoPoint get() = destination
+
+    // ── Arrêts (≤ 10) ──
+    fun addStop(place: Place) {
+        val current = stops.value
+        if (current.size >= StopOrdering.MAX_STOPS || current.any { it.id == place.id }) return
+        stops.value = current + place
+    }
+    fun removeStop(index: Int) { stops.value = stops.value.filterIndexed { i, _ -> i != index } }
+    fun moveStop(from: Int, to: Int) { stops.value = StopOrdering.move(stops.value, from, to) }
+
+    /** Mode tournée : ordre optimal calculé par le fournisseur (repli local plus proche voisin). */
+    fun optimizeStops() {
+        val o = origin.value ?: return
+        val current = stops.value
+        if (current.size < 2 || optimizing.value) return
+        viewModelScope.launch {
+            optimizing.value = true
+            val order = when (val r = routing.optimizeOrder(o, current.map { it.point }, destination, computedWith)) {
+                is Outcome.Success -> r.value
+                is Outcome.Failure -> StopOrdering.nearestNeighbour(o, current.map { it.point })
+            }
+            if (stops.value == current) stops.value = order.map { current[it] }
+            optimizing.value = false
+        }
+    }
 
     /** Démarre le guidage sur l'itinéraire sélectionné ; false si aucun itinéraire n'est affiché. */
     fun startGuidance(): Boolean {

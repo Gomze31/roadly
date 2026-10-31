@@ -9,6 +9,7 @@ import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -74,6 +75,37 @@ class ValhallaRoutingProvider @Inject constructor(
         return when (val r = api.postJson(url, body.toString())) {
             is Outcome.Success -> parse(r.value, request.costing)
             is Outcome.Failure -> Outcome.Failure(mapError(r.error))
+        }
+    }
+
+    /** `/optimized_route` : l'ordre renvoyé (`original_index`) garde le premier et le dernier point fixes. */
+    override suspend fun optimizeOrder(origin: GeoPoint, stops: List<GeoPoint>, destination: GeoPoint, preferences: RoutePreferences): Outcome<List<Int>> {
+        if (stops.size < 2) return Outcome.Success(stops.indices.toList())
+        val base = try { config.config.first().valhallaBaseUrl } catch (e: CancellationException) { throw e } catch (e: Exception) { return Outcome.Failure(AppError.ProviderUnavailable(id)) }
+        val url = "$base/optimized_route".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable(id))
+        val body = buildJsonObject {
+            putJsonArray("locations") { (listOf(origin) + stops + destination).forEach { p -> addJsonObject { put("lat", p.lat); put("lon", p.lon) } } }
+            put("costing", "auto")
+            putJsonObject("costing_options") {
+                putJsonObject("auto") {
+                    if (preferences.avoidTolls) put("use_tolls", 0)
+                    if (preferences.avoidHighways) put("use_highways", 0)
+                    if (preferences.avoidFerries) put("use_ferry", 0)
+                }
+            }
+            put("units", "kilometers")
+        }
+        return when (val r = api.postJson(url, body.toString())) {
+            is Outcome.Failure -> Outcome.Failure(mapError(r.error))
+            is Outcome.Success -> try {
+                val order = json.decodeFromString(ValhallaResponse.serializer(), r.value).trip.locations
+                    .mapNotNull { it.originalIndex }
+                    .filter { it in 1..stops.size }
+                    .map { it - 1 }
+                if (order.toSet() == stops.indices.toSet()) Outcome.Success(order) else Outcome.Failure(AppError.Parse("optimized_route"))
+            } catch (e: Exception) {
+                Outcome.Failure(AppError.Parse(e.message ?: "valhalla"))
+            }
         }
     }
 

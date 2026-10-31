@@ -8,6 +8,12 @@
     <string name="route_distance_label">distance</string>
     <string name="route_start">Rouler</string>
     <string name="route_add_stop">Ajouter un arrêt</string>
+    <string name="route_add_stop_n">Ajouter un arrêt (%1$d/%2$d)</string>
+    <string name="route_stop_up">Monter</string>
+    <string name="route_stop_down">Descendre</string>
+    <string name="route_stop_remove">Retirer l\'arrêt</string>
+    <string name="route_optimize">Optimiser l\'ordre</string>
+    <string name="route_optimizing">Optimisation…</string>
     <string name="route_no_origin_title">Position inconnue</string>
     <string name="route_no_origin_body">Appuyez longuement sur la carte pour choisir un point de départ.</string>
     <string name="route_toll_yes">Avec péage</string>

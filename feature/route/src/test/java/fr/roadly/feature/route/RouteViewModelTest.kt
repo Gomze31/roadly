@@ -87,7 +87,7 @@ class RouteViewModelTest {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
         session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), dispatchers, backgroundScope)
-        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, session)
+        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, session, routing)
     }
 
     @Test fun `without known position state is NoOrigin`() = runTest {
@@ -189,6 +189,32 @@ class RouteViewModelTest {
             expectMostRecentItem()
             assertEquals(6, seen.size)
             assertTrue(seen.drop(3).all { it.preferences.avoidTolls })
+        }
+    }
+    @Test fun `stops are added once, reordered, removed and passed as waypoints`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val a = fr.roadly.core.model.Place("a", "A", null, GeoPoint(48.81, 2.31), fr.roadly.core.model.PlaceKind.POI, "t")
+        val b = fr.roadly.core.model.Place("b", "B", null, GeoPoint(48.82, 2.32), fr.roadly.core.model.PlaceKind.POI, "t")
+        val seen = mutableListOf<List<GeoPoint>>()
+        routing = object : RoutingProvider {
+            override val id = "fake"
+            override suspend fun route(request: RouteRequest) = Outcome.Success(listOf(
+                Route(request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin) + request.waypoints + request.destination,
+                    listOf(Maneuver(ManeuverType.DEPART, "", null, 10_000.0, 600.0, 0, null), Maneuver(ManeuverType.ARRIVE, "", null, 0.0, 0.0, 1, null)), false, "fake"),
+            )).also { seen += request.waypoints }
+        }
+        val vm = vm()
+        vm.uiState.test {
+            advanceUntilIdle()
+            vm.addStop(a); vm.addStop(a); vm.addStop(b); advanceUntilIdle()
+            var c = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals(listOf(a, b), c.stops)
+            assertEquals(listOf(a.point, b.point), seen.last())
+            vm.moveStop(1, 0); advanceUntilIdle()
+            c = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals(listOf(b, a), c.stops)
+            vm.removeStop(0); advanceUntilIdle()
+            assertEquals(listOf(a), (expectMostRecentItem().phase as RouteUiState.Content).stops)
         }
     }
 }

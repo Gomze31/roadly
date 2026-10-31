@@ -1,17 +1,37 @@
 package fr.roadly.feature.route
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import fr.roadly.core.model.Place
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 @Serializable data class RouteRoute(val destLat: Double, val destLon: Double, val destName: String)
 
-/** [onStartNavigation] reçoit `begin` (démarre la session, false si rien à guider) ; l'app y ajoute permission et navigation. */
+/**
+ * [onStartNavigation] reçoit `begin` (démarre la session, false si rien à guider) ; l'app y ajoute permission et navigation.
+ * [onAddStop] ouvre la recherche en mode « choisir un arrêt » ; le lieu revient par `PICKED_STOP_KEY` du
+ * `savedStateHandle` de l'entrée de pile (distinct de celui du ViewModel), consommé ici.
+ */
 fun NavGraphBuilder.routeScreen(
     isDark: Boolean,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartNavigation: (begin: () -> Boolean) -> Unit = { begin -> begin() },
+    onAddStop: () -> Unit = {},
 ) {
-    composable<RouteRoute> { RouteScreen(isDark = isDark, onBack = onBack, onOpenSettings = onOpenSettings, onStartNavigation = onStartNavigation) }
+    composable<RouteRoute> { entry ->
+        val vm: RouteViewModel = hiltViewModel()
+        val picked by entry.savedStateHandle.getStateFlow<String?>(PICKED_STOP_KEY, null).collectAsStateWithLifecycle()
+        LaunchedEffect(picked) {
+            val raw = picked ?: return@LaunchedEffect
+            entry.savedStateHandle[PICKED_STOP_KEY] = null
+            runCatching { Json.decodeFromString(Place.serializer(), raw) }.getOrNull()?.let { vm.addStop(it) }
+        }
+        RouteScreen(isDark = isDark, onBack = onBack, onOpenSettings = onOpenSettings, onStartNavigation = onStartNavigation, onAddStop = onAddStop, vm = vm)
+    }
 }

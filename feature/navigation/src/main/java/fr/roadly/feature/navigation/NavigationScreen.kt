@@ -81,15 +81,15 @@ import fr.roadly.core.model.ManeuverType
 import java.util.Locale
 
 @Composable
-fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, vm: NavigationViewModel = hiltViewModel()) {
+fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}, vm: NavigationViewModel = hiltViewModel()) {
     // Mode conduite (spec §2) : typographie ×1,3 et cibles 56 dp via LocalDrivingMode = true.
     RoadlyTheme(darkTheme = isDark, drivingMode = true) {
-        NavigationContent(isDark, onExit, onChangeDestination, vm)
+        NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm)
     }
 }
 
 @Composable
-private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, vm: NavigationViewModel) {
+private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit, vm: NavigationViewModel) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
@@ -136,7 +136,7 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
 
     if (showReport) ReportSheet(onDismiss = { showReport = false })
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
-    if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives)
+    if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives, onAddStop = { vm.dismissAlternatives(); onAddStop() })
 }
 
 /** Portrait : bandeau en haut (replier à droite), actions à droite, compteur + Horizon + barre d'information en bas. */
