@@ -32,8 +32,10 @@ class ApiClient @Inject constructor(
 
     suspend fun get(url: HttpUrl): Outcome<String> = execute(Request.Builder().url(url).get().build())
 
-    suspend fun postJson(url: HttpUrl, body: String): Outcome<String> = execute(
-        Request.Builder().url(url).post(body.toRequestBody("application/json; charset=utf-8".toMediaType())).build(),
+    /** [headers] : en-têtes supplémentaires (clé d'API d'un service configuré par l'utilisateur, par exemple). */
+    suspend fun postJson(url: HttpUrl, body: String, headers: Map<String, String> = emptyMap()): Outcome<String> = execute(
+        Request.Builder().url(url).post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .apply { headers.forEach { (k, v) -> header(k, v) } }.build(),
     )
 
     private suspend fun execute(request: Request): Outcome<String> {

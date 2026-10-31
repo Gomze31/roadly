@@ -70,6 +70,14 @@
     <string name="settings_privacy">Confidentialité</string>
     <string name="settings_privacy_body">Vos positions ne quittent l\'appareil que vers les services listés ci-dessous (géocodage, routage, tuiles). Aucune donnée n\'est vendue ni stockée sur un serveur Roadly en v1.</string>
 
+    <string name="settings_group_community">Communauté</string>
+    <string name="settings_community_service">Service de signalements</string>
+    <string name="settings_community_connected">Connecté : signalements actifs</string>
+    <string name="settings_community_unconfigured">Non configuré : la feuille « Signaler » reste inactive</string>
+    <string name="settings_community_url">URL du projet Supabase (https://…supabase.co)</string>
+    <string name="settings_community_key">Clé anon (publique)</string>
+    <string name="settings_community_disconnect">Déconnecter</string>
+    <string name="settings_community_footer">Service auto-hébergé par l\'exploitant : schéma SQL, règles anti-triche et points dans backend/supabase/schema.sql (voir docs/BACKEND.md). Seule la position d\'un signalement ou d\'un vote est envoyée, sous un pseudonyme d\'appareil.</string>
     <string name="settings_providers">Fournisseurs (avancé)</string>
     <string name="settings_providers_servers">Serveurs de données</string>
     <string name="settings_providers_servers_subtitle">Adresses, lieux, itinéraires et styles de carte</string>

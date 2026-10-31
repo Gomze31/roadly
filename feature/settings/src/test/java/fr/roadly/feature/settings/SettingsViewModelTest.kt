@@ -73,7 +73,15 @@ class SettingsViewModelTest {
         override suspend fun refreshIfStale(nowMs: Long): Outcome<Int>? = null
     }
 
-    private fun vm() = SettingsViewModel(vehicle, prefs, config, recents, favorites, speech, vigilance)
+    private val communityCfg = object : fr.roadly.core.data.community.CommunityConfigRepository {
+        val c = MutableStateFlow(fr.roadly.core.data.community.CommunityConfig())
+        override val config = c
+        override suspend fun save(config: fr.roadly.core.data.community.CommunityConfig) { c.value = config }
+        override suspend fun clear() { c.value = fr.roadly.core.data.community.CommunityConfig() }
+        override suspend fun deviceId() = "dev"
+    }
+
+    private fun vm() = SettingsViewModel(vehicle, prefs, config, recents, favorites, speech, vigilance, communityCfg)
 
     @Test fun `saving vehicle parses french decimals and rejects invalid price`() = runTest {
         val vm = vm()

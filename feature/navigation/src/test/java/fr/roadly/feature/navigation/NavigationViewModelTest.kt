@@ -86,7 +86,7 @@ class NavigationViewModelTest {
     private fun fixAt(along: Double) = LocationFix(tracker.pointAt(along), 90f, 10f, 5f, 0L)
 
     private fun NavigationViewModel(s: NavigationSession, p: FakeUserPreferencesRepository, c: ProviderConfigRepository) =
-        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing), routing, fakeVehicle)
+        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing), routing, fakeVehicle, NoopCommunity)
 
     @Test fun `alternatives are computed from the snapped position and switching restarts guidance on the chosen route`() = runTest {
         val okRouting = object : RoutingProvider {
@@ -95,7 +95,7 @@ class NavigationViewModelTest {
             override suspend fun route(request: RouteRequest): Outcome<List<Route>> { origins += request.origin; return Outcome.Success(listOf(route.copy(id = "alt-" + request.costing.name))) }
         }
         val s = session()
-        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting), okRouting, fakeVehicle)
+        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting), okRouting, fakeVehicle, NoopCommunity)
         vm.uiState.test {
             s.start(option, RoutePreferences()); runCurrent()
             location.emit(fixAt(300.0)); runCurrent()
@@ -226,4 +226,11 @@ class NavigationViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+}
+
+private object NoopCommunity : fr.roadly.core.data.community.CommunityRepository {
+    override val isConfigured = flowOf(false)
+    override suspend fun report(kind: fr.roadly.core.model.ReportKind, at: fr.roadly.core.model.GeoPoint, headingDeg: Float?) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
+    override suspend fun nearby(box: fr.roadly.core.model.BoundingBox) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
+    override suspend fun vote(reportId: String, confirm: Boolean) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
 }

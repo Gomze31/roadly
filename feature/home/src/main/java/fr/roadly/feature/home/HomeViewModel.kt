@@ -6,6 +6,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
+import fr.roadly.core.data.community.CommunityRepository
+import fr.roadly.core.data.community.pollNearby
 import fr.roadly.core.data.connectivity.ConnectivityObserver
 import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.geocoding.GeocodingProvider
@@ -15,13 +17,16 @@ import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.location.PermissionEvents
 import fr.roadly.core.map.CameraMode
 import fr.roadly.core.map.CameraSnapshot
+import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.ReportKind
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +52,29 @@ class HomeViewModel @Inject constructor(
     config: ProviderConfigRepository,
     permissionEvents: PermissionEvents,
     navigationSession: NavigationSession,
+    private val community: CommunityRepository,
 ) : ViewModel() {
+
+    /** Service communautaire configuré (Réglages → Communauté) : feuille « Signaler » active, signalements sur la carte. */
+    val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /** Signalements actifs autour de la position (toutes les 60 s). */
+    val reports: StateFlow<List<CommunityReport>> = community.pollNearby({ location.lastKnown?.point }).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val _reportMessage = MutableStateFlow<String?>(null)
+    /** Résultat du dernier signalement (affiché brièvement) ; null = rien à montrer. */
+    val reportMessage: StateFlow<String?> = _reportMessage
+
+    /** Envoie un signalement à la position courante ; sans position ou sans service, rien n'est envoyé. */
+    fun report(kind: ReportKind) {
+        val fix = location.lastKnown ?: return
+        viewModelScope.launch {
+            _reportMessage.value = when (val r = community.report(kind, fix.point, fix.bearingDeg)) {
+                is Outcome.Success -> "sent"
+                is Outcome.Failure -> "error:" + r.error.javaClass.simpleName
+            }
+            delay(4_000)
+            _reportMessage.value = null
+        }
+    }
 
     private val cameraMode = MutableStateFlow(CameraMode.CENTERED)
     private val address = MutableStateFlow<String?>(null)

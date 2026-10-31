@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import fr.roadly.core.data.community.CommunityConfig
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.ThemeMode
@@ -84,6 +86,7 @@ import fr.roadly.core.designsystem.component.RowDivider
 import fr.roadly.core.designsystem.component.SegmentedControl
 import fr.roadly.core.designsystem.component.SettingsGroup
 import fr.roadly.core.designsystem.component.StatRow
+import fr.roadly.core.designsystem.component.StatusDot
 import fr.roadly.core.designsystem.component.ToggleRow
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
@@ -105,6 +108,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
     val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
+    val community by vm.community.collectAsStateWithLifecycle()
 
     RoadlyScreen {
         RoadlyTopBar(title = stringResource(R.string.settings_title), onBack = onBack, backDescription = stringResource(R.string.settings_back))
@@ -122,6 +126,7 @@ fun SettingsScreen(onBack: () -> Unit, vm: SettingsViewModel = hiltViewModel()) 
             RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
             DataGroup(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
             PrivacyGroup()
+            CommunityGroup(community, onSave = vm::saveCommunity, onClear = vm::clearCommunity)
             ProvidersGroup(state.providers, providerError, onSave = vm::saveProviders, onReset = vm::resetProviders)
             AboutGroup()
             Spacer(Modifier.height(RoadlySpacing.s))
@@ -404,6 +409,33 @@ private fun PrivacyGroup() {
             IconTile(Icons.Default.Shield, size = 36.dp)
             Spacer(Modifier.width(RoadlySpacing.sm))
             Text(stringResource(R.string.settings_privacy_body), style = MaterialTheme.typography.bodyMedium, color = LocalRoadlyColors.current.textSecondary)
+        }
+    }
+}
+
+// ── Communauté (signalements) ───────────────────────────────────────────────
+
+@Composable
+private fun CommunityGroup(cfg: CommunityConfig, onSave: (String, String) -> Unit, onClear: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    var url by remember(cfg) { mutableStateOf(cfg.supabaseUrl) }
+    var key by remember(cfg) { mutableStateOf(cfg.anonKey) }
+    var editing by remember { mutableStateOf(false) }
+    SettingsGroup(stringResource(R.string.settings_group_community), footer = stringResource(R.string.settings_community_footer)) {
+        ListRow(
+            stringResource(R.string.settings_community_service),
+            subtitle = stringResource(if (cfg.isConfigured) R.string.settings_community_connected else R.string.settings_community_unconfigured),
+            icon = Icons.Default.Groups, iconStyle = if (cfg.isConfigured) IconTileStyle.Brand else IconTileStyle.Neutral,
+            onClick = { editing = !editing }, chevron = false, divider = false,
+            trailing = { StatusDot(if (cfg.isConfigured) c.success else c.textTertiary); Spacer(Modifier.width(RoadlySpacing.s)); ExpandArrow(editing) },
+        )
+        ExpandableContent(editing) {
+            SettingsField(stringResource(R.string.settings_community_url), url, { url = it }, KeyboardType.Uri)
+            SettingsField(stringResource(R.string.settings_community_key), key, { key = it }, KeyboardType.Password)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                GlassButton(stringResource(R.string.settings_save), onClick = { onSave(url, key) }, enabled = CommunityConfig(url, key).isConfigured)
+                if (cfg.isConfigured) GlassButton(stringResource(R.string.settings_community_disconnect), onClick = onClear, style = GlassButtonStyle.Danger)
+            }
         }
     }
 }

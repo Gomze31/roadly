@@ -1,5 +1,6 @@
 package fr.roadly.core.map
 
+import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
@@ -16,6 +17,7 @@ internal object MapIds {
     const val SRC_USER = "roadly-user"
     const val SRC_ROUTES = "roadly-routes"
     const val SRC_MARKERS = "roadly-markers"
+    const val SRC_REPORTS = "roadly-reports"
     const val SRC_TRAVERSED = "roadly-traversed"
     const val LYR_ACCURACY = "roadly-accuracy"
     const val LYR_USER = "roadly-user-arrow"
@@ -25,8 +27,10 @@ internal object MapIds {
     const val LYR_ROUTE_ACTIVE = "roadly-route-active"
     const val LYR_ROUTE_TRAVERSED = "roadly-route-traversed"
     const val LYR_MARKERS = "roadly-markers"
+    const val LYR_REPORTS = "roadly-reports"
     const val IMG_ARROW = "roadly-img-arrow"
     const val IMG_PIN = "roadly-img-pin"
+    const val IMG_REPORT = "roadly-img-report"
 }
 
 /** GeoJSON FeatureCollection des tracés ; l'itinéraire actif est placé en dernier (dessiné au-dessus). */
@@ -57,6 +61,19 @@ internal object PointFeatureBuilder {
         put("type", "Feature")
         putJsonObject("properties") { put("bearing", (fix.bearingDeg ?: 0f).toDouble()); put("accuracy", fix.accuracyM.toDouble()) }
         putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(fix.point.lon), JsonPrimitive(fix.point.lat)))) }
+    }.toString()
+
+    fun reports(reports: List<CommunityReport>): String = buildJsonObject {
+        put("type", "FeatureCollection")
+        putJsonArray("features") {
+            reports.forEach { r ->
+                add(buildJsonObject {
+                    put("type", "Feature")
+                    putJsonObject("properties") { put("id", r.id); put("kind", r.kind.name) }
+                    putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(r.point.lon), JsonPrimitive(r.point.lat)))) }
+                })
+            }
+        }
     }.toString()
 
     fun markers(places: List<Place>): String = buildJsonObject {

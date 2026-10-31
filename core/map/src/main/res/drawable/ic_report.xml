@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Signalement communautaire : disque ambre, bord sombre, point d'exclamation. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp" android:height="30dp" android:viewportWidth="30" android:viewportHeight="30">
+    <path android:fillColor="#F5A524" android:strokeColor="#0E0B14" android:strokeWidth="2" android:pathData="M15,15m-13,0a13,13 0,1 1,26 0a13,13 0,1 1,-26 0" />
+    <path android:fillColor="#0E0B14" android:pathData="M13.6,7h2.8l-0.5,10h-1.8zM15,19.2a1.7,1.7 0,1 1,0 3.4a1.7,1.7 0,1 1,0 -3.4z" />
+</vector>

@@ -96,7 +96,7 @@ class HomeViewModelTest {
     }
 
     private fun TestScope.vm(session: NavigationSession = session()) =
-        HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents(), session)
+        HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents(), session, NoopCommunity)
 
     @Test fun `collecting state switches location to MAP mode and exposes speed in km per h`() = runTest {
         val vm = vm()
@@ -145,4 +145,12 @@ class HomeViewModelTest {
             assertEquals(false, awaitItem())
         }
     }
+}
+
+/** Service communautaire non configuré : aucun appel. */
+private object NoopCommunity : fr.roadly.core.data.community.CommunityRepository {
+    override val isConfigured = kotlinx.coroutines.flow.flowOf(false)
+    override suspend fun report(kind: fr.roadly.core.model.ReportKind, at: GeoPoint, headingDeg: Float?) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
+    override suspend fun nearby(box: fr.roadly.core.model.BoundingBox) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
+    override suspend fun vote(reportId: String, confirm: Boolean) = Outcome.Failure(AppError.ProviderUnavailable("communauté"))
 }

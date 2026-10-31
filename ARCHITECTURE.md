@@ -68,4 +68,4 @@ Supabase : Auth (pseudonyme d'appareil puis e-mail sans mot de passe), tables `r
 
 ## 8. Qualité
 
-268 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.
+272 tests unitaires (JVM) + 3 tests instrumentés (Room ×2, Compose ×1) verts sur appareil ; fixtures = enregistrements réels des API ; revue par diff à chaque tâche ; `FEATURES.md` tient le statut de chaque fonction.

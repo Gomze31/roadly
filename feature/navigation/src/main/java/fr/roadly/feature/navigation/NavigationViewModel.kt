@@ -5,14 +5,20 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.common.Formatters
+import fr.roadly.core.data.community.CommunityRepository
+import fr.roadly.core.data.community.pollNearby
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
+import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.Place
+import fr.roadly.core.model.ReportKind
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.navigation.RouteGeometry
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
@@ -43,7 +49,37 @@ class NavigationViewModel @Inject constructor(
     private val alternatives: RouteAlternativesUseCase,
     private val routing: RoutingProvider,
     vehicleRepo: VehicleProfileRepository,
+    private val community: CommunityRepository,
 ) : ViewModel() {
+    val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /** Signalements autour de la position projetée (toutes les 60 s), affichés sur la carte. */
+    val reports: StateFlow<List<CommunityReport>> = community.pollNearby({ (session.state.value as? NavigationState.Guiding)?.progress?.snapped }).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val _reportMessage = MutableStateFlow<String?>(null)
+    val reportMessage: StateFlow<String?> = _reportMessage
+
+    /** Signalement à la position projetée, avec le cap ; résultat affiché 4 s. */
+    fun report(kind: ReportKind) {
+        val g = session.state.value as? NavigationState.Guiding ?: return
+        viewModelScope.launch {
+            _reportMessage.value = when (val r = community.report(kind, g.progress.snapped, g.progress.bearingDeg)) {
+                is Outcome.Success -> "sent"
+                is Outcome.Failure -> "error:" + r.error.javaClass.simpleName
+            }
+            delay(4_000)
+            _reportMessage.value = null
+        }
+    }
+
+    /** Signalements projetés sur le tracé courant, devant soi (≤ 60 m du tracé, ≤ 5 km) : alimentent l'Horizon. */
+    val reportsAhead: StateFlow<List<ReportAheadUi>> = combine(reports, session.state) { list, s ->
+        val g = s as? NavigationState.Guiding ?: return@combine emptyList()
+        val geo = RouteGeometry(g.route.geometry)
+        list.mapNotNull { r ->
+            val p = geo.project(r.point) ?: return@mapNotNull null
+            val d = p.alongM - g.progress.distanceAlongM
+            if (p.offsetM > 60.0 || d < -50.0 || d > 5_000.0) null else ReportAheadUi(r, d.coerceAtLeast(0.0), Formatters.distance(d.coerceAtLeast(0.0)))
+        }.sortedBy { it.distanceM }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val vehicle = vehicleRepo.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val isDark = MutableStateFlow(true)
     private val following = MutableStateFlow(true)
@@ -126,3 +162,6 @@ class NavigationViewModel @Inject constructor(
 
     companion object { const val RECENTER_AFTER_MS = 8_000L }
 }
+
+/** Signalement devant soi : [distanceM] le long du tracé depuis la position projetée. */
+data class ReportAheadUi(val report: CommunityReport, val distanceM: Double, val distanceText: String)

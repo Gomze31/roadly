@@ -30,7 +30,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Explore
@@ -148,6 +150,10 @@ fun HomeScreen(
             )
         }
 
+        // Résultat du dernier signalement, 4 s, sous la barre de recherche.
+        val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
+        ReportResultPill(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 76.dp))
+
         // Colonne d'actions à droite : signaler (feuille des types), boussole si la carte est tournée.
         Column(
             Modifier.align(if (landscape) Alignment.TopEnd else Alignment.CenterEnd).statusBarsPadding().padding(RoadlySpacing.screenEdge).padding(top = if (landscape) 60.dp else 0.dp),
@@ -208,7 +214,10 @@ fun HomeScreen(
         }
     }
 
-    if (showReport) ReportSheet(onDismiss = { showReport = false })
+    val communityEnabled by vm.communityEnabled.collectAsStateWithLifecycle()
+    val reports by vm.reports.collectAsStateWithLifecycle()
+    LaunchedEffect(reports) { map.setReports(reports) }
+    if (showReport) ReportSheet(onDismiss = { showReport = false }, enabled = communityEnabled, onSelect = vm::report)
     val fix = state.fix
     if (showPosition && fix != null) PositionSheet(point = fix.point, address = state.address, onDismiss = { showPosition = false })
 
@@ -405,3 +414,26 @@ private fun PositionSheet(point: GeoPoint, address: String?, onDismiss: () -> Un
 
 /** Couleur Compose → `#RRGGBB` (CSS, sans alpha) pour les couches de style MapLibre. */
 private fun Color.toHex(): String = String.format(Locale.ROOT, "#%06X", 0xFFFFFF and toArgb())
+
+/** « Signalement envoyé » / « Signalement impossible : … » pendant 4 s ; `null` = rien. */
+@Composable
+internal fun ReportResultPill(message: String?, modifier: Modifier = Modifier) {
+    val c = LocalRoadlyColors.current
+    AnimatedVisibility(message != null, modifier = modifier, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+        val ok = message == "sent"
+        GlassPanel(contentPadding = 10.dp, shape = RoadlyShapes.Chip) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (ok) Icons.Default.CheckCircle else Icons.Default.ErrorOutline, contentDescription = null, tint = if (ok) c.success else c.danger, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(when {
+                        ok -> R.string.report_sent
+                        message == "error:RateLimited" -> R.string.report_rate_limited
+                        else -> R.string.report_failed
+                    }),
+                    style = MaterialTheme.typography.labelLarge, color = c.textPrimary,
+                )
+            }
+        }
+    }
+}

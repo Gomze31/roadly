@@ -64,6 +64,8 @@ import fr.roadly.core.designsystem.component.LoadingRow
 import fr.roadly.core.designsystem.component.NavInfoBar
 import fr.roadly.core.designsystem.component.RoundButtonStyle
 import fr.roadly.core.designsystem.component.ReportSheet
+import fr.roadly.core.designsystem.component.horizonKind
+import fr.roadly.core.designsystem.component.labelRes
 import fr.roadly.core.designsystem.component.RoundIconButton
 import fr.roadly.core.designsystem.component.SpeedBadge
 import fr.roadly.core.designsystem.component.SpeedLimitSign
@@ -124,17 +126,25 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
+        // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
+        val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
+        val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
+        val full = state.copy(communityAhead = reportsAhead)
         if (state.styleUrl.isNotEmpty()) {
             RoadlyMap(styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture)
         }
         if (landscape) {
-            LandscapeOverlay(state, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
+            LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
         } else {
-            PortraitOverlay(state, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
+            PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
         }
+        ReportResultPillNav(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp))
     }
 
-    if (showReport) ReportSheet(onDismiss = { showReport = false })
+    val communityEnabled by vm.communityEnabled.collectAsStateWithLifecycle()
+    val reports by vm.reports.collectAsStateWithLifecycle()
+    LaunchedEffect(reports) { map.setReports(reports) }
+    if (showReport) ReportSheet(onDismiss = { showReport = false }, enabled = communityEnabled, onSelect = vm::report)
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
     if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives, onAddStop = { vm.dismissAlternatives(); onAddStop() })
 }
@@ -264,7 +274,7 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
     val c = LocalRoadlyColors.current
     when (state.phase) {
         NavigationPhase.GUIDING -> {
-            AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty()) {
+            AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()) {
                 HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
             }
             NavInfoBar(
@@ -289,6 +299,10 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
         val what = u.street ?: stringResource(R.string.nav_horizon_maneuver)
         HorizonItem(kind, u.distanceM, "${u.distanceText} · $what", "$what dans ${u.distanceText}")
     }
+    val community = state.communityAhead.map { r ->
+        val what = stringResource(r.report.kind.labelRes())
+        HorizonItem(r.report.kind.horizonKind(), r.distanceM, "${r.distanceText} · $what", "$what dans ${r.distanceText}")
+    }
     val hazards = state.hazards.map { h ->
         when (h.kind) {
             HazardKind.CURVE -> {
@@ -301,7 +315,7 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
             }
         }
     }
-    return (maneuvers + hazards).sortedBy { it.distanceM }
+    return (maneuvers + hazards + community).sortedBy { it.distanceM }
 }
 
 /** Badge « Zone de vigilance » (avec sa limitation si connue) et badge pluie, à côté du compteur. */
@@ -406,3 +420,18 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 private fun Color.toHex(): String = String.format(Locale.ROOT, "#%06X", 0xFFFFFF and toArgb())
+
+/** Retour du dernier signalement (« envoyé », « limité », « impossible ») pendant 4 s ; `null` = rien. */
+@Composable
+private fun ReportResultPillNav(message: String?, modifier: Modifier = Modifier) {
+    val c = LocalRoadlyColors.current
+    AnimatedVisibility(message != null, modifier = modifier) {
+        val ok = message == "sent"
+        GlassPanel(contentPadding = 10.dp, shape = RoadlyShapes.Chip) {
+            Text(
+                stringResource(when { ok -> R.string.nav_report_sent; message == "error:RateLimited" -> R.string.nav_report_rate_limited; else -> R.string.nav_report_failed }),
+                style = MaterialTheme.typography.labelLarge, color = if (ok) c.success else c.danger,
+            )
+        }
+    }
+}

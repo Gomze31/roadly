@@ -14,6 +14,9 @@
     <string name="nav_collapse_banner">Replier le bandeau</string>
     <string name="nav_expand_banner">Déplier le bandeau</string>
     <string name="nav_report">Signaler</string>
+    <string name="nav_report_sent">Signalement envoyé, merci !</string>
+    <string name="nav_report_rate_limited">Un signalement par minute au maximum.</string>
+    <string name="nav_report_failed">Signalement impossible pour le moment.</string>
     <string name="nav_horizon_title">La route à venir</string>
     <string name="nav_horizon_maneuver">manœuvre</string>
     <string name="nav_horizon_curve">virage</string>

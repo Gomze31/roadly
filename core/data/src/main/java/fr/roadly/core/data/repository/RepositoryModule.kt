@@ -8,6 +8,10 @@ import fr.roadly.core.data.config.DataStoreProviderConfigRepository
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.connectivity.AndroidConnectivityObserver
 import fr.roadly.core.data.connectivity.ConnectivityObserver
+import fr.roadly.core.data.community.CommunityConfigRepository
+import fr.roadly.core.data.community.CommunityRepository
+import fr.roadly.core.data.community.DataStoreCommunityConfigRepository
+import fr.roadly.core.data.community.SupabaseCommunityRepository
 import fr.roadly.core.data.fuel.FuelStationProvider
 import fr.roadly.core.data.fuel.OpenDataFuelStationProvider
 import fr.roadly.core.data.vigilance.RoomVigilanceRepository
@@ -24,4 +28,6 @@ abstract class RepositoryModule {
     @Binds abstract fun connectivity(impl: AndroidConnectivityObserver): ConnectivityObserver
     @Binds abstract fun vigilance(impl: RoomVigilanceRepository): VigilanceRepository
     @Binds abstract fun fuel(impl: OpenDataFuelStationProvider): FuelStationProvider
+    @Binds abstract fun communityConfig(impl: DataStoreCommunityConfigRepository): CommunityConfigRepository
+    @Binds abstract fun community(impl: SupabaseCommunityRepository): CommunityRepository
 }

@@ -46,6 +46,8 @@ data class NavigationUiState(
     /** Virages et zones devant soi (≤ 5 km), triés par distance. */
     val hazards: List<HazardUi> = emptyList(),
     val activeZone: RouteHazard? = null,
+    /** Signalements communautaires devant soi (projetés sur le tracé), fournis par le ViewModel. */
+    val communityAhead: List<ReportAheadUi> = emptyList(),
     val raining: Boolean? = null,
     val limitLoweredByRain: Boolean = false,
     val etaClock: String = "",

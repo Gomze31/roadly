@@ -18,6 +18,9 @@
     <string name="home_picked_route">Itinéraire vers ce point</string>
     <string name="home_resume_guidance">Reprendre le guidage</string>
     <string name="home_report">Signaler</string>
+    <string name="report_sent">Signalement envoyé, merci !</string>
+    <string name="report_rate_limited">Un signalement par minute au maximum.</string>
+    <string name="report_failed">Signalement impossible pour le moment.</string>
     <string name="home_compass">Remettre le nord en haut</string>
     <string name="home_position_title">Ma position</string>
     <string name="home_position_no_address">Adresse inconnue</string>

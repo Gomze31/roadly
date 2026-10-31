@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.data.community.CommunityConfig
+import fr.roadly.core.data.community.CommunityConfigRepository
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.config.normalized
@@ -73,7 +75,12 @@ class SettingsViewModel @Inject constructor(
     private val favorites: FavoritesRepository,
     private val speech: SpeechService,
     private val vigilanceRepo: VigilanceRepository,
+    private val communityConfig: CommunityConfigRepository,
 ) : ViewModel() {
+    /** Réglages → Communauté : URL et clé du projet Supabase de l'exploitant. */
+    val community: StateFlow<CommunityConfig> = communityConfig.config.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CommunityConfig())
+    fun saveCommunity(url: String, key: String) { viewModelScope.launch { communityConfig.save(CommunityConfig(url, key)) } }
+    fun clearCommunity() { viewModelScope.launch { communityConfig.clear() } }
 
     private val alerts = combine(prefs.vigilanceEnabled, prefs.vigilanceSound, prefs.rainLowersLimit, vigilanceRepo.count, vigilanceRepo.updatedAtMs) { e, s, r, n, u -> AlertSettings(e, s, r, n, u) }
     private val _vigilanceRefresh = MutableStateFlow<RefreshState>(RefreshState.Idle)

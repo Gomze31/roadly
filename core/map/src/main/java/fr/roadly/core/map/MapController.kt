@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.core.content.ContextCompat
 import fr.roadly.core.model.BoundingBox
+import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
@@ -54,6 +55,7 @@ class MapController(internal val context: Context) {
     private var lastRoutes: List<Route> = emptyList()
     private var lastActiveRouteId: String? = null
     private var lastMarkers: List<Place> = emptyList()
+    private var lastReports: List<CommunityReport> = emptyList()
     private var lastTraversed: String = TraversedFeatureBuilder.EMPTY
     private var routeColorActive = "#B794FF"
     private var routeColorInactive = "#5A5470"
@@ -110,6 +112,8 @@ class MapController(internal val context: Context) {
     private fun installLayers(style: Style) {
         style.addImage(MapIds.IMG_ARROW, drawableToBitmap(R.drawable.ic_user_arrow))
         style.addImage(MapIds.IMG_PIN, drawableToBitmap(R.drawable.ic_place_pin))
+        style.addImage(MapIds.IMG_REPORT, drawableToBitmap(R.drawable.ic_report))
+        style.addSource(GeoJsonSource(MapIds.SRC_REPORTS))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
         style.addSource(GeoJsonSource(MapIds.SRC_MARKERS))
@@ -135,6 +139,9 @@ class MapController(internal val context: Context) {
         style.addLayer(SymbolLayer(MapIds.LYR_MARKERS, MapIds.SRC_MARKERS).withProperties(
             iconImage(MapIds.IMG_PIN), iconAnchor(Property.ICON_ANCHOR_BOTTOM), iconAllowOverlap(true), iconSize(1f),
         ))
+        style.addLayer(SymbolLayer(MapIds.LYR_REPORTS, MapIds.SRC_REPORTS).withProperties(
+            iconImage(MapIds.IMG_REPORT), iconAnchor(Property.ICON_ANCHOR_CENTER), iconAllowOverlap(true), iconSize(1f),
+        ))
         style.addLayer(CircleLayer(MapIds.LYR_ACCURACY, MapIds.SRC_USER).withProperties(
             circleColor(routeColorActive), circleOpacity(0.15f), circleRadius(18f),
         ))
@@ -149,6 +156,7 @@ class MapController(internal val context: Context) {
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ROUTES)?.setGeoJson(RouteFeatureBuilder.build(lastRoutes, lastActiveRouteId))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(lastReports))
         (style.getLayer(MapIds.LYR_ROUTE_ACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorActive))
         (style.getLayer(MapIds.LYR_ROUTE_GLOW) as? LineLayer)?.setProperties(lineColor(routeColorActive))
         (style.getLayer(MapIds.LYR_ROUTE_CASING) as? LineLayer)?.setProperties(lineColor(routeColorCasing))
@@ -167,6 +175,12 @@ class MapController(internal val context: Context) {
     fun setRoutes(routes: List<Route>, activeId: String?) {
         lastRoutes = routes; lastActiveRouteId = activeId
         if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_ROUTES)?.setGeoJson(RouteFeatureBuilder.build(routes, activeId))
+    }
+
+    /** Signalements communautaires actifs autour de la position (couche dédiée, icône ambre). */
+    fun setReports(reports: List<CommunityReport>) {
+        lastReports = reports
+        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(reports))
     }
 
     fun setMarkers(places: List<Place>) {
