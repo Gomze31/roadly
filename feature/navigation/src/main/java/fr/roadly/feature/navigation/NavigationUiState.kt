@@ -3,6 +3,7 @@ package fr.roadly.feature.navigation
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Formatters
 import fr.roadly.core.data.repository.GuidanceDefaults
+import fr.roadly.core.map.GuidanceCameraPolicy
 import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.Lane
 import fr.roadly.core.model.ManeuverType
@@ -24,10 +25,15 @@ data class BannerUi(
     val street: String?,
     val exitNumber: String?,
     val roundaboutExit: Int?,
+    /** Direction du panneau de sortie (« Lyon · Mâcon »), si Valhalla la fournit. */
+    val exitToward: String? = null,
 )
 
 /** Manœuvre à venir ; [distanceM] sert au ruban Horizon (échelle), [distanceText] à l'affichage. */
 data class UpcomingUi(val type: ManeuverType, val distanceText: String, val street: String?, val distanceM: Double = 0.0)
+
+/** Approche d'une intersection (vue serrée, flèche, panneau) ; [maneuverShapeIndex] = point du tracé où dessiner la flèche. */
+data class ApproachUi(val type: ManeuverType, val exitNumber: String?, val exitToward: String?, val maneuverShapeIndex: Int)
 
 /** Virage ou zone de vigilance devant soi : [distanceM] jusqu'au début, [limitKmh] si connue, [angleDeg] pour un virage. */
 data class HazardUi(val kind: HazardKind, val distanceM: Double, val distanceText: String, val limitKmh: Int?, val angleDeg: Double?)
@@ -43,6 +49,7 @@ data class NavigationUiState(
     val banner: BannerUi? = null,
     val lanes: List<Lane> = emptyList(),
     val upcoming: List<UpcomingUi> = emptyList(),
+    val approach: ApproachUi? = null,
     /** Virages et zones devant soi (≤ 5 km), triés par distance. */
     val hazards: List<HazardUi> = emptyList(),
     val activeZone: RouteHazard? = null,
@@ -112,7 +119,8 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 phase = NavigationPhase.GUIDING,
                 route = s.route,
                 progress = p,
-                banner = BannerUi(m.type, Formatters.distance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit),
+                banner = BannerUi(m.type, Formatters.distance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit, m.exitToward),
+                approach = if (GuidanceCameraPolicy.isApproaching(p.distanceToNextManeuverM, m.type, s.speedKmh)) ApproachUi(m.type, m.exitNumber, m.exitToward, m.beginShapeIndex) else null,
                 lanes = s.lanes,
                 upcoming = upcoming,
                 hazards = hazardsAhead(s.hazards, p.distanceAlongM),

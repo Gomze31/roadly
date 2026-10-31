@@ -156,6 +156,25 @@ class NavigationViewModelTest {
         }
     }
 
+    @Test fun `approach is flagged within 150 m of a turn and the exit direction reaches the banner`() = runTest {
+        val withSign = route.copy(maneuvers = route.maneuvers.mapIndexed { i, m -> if (i == 1) m.copy(exitNumber = "12", exitToward = "Lyon · Mâcon") else m })
+        val s = session()
+        val vm = NavigationViewModel(s, prefs, config)
+        vm.uiState.test {
+            s.start(option.copy(route = withSign), RoutePreferences()); runCurrent()
+            location.emit(fixAt(300.0)); runCurrent()
+            assertNull(vm.uiState.value.approach)
+            assertEquals("Lyon · Mâcon", vm.uiState.value.banner!!.exitToward)
+            location.emit(fixAt(650.0)); runCurrent()
+            val approach = vm.uiState.value.approach!!
+            assertEquals(ManeuverType.TURN_RIGHT, approach.type)
+            assertEquals("12", approach.exitNumber)
+            assertEquals("Lyon · Mâcon", approach.exitToward)
+            assertEquals(10, approach.maneuverShapeIndex)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test fun `mute toggles the session and stop ends in IDLE`() = runTest {
         val s = session()
         val vm = NavigationViewModel(s, prefs, config)
