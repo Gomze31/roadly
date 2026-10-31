@@ -3,6 +3,7 @@ package fr.roadly.core.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -57,5 +59,16 @@ class DataStoreUserPreferencesRepositoryTest {
         repo.setVoiceEnabled(false); repo.setSpeedAlertSound(true)
         assertEquals(false, repo.voiceEnabled.first())
         assertEquals(true, repo.speedAlertSound.first())
+    }
+
+    @Test fun `last guidance round trip and clear`() = runTest {
+        assertNull(repo.lastGuidance.first())
+        val saved = LastGuidance(GeoPoint(48.8738, 2.2950), "Arc de Triomphe", "route-1", 1_782_131_520_000L)
+        repo.setLastGuidance(saved)
+        assertEquals(saved, repo.lastGuidance.first())
+        repo.setLastGuidance(saved.copy(destinationName = null))
+        assertEquals(null, repo.lastGuidance.first()!!.destinationName)
+        repo.setLastGuidance(null)
+        assertNull(repo.lastGuidance.first())
     }
 }

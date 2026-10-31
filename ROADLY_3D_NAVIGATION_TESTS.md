@@ -46,3 +46,4 @@ Commandes : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test 
 | Date | Scénarios | Appareil | Résultat | Notes |
 |---|---|---|---|---|
 | 2026-10-31 | 1 (stationnaire), 2 (approche), 15 (3D off), 19 | HONOR Magic 8 Pro | OK (phase 1) | sans sortie ni voies sur le trajet d'essai ; économie d'énergie et recentrage à refaire |
+| 2026-10-31 | B : 1–14, 20 automatisés (JVM) | — | verts | essais réels à faire : `adb shell am kill fr.roadly` en guidage → `lastGuidance` présent (bouton « Reprendre » : E3), 130 km/h sur autoroute, double rond-point |

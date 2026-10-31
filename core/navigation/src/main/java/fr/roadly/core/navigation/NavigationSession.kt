@@ -5,6 +5,7 @@ import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.di.ApplicationScope
 import fr.roadly.core.data.repository.GuidanceDefaults
+import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.location.LocationRepository
@@ -75,14 +76,17 @@ class NavigationSession @Inject constructor(
     private var lastOption: RouteOption? = null
     private var lastPreferences = RoutePreferences()
     private var lastVehicle: VehicleProfile? = null
+    /** Nom de destination de la dernière course demandée : repris par [retry] pour ne pas l'effacer de `lastGuidance`. */
+    private var lastDestinationName: String? = null
 
     /** Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs. */
-    /** [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto. */
-    fun start(option: RouteOption, preferences: RoutePreferences, vehicle: VehicleProfile? = null) {
+    /** [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto. [destinationName] : nom mémorisé (B6). */
+    fun start(option: RouteOption, preferences: RoutePreferences, vehicle: VehicleProfile? = null, destinationName: String? = null) {
         cancelRun(null)
         lastOption = option
         lastPreferences = preferences
         lastVehicle = vehicle
+        lastDestinationName = destinationName
         if (location.permissionState.value != LocationPermissionState.GRANTED) {
             publishFailure(NavigationState.Failed(AppError.PermissionDenied))
             return
@@ -102,6 +106,8 @@ class NavigationSession @Inject constructor(
         location.setGuidanceActive(true)
         serviceController.start()
         job = scope.launch(confined) { run.execute() }
+        // B6 : course mémorisée pour être proposée à la reprise après la mort du processus (bouton : Étape E3).
+        persistLastGuidance(LastGuidance(option.route.geometry.last(), destinationName, option.route.id, clock.nowMs()))
     }
 
     /** Arrête la course : `Idle`, GPS relâché, parole coupée et moteur de synthèse libéré. */
@@ -109,12 +115,13 @@ class NavigationSession @Inject constructor(
         val wasGuiding = _state.value is NavigationState.Guiding
         cancelRun(NavigationState.Idle)
         speech.release()
+        persistLastGuidance(null)
         if (wasGuiding) scope.launch { tripRecorder.end(arrived = false, nowMs = clock.nowMs()) }
     }
 
     /** Relance la dernière course demandée (après un `Failed`, par exemple). */
     fun retry() {
-        lastOption?.let { start(it, lastPreferences, lastVehicle) }
+        lastOption?.let { start(it, lastPreferences, lastVehicle, lastDestinationName) }
     }
 
     fun setMuted(muted: Boolean) {
@@ -124,6 +131,19 @@ class NavigationSession @Inject constructor(
 
     private fun publishFailure(failed: NavigationState.Failed) {
         synchronized(stateLock) { _state.value = failed }
+    }
+
+    /** Écrit ou efface ([value] null) la dernière course ; l'ordre est garanti par [confined], une erreur DataStore ne touche pas au guidage. */
+    private fun persistLastGuidance(value: LastGuidance?) {
+        scope.launch(confined) {
+            try {
+                prefs.setLastGuidance(value)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Mémoire non disponible : la reprise ne sera simplement pas proposée.
+            }
+        }
     }
 
     /** Invalide la course en cours ([generation]) et, si [state] n'est pas nul, l'écrit dans le même verrou. */
@@ -300,6 +320,7 @@ class NavigationSession @Inject constructor(
                 say(m.verbalPre ?: m.instruction, priority = SpeechPriority.URGENT)
             }
             publish(NavigationState.Arrived(route))
+            persistLastGuidance(null)
             tripRecorder.end(arrived = true, nowMs = clock.nowMs())
             val current = synchronized(stateLock) {
                 (gen == generation).also { if (it) location.setGuidanceActive(false) }

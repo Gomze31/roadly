@@ -1,6 +1,7 @@
 package fr.roadly.core.data.testing
 
 import fr.roadly.core.data.repository.GuidanceDefaults
+import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.model.RoutePreferences
@@ -49,4 +50,7 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val tint = MutableStateFlow<String?>(null)
     override val cockpitTint: Flow<String?> = tint
     override suspend fun setCockpitTint(name: String?) { tint.value = name }
+    val last = MutableStateFlow<LastGuidance?>(null)
+    override val lastGuidance: Flow<LastGuidance?> = last
+    override suspend fun setLastGuidance(value: LastGuidance?) { last.value = value }
 }

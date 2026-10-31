@@ -3,9 +3,12 @@ package fr.roadly.core.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -28,6 +31,9 @@ object GuidanceDefaults {
     /** Carte inclinée + bâtiments 3D pendant le guidage. */
     const val MAP_3D = true
 }
+
+/** B6 : course de guidage en cours ou interrompue (mort du processus) — base du « Reprendre le guidage » de l'Étape E3. */
+data class LastGuidance(val destination: GeoPoint, val destinationName: String?, val routeId: String, val startedAtEpochMs: Long)
 
 interface UserPreferencesRepository {
     val themeMode: Flow<ThemeMode>
@@ -66,6 +72,9 @@ interface UserPreferencesRepository {
     /** Teinte du cockpit (nom de `CockpitTint`) ; null = violet par défaut. */
     val cockpitTint: Flow<String?>
     suspend fun setCockpitTint(name: String?)
+    /** B6 : course en cours, mémorisée au démarrage du guidage ; null après un arrêt ou une arrivée. */
+    val lastGuidance: Flow<LastGuidance?>
+    suspend fun setLastGuidance(value: LastGuidance?)
 }
 
 @Singleton
@@ -85,6 +94,11 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
     private val kMap3d = booleanPreferencesKey("map.3d")
     private val kTint = stringPreferencesKey("cockpit.tint")
+    private val kLastLat = doublePreferencesKey("guidance.last.lat")
+    private val kLastLon = doublePreferencesKey("guidance.last.lon")
+    private val kLastName = stringPreferencesKey("guidance.last.name")
+    private val kLastRoute = stringPreferencesKey("guidance.last.route")
+    private val kLastAt = longPreferencesKey("guidance.last.at")
 
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
     override suspend fun setThemeMode(mode: ThemeMode) { store.edit { it[kTheme] = mode.name } }
@@ -122,4 +136,19 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setMap3dEnabled(value: Boolean) { store.edit { it[kMap3d] = value } }
     override val cockpitTint: Flow<String?> = store.data.map { it[kTint] }
     override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
+    override val lastGuidance: Flow<LastGuidance?> = store.data.map { p ->
+        val lat = p[kLastLat]; val lon = p[kLastLon]; val routeId = p[kLastRoute]; val at = p[kLastAt]
+        if (lat == null || lon == null || routeId == null || at == null) null else LastGuidance(GeoPoint(lat, lon), p[kLastName], routeId, at)
+    }
+    override suspend fun setLastGuidance(value: LastGuidance?) {
+        store.edit {
+            if (value == null) {
+                it.remove(kLastLat); it.remove(kLastLon); it.remove(kLastName); it.remove(kLastRoute); it.remove(kLastAt)
+            } else {
+                it[kLastLat] = value.destination.lat; it[kLastLon] = value.destination.lon
+                it[kLastRoute] = value.routeId; it[kLastAt] = value.startedAtEpochMs
+                if (value.destinationName == null) it.remove(kLastName) else it[kLastName] = value.destinationName
+            }
+        }
+    }
 }

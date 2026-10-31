@@ -3,7 +3,9 @@ package fr.roadly.core.navigation
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
+import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Route
@@ -17,6 +19,7 @@ import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -157,5 +160,28 @@ class NavigationSessionGuidanceTest {
         play(FixScript(route).drive(turnAt - 66.0, turnAt - 66.0, speedKmh = 36.0))
         assertEquals(1, guiding(s).progress.nextManeuverIndex)
         assertEquals("annonces réinitialisées : NEAR redit sur le nouveau tracé", 2, speech.spoken.count { it == near })
+    }
+
+    @Test fun `the run is remembered at start and forgotten at stop`() = runTest { // scénario 14 (JVM)
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertEquals(LastGuidance(route.geometry.last(), "Maison", route.id, 0L), prefs.lastGuidance.first())
+        s.stop(); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `the run is forgotten at arrival`() = runTest {
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
+        play(FixScript(route).drive(RouteTracker(route).totalGeometryM, RouteTracker(route).totalGeometryM, speedKmh = 36.0))
+        assertTrue(s.state.value is NavigationState.Arrived)
+        assertNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `nothing is remembered when the run cannot start`() = runTest {
+        location.permission.value = LocationPermissionState.DENIED
+        val s = session(); s.start(option(TestRoutes.straight()), RoutePreferences()); runCurrent()
+        assertNull(prefs.lastGuidance.first())
     }
 }
