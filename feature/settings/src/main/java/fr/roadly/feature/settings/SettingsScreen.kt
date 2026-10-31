@@ -78,6 +78,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -143,6 +145,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
             TintGroup(tint, onSelect = vm::setTint)
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
+            AssistantGroup()
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
             AlertsGroup(state.alerts, vigilanceRefresh, onVigilance = vm::setVigilanceEnabled, onSound = vm::setVigilanceSound, onRain = vm::setRainLowersLimit, onRefresh = vm::refreshVigilance)
             RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
@@ -159,7 +162,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
 // ── Briques communes ────────────────────────────────────────────────────────
 
 @Composable
-private fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
+internal fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
     OutlinedTextFieldDefaults.colors(
         focusedTextColor = c.textPrimary, unfocusedTextColor = c.textPrimary,
         focusedBorderColor = c.brand, unfocusedBorderColor = c.glassBorder,
@@ -170,17 +173,18 @@ private fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
 }
 
 @Composable
-private fun SettingsField(label: String, value: String, onValueChange: (String) -> Unit, keyboardType: KeyboardType) {
+internal fun SettingsField(label: String, value: String, onValueChange: (String) -> Unit, keyboardType: KeyboardType, masked: Boolean = false) {
     OutlinedTextField(
         value = value, onValueChange = onValueChange, label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        visualTransformation = if (masked) PasswordVisualTransformation() else VisualTransformation.None,
         singleLine = true, colors = settingsFieldColors(), shape = RoadlyShapes.Tile, modifier = Modifier.fillMaxWidth(),
     )
 }
 
 /** Flèche de repli/dépli placée à droite d'une ligne qui ouvre un éditeur en ligne. */
 @Composable
-private fun ExpandArrow(expanded: Boolean) {
+internal fun ExpandArrow(expanded: Boolean) {
     Icon(
         if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
         contentDescription = null, tint = LocalRoadlyColors.current.textTertiary, modifier = Modifier.size(22.dp),
@@ -189,7 +193,7 @@ private fun ExpandArrow(expanded: Boolean) {
 
 /** Zone dépliable sous une ligne : même carte, retrait horizontal standard. */
 @Composable
-private fun ExpandableContent(expanded: Boolean, content: @Composable () -> Unit) {
+internal fun ExpandableContent(expanded: Boolean, content: @Composable () -> Unit) {
     AnimatedVisibility(visible = expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
         Column(
             Modifier.fillMaxWidth().padding(start = RoadlySpacing.m, end = RoadlySpacing.m, top = RoadlySpacing.xs, bottom = RoadlySpacing.m),

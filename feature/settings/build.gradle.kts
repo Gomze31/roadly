@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":core:geocoding"))
     implementation(project(":core:routing"))
     implementation(project(":core:navigation"))
+    implementation(project(":core:assistant"))
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
