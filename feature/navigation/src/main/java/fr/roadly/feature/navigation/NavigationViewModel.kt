@@ -16,7 +16,7 @@ import fr.roadly.core.model.ReportKind
 import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
-import fr.roadly.core.navigation.RouteGeometry
+import fr.roadly.core.navigation.reportsAhead
 import fr.roadly.core.routing.RouteOption
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -67,12 +67,7 @@ class NavigationViewModel @Inject constructor(
     /** Signalements projetés sur le tracé courant, devant soi (≤ 60 m du tracé, ≤ 5 km) : alimentent l'Horizon. */
     val reportsAhead: StateFlow<List<ReportAheadUi>> = combine(reports, session.state) { list, s ->
         val g = s as? NavigationState.Guiding ?: return@combine emptyList()
-        val geo = RouteGeometry(g.route.geometry)
-        list.mapNotNull { r ->
-            val p = geo.project(r.point) ?: return@mapNotNull null
-            val d = p.alongM - g.progress.distanceAlongM
-            if (p.offsetM > 60.0 || d < -50.0 || d > 5_000.0) null else ReportAheadUi(r, d.coerceAtLeast(0.0), Formatters.distance(d.coerceAtLeast(0.0)))
-        }.sortedBy { it.distanceM }
+        reportsAhead(g, list).map { ReportAheadUi(it.report, it.distanceM, Formatters.distance(it.distanceM)) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val isDark = MutableStateFlow(true)
     private val following = MutableStateFlow(true)
