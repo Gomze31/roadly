@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -114,7 +116,7 @@ import kotlin.math.roundToInt
 private val RowContentInset = 64.dp
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, onOpenPremium: () -> Unit = {}, onOpenAssistance: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
     val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
@@ -133,6 +135,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
             SettingsGroup(stringResource(R.string.settings_group_trips)) {
                 ListRow(stringResource(R.string.settings_profile), subtitle = stringResource(R.string.settings_profile_subtitle), icon = Icons.Default.Person, onClick = onOpenProfile)
                 ListRow(stringResource(R.string.settings_trips), subtitle = stringResource(R.string.settings_trips_subtitle), icon = Icons.Default.History, onClick = onOpenTrips, divider = false)
+            }
+            SettingsGroup(stringResource(R.string.settings_group_plus)) {
+                ListRow(stringResource(R.string.settings_premium), subtitle = stringResource(R.string.settings_premium_subtitle), icon = Icons.Default.Star, onClick = onOpenPremium)
+                ListRow(stringResource(R.string.settings_assistance), subtitle = stringResource(R.string.settings_assistance_subtitle), icon = Icons.Default.SupportAgent, onClick = onOpenAssistance, divider = false)
             }
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
             TintGroup(tint, onSelect = vm::setTint)
@@ -544,7 +550,7 @@ private fun AboutGroup() {
 }
 
 /** `BuildConfig` du module app est inaccessible ici : on lit la version via le PackageManager. */
-private fun Context.versionName(): String? = try {
+internal fun Context.versionName(): String? = try {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0)).versionName
     } else {

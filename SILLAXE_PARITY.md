@@ -64,12 +64,12 @@ Constats de l'audit (écarts avec Sillaxe) :
 | 17 | Trophées | L10 | ⬜ | Trophées locaux (pays traversés, km, séries) |
 | 18 | Historique | L9 | 🟡 | **Enregistrement local des trajets guidés (`TripRecorder`, Room v4) : tracé échantillonné 20 m, date, distance, durée, vitesse max/moyenne, coût carburant, arrivé/interrompu ; écran « Mes trajets » avec bilan du mois et totaux (L9)**. Manque : arrêts et événements rencontrés dans le trajet, export |
 | 19 | Replay | L9 | 🟡 | **Rejeu sur la carte : tracé, marqueur interpolé, timeline, lecture ×1/×2/×4/×8, « Y retourner » (L9)**. Manque : événements sur la timeline |
-| 20 | Paramètres | L2/L11 | 🟡 | Véhicule, apparence, voix et sons, alertes vitesse, préférences d'itinéraire, données, confidentialité, fournisseurs, à propos. Manque : organisation Sillaxe (groupes, lignes avec icônes), compte, notifications, autorisations, choix publicitaires, assistance |
+| 20 | Paramètres | L2/L11 | 🟡 | Groupes avec icônes : conduite, trajets, **Roadly+ et assistance (L11)**, apparence, personnalisation, voix et sons, alertes, itinéraires, données, confidentialité, communauté, fournisseurs, à propos. Manque : compte, notifications, autorisations ; choix publicitaires sans objet (pas de publicité) |
 | 21 | Personnalisation | L10 | 🟡 | **Teinte du cockpit (5 teintes, appliquée à l'app et au guidage, L10)**. Manque : icône alternative, avatars, silhouettes de véhicule |
 | 22 | Profils de véhicules | L7 | 🟡 | **Types citadine / berline / SUV / utilitaire / moto / taxi / poids lourd, gabarit (hauteur, largeur, longueur, poids, essieux), Crit'Air (L7)** ; costing Valhalla `truck` / `motorcycle` / `taxi` avec le gabarit, appliqué aux 3 variantes, au recalcul et aux alternatives. Manque : plusieurs profils enregistrés, péages PL (⛔), ZFE (⛔ source) |
-| 23 | Abonnement et premium | L11 | ⬜ | Architecture gratuit/premium (`Entitlements`), écran de présentation, gestion |
-| 24 | Centre de notifications | L11 | ⬜ | Rappels de départ, péages flux libre, défis, amis |
-| 25 | Assistance | L11 | ⬜ | Demandes (bug / idée / autre), fil « Mes demandes », état du service |
+| 23 | Abonnement et premium | L11 | 🟡 | **Architecture gratuit / Roadly+ (`Entitlements`, `Feature.plus`, `BillingProvider`, L11)** : écran « Roadly+ » (palier, fonctions incluses / Roadly+, état réel de la boutique). Sans boutique intégrée tout reste inclus et aucun bouton d'achat n'est affiché. Manque : implémentation Google Play Billing (produit à créer par l'exploitant, `docs/PREMIUM.md`), essai, gestion de l'abonnement |
+| 24 | Centre de notifications | L11 | ⬜ | Aucune notification à centraliser aujourd'hui (pas de rappel de départ, de péage flux libre ⛔, de défi ni d'ami) ; écran sans objet tant que ces sources n'existent pas |
+| 25 | Assistance | L11 | 🟡 | **Demandes bug / idée / autre : partage Android d'un rapport pré-rempli (type, version, appareil), canal au choix de l'utilisateur (L11)**. Fil « Mes demandes » : ⬜ (exige un compte). État du service : voir Réglages → Fournisseurs |
 
 ---
 
@@ -158,15 +158,16 @@ Constats de l'audit (écarts avec Sillaxe) :
 
 | Fonction | Lot | Statut |
 |---|---|---|
-| Architecture gratuit/premium (`Entitlements`, flags testables) | L11 | ⬜ |
+| Architecture gratuit/premium (`Entitlements`, flags testables) | L11 | ✅ | `Feature` (11 fonctions, 5 marquées Roadly+), `Entitlements.includes` (tout inclus sans boutique), `BillingProvider` / `NoBillingProvider`, 5 tests |
+| Achat, essai, restauration (Google Play Billing) | L11 | ⬜ | Interface prête (`purchase`, `restore`, `StoreState`) ; produit Play à créer par l'exploitant (`docs/PREMIUM.md`) |
 | Absence de publicité | — | ✅ (Roadly n'a pas de publicité) |
 | Zones de vigilance complètes, alertes sans trajet | L4 | ⛔ |
-| Profils véhicules avancés | L7 | ⬜ |
+| Profils véhicules avancés | L7 | ✅ | Marqués Roadly+ (`Feature.VEHICLE_ADVANCED`) |
 | Itinéraires temps réel longs trajets | L4 | ⛔ |
 | Mode tournée | L6 | 🟡 | = optimisation de l'ordre ; pas encore d'enchaînement « arrêt par arrêt » avec validation |
 | Partage de trajet en direct | L9 | ⬜ |
 | Rappels péages flux libre | L11 | ⛔ (géofences des portiques à constituer) |
-| Replay | L9 | ⬜ |
+| Replay | L9 | ✅ | Marqué Roadly+ (`Feature.REPLAY`) |
 | Synchronisation favoris, domicile, travail | L9 | ⬜ |
 | Historique kilométrique, coût des déplacements | L9 | ⬜ |
 | Couleurs, icônes, avatars, silhouettes | L10 | ⬜ |
@@ -234,3 +235,4 @@ Constats de l'audit (écarts avec Sillaxe) :
 - 2026-10-31 — **LOT 8 livré** (communauté) : schéma Supabase `backend/supabase/schema.sql` (profils pseudonymes, signalements, votes, fonctions `create_report` / `vote_report` / `reports_in_box` / `expire_reports`, TTL par type, anti-spam, points serveur, RLS) + `docs/BACKEND.md` ; client `CommunityConfigRepository` (URL, clé anon, identifiant d'appareil) et `SupabaseCommunityRepository` (PostgREST rpc, erreurs métier mappées, 4 tests) ; feuille « Signaler » active dès que le service est configuré (accueil + guidage), retour visuel, signalements sur la carte (couche + icône) et dans l'Horizon (projection sur le tracé) ; Réglages → Communauté (URL, clé, état, déconnexion). Aucune donnée fictive : sans projet Supabase saisi, rien n'est envoyé ni affiché. 272 tests verts.
 - 2026-10-31 — **LOT 9 (historique, Replay) livré, compte reporté** : `TripRecorder` branché sur la course (début, fixes échantillonnés 20 m, fin arrivée/arrêt, trajets < 200 m ignorés), Room v4 (`trips`, migration 3→4), `TripRepository` + codec des points (2 tests), coût d'après le profil ; module `feature:trips` : « Mes trajets » (bilan du mois, totaux, liste, suppression) et Replay (tracé, marqueur interpolé, timeline, ×1–×8, « Y retourner » ; 2 tests), entrée Réglages → Trajets. Compte / synchronisation : ⬜ (exige le backend L8 configuré ; à faire en L10/L11). 276 tests verts. Non vérifié sur appareil avec un vrai trajet (exige de rouler).
 - 2026-10-31 — **LOT 10 livré** (gamification, personnalisation) : teinte du cockpit (5 teintes `CockpitTint`, préférence DataStore, appliquée au thème de l'app et au guidage, Réglages → Personnalisation) ; modèle `CommunityProfile` / `LeaderboardEntry` / `Trophies` (8 trophées locaux calculés depuis l'historique, 2 tests) ; `CommunityRepository.profile()` / `leaderboard()` (rpc `get_profile`, `leaderboard` ajoutées au schéma Supabase, 1 test) ; écran « Mon profil » (bouton sur l'accueil + Réglages) : stats locales, trophées avec progression, points et classement serveur seulement si le service est configuré, sinon mention explicite. Ligues, défis, avatars, profil public : ⬜ (serveur). 282 tests verts ; vérifié sur HONOR (profil, trophées, classement inactif sans backend). Réparation de l'encodage de ce fichier (mojibake accumulé depuis le LOT 3, rangées de la matrice remises en place).
+- 2026-10-31 — **LOT 11 livré** (abonnement, premium, assistance) : modèle `Feature` / `Tier` / `Entitlements` (règle : tout inclus tant qu'aucune boutique n'est configurée ; les fonctions `plus` exigent `PLUS` dès qu'une boutique existe ; 3 tests), `BillingProvider` (`store`, `tier`, `purchase`, `restore`) avec `NoBillingProvider` livré et `DefaultEntitlementsRepository` (2 tests) ; écran « Roadly+ » (palier, fonctions incluses / Roadly+, boutique : « Achat indisponible — Google Play Billing non intégré », boutons d'achat et de restauration rendus seulement quand la boutique est prête) ; écran « Assistance » (bug / idée / autre → partage Android d'un rapport pré-rempli ; fil des demandes « Bientôt » sans action) ; groupe Réglages → « Roadly+ et assistance ». Centre de notifications : ⬜ sans objet (aucune source de notification). Intégration Play : `docs/PREMIUM.md`. 287 tests verts ; vérifié sur HONOR (Réglages, Roadly+, Assistance, feuille de partage).

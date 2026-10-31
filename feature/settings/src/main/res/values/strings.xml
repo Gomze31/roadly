@@ -128,4 +128,53 @@
     <string name="settings_fuel_diesel">Gazole</string>
     <string name="settings_fuel_lpg">GPL</string>
     <string name="settings_fuel_electric">Électrique</string>
+
+    <string name="settings_group_plus">Roadly+ et assistance</string>
+    <string name="settings_premium">Roadly+</string>
+    <string name="settings_premium_subtitle">Fonctions incluses, palier, boutique</string>
+    <string name="settings_assistance">Assistance</string>
+    <string name="settings_assistance_subtitle">Signaler un bug, proposer une idée</string>
+
+    <string name="premium_title">Roadly+</string>
+    <string name="premium_tier_free">Roadly</string>
+    <string name="premium_tier_plus">Roadly+</string>
+    <string name="premium_state_no_store">Aucune boutique configurée : toutes les fonctions sont incluses sur cet appareil.</string>
+    <string name="premium_state_free">Palier gratuit. Les fonctions Roadly+ sont verrouillées.</string>
+    <string name="premium_state_plus">Abonnement actif : toutes les fonctions sont incluses.</string>
+    <string name="premium_group_free">Inclus dans Roadly</string>
+    <string name="premium_group_free_footer">Jamais de publicité, pendant le guidage ou ailleurs.</string>
+    <string name="premium_group_plus">Roadly+</string>
+    <string name="premium_group_plus_footer">Réservées au palier Roadly+.</string>
+    <string name="premium_group_plus_footer_no_store">Palier prévu pour ces fonctions ; incluses tant qu\'aucune boutique n\'est configurée.</string>
+    <string name="premium_group_store">Boutique</string>
+    <string name="premium_store_unavailable">Achat indisponible</string>
+    <string name="premium_store_not_integrated">Google Play Billing n\'est pas intégré : produit et clé à configurer par l\'exploitant (docs/PREMIUM.md).</string>
+    <string name="premium_store_no_network">Pas de connexion réseau.</string>
+    <string name="premium_store_error">La boutique a renvoyé une erreur.</string>
+    <string name="premium_store_footer">Les prix et libellés viennent de la boutique, jamais de l\'application. Essai, résiliation et remboursement : conditions de la boutique.</string>
+    <string name="premium_buy">S\'abonner</string>
+    <string name="premium_restore">Restaurer mes achats</string>
+    <string name="premium_included">Inclus</string>
+    <string name="premium_locked">Verrouillé</string>
+    <string name="premium_f_navigation">Guidage, recalcul, voix, voies</string>
+    <string name="premium_f_speed">Alertes de vitesse</string>
+    <string name="premium_f_vigilance">Zones de vigilance, pluie</string>
+    <string name="premium_f_fuel">Prix des carburants</string>
+    <string name="premium_f_community">Signalements communautaires</string>
+    <string name="premium_f_trophies">Profil et trophées</string>
+    <string name="premium_f_vehicle">Profils moto / taxi / poids lourd, gabarit</string>
+    <string name="premium_f_tour">Optimisation de tournée</string>
+    <string name="premium_f_history">Historique des trajets</string>
+    <string name="premium_f_replay">Replay</string>
+    <string name="premium_f_tint">Teinte du cockpit</string>
+
+    <string name="assist_title">Assistance</string>
+    <string name="assist_group_new">Nouvelle demande</string>
+    <string name="assist_bug">Signaler un bug</string>
+    <string name="assist_idea">Proposer une idée</string>
+    <string name="assist_other">Autre demande</string>
+    <string name="assist_footer">Ouvre le partage Android avec un rapport pré-rempli (version, appareil). Vous choisissez le canal : e-mail, messagerie…</string>
+    <string name="assist_group_history">Mes demandes</string>
+    <string name="assist_history">Fil des demandes</string>
+    <string name="assist_history_subtitle">Nécessite un compte Roadly</string>
 </resources>

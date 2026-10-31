@@ -4,6 +4,10 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import fr.roadly.core.data.premium.BillingProvider
+import fr.roadly.core.data.premium.DefaultEntitlementsRepository
+import fr.roadly.core.data.premium.EntitlementsRepository
+import fr.roadly.core.data.premium.NoBillingProvider
 import fr.roadly.core.data.config.DataStoreProviderConfigRepository
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.connectivity.AndroidConnectivityObserver
@@ -31,4 +35,6 @@ abstract class RepositoryModule {
     @Binds abstract fun communityConfig(impl: DataStoreCommunityConfigRepository): CommunityConfigRepository
     @Binds abstract fun community(impl: SupabaseCommunityRepository): CommunityRepository
     @Binds abstract fun trips(impl: RoomTripRepository): TripRepository
+    @Binds abstract fun billing(impl: NoBillingProvider): BillingProvider
+    @Binds abstract fun entitlements(impl: DefaultEntitlementsRepository): EntitlementsRepository
 }

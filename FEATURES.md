@@ -161,17 +161,20 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | À propos / licences | fonctionnelle | |
 | Voix et sons, volume, mode Silence | fonctionnelle | Voix, volume 0–100, son de dépassement, « Tester la voix » ; Silence sur l'écran de guidage |
 | Alertes de vitesse (tolérance 0/5/10 km/h) | fonctionnelle | Réglage fait ; l'alerte ne se déclenche que si une limitation est connue (voir « Limitation de vitesse », bloquée) |
-| Alertes de vigilance | non commencée | Phase 3 |
+| Alertes de vigilance | fonctionnelle | Zones, bip, mise à jour manuelle, pluie (LOT 4) |
 | Préférences d'itinéraire (péages, autoroutes, ferries) | fonctionnelle | `use_tolls/use_highways/use_ferry = 0`, 3 variantes et recalcul |
 | Domicile / travail dans les réglages | en cours | Définis via la fiche lieu ; pas d'écran dédié |
-| Compte, abonnement, assistance | non commencée | Phase 4 (Supabase) |
+| Roadly+ (architecture gratuit / premium) | fonctionnelle | `Entitlements`, écran Roadly+ ; tout inclus tant qu'aucune boutique n'est intégrée (LOT 11) |
+| Achat, essai, restauration (Google Play Billing) | non commencée | `BillingProvider` prêt ; produit Play à créer par l'exploitant (`docs/PREMIUM.md`) |
+| Assistance (bug / idée / autre) | fonctionnelle | Partage Android d'un rapport pré-rempli (LOT 11) ; fil des demandes : nécessite un compte |
+| Compte | non commencée | Exige le backend Supabase configuré |
 
 ## 14. Plateforme
 
 | Fonction | Statut | Notes |
 |---|---|---|
 | APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
-| Tests unitaires | fonctionnelle | 282 tests (JVM) |
+| Tests unitaires | fonctionnelle | 287 tests (JVM) |
 | Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
 | Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
 | Widgets, Android Auto | non commencée | Phase 5 |

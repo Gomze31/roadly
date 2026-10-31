@@ -16,7 +16,11 @@ import kotlinx.serialization.json.Json
 import fr.roadly.feature.route.routeScreen
 import fr.roadly.feature.search.SearchRoute
 import fr.roadly.feature.search.searchScreen
+import fr.roadly.feature.settings.AssistanceRoute
+import fr.roadly.feature.settings.PremiumRoute
 import fr.roadly.feature.settings.SettingsRoute
+import fr.roadly.feature.settings.assistanceScreen
+import fr.roadly.feature.settings.premiumScreen
 import fr.roadly.feature.settings.settingsScreen
 import fr.roadly.feature.trips.ProfileRoute
 import fr.roadly.feature.trips.ReplayRoute
@@ -76,7 +80,9 @@ fun RoadlyNavHost(
             },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
         )
-        settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) }, onOpenProfile = { nav.navigate(ProfileRoute) })
+        settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) }, onOpenProfile = { nav.navigate(ProfileRoute) }, onOpenPremium = { nav.navigate(PremiumRoute) }, onOpenAssistance = { nav.navigate(AssistanceRoute) })
+        premiumScreen(onBack = { nav.popBackStack() })
+        assistanceScreen(onBack = { nav.popBackStack() })
         tripsScreen(onBack = { nav.popBackStack() }, onOpenTrip = { id -> nav.navigate(ReplayRoute(id)) })
         profileScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) })
         replayScreen(isDark = isDark, onBack = { nav.popBackStack() }, onNavigateTo = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) { popUpTo(HomeRoute) } })
