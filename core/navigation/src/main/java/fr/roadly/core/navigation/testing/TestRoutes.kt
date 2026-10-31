@@ -125,4 +125,47 @@ object TestRoutes {
         )
         return Route(id, costing, total, 100.0, pts, maneuvers, hasToll = false, providerId = "test")
     }
+
+    /** Écart (m) de la voie de desserte de [parallelRoads] (scénario 9). */
+    const val PARALLEL_ROAD_OFFSET_M = 25.0
+
+    /**
+     * Route principale 1 km plein est (pas de 50 m), virage à droite à 600 m ; la voie de desserte, hors itinéraire, est parallèle
+     * à [PARALLEL_ROAD_OFFSET_M] au nord (positions simulées par `FixScript.drive(lateralM = …)`).
+     */
+    fun parallelRoads(id: String = "parallelRoads", costing: RouteCosting = RouteCosting.FASTEST): Route {
+        val pts = (0..20).map { xy(it * 50.0, 0.0) }
+        val total = (0 until 20).sumOf { pts[it].distanceTo(pts[it + 1]) }
+        val first = (0 until 12).sumOf { pts[it].distanceTo(pts[it + 1]) }
+        val maneuvers = listOf(
+            Maneuver(ManeuverType.DEPART, "Conduisez vers l'est.", null, first, 43.0, 0, null, verbalPre = "Conduisez vers l'est."),
+            Maneuver(
+                ManeuverType.TURN_RIGHT, "Tournez à droite dans Rue de la Desserte.", "Rue de la Desserte", total - first, 29.0, 12, null,
+                verbalPre = "Tournez à droite dans Rue de la Desserte.", verbalAlert = "Tournez à droite dans Rue de la Desserte.",
+            ),
+            Maneuver(ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 20, null, verbalPre = "Votre destination est sur la droite."),
+        )
+        return Route(id, costing, total, 72.0, pts, maneuvers, hasToll = false, providerId = "test")
+    }
+
+    /**
+     * Passage supérieur (B6, « pont au-dessus ») : 300 m plein est, 50 m nord, 175 m ouest, puis 100 m sud en recoupant le premier
+     * tronçon à 125 m du départ (abscisse ≈ 563 m au croisement). Manœuvres : départ, 3 virages à gauche, arrivée.
+     */
+    fun overpass(id: String = "overpass", costing: RouteCosting = RouteCosting.FASTEST): Route {
+        val pts = listOf(0.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0).map { xy(it, 0.0) } +
+            listOf(25.0, 50.0).map { xy(300.0, it) } +
+            listOf(250.0, 200.0, 150.0, 125.0).map { xy(it, 50.0) } +
+            listOf(25.0, 0.0, -25.0, -50.0).map { xy(125.0, it) }
+        val cum = DoubleArray(pts.size).also { c -> for (i in 1 until pts.size) c[i] = c[i - 1] + pts[i - 1].distanceTo(pts[i]) }
+        fun len(a: Int, b: Int) = cum[b] - cum[a]
+        val maneuvers = listOf(
+            Maneuver(ManeuverType.DEPART, "Conduisez vers l'est.", null, len(0, 6), 30.0, 0, null, verbalPre = "Conduisez vers l'est."),
+            Maneuver(ManeuverType.TURN_LEFT, "Tournez à gauche.", null, len(6, 8), 8.0, 6, null, verbalPre = "Tournez à gauche."),
+            Maneuver(ManeuverType.TURN_LEFT, "Tournez à gauche.", null, len(8, 12), 18.0, 8, null, verbalPre = "Tournez à gauche."),
+            Maneuver(ManeuverType.TURN_LEFT, "Tournez à gauche sur le pont.", null, len(12, 16), 12.0, 12, null, verbalPre = "Tournez à gauche sur le pont."),
+            Maneuver(ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 16, null, verbalPre = "Votre destination est devant vous."),
+        )
+        return Route(id, costing, cum.last(), 68.0, pts, maneuvers, hasToll = false, providerId = "test")
+    }
 }

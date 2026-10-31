@@ -53,6 +53,8 @@ class RouteTracker(private val route: Route) {
     }
 
     private var consecutiveOff = 0
+    /** B6 : fixes consécutifs dont le cap GPS s'écarte de plus de 50° du tracé. */
+    private var consecutiveHeadingOff = 0
     /** `along` du dernier candidat global non confirmé (> 100 m de saut), en attente d'un second fix concordant. */
     private var pendingGlobal: Double? = null
     /** `along` du dernier fix réel (point de départ du plafond d'extrapolation). */
@@ -98,15 +100,8 @@ class RouteTracker(private val route: Route) {
         } else {
             pendingGlobal = null
         }
-        when {
-            best.offM > GuidanceConstants.OFF_ROUTE_HARD_M && fix.accuracyM <= GuidanceConstants.HARD_RULE_MAX_ACCURACY_M -> {
-                consecutiveOff++; isOffRoute = true
-            }
-            best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M -> {
-                consecutiveOff++; isOffRoute = consecutiveOff >= GuidanceConstants.OFF_ROUTE_SOFT_FIXES
-            }
-            else -> { consecutiveOff = 0; isOffRoute = false }
-        }
+        // B6 : un fix imprécis (> 30 m) ne change aucune décision « hors itinéraire ».
+        if (fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M) updateOffRoute(best, gpsHeading)
         val moving = (fix.speedMps ?: 0f) >= 1f
         val heading = fix.bearingDeg?.takeIf { moving } ?: bearing(pts[best.segment], pts[best.segment + 1]).toFloat()
         lastAccuracyM = fix.accuracyM
@@ -209,7 +204,26 @@ class RouteTracker(private val route: Route) {
     /** B2 : distance (m) de [along] au début de la manœuvre [k], le long du tracé mis à l'échelle de la longueur Valhalla (`distScale`). */
     private fun distanceTo(k: Int, along: Double): Double = (maneuverStartM[k] - along).coerceAtLeast(0.0) * distScale
 
-    private class Hit(val segment: Int, val alongM: Double, val offM: Double, val snapped: GeoPoint)
+    /** [interior] = projection strictement à l'intérieur du segment (pas sur une extrémité). */
+    private class Hit(val segment: Int, val alongM: Double, val offM: Double, val snapped: GeoPoint, val interior: Boolean = false)
+
+    /**
+     * B6 : hors itinéraire si > 100 m une fois, ou > 40 m sur 5 fixes consécutifs **et** cap écarté de plus de 50° sur 3 fixes
+     * consécutifs : une route parallèle suivie dans le même sens n'est pas une sortie d'itinéraire.
+     */
+    private fun updateOffRoute(best: Hit, gpsHeading: Float?) {
+        val deviates = gpsHeading != null && headingDiffDeg(best.segment, gpsHeading) > GuidanceConstants.OFF_ROUTE_HEADING_DEG
+        consecutiveHeadingOff = if (deviates) consecutiveHeadingOff + 1 else 0
+        when {
+            best.offM > GuidanceConstants.OFF_ROUTE_HARD_M -> { consecutiveOff++; isOffRoute = true }
+            best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M -> {
+                consecutiveOff++
+                isOffRoute = consecutiveOff >= GuidanceConstants.OFF_ROUTE_SOFT_FIXES &&
+                    consecutiveHeadingOff >= GuidanceConstants.OFF_ROUTE_HEADING_FIXES
+            }
+            else -> { consecutiveOff = 0; isOffRoute = false }
+        }
+    }
 
     /** Garde la position [lastAlong] (candidat global non confirmé) ; l'écart est mesuré à ce point. */
     private fun hold(p: GeoPoint, lastAlong: Double): Hit {
@@ -217,17 +231,20 @@ class RouteTracker(private val route: Route) {
         return Hit(segmentAt(lastAlong), lastAlong.coerceIn(0.0, totalGeometryM), p.distanceTo(snapped), snapped)
     }
 
-    /** Vrai si le segment [i] est à au plus 90° du cap [headingDeg] (un segment nul est toujours accepté). */
-    private fun headingOk(i: Int, headingDeg: Float): Boolean {
+    /** Écart (0..180°) entre le cap du segment [i] et [headingDeg] ; 0 pour un segment nul. */
+    private fun headingDiffDeg(i: Int, headingDeg: Float): Double {
         val b = segBearingDeg[i]
-        if (b.isNaN()) return true
-        return abs(((b - headingDeg + 540.0) % 360.0) - 180.0) <= GuidanceConstants.HEADING_MAX_DIFF_DEG
+        if (b.isNaN()) return 0.0
+        return abs(((b - headingDeg + 540.0) % 360.0) - 180.0)
     }
+
+    /** Vrai si le segment [i] est à au plus 90° du cap [headingDeg] (un segment nul est toujours accepté). */
+    private fun headingOk(i: Int, headingDeg: Float): Boolean = headingDiffDeg(i, headingDeg) <= GuidanceConstants.HEADING_MAX_DIFF_DEG
 
     /**
      * Meilleur segment de [from]..[to]. Avec un cap GPS [headingDeg], les segments à plus de 90° sont écartés (tous écartés : pas de filtre).
-     * À distance perpendiculaire quasi égale (< 10 m), on préfère, pour un candidat d'un autre tronçon (> 10 m le long du tracé),
-     * celui dont `along` est le plus proche de [lastAlong].
+     * À distance perpendiculaire quasi égale (≤ 15 m), on préfère, pour un candidat d'un autre passage (> 50 m le long du tracé,
+     * projection intérieure, recul ≤ 30 m), celui dont `along` est le plus proche de [lastAlong] (B6).
      */
     private fun search(p: GeoPoint, from: Int, to: Int, headingDeg: Float?, lastAlong: Double?): Hit {
         val all = ArrayList<Hit>(to - from + 1)
@@ -235,8 +252,14 @@ class RouteTracker(private val route: Route) {
         val pool = if (headingDeg == null) all else all.filter { headingOk(it.segment, headingDeg) }.ifEmpty { all }
         var best = pool.minBy { it.offM }
         if (lastAlong != null) {
+            // B6 : continuité plutôt que distance brute (pont, échangeur, chaussées séparées) ; une extrémité de segment voisin n'est pas
+            // un autre passage, et un candidat qui recule de plus de 30 m est écarté.
             val alt = pool
-                .filter { it.offM < best.offM + GuidanceConstants.SEGMENT_TIE_M && abs(it.alongM - best.alongM) > GuidanceConstants.SEGMENT_TIE_M }
+                .filter {
+                    it.interior && it.offM <= best.offM + GuidanceConstants.CONTINUITY_TIE_M &&
+                        abs(it.alongM - best.alongM) > GuidanceConstants.CONTINUITY_MIN_GAP_M &&
+                        it.alongM >= lastAlong - GuidanceConstants.CONTINUITY_BACK_M
+                }
                 .minByOrNull { abs(it.alongM - lastAlong) }
             if (alt != null && abs(alt.alongM - lastAlong) < abs(best.alongM - lastAlong)) best = alt
         }
@@ -266,7 +289,7 @@ class RouteTracker(private val route: Route) {
         val t = if (dd == 0.0) 0.0 else (-(ax * dx + ay * dy) / dd).coerceIn(0.0, 1.0)
         val qx = ax + t * dx
         val qy = ay + t * dy
-        return Hit(i, cumDistM[i] + t * segLenM[i], sqrt(qx * qx + qy * qy), GeoPoint(a.lat + t * (b.lat - a.lat), a.lon + t * (b.lon - a.lon)))
+        return Hit(i, cumDistM[i] + t * segLenM[i], sqrt(qx * qx + qy * qy), GeoPoint(a.lat + t * (b.lat - a.lat), a.lon + t * (b.lon - a.lon)), interior = t > 0.0 && t < 1.0)
     }
 }
 

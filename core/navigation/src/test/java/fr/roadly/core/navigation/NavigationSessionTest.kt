@@ -68,8 +68,9 @@ class NavigationSessionTest {
         return NavigationSession(location, routing, speedLimits, speech, preferences, service, { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
     }
 
-    private fun fixAt(along: Double, speedMps: Float? = 10f, northM: Double = 0.0, timestampMs: Long = 0L) =
-        LocationFix(TestRoutes.north(tracker.pointAt(along), northM), 90f, speedMps, 5f, timestampMs)
+    /** Un écart latéral simulé s'accompagne d'un cap qui s'éloigne du tracé (20°, soit 70° d'écart, B6) ; sinon cap du tracé (90°). */
+    private fun fixAt(along: Double, speedMps: Float? = 10f, northM: Double = 0.0, timestampMs: Long = 0L, bearing: Float = if (northM > 0.0) 20f else 90f) =
+        LocationFix(TestRoutes.north(tracker.pointAt(along), northM), bearing, speedMps, 5f, timestampMs)
 
     private fun guiding(s: NavigationSession) = s.state.value as NavigationState.Guiding
 
@@ -412,13 +413,14 @@ class NavigationSessionTest {
         val s = session()
         s.start(option, RoutePreferences()); runCurrent()
         repeat(5) { location.emit(fixAt(300.0 + it * 5, northM = 60.0)); runCurrent() }
-        assertEquals(90f, requests.single().originHeadingDeg)
+        assertEquals(20f, requests.single().originHeadingDeg)
     }
 
     @Test fun `a reroute on a slow fix sends no heading`() = runTest {
         val s = session()
         s.start(option, RoutePreferences()); runCurrent()
-        repeat(5) { location.emit(fixAt(300.0, speedMps = 1f, northM = 60.0)); runCurrent() }
+        // Lent : pas de cap GPS, seule la règle des 100 m s'applique (B6).
+        repeat(5) { location.emit(fixAt(300.0, speedMps = 1f, northM = 150.0)); runCurrent() }
         assertEquals(null, requests.single().originHeadingDeg)
     }
 

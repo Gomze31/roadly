@@ -134,4 +134,28 @@ class NavigationSessionGuidanceTest {
         assertTrue(speech.spoken.any { it == "Quittez le rond-point dans Rue Médiane, puis entrez dans le rond-point et prenez la 1re sortie." })
         assertTrue("pas de FAR pour le 2e rond-point (moins de 10 s après la sortie du 1er)", speech.spoken.none { it.startsWith("Dans 100 mètres, entrez") || it.startsWith("Dans 150 mètres, entrez") })
     }
+
+    @Test fun `8 s on a parallel road 45 m away do not trigger a reroute`() = runTest { // scénario 9
+        val route = TestRoutes.parallelRoads()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(100.0, 100.0 + 7 * 50 / 3.6, speedKmh = 50.0, lateralM = 45.0))
+        assertTrue(requests.isEmpty())
+        assertFalse(guiding(s).rerouting)
+    }
+
+    @Test fun `after a reroute the maneuver index and the announcements start over`() = runTest { // scénario 12
+        val route = TestRoutes.straight()
+        routingResult = Outcome.Success(listOf(TestRoutes.straight("rerouted")))
+        val tracker = RouteTracker(route)
+        val turnAt = tracker.maneuverStartM[1]
+        val near = "Dans 70 mètres, tournez à droite dans Rue d'Essai."
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(turnAt - 70.0, turnAt - 70.0, speedKmh = 36.0))
+        assertEquals(1, speech.spoken.count { it == near })
+        play(listOf(LocationFix(TestRoutes.north(tracker.pointAt(turnAt - 60.0), 150.0), 20f, 10f, 5f, 0L)))
+        assertEquals("rerouted", guiding(s).route.id)
+        play(FixScript(route).drive(turnAt - 66.0, turnAt - 66.0, speedKmh = 36.0))
+        assertEquals(1, guiding(s).progress.nextManeuverIndex)
+        assertEquals("annonces réinitialisées : NEAR redit sur le nouveau tracé", 2, speech.spoken.count { it == near })
+    }
 }

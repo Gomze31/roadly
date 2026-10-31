@@ -28,13 +28,20 @@ object GuidanceConstants {
     /** Extrapolation GPS plafonnée : au plus 10 s et 150 m après le dernier fix réel. */
     const val EXTRAPOLATION_MAX_MS = 10_000L
     const val EXTRAPOLATION_MAX_M = 150.0
-    /** Un fix de précision > 50 m ne peut pas déclencher seul la règle « hors itinéraire > 100 m ». */
-    const val HARD_RULE_MAX_ACCURACY_M = 50f
+    /** B6 : un fix de précision > 30 m est ignoré par toute décision « hors itinéraire » (compteurs inchangés). */
+    const val OFF_ROUTE_MAX_ACCURACY_M = 30f
+    /** B6 : la règle des 5 fixes > 40 m exige aussi un cap écarté de plus de 50° du tracé sur 3 fixes consécutifs (route parallèle). */
+    const val OFF_ROUTE_HEADING_DEG = 50.0
+    const val OFF_ROUTE_HEADING_FIXES = 3
     /** Filtre de cap : au-delà de 2,5 m/s, les segments à plus de 90° du cap GPS sont écartés. */
     const val HEADING_FILTER_MIN_SPEED_MPS = 2.5f
     const val HEADING_MAX_DIFF_DEG = 90.0
-    /** Quasi-égalité de distance perpendiculaire (m) : on préfère alors la continuité le long du tracé. */
-    const val SEGMENT_TIE_M = 10.0
+    /** B6 : à écart perpendiculaire quasi égal (≤ 15 m), un autre passage du tracé proche de la dernière abscisse l'emporte (pont, échangeur)… */
+    const val CONTINUITY_TIE_M = 15.0
+    /** … s'il est à plus de 50 m le long du tracé (en deçà : simple angle du même passage)… */
+    const val CONTINUITY_MIN_GAP_M = 50.0
+    /** … et ne recule pas de plus de 30 m (même valeur que le recul confirmé de B1). */
+    const val CONTINUITY_BACK_M = 30.0
     /** Un saut global de plus de 100 m le long du tracé doit être confirmé par un second fix (à 50 m près). */
     const val GLOBAL_JUMP_M = 100.0
     const val GLOBAL_CONFIRM_RADIUS_M = 50.0
