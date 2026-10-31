@@ -41,6 +41,7 @@ dependencies {
     implementation(project(":core:geocoding"))
     implementation(project(":core:routing"))
     implementation(project(":core:navigation"))
+    implementation(project(":core:assistant"))
     implementation(project(":feature:home"))
     implementation(project(":feature:search"))
     implementation(project(":feature:route"))
