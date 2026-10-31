@@ -87,6 +87,9 @@ class SettingsViewModel @Inject constructor(
     /** État du dernier téléchargement manuel des zones de vigilance. */
     val vigilanceRefresh: StateFlow<RefreshState> = _vigilanceRefresh.asStateFlow()
 
+    /** Carte 3D pendant le guidage. */
+    val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_3D)
+
     private val voice = combine(prefs.voiceEnabled, prefs.voiceVolume, prefs.speedAlertToleranceKmh, prefs.speedAlertSound) { e, v, t, s -> VoiceSettings(e, v, t, s) }
 
     val uiState: StateFlow<SettingsUiState> = combine(vehicleRepo.profile, prefs.themeMode, config.config, voice, prefs.routePreferences, alerts) { values ->
@@ -131,6 +134,7 @@ class SettingsViewModel @Inject constructor(
     // ── Alertes (zones de vigilance, pluie) ──
     fun setVigilanceEnabled(value: Boolean) { viewModelScope.launch { prefs.setVigilanceEnabled(value) } }
     fun setVigilanceSound(value: Boolean) { viewModelScope.launch { prefs.setVigilanceSound(value) } }
+    fun setMap3d(value: Boolean) { viewModelScope.launch { prefs.setMap3dEnabled(value) } }
     fun setRainLowersLimit(value: Boolean) { viewModelScope.launch { prefs.setRainLowersLimit(value) } }
     fun refreshVigilance() {
         if (_vigilanceRefresh.value == RefreshState.Loading) return

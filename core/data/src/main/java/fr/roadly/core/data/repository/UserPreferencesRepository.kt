@@ -25,6 +25,8 @@ object GuidanceDefaults {
     const val VIGILANCE_ENABLED = true
     const val VIGILANCE_SOUND = true
     const val RAIN_LOWERS_LIMIT = false
+    /** Carte inclinée + bâtiments 3D pendant le guidage. */
+    const val MAP_3D = true
 }
 
 interface UserPreferencesRepository {
@@ -58,6 +60,9 @@ interface UserPreferencesRepository {
     /** Limitation abaissée par temps de pluie (R413-2) quand une limitation est connue. */
     val rainLowersLimit: Flow<Boolean>
     suspend fun setRainLowersLimit(value: Boolean)
+    /** Perspective 3D et bâtiments extrudés pendant le guidage. */
+    val map3dEnabled: Flow<Boolean>
+    suspend fun setMap3dEnabled(value: Boolean)
     /** Teinte du cockpit (nom de `CockpitTint`) ; null = violet par défaut. */
     val cockpitTint: Flow<String?>
     suspend fun setCockpitTint(name: String?)
@@ -78,6 +83,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kVigilance = booleanPreferencesKey("vigilance.enabled")
     private val kVigilanceSound = booleanPreferencesKey("vigilance.sound")
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
+    private val kMap3d = booleanPreferencesKey("map.3d")
     private val kTint = stringPreferencesKey("cockpit.tint")
 
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
@@ -112,6 +118,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setVigilanceSound(value: Boolean) { store.edit { it[kVigilanceSound] = value } }
     override val rainLowersLimit: Flow<Boolean> = store.data.map { it[kRainLimit] ?: GuidanceDefaults.RAIN_LOWERS_LIMIT }
     override suspend fun setRainLowersLimit(value: Boolean) { store.edit { it[kRainLimit] = value } }
+    override val map3dEnabled: Flow<Boolean> = store.data.map { it[kMap3d] ?: GuidanceDefaults.MAP_3D }
+    override suspend fun setMap3dEnabled(value: Boolean) { store.edit { it[kMap3d] = value } }
     override val cockpitTint: Flow<String?> = store.data.map { it[kTint] }
     override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
 }

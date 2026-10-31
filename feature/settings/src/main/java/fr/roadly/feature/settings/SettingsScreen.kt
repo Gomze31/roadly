@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -140,7 +141,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
                 ListRow(stringResource(R.string.settings_premium), subtitle = stringResource(R.string.settings_premium_subtitle), icon = Icons.Default.Star, onClick = onOpenPremium)
                 ListRow(stringResource(R.string.settings_assistance), subtitle = stringResource(R.string.settings_assistance_subtitle), icon = Icons.Default.SupportAgent, onClick = onOpenAssistance, divider = false)
             }
-            AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
+            val map3d by vm.map3d.collectAsStateWithLifecycle()
+            AppearanceGroup(state.themeMode, onSelect = vm::setTheme, map3d = map3d, onMap3d = vm::setMap3d)
             TintGroup(tint, onSelect = vm::setTint)
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
@@ -286,8 +288,14 @@ private fun VehicleProfile.summary(): String {
 // ── Apparence : thème ───────────────────────────────────────────────────────
 
 @Composable
-private fun AppearanceGroup(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+private fun AppearanceGroup(current: ThemeMode, onSelect: (ThemeMode) -> Unit, map3d: Boolean, onMap3d: (Boolean) -> Unit) {
     SettingsGroup(stringResource(R.string.settings_group_appearance)) {
+        ToggleRow(
+            stringResource(R.string.settings_map_3d),
+            checked = map3d, onCheckedChange = onMap3d,
+            subtitle = stringResource(R.string.settings_map_3d_subtitle),
+            icon = Icons.Default.ViewInAr,
+        )
         ListRow(
             stringResource(R.string.settings_theme),
             subtitle = stringResource(R.string.settings_theme_auto),
