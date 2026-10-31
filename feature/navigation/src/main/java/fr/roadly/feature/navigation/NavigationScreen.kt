@@ -55,6 +55,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -70,7 +73,6 @@ import fr.roadly.core.designsystem.component.HorizonStrip
 import fr.roadly.core.designsystem.component.IconTile
 import fr.roadly.core.designsystem.component.IconTileStyle
 import fr.roadly.core.designsystem.component.LoadingRow
-import fr.roadly.core.designsystem.component.NavInfoBar
 import fr.roadly.core.designsystem.component.RoundButtonStyle
 import fr.roadly.core.designsystem.component.ReportSheet
 import fr.roadly.core.designsystem.component.horizonKind
@@ -152,10 +154,11 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     DisposableEffect(map) { onDispose { vm.rememberCamera(map.cameraPosition()) } }
     LaunchedEffect(map) { vm.lastCamera?.let { map.restore(it, keepTilt = true) } }
     val camera = remember { NavigationCameraController() }
+    val bottomPanel = vm.bottomPanelFraction.collectAsStateWithLifecycle()
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
-        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera)
+        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera, bottomPanel)
         // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
         val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
@@ -309,18 +312,25 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
     val c = LocalRoadlyColors.current
     when (state.phase) {
         NavigationPhase.GUIDING -> {
-            AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()) {
-                HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
-            }
+            val expanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
+            val destination by vm.destinationName.collectAsStateWithLifecycle()
             val recenterIn by vm.recenterInSeconds.collectAsStateWithLifecycle()
-            recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }
-            NavInfoBar(
-                etaClock = state.etaClock, etaLabel = stringResource(R.string.nav_eta_label),
-                minutesValue = state.remainingDurationSplit.value, minutesLabel = state.remainingDurationSplit.unit,
-                kmValue = state.remainingDistanceSplit.value, kmLabel = state.remainingDistanceSplit.unit,
-                showRecenter = !state.following, onRecenter = vm::recenter, onStop = vm::stop,
-                recenterDescription = stringResource(R.string.nav_recenter), stopDescription = stringResource(R.string.nav_stop),
-            )
+            // D5 : hauteur du bloc (Horizon + panneau) mesurée → marge basse de la caméra (portrait ; ignorée en paysage).
+            Column(
+                Modifier.fillMaxWidth().onGloballyPositioned { coords ->
+                    vm.setBottomPanelFraction(BottomPanelGeometry.fraction(coords.positionInRoot().y, coords.findRootCoordinates().size.height.toFloat()))
+                },
+            ) {
+                AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()) {
+                    HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
+                }
+                recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }
+                NavigationBottomPanel(
+                    state = state, expanded = expanded, destinationName = destination,
+                    onToggleExpanded = vm::toggleBottomPanel, onToggleMute = vm::toggleMute, onRecenter = vm::recenter, onStop = vm::stop,
+                    onTripDetails = vm::openTripDetails, onAlternatives = vm::loadAlternatives,
+                )
+            }
         }
         NavigationPhase.ARRIVED -> ArrivedPanel(onFinish = vm::stop)
         NavigationPhase.FAILED -> FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop)
@@ -483,6 +493,8 @@ private data class MapTick(
     val mode: CameraMode3D,
     val powerSave: Boolean,
     val landscape: Boolean,
+    /** D5 : part de l'écran sous le panneau du bas (quantifiée), null avant la première mesure. */
+    val bottomPanel: Float?,
 )
 
 /**
@@ -497,6 +509,7 @@ private fun GuidanceMapEffects(
     landscape: Boolean,
     map: MapController,
     camera: NavigationCameraController,
+    bottomPanel: State<Float?>,
 ) {
     // Rotation (l'activité gère `orientation|screenSize`) : pas de relance de l'effet, juste une image de recadrage ordinaire.
     val isLandscape = rememberUpdatedState(landscape)
@@ -504,7 +517,7 @@ private fun GuidanceMapEffects(
         var lastProgress: RouteProgress? = null
         var wasFollowing = true
         // `snapshotFlow` n'émet que si la valeur change (égalité) : pas besoin de `distinctUntilChanged`.
-        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value) } }
+        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value, bottomPanel.value) } }
             .collect { t ->
                 val route = t.route ?: return@collect
                 val progress = t.progress ?: return@collect
@@ -523,6 +536,7 @@ private fun GuidanceMapEffects(
                         point = progress.snapped, bearingDeg = progress.bearingDeg, speedKmh = t.speedKmh,
                         distanceToManeuverM = progress.distanceToNextManeuverM, maneuverType = next.type, approaching = t.approaching,
                         mode = t.mode, powerSave = t.powerSave, landscape = t.landscape, nowMs = SystemClock.elapsedRealtime(),
+                        bottomPanelFraction = t.bottomPanel,
                     ),
                 )
                 map.applyGuidanceCamera(frame.point, frame.camera, frame.durationMs, frame.eased)
@@ -568,11 +582,14 @@ private fun RecenterCountdownPill(seconds: Int, onCancel: () -> Unit) {
 @Composable
 internal fun GuidanceSheets(state: NavigationUiState, vm: NavigationViewModel) {
     val sheet by vm.guidanceSheet.collectAsStateWithLifecycle()
-    // Fin du guidage (arrivée, échec, arrêt) : la feuille est refermée dans le ViewModel, pas seulement masquée, pour ne pas rouvrir au guidage suivant.
-    LaunchedEffect(state.phase) { if (closesGuidanceSheet(state.phase)) vm.closeSheet() }
+    val destination by vm.destinationName.collectAsStateWithLifecycle()
+    // Fin du guidage (arrivée, échec, arrêt) : la feuille est refermée dans le ViewModel, pas seulement masquée, pour ne pas rouvrir au guidage suivant ;
+    // le panneau du bas est replié pour la même raison.
+    LaunchedEffect(state.phase) { if (closesGuidanceSheet(state.phase)) { vm.closeSheet(); vm.collapseBottomPanel() } }
     when (visibleSheet(state.phase, sheet)) {
         GuidanceSheet.MANEUVER_PREVIEW -> ManeuverPreviewSheet(state, onDismiss = vm::closeSheet)
-        GuidanceSheet.TRIP_DETAILS, GuidanceSheet.NONE -> Unit
+        GuidanceSheet.TRIP_DETAILS -> TripDetailsSheet(state, destination, onDismiss = vm::closeSheet)
+        GuidanceSheet.NONE -> Unit
     }
 }
 

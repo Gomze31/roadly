@@ -145,6 +145,8 @@ class NavigationViewModel @Inject constructor(
     val bottomPanelExpanded: StateFlow<Boolean> = _panelExpanded
 
     fun toggleBottomPanel() { _panelExpanded.value = !_panelExpanded.value }
+    /** Fin du guidage (arrivée, échec, arrêt) : le guidage suivant repart avec le panneau replié. */
+    fun collapseBottomPanel() { _panelExpanded.value = false }
 
     private val _panelFraction = MutableStateFlow<Float?>(null)
     /** D5 : part de l'écran couverte par le bloc du bas, mesurée par l'écran (`BottomPanelGeometry`) → marge basse de la caméra. */

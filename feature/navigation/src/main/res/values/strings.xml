@@ -52,6 +52,13 @@
     <string name="nav_close">Fermer</string>
     <string name="nav_sign_next">Prochaine sortie</string>
     <string name="nav_sign_following">Sortie suivante</string>
+    <string name="nav_panel_expand">Afficher les détails du trajet</string>
+    <string name="nav_panel_collapse">Masquer les détails du trajet</string>
+    <string name="nav_destination">Destination</string>
+    <string name="nav_trip_details">Trajet complet</string>
+    <string name="nav_trip_title_fallback">Itinéraire</string>
+    <string name="nav_trip_summary">%1$s · %2$s · arrivée %3$s</string>
+    <string name="nav_trip_step_length">sur %1$s</string>
 
     <string name="alt_overline">En cours de trajet</string>
     <string name="alt_title">Changer d\'itinéraire</string>

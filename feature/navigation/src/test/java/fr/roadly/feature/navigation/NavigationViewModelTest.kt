@@ -335,6 +335,9 @@ class NavigationViewModelTest {
         assertFalse(vm.bottomPanelExpanded.value)
         vm.toggleBottomPanel(); assertTrue(vm.bottomPanelExpanded.value)
         vm.toggleBottomPanel(); assertFalse(vm.bottomPanelExpanded.value)
+        // Fin du guidage : le panneau est replié pour que le guidage suivant reparte replié (idempotent).
+        vm.toggleBottomPanel(); vm.collapseBottomPanel(); assertFalse(vm.bottomPanelExpanded.value)
+        vm.collapseBottomPanel(); assertFalse(vm.bottomPanelExpanded.value)
         assertNull(vm.bottomPanelFraction.value)
         vm.setBottomPanelFraction(0.3f)
         assertEquals(0.3f, vm.bottomPanelFraction.value!!, 0f)
