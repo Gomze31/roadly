@@ -201,7 +201,7 @@ private fun PortraitOverlay(
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                     state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                    if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneStrip(state.lanes, emphasized = state.approach != null)
+                    if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneGuidanceView(state.lanes, emphasized = state.approach != null)
                     if (state.rerouting) ReroutingPill()
                 }
                 Spacer(Modifier.width(RoadlySpacing.s))
@@ -264,7 +264,7 @@ private fun LandscapeOverlay(
         Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
             Column(Modifier.align(Alignment.TopStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneStrip(state.lanes, emphasized = state.approach != null)
+                if (state.lanes.isNotEmpty() && (bannerExpanded || state.approach != null)) LaneGuidanceView(state.lanes, emphasized = state.approach != null)
                 if (state.rerouting) ReroutingPill()
             }
             Column(Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {

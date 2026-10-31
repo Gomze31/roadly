@@ -42,6 +42,9 @@
     <string name="nav_failed_title">Guidage impossible</string>
     <string name="nav_retry">Réessayer</string>
     <string name="nav_alternatives">Itinéraires</string>
+    <string name="nav_roundabout_desc">Rond-point, %1$s</string>
+    <string name="nav_roundabout_desc_unknown">Rond-point</string>
+    <string name="nav_lanes_desc">Voies conseillées : %1$s sur %2$d</string>
 
     <string name="alt_overline">En cours de trajet</string>
     <string name="alt_title">Changer d\'itinéraire</string>
