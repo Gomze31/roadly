@@ -88,4 +88,22 @@ class GuidanceCameraPolicyTest {
         assertEquals(GuidanceCameraPolicy.PITCH_APPROACH, GuidanceCameraPolicy.compute(input(distance = 160.0).copy(approaching = true), null).pitch, 1e-9)
         assertEquals(GuidanceCameraPolicy.PITCH_3D, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(approaching = false), null).pitch, 1e-9)
     }
+
+    @Test fun `dense city tilts to the MapLibre maximum below 30 km per h when buildings are visible`() {
+        fun pitch(speed: Double?, buildings: Boolean, distance: Double = 2_000.0) =
+            GuidanceCameraPolicy.compute(input(speed = speed, distance = distance).copy(buildingsVisible = buildings), null).pitch
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(20.0, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(2.0, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, pitch(20.0, false), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, pitch(30.0, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, pitch(null, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_APPROACH, pitch(20.0, true, distance = 100.0), 1e-9)
+    }
+
+    @Test fun `no pitch goes beyond what MapLibre Android renders`() {
+        for (speed in listOf(null, 0.0, 20.0, 50.0, 130.0)) for (buildings in listOf(true, false)) for (powerSave in listOf(true, false)) for (distance in listOf(100.0, 2_000.0)) {
+            val pitch = GuidanceCameraPolicy.compute(input(speed = speed, distance = distance, powerSave = powerSave).copy(buildingsVisible = buildings), null).pitch
+            assertTrue("$speed $buildings $powerSave $distance → $pitch", pitch <= GuidanceCameraPolicy.MAX_PITCH)
+        }
+    }
 }

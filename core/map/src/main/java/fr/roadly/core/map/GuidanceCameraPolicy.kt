@@ -21,16 +21,24 @@ data class GuidanceCameraInput(
     val landscape: Boolean,
     /** Approche décidée par l'écran (hystérésis B1) ; null = règle de distance [GuidanceCameraPolicy.isApproaching]. */
     val approaching: Boolean? = null,
+    /** Bâtiments 3D affichés (mode 3D hors économie d'énergie) : autorise l'inclinaison « ville dense ». */
+    val buildingsVisible: Boolean = false,
 )
 
 /**
- * Caméra de guidage (spec guidage 3D §1) : inclinaison 58° (45° en économie, 0° en 2D), zoom de croisière
- * selon la vitesse, vue serrée à l'approche d'une manœuvre, cap conservé à l'arrêt, voiture décalée vers le bas.
+ * Caméra de guidage (spec guidage 3D §1, C1) : inclinaison 58° (50° à l'approche, 60° en ville dense, 45° en économie, 0° en 2D),
+ * zoom de croisière selon la vitesse, vue serrée à l'approche d'une manœuvre, cap conservé à l'arrêt, voiture décalée vers le bas.
  */
 object GuidanceCameraPolicy {
     const val PITCH_3D = 58.0
     const val PITCH_POWER_SAVE = 45.0
     const val PITCH_APPROACH = 50.0
+    /** LIMITE : MapLibre Android 11.13.5 ne rend pas au-delà de 60° (`MapLibreConstants.MAXIMUM_PITCH`, `Transform.setMaxPitch`). */
+    const val MAX_PITCH = 60.0
+    /** Ville dense (C1 demande 62°) : plafonnée au maximum rendu par MapLibre, [MAX_PITCH]. */
+    const val PITCH_DENSE_CITY = MAX_PITCH
+    /** Vitesse (km/h) sous laquelle, bâtiments visibles, la caméra passe en inclinaison « ville dense ». */
+    const val DENSE_CITY_MAX_KMH = 30.0
     const val ZOOM_2D = 17.0
     const val ZOOM_APPROACH = 18.0
     const val MAX_ZOOM_STEP = 0.5
@@ -68,6 +76,7 @@ object GuidanceCameraPolicy {
         val pitch = when {
             input.powerSave -> PITCH_POWER_SAVE
             approaching -> PITCH_APPROACH
+            input.buildingsVisible && input.speedKmh != null && input.speedKmh < DENSE_CITY_MAX_KMH -> PITCH_DENSE_CITY
             else -> PITCH_3D
         }
         val target = if (approaching) ZOOM_APPROACH else zoomForSpeed(input.speedKmh)
