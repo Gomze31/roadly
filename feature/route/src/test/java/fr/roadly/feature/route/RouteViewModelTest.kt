@@ -19,6 +19,8 @@ import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
+import fr.roadly.core.navigation.GuidanceActions
+import fr.roadly.core.navigation.NavigationClock
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.navigation.NoopRainProvider
@@ -88,7 +90,7 @@ class RouteViewModelTest {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
         session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
-        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, session, routing)
+        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing)
     }
 
     @Test fun `without known position state is NoOrigin`() = runTest {

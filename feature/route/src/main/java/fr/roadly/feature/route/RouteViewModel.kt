@@ -14,7 +14,7 @@ import fr.roadly.core.model.Place
 import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
-import fr.roadly.core.navigation.NavigationSession
+import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
@@ -38,7 +38,7 @@ class RouteViewModel @Inject constructor(
     private val location: LocationRepository,
     private val config: ProviderConfigRepository,
     private val prefs: UserPreferencesRepository,
-    private val session: NavigationSession,
+    private val guidance: GuidanceActions,
     private val routing: RoutingProvider,
 ) : ViewModel() {
 
@@ -135,7 +135,7 @@ class RouteViewModel @Inject constructor(
         val content = computed.value as? RouteUiState.Content ?: return false
         val id = activeId.value ?: content.activeId
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
-        session.start(option, computedWith, computedVehicle)
+        guidance.start(option, computedWith, computedVehicle, stops.value, destName)
         return true
     }
 

@@ -10,18 +10,14 @@ import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.pollNearby
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.UserPreferencesRepository
-import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.ReportKind
-import fr.roadly.core.model.RoutePreferences
-import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.navigation.RouteGeometry
-import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
-import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,9 +42,7 @@ class NavigationViewModel @Inject constructor(
     private val session: NavigationSession,
     prefs: UserPreferencesRepository,
     config: ProviderConfigRepository,
-    private val alternatives: RouteAlternativesUseCase,
-    private val routing: RoutingProvider,
-    vehicleRepo: VehicleProfileRepository,
+    private val guidance: GuidanceActions,
     private val community: CommunityRepository,
 ) : ViewModel() {
     val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -80,13 +74,11 @@ class NavigationViewModel @Inject constructor(
             if (p.offsetM > 60.0 || d < -50.0 || d > 5_000.0) null else ReportAheadUi(r, d.coerceAtLeast(0.0), Formatters.distance(d.coerceAtLeast(0.0)))
         }.sortedBy { it.distanceM }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    private val vehicle = vehicleRepo.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val isDark = MutableStateFlow(true)
     private val following = MutableStateFlow(true)
     private var refollowJob: Job? = null
     private var alternativesJob: Job? = null
     private val styleUrl = combine(isDark, config.config) { dark, cfg -> if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl }
-    private val routePreferences = prefs.routePreferences.stateIn(viewModelScope, SharingStarted.Eagerly, RoutePreferences())
 
     private val _alternatives = MutableStateFlow<AlternativesUi>(AlternativesUi.Hidden)
     val alternativesUi: StateFlow<AlternativesUi> = _alternatives
@@ -97,7 +89,7 @@ class NavigationViewModel @Inject constructor(
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
     fun toggleMute() = session.setMuted(!session.muted.value)
-    fun stop() = session.stop()
+    fun stop() = guidance.stop()
     fun retry() = session.retry()
 
     /** L'utilisateur a déplacé la carte : suivi suspendu, repris automatiquement après 8 s (spec §5). */
@@ -121,7 +113,7 @@ class NavigationViewModel @Inject constructor(
         alternativesJob?.cancel()
         _alternatives.value = AlternativesUi.Loading
         alternativesJob = viewModelScope.launch {
-            when (val r = alternatives(g.progress.snapped, g.route.geometry.last(), vehicle.value, System.currentTimeMillis(), routePreferences.value)) {
+            when (val r = guidance.alternativesFromHere()) {
                 is Outcome.Success -> _alternatives.value = AlternativesUi.Content(r.value, g.route.id)
                 is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
             }
@@ -136,27 +128,17 @@ class NavigationViewModel @Inject constructor(
 
     /** Ajoute un arrêt en cours de trajet : position projetée → arrêt → destination courante, puis bascule du guidage. */
     fun addStop(place: Place) {
-        val g = session.state.value as? NavigationState.Guiding ?: return
-        if (_addingStop.value) return
+        if (session.state.value !is NavigationState.Guiding || _addingStop.value) return
         viewModelScope.launch {
             _addingStop.value = true
-            val request = RouteRequest(
-                origin = g.progress.snapped, destination = g.route.geometry.last(), waypoints = listOf(place.point),
-                costing = g.route.costing, preferences = routePreferences.value, originHeadingDeg = g.progress.bearingDeg, vehicle = vehicle.value,
-            )
-            when (val r = routing.route(request)) {
-                is Outcome.Success -> r.value.firstOrNull()?.let { route ->
-                    session.start(RouteOption(route.copy(costing = g.route.costing), "Via ${place.name}", System.currentTimeMillis() + (route.durationSeconds * 1000).toLong(), null, sameAsFastest = false), routePreferences.value, vehicle.value)
-                }
-                is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
-            }
+            (guidance.addStop(place) as? Outcome.Failure)?.let { _alternatives.value = AlternativesUi.Error(it.error) }
             _addingStop.value = false
         }
     }
 
     /** Bascule le guidage sur [option] : la course est remplacée, la voix et le service continuent. */
     fun switchTo(option: RouteOption) {
-        session.start(option, routePreferences.value, vehicle.value)
+        viewModelScope.launch { guidance.select(option) }
         dismissAlternatives()
     }
 
