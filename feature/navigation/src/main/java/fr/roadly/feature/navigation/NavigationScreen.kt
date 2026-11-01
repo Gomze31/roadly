@@ -40,6 +40,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,6 +77,17 @@ import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.map.CameraMode
+import fr.roadly.core.scooter.map.ScooterCamera
+import fr.roadly.core.scooter.map.ScooterRouteFeatures
+import fr.roadly.core.scooter.osm.ScooterPoiKind
+import fr.roadly.core.designsystem.component.BatteryDialog
+import fr.roadly.core.designsystem.component.rememberVoiceInput
+import androidx.compose.material.icons.filled.EvStation
+import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.roundToInt
 import fr.roadly.core.map.RoadlyMap
 import fr.roadly.core.map.rememberMapController
 import fr.roadly.core.model.LocationFix
@@ -118,14 +130,30 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     }
     val progress = state.progress
     val following = state.following
+    val scooterUi = state.scooter
+    // Caméra trottinette : position placée au tiers bas de l'écran pour voir la route devant soi.
+    val topPaddingPx = with(LocalDensity.current) { (LocalConfiguration.current.screenHeightDp.dp * 0.38f).roundToPx() }
     LaunchedEffect(progress, following) {
         if (route != null && progress != null) {
             val fix = LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L)
             map.setUserLocation(fix)
             map.setTraversed(route.geometry, progress.segmentIndex, progress.snapped)
-            // Suivi : zoom 17, cap, inclinaison 0 (CameraMode.FOLLOW de la v1).
-            if (following) map.applyCameraMode(CameraMode.FOLLOW, fix)
+            if (following) {
+                if (scooterUi != null) {
+                    // Perspective 3D adaptée à la ville, plus haute et plus proche à l'approche des intersections.
+                    val t = ScooterCamera.target(progress.distanceToNextManeuverM, state.speedKmh)
+                    map.followNavigation(fix, t.zoom, t.tiltDeg, topPaddingPx)
+                } else {
+                    // Suivi : zoom 17, cap, inclinaison 0 (CameraMode.FOLLOW de la v1).
+                    map.applyCameraMode(CameraMode.FOLLOW, fix)
+                }
+            }
         }
+    }
+    // Tracé trottinette par type de voie (piste, bande, voie verte, route partagée, chemin, vigilance).
+    val analysis = scooterUi?.analysis
+    LaunchedEffect(route?.id, analysis) {
+        map.setScooterRoute(if (route != null && analysis != null) ScooterRouteFeatures.build(route.geometry, analysis) else ScooterRouteFeatures.EMPTY)
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
@@ -149,6 +177,8 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     val reports by vm.reports.collectAsStateWithLifecycle()
     LaunchedEffect(reports) { map.setReports(reports) }
     if (showReport) ReportSheet(onDismiss = { showReport = false }, enabled = communityEnabled, onSelect = vm::report)
+    val pois by vm.pois.collectAsStateWithLifecycle()
+    if (pois != PoisUi.Hidden) ScooterPoiSheet(pois, onSelect = vm::navigateToPoi, onDismiss = vm::dismissPois)
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
     if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives, onAddStop = { vm.dismissAlternatives(); onAddStop() })
 }
@@ -174,6 +204,7 @@ private fun PortraitOverlay(
                     state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
                     if (state.lanes.isNotEmpty() && bannerExpanded) LaneStrip(state.lanes)
                     if (state.rerouting) ReroutingPill()
+                    ScooterExtras(state, vm)
                 }
                 Spacer(Modifier.width(RoadlySpacing.s))
                 Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s), horizontalAlignment = Alignment.End) {
@@ -200,6 +231,7 @@ private fun PortraitOverlay(
             )
             RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
             if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
+            if (state.scooter != null) ScooterActions(vm)
         }
 
         Column(
@@ -219,6 +251,26 @@ private fun PortraitOverlay(
     }
 }
 
+/** Panneau trottinette (voie, transitions, alertes, autonomie) et réponse de Roadly AI, sous le bandeau. */
+@Composable
+private fun ScooterExtras(state: NavigationUiState, vm: NavigationViewModel) {
+    val scooter = state.scooter ?: return
+    var batteryDialog by remember { mutableStateOf(false) }
+    ScooterGuidancePanel(scooter, onBatteryClick = { batteryDialog = true })
+    val reply by vm.assistantReply.collectAsStateWithLifecycle()
+    reply?.let { AssistantReplyPill(it) }
+    if (batteryDialog) BatteryDialog(scooter.range?.batteryNowPct?.roundToInt(), onDismiss = { batteryDialog = false }, onSave = { vm.setBattery(it); batteryDialog = false })
+}
+
+/** Actions trottinette : Roadly AI (voix), stationnement près de l'arrivée, recharge à proximité. */
+@Composable
+private fun ScooterActions(vm: NavigationViewModel) {
+    val listen = rememberVoiceInput("Roadly AI — votre demande", onText = vm::onAssistantText)
+    RoundIconButton(Icons.Default.Mic, "Roadly AI", onClick = listen)
+    RoundIconButton(Icons.Default.LocalParking, "Stationnement trottinettes", onClick = { vm.searchPois(ScooterPoiKind.PARKING) })
+    RoundIconButton(Icons.Default.EvStation, "Recharge", onClick = { vm.searchPois(ScooterPoiKind.CHARGING) })
+}
+
 /** Paysage : colonne gauche (bandeau, voies, Horizon, barre d'information) sur ~45 % ; compteur et actions à droite. */
 @Composable
 private fun LandscapeOverlay(
@@ -236,6 +288,7 @@ private fun LandscapeOverlay(
                 state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
                 if (state.lanes.isNotEmpty() && bannerExpanded) LaneStrip(state.lanes)
                 if (state.rerouting) ReroutingPill()
+                ScooterExtras(state, vm)
             }
             Column(Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 BottomBlock(state, vm, onChangeDestination)
@@ -259,6 +312,7 @@ private fun LandscapeOverlay(
             )
             RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
             if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
+            if (state.scooter != null) ScooterActions(vm)
         }
         // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges).
         Row(Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm), verticalAlignment = Alignment.Bottom) {
@@ -289,7 +343,10 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
                 recenterDescription = stringResource(R.string.nav_recenter), stopDescription = stringResource(R.string.nav_stop),
             )
         }
-        NavigationPhase.ARRIVED -> ArrivedPanel(onFinish = vm::stop)
+        NavigationPhase.ARRIVED -> if (vm.scooterMode) {
+            val trip by vm.lastTrip.collectAsStateWithLifecycle()
+            ScooterRecapPanel(trip, onArrivalBattery = vm::setArrivalBattery, onFinish = vm::stop)
+        } else ArrivedPanel(onFinish = vm::stop)
         NavigationPhase.FAILED -> FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop)
         NavigationPhase.LOADING, NavigationPhase.IDLE -> GlassPanel(Modifier.fillMaxWidth()) { LoadingRow(stringResource(R.string.nav_loading)) }
     }

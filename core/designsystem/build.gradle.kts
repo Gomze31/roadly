@@ -17,6 +17,7 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 dependencies {
     api(project(":core:model"))
     api(project(":core:common"))
+    api(project(":core:scooter"))
     api(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.ui.graphics)
@@ -25,6 +26,7 @@ dependencies {
     api(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.compose.ui.test.junit4)
     // Compose pulls espresso-core 3.5.0, which crashes on Android 16+ (InputManager.getInstance removed).

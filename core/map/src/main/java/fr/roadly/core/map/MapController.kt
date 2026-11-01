@@ -10,6 +10,8 @@ import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.Route
+import fr.roadly.core.scooter.map.RouteDisplayGroup
+import fr.roadly.core.scooter.map.ScooterRouteFeatures
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -33,6 +35,7 @@ import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineBlur
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
+import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
@@ -57,6 +60,7 @@ class MapController(internal val context: Context) {
     private var lastMarkers: List<Place> = emptyList()
     private var lastReports: List<CommunityReport> = emptyList()
     private var lastTraversed: String = TraversedFeatureBuilder.EMPTY
+    private var lastScooter: String = ScooterRouteFeatures.EMPTY
     private var routeColorActive = "#B794FF"
     private var routeColorInactive = "#5A5470"
     private var routeColorCasing = "#0E0B14"
@@ -116,6 +120,7 @@ class MapController(internal val context: Context) {
         style.addSource(GeoJsonSource(MapIds.SRC_REPORTS))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
+        style.addSource(GeoJsonSource(MapIds.SRC_SCOOTER))
         style.addSource(GeoJsonSource(MapIds.SRC_MARKERS))
         style.addSource(GeoJsonSource(MapIds.SRC_USER))
 
@@ -132,6 +137,15 @@ class MapController(internal val context: Context) {
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_ACTIVE, MapIds.SRC_ROUTES).withProperties(
             lineColor(routeColorActive), lineWidth(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("active"), literal(true))))
+        // Mode trottinette : tracé coloré par type de voie (piste, bande, voie verte, route partagée, chemin), puis vigilance en pointillés.
+        RouteDisplayGroup.entries.filter { it != RouteDisplayGroup.CAUTION }.forEach { g ->
+            style.addLayer(LineLayer(MapIds.LYR_SCOOTER_PREFIX + g.key, MapIds.SRC_SCOOTER).withProperties(
+                lineColor(g.colorHex), lineWidth(6.5f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            ).withFilter(eq(get("group"), literal(g.key))))
+        }
+        style.addLayer(LineLayer(MapIds.LYR_SCOOTER_CAUTION, MapIds.SRC_SCOOTER).withProperties(
+            lineColor(RouteDisplayGroup.CAUTION.colorHex), lineWidth(3.5f), lineDasharray(arrayOf(1.2f, 1.2f)), lineCap(Property.LINE_CAP_BUTT),
+        ).withFilter(eq(get("caution"), literal(true))))
         // Tronçon déjà parcouru, dessiné par-dessus le tracé actif (spec §5 : « tracé parcouru atténué »).
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED, MapIds.SRC_TRAVERSED).withProperties(
             lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
@@ -155,6 +169,7 @@ class MapController(internal val context: Context) {
         lastFix?.let { style.getSourceAs<GeoJsonSource>(MapIds.SRC_USER)?.setGeoJson(PointFeatureBuilder.user(it)) }
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ROUTES)?.setGeoJson(RouteFeatureBuilder.build(lastRoutes, lastActiveRouteId))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_TRAVERSED)?.setGeoJson(lastTraversed)
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_SCOOTER)?.setGeoJson(lastScooter)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(lastReports))
         (style.getLayer(MapIds.LYR_ROUTE_ACTIVE) as? LineLayer)?.setProperties(lineColor(routeColorActive))
@@ -195,6 +210,29 @@ class MapController(internal val context: Context) {
     }
 
     fun clearTraversed() = setTraversed(emptyList(), -1, null)
+
+    /** Tracé trottinette par type de voie ([ScooterRouteFeatures.build]) ; [ScooterRouteFeatures.EMPTY] pour l'effacer. */
+    fun setScooterRoute(geoJson: String) {
+        lastScooter = geoJson
+        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_SCOOTER)?.setGeoJson(geoJson)
+    }
+
+    /**
+     * Caméra de guidage en perspective : [tiltDeg] d'inclinaison, position décalée vers le bas de l'écran
+     * ([topPaddingPx]) pour montrer davantage la route devant soi ; transition animée continue.
+     */
+    fun followNavigation(fix: LocationFix, zoom: Double, tiltDeg: Double, topPaddingPx: Int, durationMs: Int = 900) {
+        val action: (MapLibreMap) -> Unit = { m ->
+            val pos = CameraPosition.Builder()
+                .target(LatLng(fix.point.lat, fix.point.lon)).zoom(zoom).bearing((fix.bearingDeg ?: 0f).toDouble()).tilt(tiltDeg)
+                .padding(0.0, topPaddingPx.toDouble(), 0.0, 0.0)
+                .build()
+            m.animateCamera(CameraUpdateFactory.newCameraPosition(pos), durationMs)
+        }
+        val m = map
+        if (m == null || !styleReady) { pendingCamera = action; return }
+        action(m)
+    }
 
     fun moveTo(point: GeoPoint, zoom: Double, bearing: Double = 0.0, animate: Boolean = true) {
         val action: (MapLibreMap) -> Unit = { m ->

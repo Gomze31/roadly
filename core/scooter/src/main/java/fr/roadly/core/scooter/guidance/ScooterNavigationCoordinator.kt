@@ -42,6 +42,10 @@ data class ScooterNavigationUiState(
     /** Part restante en pistes / bandes / voies vertes (0–1), null sans analyse. */
     val remainingCycleShare: Double? = null,
     val traversedAscentM: Double? = null,
+    /** Type de voie juste après la prochaine manœuvre (pictogramme de changement de voie au carrefour). */
+    val nextManeuverInto: WayCategory? = null,
+    /** Analyse du tracé courant (dessin de la carte par type de voie) ; null sans analyse. */
+    val analysis: ScooterRouteAnalysis? = null,
 )
 
 data class ScooterGuidanceUpdate(val ui: ScooterNavigationUiState, val speech: List<String>)
@@ -119,7 +123,7 @@ class ScooterNavigationCoordinator(
         return ScooterPhrases.forStage(stage, distanceM, action)
     }
 
-    fun update(alongM: Double, speedKmh: Double?, extrapolated: Boolean = false): ScooterGuidanceUpdate {
+    fun update(alongM: Double, speedKmh: Double?, extrapolated: Boolean = false, nextManeuverIndex: Int? = null): ScooterGuidanceUpdate {
         val speech = ArrayList<String>()
         val speed = speedKmh?.takeIf { it >= MIN_SPEED_FOR_MODEL_KMH } ?: cruiseSpeedKmh
         accumulate(alongM, speed)
@@ -183,6 +187,8 @@ class ScooterNavigationCoordinator(
             range = range,
             remainingCycleShare = if (analysis != null && remainingLen > 0) remainingCycle / remainingLen else null,
             traversedAscentM = if (segments.any { it.gradePct != null }) ascentDoneM else null,
+            nextManeuverInto = nextManeuverIndex?.let { route.maneuvers.getOrNull(it) }?.let { m -> segmentAt(line.alongAt(m.beginShapeIndex) + 5.0)?.category },
+            analysis = analysis,
         )
         return ScooterGuidanceUpdate(ui, speech)
     }

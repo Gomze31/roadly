@@ -11,4 +11,5 @@ import dagger.hilt.components.SingletonComponent
 abstract class RoutingModule {
     @Binds abstract fun routing(impl: ValhallaRoutingProvider): RoutingProvider
     @Binds abstract fun scooterAnalyzer(impl: ValhallaScooterRouteAnalyzer): ScooterRouteAnalyzer
+    @Binds abstract fun scooterPois(impl: OverpassScooterPoiProvider): ScooterPoiProvider
 }

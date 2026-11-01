@@ -22,6 +22,17 @@ import fr.roadly.core.navigation.RouteGeometry
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
+import fr.roadly.core.data.repository.BatteryReading
+import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.Trip
+import fr.roadly.core.navigation.ScooterGuidanceConfig
+import fr.roadly.core.navigation.ScooterServices
+import fr.roadly.core.routing.ScooterRouteOptionsUseCase
+import fr.roadly.core.scooter.assistant.AssistantAction
+import fr.roadly.core.scooter.assistant.ScooterAssistantContext
+import fr.roadly.core.scooter.osm.ScooterPoi
+import fr.roadly.core.scooter.osm.ScooterPoiKind
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +61,8 @@ class NavigationViewModel @Inject constructor(
     private val routing: RoutingProvider,
     vehicleRepo: VehicleProfileRepository,
     private val community: CommunityRepository,
+    /** Services du mode trottinette ; null (tests existants) = guidage voiture / moto inchangé. */
+    private val scooter: ScooterServices? = null,
 ) : ViewModel() {
     val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     /** Signalements autour de la position projetée (toutes les 60 s), affichés sur la carte. */
@@ -121,7 +134,13 @@ class NavigationViewModel @Inject constructor(
         alternativesJob?.cancel()
         _alternatives.value = AlternativesUi.Loading
         alternativesJob = viewModelScope.launch {
-            when (val r = alternatives(g.progress.snapped, g.route.geometry.last(), vehicle.value, System.currentTimeMillis(), routePreferences.value)) {
+            val sc = scooter
+            val cfg = session.scooterConfig
+            val result = if (sc != null && cfg != null) {
+                // Trottinette : variantes trottinette depuis la position (jamais les variantes voiture).
+                sc.options(scooterParams(sc, cfg, g.progress.snapped, g.route.geometry.last(), emptyList()))
+            } else alternatives(g.progress.snapped, g.route.geometry.last(), vehicle.value, System.currentTimeMillis(), routePreferences.value)
+            when (val r = result) {
                 is Outcome.Success -> _alternatives.value = AlternativesUi.Content(r.value, g.route.id)
                 is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
             }
@@ -140,13 +159,16 @@ class NavigationViewModel @Inject constructor(
         if (_addingStop.value) return
         viewModelScope.launch {
             _addingStop.value = true
+            val cfg = session.scooterConfig
             val request = RouteRequest(
                 origin = g.progress.snapped, destination = g.route.geometry.last(), waypoints = listOf(place.point),
-                costing = g.route.costing, preferences = routePreferences.value, originHeadingDeg = g.progress.bearingDeg, vehicle = vehicle.value,
+                costing = g.route.costing, preferences = if (cfg != null) RoutePreferences() else routePreferences.value,
+                originHeadingDeg = g.progress.bearingDeg, vehicle = if (cfg != null) null else vehicle.value, scooter = cfg?.request,
             )
             when (val r = routing.route(request)) {
                 is Outcome.Success -> r.value.firstOrNull()?.let { route ->
-                    session.start(RouteOption(route.copy(costing = g.route.costing), "Via ${place.name}", System.currentTimeMillis() + (route.durationSeconds * 1000).toLong(), null, sameAsFastest = false), routePreferences.value, vehicle.value)
+                    val cfgNow = session.scooterConfig?.let { it.copy(batteryPct = g.scooter?.range?.batteryNowPct ?: it.batteryPct) }
+                    session.start(RouteOption(route.copy(costing = g.route.costing), "Via ${place.name}", System.currentTimeMillis() + (route.durationSeconds * 1000).toLong(), null, sameAsFastest = false), routePreferences.value, vehicle.value, cfgNow)
                 }
                 is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
             }
@@ -156,11 +178,117 @@ class NavigationViewModel @Inject constructor(
 
     /** Bascule le guidage sur [option] : la course est remplacée, la voix et le service continuent. */
     fun switchTo(option: RouteOption) {
-        session.start(option, routePreferences.value, vehicle.value)
+        val g = session.state.value as? NavigationState.Guiding
+        val cfg = session.scooterConfig?.let { it.copy(batteryPct = g?.scooter?.range?.batteryNowPct ?: it.batteryPct) }
+        if (cfg != null) session.start(option, RoutePreferences(), null, cfg) else session.start(option, routePreferences.value, vehicle.value)
         dismissAlternatives()
     }
 
+    // ── Mode trottinette ──
+    val scooterMode: Boolean get() = session.scooterConfig != null
+
+    private suspend fun scooterParams(sc: ScooterServices, cfg: ScooterGuidanceConfig, from: GeoPoint, to: GeoPoint, waypoints: List<GeoPoint>): ScooterRouteOptionsUseCase.Params {
+        val g = session.state.value as? NavigationState.Guiding
+        return ScooterRouteOptionsUseCase.Params(
+            from, to, cfg.request.profile, sc.mobility.scooterRoutePreferences.first(), System.currentTimeMillis(), waypoints,
+            batteryPct = g?.scooter?.range?.batteryNowPct ?: cfg.batteryPct, temperatureC = cfg.temperatureC, calibration = cfg.calibration, withOsmTags = cfg.withOsmTags,
+        )
+    }
+
+    /** Niveau de batterie lu sur la trottinette et saisi en route : devient la référence de l'estimation. */
+    fun setBattery(pct: Int?) {
+        val sc = scooter ?: return
+        if (pct == null) return
+        session.setScooterBattery(pct.toDouble())
+        viewModelScope.launch { sc.mobility.setScooterBattery(BatteryReading(pct.coerceIn(0, 100), System.currentTimeMillis())) }
+    }
+
+    private val _assistantReply = MutableStateFlow<String?>(null)
+    val assistantReply: StateFlow<String?> = _assistantReply
+
+    /** Roadly AI : réponse calculée sur l'état réel du guidage et du profil, prononcée puis affichée 8 s. */
+    fun onAssistantText(text: String) {
+        val sc = scooter ?: return
+        val g = session.state.value as? NavigationState.Guiding
+        viewModelScope.launch {
+            val ui = g?.scooter
+            val range = ui?.range
+            val estimate = range?.let { r ->
+                fr.roadly.core.scooter.range.RangeEstimate(r.risk, 0.0, 0.0, null, r.batteryNowPct, r.arrivalPct, r.arrivalPct, r.remainingRangeKm, session.scooterConfig?.calibration ?: fr.roadly.core.scooter.range.RangeCalibration(), emptyList())
+            }
+            val ctx = ScooterAssistantContext(
+                preferences = sc.mobility.scooterRoutePreferences.first(), rangeToDestination = estimate,
+                nextCycleInfrastructure = ui?.nextCycleInfrastructure, guiding = g != null, analysisAvailable = ui?.analysisAvailable == true,
+            )
+            val reply = sc.assistant(text, ctx, g?.progress?.snapped, session)
+            sc.speech.speak(reply.speech, flush = true)
+            _assistantReply.value = reply.speech
+            when (val a = reply.action) {
+                is AssistantAction.ApplyPreferences -> if (g != null) loadAlternatives()
+                is AssistantAction.SearchWithinRange -> searchPois(ScooterPoiKind.CHARGING, a.maxDistanceM.toInt())
+                else -> Unit
+            }
+            delay(8_000)
+            if (_assistantReply.value == reply.speech) _assistantReply.value = null
+        }
+    }
+
+    private val _pois = MutableStateFlow<PoisUi>(PoisUi.Hidden)
+    val pois: StateFlow<PoisUi> = _pois
+
+    /** Parkings près de l'arrivée, ou bornes autour de soi (rayon [radiusM]) ; uniquement les lieux présents dans OSM. */
+    fun searchPois(kind: ScooterPoiKind, radiusM: Int? = null) {
+        val sc = scooter ?: return
+        val g = session.state.value as? NavigationState.Guiding ?: return
+        val center = if (kind == ScooterPoiKind.PARKING) g.route.geometry.last() else g.progress.snapped
+        _pois.value = PoisUi.Loading(kind)
+        viewModelScope.launch {
+            _pois.value = when (val r = sc.pois.around(kind, center, radiusM ?: if (kind == ScooterPoiKind.PARKING) 400 else 3_000)) {
+                is Outcome.Success -> PoisUi.Content(kind, r.value.take(20).map { PoiUi(it, it.point.distanceTo(center)) })
+                is Outcome.Failure -> PoisUi.Error(kind, r.error)
+            }
+        }
+    }
+    fun dismissPois() { _pois.value = PoisUi.Hidden }
+
+    /** Nouvelle destination (lieu trouvé dans OSM) : itinéraire trottinette depuis la position, guidage remplacé. */
+    fun navigateToPoi(poi: PoiUi) {
+        val sc = scooter ?: return
+        val cfg = session.scooterConfig ?: return
+        val g = session.state.value as? NavigationState.Guiding ?: return
+        dismissPois()
+        viewModelScope.launch {
+            when (val r = sc.options(scooterParams(sc, cfg, g.progress.snapped, poi.poi.point, emptyList()).copy(variants = 1))) {
+                is Outcome.Success -> r.value.firstOrNull()?.let { session.start(it.copy(label = poi.poi.name ?: "Lieu OSM"), RoutePreferences(), null, cfg.copy(batteryPct = g.scooter?.range?.batteryNowPct ?: cfg.batteryPct)) }
+                is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
+            }
+        }
+    }
+
+    /** Dernier trajet enregistré (écran récapitulatif après l'arrivée). */
+    val lastTrip: StateFlow<Trip?> = (scooter?.tripRecorder?.lastSaved ?: MutableStateFlow(null)).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Batterie lue à l'arrivée : enregistrée avec le trajet pour calibrer les prochaines estimations. */
+    fun setArrivalBattery(pct: Int?) {
+        val sc = scooter ?: return
+        val trip = lastTrip.value ?: return
+        viewModelScope.launch {
+            sc.trips.setBatteryEnd(trip.id, pct)
+            if (pct != null) sc.mobility.setScooterBattery(BatteryReading(pct, System.currentTimeMillis()))
+        }
+    }
+
     companion object { const val RECENTER_AFTER_MS = 8_000L }
+}
+
+/** Lieu trottinette trouvé dans OSM, avec sa distance au point de recherche. */
+data class PoiUi(val poi: ScooterPoi, val distanceM: Double)
+
+sealed interface PoisUi {
+    data object Hidden : PoisUi
+    data class Loading(val kind: ScooterPoiKind) : PoisUi
+    data class Content(val kind: ScooterPoiKind, val items: List<PoiUi>) : PoisUi
+    data class Error(val kind: ScooterPoiKind, val error: AppError) : PoisUi
 }
 
 /** Signalement devant soi : [distanceM] le long du tracé depuis la position projetée. */

@@ -15,6 +15,21 @@ import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.navigation.NavigationSession
+import fr.roadly.core.common.AppError
+import fr.roadly.core.data.repository.BatteryReading
+import fr.roadly.core.model.ElectricScooterProfile
+import fr.roadly.core.model.ScooterRoutePreferences
+import fr.roadly.core.model.ScooterRouteRequest
+import fr.roadly.core.model.TravelMode
+import fr.roadly.core.model.motorVehicle
+import fr.roadly.core.navigation.ScooterGuidanceConfig
+import fr.roadly.core.navigation.ScooterServices
+import fr.roadly.core.routing.ScooterRouteOptionsUseCase
+import fr.roadly.core.scooter.assistant.ScooterAssistantContext
+import fr.roadly.core.scooter.guidance.CategoryAhead
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
@@ -40,6 +55,8 @@ class RouteViewModel @Inject constructor(
     private val prefs: UserPreferencesRepository,
     private val session: NavigationSession,
     private val routing: RoutingProvider,
+    /** Services du mode trottinette ; null (tests existants) = seuls les modes voiture / moto existent. */
+    private val scooter: ScooterServices? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -62,17 +79,41 @@ class RouteViewModel @Inject constructor(
     /** Préférences du dernier calcul affiché : transmises à la session (et donc au recalcul). */
     private var computedWith = RoutePreferences()
     private var computedVehicle: VehicleProfile? = null
+    /** Course trottinette du dernier calcul affiché (transmise au guidage). */
+    private var computedScooter: ScooterGuidanceConfig? = null
+    private val assistantReply = MutableStateFlow<String?>(null)
+
+    /** Mode actif : choix mémorisé, sinon déduit du profil véhicule (aucun changement pour les profils existants). */
+    private val travelMode: StateFlow<TravelMode> = combine(scooter?.mobility?.travelMode ?: flowOf(null), vehicleRepo.profile) { saved, profile ->
+        saved?.takeIf { it.available && (scooter != null || it != TravelMode.ELECTRIC_SCOOTER) } ?: TravelMode.derivedFrom(profile)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, TravelMode.CAR)
+
+    private data class ScooterInputs(
+        val profile: ElectricScooterProfile?, val preferences: ScooterRoutePreferences, val battery: BatteryReading?, val osm: Boolean,
+    )
+    private val scooterInputs = scooter?.let { sc ->
+        combine(sc.activeProfile, sc.mobility.scooterRoutePreferences, sc.mobility.scooterBattery, sc.mobility.scooterOsmEnrichment) { p, prefs, b, osm -> ScooterInputs(p, prefs, b, osm) }
+    } ?: flowOf(null)
 
     private data class Params(val origin: GeoPoint?, val departAt: Long, val arriveAt: Long?, val vehicle: VehicleProfile?, val preferences: RoutePreferences, val stops: List<Place>)
 
     init {
+        scooter?.let { sc -> viewModelScope.launch { sc.ensureProfile() } }
         viewModelScope.launch {
-            combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, stops, reload) { values ->
+            val base = combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, stops, reload) { values ->
                 @Suppress("UNCHECKED_CAST")
                 Params(values[0] as GeoPoint?, values[1] as Long, values[2] as Long?, values[3] as VehicleProfile?, values[4] as RoutePreferences, values[5] as List<Place>)
-            }.collect { (o, d, a, v, p, s) ->
+            }
+            combine(base, travelMode, scooterInputs) { params, mode, sIn -> Triple(params, mode, sIn) }.collect { (params, mode, sIn) ->
+                val (o, d, a, saved, p, s) = params
                 if (o == null) { computed.value = RouteUiState.NoOrigin(destName); return@collect }
                 computed.value = RouteUiState.Loading
+                if (mode == TravelMode.ELECTRIC_SCOOTER && scooter != null) {
+                    computeScooter(o, d, a, s, sIn)
+                    return@collect
+                }
+                computedScooter = null
+                val v = mode.motorVehicle(saved)
                 when (val r = alternatives(o, destination, v, d, p, s.map { it.point })) {
                     is Outcome.Success -> {
                         val (options, effectiveDepart) = if (a != null) shiftToArrival(r.value, a) else r.value to d
@@ -80,7 +121,7 @@ class RouteViewModel @Inject constructor(
                         if (activeId.value == null || options.none { it.route.id == activeId.value }) activeId.value = options.first().route.id
                         computedWith = p
                         computedVehicle = v
-                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, v != null, effectiveDepart, a, p, s)
+                        computed.value = RouteUiState.Content(o, destName, options, activeId.value!!, saved != null, effectiveDepart, a, p, s)
                     }
                     is Outcome.Failure -> computed.value = RouteUiState.Error(r.error)
                 }
@@ -88,10 +129,74 @@ class RouteViewModel @Inject constructor(
         }
     }
 
-    val uiState: StateFlow<RouteScreenState> = combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
+    /** Variantes trottinette : profil actif, préférences trottinette, batterie saisie, température Open-Meteo. */
+    private suspend fun computeScooter(o: GeoPoint, departAtMs: Long, arriveAtMs: Long?, stopsNow: List<Place>, inputs: ScooterInputs?) {
+        val sc = scooter ?: return
+        val inp = inputs ?: run { computed.value = RouteUiState.Error(AppError.NoResult); return }
+        val profile = inp.profile ?: run { computed.value = RouteUiState.Error(AppError.NoResult); return }
+        val prefsNow = inp.preferences
+        val temperature = sc.temperatureAt(o)
+        val calibration = sc.calibration(profile)
+        val battery = inp.battery
+        val params = ScooterRouteOptionsUseCase.Params(
+            o, destination, profile, prefsNow, departAtMs, stopsNow.map { it.point },
+            batteryPct = battery?.pct?.toDouble(), temperatureC = temperature, calibration = calibration, withOsmTags = inp.osm,
+        )
+        when (val r = sc.options(params)) {
+            is Outcome.Success -> {
+                val (options, effectiveDepart) = if (arriveAtMs != null) shiftToArrival(r.value, arriveAtMs) else r.value to departAtMs
+                if (activeId.value == null || options.none { it.route.id == activeId.value }) activeId.value = options.first().route.id
+                computedWith = RoutePreferences()
+                computedVehicle = null
+                computedScooter = ScooterGuidanceConfig(ScooterRouteRequest(profile, prefsNow), battery?.pct?.toDouble(), temperature, calibration, inp.osm)
+                val ageMin = battery?.let { (System.currentTimeMillis() - it.atEpochMs).coerceAtLeast(0) / 60_000 }
+                computed.value = RouteUiState.Content(
+                    o, destName, options, activeId.value!!, hasVehicleProfile = true, departAtEpochMs = effectiveDepart, arriveAtEpochMs = arriveAtMs,
+                    stops = stopsNow, scooter = ScooterRouteUi(profile.name, prefsNow, battery?.pct, ageMin, temperature, inp.osm),
+                )
+            }
+            is Outcome.Failure -> computed.value = RouteUiState.Error(r.error)
+        }
+    }
+
+    val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())
+    }, travelMode, assistantReply) { st, mode, reply -> st.copy(travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())
+
+    // ── Mode trottinette ──
+    fun setTravelMode(mode: TravelMode) {
+        val sc = scooter ?: return
+        if (!mode.available) return
+        viewModelScope.launch { sc.mobility.setTravelMode(mode) }
+    }
+    fun setScooterPreferences(value: ScooterRoutePreferences) { scooter?.let { sc -> viewModelScope.launch { sc.mobility.setScooterRoutePreferences(value) } } }
+    /** Saisie manuelle du niveau de batterie (Roadly n'est pas connecté à la trottinette). */
+    fun setBattery(pct: Int?) {
+        val sc = scooter ?: return
+        viewModelScope.launch { sc.mobility.setScooterBattery(pct?.let { BatteryReading(it.coerceIn(0, 100), System.currentTimeMillis()) }) }
+    }
+
+    /** Roadly AI (texte reconnu par la reconnaissance vocale du système) : réponse affichée et prononcée. */
+    fun onAssistantText(text: String) {
+        val sc = scooter ?: return
+        val content = computed.value as? RouteUiState.Content
+        val active = content?.options?.firstOrNull { it.route.id == activeId.value }
+        viewModelScope.launch {
+            val ctx = ScooterAssistantContext(
+                preferences = sc.mobility.scooterRoutePreferences.first(),
+                rangeToDestination = active?.scooter?.range,
+                nextCycleInfrastructure = active?.scooter?.analysis?.let { a -> a.segments.firstOrNull { it.category.isCycleInfrastructure }?.let { CategoryAhead(it.category, it.startAlongM, it.lengthM) } },
+                analysisAvailable = active?.scooter?.analysis != null,
+            )
+            val reply = sc.assistant(text, ctx, origin.value, null)
+            sc.speech.speak(reply.speech, flush = true)
+            assistantReply.value = reply.speech
+            delay(8_000)
+            if (assistantReply.value == reply.speech) assistantReply.value = null
+        }
+    }
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
     fun selectRoute(id: String) { activeId.value = id }
@@ -135,7 +240,7 @@ class RouteViewModel @Inject constructor(
         val content = computed.value as? RouteUiState.Content ?: return false
         val id = activeId.value ?: content.activeId
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
-        session.start(option, computedWith, computedVehicle)
+        session.start(option, computedWith, computedVehicle, computedScooter)
         return true
     }
 

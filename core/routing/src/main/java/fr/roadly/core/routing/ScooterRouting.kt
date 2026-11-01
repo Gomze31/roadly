@@ -207,3 +207,24 @@ class ScooterRouteOptionsUseCase @Inject constructor(
         }
     }
 }
+
+/** Parkings et bornes pour trottinettes (OSM via Overpass), uniquement là où les données existent. */
+interface ScooterPoiProvider {
+    suspend fun around(kind: fr.roadly.core.scooter.osm.ScooterPoiKind, center: GeoPoint, radiusM: Int): Outcome<List<fr.roadly.core.scooter.osm.ScooterPoi>>
+}
+
+@Singleton
+class OverpassScooterPoiProvider @Inject constructor(
+    private val api: ApiClient,
+    private val config: ProviderConfigRepository,
+    private val json: Json,
+) : ScooterPoiProvider {
+    override suspend fun around(kind: fr.roadly.core.scooter.osm.ScooterPoiKind, center: GeoPoint, radiusM: Int): Outcome<List<fr.roadly.core.scooter.osm.ScooterPoi>> {
+        val base = try { config.config.first().overpassBaseUrl } catch (e: CancellationException) { throw e } catch (e: Exception) { return Outcome.Failure(AppError.ProviderUnavailable("overpass")) }
+        val url = "${base.trimEnd('/')}/interpreter".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable("overpass"))
+        return when (val r = api.postForm(url, mapOf("data" to Overpass.poiQuery(kind, center, radiusM.coerceIn(100, 10_000))))) {
+            is Outcome.Success -> Overpass.parsePois(json, r.value, kind)?.sortedBy { it.point.distanceTo(center) }?.let { Outcome.Success(it) } ?: Outcome.Failure(AppError.Parse("overpass"))
+            is Outcome.Failure -> r
+        }
+    }
+}

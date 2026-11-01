@@ -123,6 +123,9 @@ class NavigationSession @Inject constructor(
         job = scope.launch(confined) { current = run; run.execute() }
     }
 
+    /** Réglages trottinette de la course en cours (alternatives, ajout d'arrêt) ; null en voiture / moto. */
+    val scooterConfig: ScooterGuidanceConfig? get() = lastScooter
+
     /** Niveau de batterie saisi en cours de route (trottinette) : devient la référence de l'estimation. */
     fun setScooterBattery(pct: Double) {
         lastScooter = lastScooter?.copy(batteryPct = pct)
@@ -179,6 +182,8 @@ class NavigationSession @Inject constructor(
         /** Coordinateur trottinette du tracé courant (remplacé après un recalcul). */
         private var coordinator: ScooterNavigationCoordinator? = scooter?.let { newCoordinator(route, initialAnalysis, it.batteryPct, null) }
         private var scooterUi: ScooterNavigationUiState? = null
+        // État trottinette affiché dès le départ, avant le premier fix (sans annonce : position non mesurée).
+        init { scooterUi = coordinator?.update(0.0, null, extrapolated = true)?.ui }
         private val destination: GeoPoint = route.geometry.last()
         private val costing = route.costing
         private val announced = mutableSetOf<Pair<Int, Tier>>()
@@ -326,7 +331,7 @@ class NavigationSession @Inject constructor(
 
         /** Transitions de voie, avertissements anticipés et autonomie (trottinette). */
         private suspend fun scooterTick(c: ScooterNavigationCoordinator, progress: RouteProgress) {
-            val u = c.update(progress.distanceAlongM, speedKmh, extrapolated = progress.extrapolated)
+            val u = c.update(progress.distanceAlongM, speedKmh, extrapolated = progress.extrapolated, nextManeuverIndex = progress.nextManeuverIndex)
             scooterUi = u.ui
             tripRecorder.setExtras(TripExtras(c.ascentDone.takeIf { c.hasGradeData }, c.descentDone.takeIf { c.hasGradeData }, c.modelEnergyUsedWh.takeIf { estimator != null && it > 0 }))
             u.speech.forEach { say(it, routeId = progress.routeId) }

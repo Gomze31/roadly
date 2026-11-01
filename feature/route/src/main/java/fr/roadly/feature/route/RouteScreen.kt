@@ -69,6 +69,11 @@ import fr.roadly.core.designsystem.component.userMessage
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.map.RoadlyMap
+import fr.roadly.core.map.OfflineMapDownloader
+import fr.roadly.core.scooter.map.ScooterRouteFeatures
+import fr.roadly.core.designsystem.component.TravelModeSelector
+import fr.roadly.core.designsystem.component.rememberVoiceInput
+import androidx.compose.ui.platform.LocalContext
 import fr.roadly.core.map.rememberMapController
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
@@ -93,6 +98,11 @@ fun RouteScreen(
     val map = rememberMapController()
     val density = LocalDensity.current
     var showTimePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val offlineDownloader = remember { OfflineMapDownloader(context.applicationContext) }
+    val offline by offlineDownloader.state.collectAsStateWithLifecycle()
+    // Roadly AI : reconnaissance vocale du système, réponse calculée sur les données du moteur.
+    val listen = rememberVoiceInput("Roadly AI — votre demande", onText = vm::onAssistantText)
 
     LaunchedEffect(isDark) { vm.setDarkTheme(isDark) }
     LaunchedEffect(c.routeActive, c.routeInactive, c.routeCasing) { map.setRouteColors(c.routeActive.toHex(), c.routeInactive.toHex(), c.routeCasing.toHex()) }
@@ -104,6 +114,9 @@ fun RouteScreen(
             when (phase) {
                 is RouteUiState.Content -> {
                     map.setRoutes(phase.options.map { it.route }, phase.activeId)
+                    // Trottinette : tracé actif coloré par type de voie (piste, bande, voie verte, route partagée, vigilance).
+                    val active = phase.options.firstOrNull { it.route.id == phase.activeId }
+                    map.setScooterRoute(if (active?.scooter != null) ScooterRouteFeatures.build(active.route.geometry, active.scooter?.analysis) else ScooterRouteFeatures.EMPTY)
                     map.setMarkers(listOf(Place("dest", phase.destinationName, null, vm.destinationPoint, PlaceKind.ADDRESS, "local")))
                     // Marges : en-tête en haut, panneau « Votre choix » en bas (portrait) ou à gauche (paysage).
                     with(density) {
@@ -133,11 +146,17 @@ fun RouteScreen(
         }
 
         if (!landscape) {
-            TripHeader(destinationName, onBack, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(RoadlySpacing.screenEdge))
+            Column(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(RoadlySpacing.screenEdge), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                TripHeader(destinationName, onBack)
+                if (state.scooterAvailable) TravelModeSelector(state.travelMode, vm::setTravelMode)
+                state.assistantReply?.let { AssistantBubble(it) }
+            }
         }
 
         Column(panelModifier, verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
             if (landscape) TripHeader(destinationName, onBack)
+            if (landscape && state.scooterAvailable) TravelModeSelector(state.travelMode, vm::setTravelMode)
+            if (landscape) state.assistantReply?.let { AssistantBubble(it) }
             if (landscape) Spacer(Modifier.weight(1f))
             when (val s = phase) {
                 RouteUiState.Loading -> GlassPanel(Modifier.fillMaxWidth()) { LoadingRow(stringResource(R.string.route_loading)) }
@@ -152,7 +171,14 @@ fun RouteScreen(
                     }
                 }
                 is RouteUiState.Error -> GlassPanel(Modifier.fillMaxWidth()) { ErrorState(s.error.userMessage(), onRetry = vm::retry) }
-                is RouteUiState.Content -> ChoicePanel(
+                is RouteUiState.Content -> if (s.scooter != null) ScooterChoicePanel(
+                    s, offline, onSelect = vm::selectRoute, onPreferences = vm::setScooterPreferences, onBattery = vm::setBattery,
+                    onDownload = {
+                        val active = s.options.firstOrNull { it.route.id == s.activeId } ?: s.options.first()
+                        offlineDownloader.download(state.styleUrl, active.route.geometry, "Roadly · ${s.destinationName}")
+                    },
+                    onAssistant = listen, onStart = { onStartNavigation(vm::startGuidance) },
+                ) else ChoicePanel(
                     s, onSelect = vm::selectRoute, onPickTime = { showTimePicker = true }, onOpenSettings = onOpenSettings,
                     onStart = { onStartNavigation(vm::startGuidance) }, onPreferences = vm::setPreferences,
                     onAddStop = onAddStop, onMoveStop = vm::moveStop, onRemoveStop = vm::removeStop, onOptimize = vm::optimizeStops,
@@ -186,6 +212,15 @@ fun RouteScreen(
                 }
             },
         )
+    }
+}
+
+/** Réponse de Roadly AI (texte de ce qui a été prononcé). */
+@Composable
+private fun AssistantBubble(text: String) {
+    val c = LocalRoadlyColors.current
+    GlassPanel(Modifier.fillMaxWidth(), contentPadding = RoadlySpacing.sm) {
+        Text(text, style = MaterialTheme.typography.bodySmall, color = c.textPrimary)
     }
 }
 

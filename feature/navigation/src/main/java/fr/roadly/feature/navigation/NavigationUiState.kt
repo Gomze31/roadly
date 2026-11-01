@@ -10,6 +10,7 @@ import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteHazard
 import fr.roadly.core.model.RouteProgress
 import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.scooter.guidance.ScooterNavigationUiState
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -63,6 +64,8 @@ data class NavigationUiState(
     val muted: Boolean = false,
     val following: Boolean = true,
     val error: AppError? = null,
+    /** Mode trottinette : voie courante, transitions, alertes, autonomie ; null en voiture / moto. */
+    val scooter: ScooterNavigationUiState? = null,
 )
 
 /** « 6 » / « min » sous l'heure ; « 1 h 12 » / « restant » au-delà d'une heure. */
@@ -128,6 +131,7 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 speedLimitKmh = s.speedLimitKmh,
                 gpsLost = s.gpsLost,
                 rerouting = s.rerouting,
+                scooter = s.scooter,
             )
         }
     }
