@@ -217,6 +217,18 @@ internal fun thenFor(next: Maneuver?, gapM: Double?): ThenUi? {
     return ThenUi(next.type, next.streetName ?: next.instruction)
 }
 
+/**
+ * D2 : rue montrée par le bandeau. Au rond-point, la rue de sortie (affichée « vers … ») plutôt que le nom de l'anneau
+ * (« Rond-point des Champs-Élysées-Marcel-Dassault ») ; sinon la rue de la manœuvre ; null sans bandeau.
+ */
+internal fun bannerStreet(state: NavigationUiState): String? = bannerStreet(state.banner, state.roundabout)
+
+/** Variante de [bannerStreet] pour le composant du bandeau, qui reçoit le bandeau et le rond-point séparément. */
+internal fun bannerStreet(banner: BannerUi?, roundabout: RoundaboutInfo?): String? {
+    if (banner == null) return null
+    return roundabout?.exitStreet ?: banner.street
+}
+
 /** D4 : voies visibles dans les [LANES_FROM_M] derniers mètres ou à l'approche ; jamais sans données (LIMITE : FOSSGIS public n'en renvoie pas). */
 internal fun lanesVisible(lanes: List<Lane>, distanceToNextM: Double, approaching: Boolean): Boolean =
     lanes.isNotEmpty() && (approaching || distanceToNextM < LANES_FROM_M)

@@ -26,8 +26,9 @@ import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.model.ManeuverType
 
 /**
- * Pile du bandeau, commune aux deux overlays : bandeau (D1, D2), ligne « puis … » (D1), panneau de direction à l'approche (D3)
- * ou voies seules (D4). Un seul appel par overlay garde la surface de fusion minimale.
+ * Pile du bandeau, commune aux deux overlays, dans l'ordre : bandeau (D1, D2), puis panneau de direction à l'approche (D3)
+ * ou voies seules (D4) de la même manœuvre, puis la ligne « puis … » (D1) de la manœuvre d'après.
+ * Un seul appel par overlay garde la surface de fusion minimale.
  */
 @Composable
 internal fun BannerStack(state: NavigationUiState, expanded: Boolean, onOpenPreview: () -> Unit, modifier: Modifier = Modifier) {
@@ -35,12 +36,12 @@ internal fun BannerStack(state: NavigationUiState, expanded: Boolean, onOpenPrev
     val sign = bannerSign(state)
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
         ManeuverBanner(banner, Modifier.fillMaxWidth(), expanded = expanded, onClick = onOpenPreview, roundabout = state.roundabout, signShownBelow = sign != null)
-        state.then?.let { ThenRow(it) }
         if (sign != null) {
-            ExitSignPanel(sign.exitNumber, sign.toward, sign.branch, if (state.showLanes) state.lanes else emptyList(), banner.distanceText, isNext = true, Modifier.fillMaxWidth())
+            ExitSignPanel(banner.type, sign.exitNumber, sign.toward, sign.branch, if (state.showLanes) state.lanes else emptyList(), banner.distanceText, isNext = true, Modifier.fillMaxWidth())
         } else if (state.showLanes) {
             LaneGuidanceView(state.lanes, emphasized = state.approach != null)
         }
+        state.then?.let { ThenRow(it) }
     }
 }
 

@@ -74,7 +74,7 @@ internal fun ManeuverPreviewContent(state: NavigationUiState, onDismiss: () -> U
         }
         val sign = state.sign
         if (sign != null) {
-            ExitSignPanel(sign.exitNumber, sign.toward, sign.branch, state.lanes, banner.distanceText, isNext = true, Modifier.fillMaxWidth())
+            ExitSignPanel(banner.type, sign.exitNumber, sign.toward, sign.branch, state.lanes, banner.distanceText, isNext = true, Modifier.fillMaxWidth())
         } else {
             LaneGuidanceView(state.lanes, emphasized = true)
         }
@@ -82,7 +82,7 @@ internal fun ManeuverPreviewContent(state: NavigationUiState, onDismiss: () -> U
             Text(stringResource(R.string.nav_preview_next), style = MaterialTheme.typography.titleSmall, color = c.textSecondary)
             state.upcoming.forEach { u ->
                 ListRow(title = u.street ?: u.instruction ?: stringResource(R.string.nav_horizon_maneuver), icon = u.type.icon(), value = u.distanceText, divider = false)
-                u.sign?.let { s -> ExitSignPanel(s.exitNumber, s.toward, s.branch, emptyList(), u.distanceText, isNext = false, Modifier.fillMaxWidth()) }
+                u.sign?.let { s -> ExitSignPanel(u.type, s.exitNumber, s.toward, s.branch, emptyList(), u.distanceText, isNext = false, Modifier.fillMaxWidth()) }
             }
         }
         GlassButton(stringResource(R.string.nav_close), onClick = onDismiss, style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth())

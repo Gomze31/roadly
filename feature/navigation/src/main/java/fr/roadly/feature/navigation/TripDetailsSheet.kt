@@ -50,7 +50,8 @@ fun TripDetailsSheet(state: NavigationUiState, destinationName: String?, onDismi
             Text(stringResource(R.string.nav_trip_summary, state.remainingDistance, state.remainingDuration, state.etaClock), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary)
             Spacer(Modifier.height(RoadlySpacing.m))
             val listState = rememberLazyListState(initialFirstVisibleItemIndex = next.coerceIn(0, (steps.size - 1).coerceAtLeast(0)))
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp), state = listState) {
+            // Paysage : la feuille borne la colonne ; la liste prend la place restante (`weight`, sans remplir) et « Fermer » reste visible dessous.
+            LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 420.dp), state = listState) {
                 items(steps, key = { it.index }) { step -> TripStepRow(step) }
             }
             Spacer(Modifier.height(RoadlySpacing.sm))

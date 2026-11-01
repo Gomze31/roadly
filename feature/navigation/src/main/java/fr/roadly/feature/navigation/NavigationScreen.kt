@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
@@ -334,13 +335,18 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
             val expanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
             val destination by vm.destinationName.collectAsStateWithLifecycle()
             val recenterIn by vm.recenterInSeconds.collectAsStateWithLifecycle()
+            // Retour système panneau déplié : le replier, pas arrêter le guidage (composé après le `BackHandler` de l'écran → prioritaire).
+            BackHandler(enabled = expanded) { vm.collapseBottomPanel() }
+            // Orientation lue ici (même critère largeur > hauteur que `NavigationContent`) : signatures et corps des overlays inchangés.
+            val configuration = LocalConfiguration.current
+            val landscape = configuration.screenWidthDp > configuration.screenHeightDp
             // D5 : hauteur du bloc (Horizon + panneau) mesurée → marge basse de la caméra (portrait ; ignorée en paysage).
             Column(
                 Modifier.fillMaxWidth().onGloballyPositioned { coords ->
                     vm.setBottomPanelFraction(BottomPanelGeometry.fraction(coords.positionInRoot().y, coords.findRootCoordinates().size.height.toFloat()))
                 },
             ) {
-                AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()) {
+                AnimatedVisibility(horizonVisible(state, landscape)) {
                     HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
                 }
                 recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }
@@ -355,6 +361,15 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
         NavigationPhase.FAILED -> FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop)
         NavigationPhase.LOADING, NavigationPhase.IDLE -> GlassPanel(Modifier.fillMaxWidth()) { LoadingRow(stringResource(R.string.nav_loading)) }
     }
+}
+
+/**
+ * Ruban Horizon montré s'il a des éléments. En paysage, masqué tant que le panneau de direction (D3) ou les voies (D4) occupent
+ * la colonne gauche : bandeau + panneau + voies (≈ 350 dp) et bloc du bas ne tiennent pas ensemble sur ≈ 409 dp.
+ */
+internal fun horizonVisible(state: NavigationUiState, landscape: Boolean): Boolean {
+    val hasItems = state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()
+    return hasItems && !(landscape && (bannerSign(state) != null || state.showLanes))
 }
 
 /** Horizon : manœuvres et arrivée (Valhalla), virages (géométrie) et zones de vigilance (base officielle) ; pas de trafic (⛔ source). */
@@ -605,6 +620,16 @@ internal fun GuidanceSheets(state: NavigationUiState, vm: NavigationViewModel) {
     // Fin du guidage (arrivée, échec, arrêt) : la feuille est refermée dans le ViewModel, pas seulement masquée, pour ne pas rouvrir au guidage suivant ;
     // le panneau du bas est replié pour la même raison.
     LaunchedEffect(state.phase) { if (closesGuidanceSheet(state.phase)) { vm.closeSheet(); vm.collapseBottomPanel() } }
+    // Début d'une approche (deux orientations) : le panneau du bas se replie pour laisser la place au panneau de direction et aux voies.
+    val approaching = state.approach != null
+    LaunchedEffect(approaching) { if (approaching) vm.collapseBottomPanel() }
+    // Manœuvre visée franchie : l'aperçu (modal, couvre compteur, Horizon et Arrêter) se referme ; le trajet complet reste ouvert.
+    val nextIndex = state.progress?.nextManeuverIndex
+    var lastIndex by remember { mutableStateOf(nextIndex) }
+    LaunchedEffect(nextIndex) {
+        if (closesPreviewOnIndexChange(lastIndex, nextIndex, visibleSheet(state.phase, sheet))) vm.closeSheet()
+        if (nextIndex != null) lastIndex = nextIndex
+    }
     when (visibleSheet(state.phase, sheet)) {
         GuidanceSheet.MANEUVER_PREVIEW -> ManeuverPreviewSheet(state, onDismiss = vm::closeSheet)
         GuidanceSheet.TRIP_DETAILS -> TripDetailsSheet(state, destination, onDismiss = vm::closeSheet)
@@ -618,6 +643,10 @@ internal fun visibleSheet(phase: NavigationPhase, sheet: GuidanceSheet): Guidanc
 /** La feuille ouverte est refermée quand le guidage s'arrête ; pas pendant le chargement, qui précède le premier état. */
 internal fun closesGuidanceSheet(phase: NavigationPhase): Boolean =
     phase == NavigationPhase.ARRIVED || phase == NavigationPhase.FAILED || phase == NavigationPhase.IDLE
+
+/** D1 : l'aperçu se referme quand la manœuvre visée change ([prev] → [next], tous deux connus) ; jamais le trajet complet. */
+internal fun closesPreviewOnIndexChange(prev: Int?, next: Int?, sheet: GuidanceSheet): Boolean =
+    sheet == GuidanceSheet.MANEUVER_PREVIEW && prev != null && next != null && prev != next
 
 /** Part de la largeur occupée par la colonne gauche de `LandscapeOverlay` (même valeur que `fillMaxWidth(0.46f)`). */
 private const val LANDSCAPE_LEFT_COLUMN = 0.46f

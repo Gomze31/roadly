@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -39,8 +40,10 @@ internal const val BANNER_TAG = "maneuver_banner"
 /**
  * Bandeau de manœuvre : tuile de manœuvre (marque) ou schéma de rond-point compact (D2), distance en grand, rue et pastille de sortie.
  * [expanded] = false réduit le bandeau à la tuile, à la distance et à la direction de sortie (bouton « replier »).
- * [onClick] : tout le panneau (≥ 56 dp) ouvre l'aperçu de la manœuvre (D1).
- * [signShownBelow] : le panneau de direction est affiché dessous (D3) ; la pastille et la ligne « Direction … » s'effacent pour ne pas doubler.
+ * Au rond-point, la ligne « vers {rue de sortie} » ([bannerStreet]) remplace le nom de l'anneau et reste visible bandeau replié (D2).
+ * [onClick] : tout le panneau (≥ 56 dp) ouvre l'aperçu de la manœuvre (D1), annoncé « Aperçu de la manœuvre » par TalkBack (bouton).
+ * [signShownBelow] : le panneau de direction est affiché dessous (D3) ; la pastille, la ligne « Direction … » et l'instruction sur
+ * 2 lignes s'effacent pour ne pas doubler (≈ 48 dp gagnés) ; la distance et la ligne de rue restent.
  */
 @Composable
 fun ManeuverBanner(
@@ -52,7 +55,12 @@ fun ManeuverBanner(
     signShownBelow: Boolean = false,
 ) {
     val c = LocalRoadlyColors.current
-    GlassPanel(modifier.testTag(BANNER_TAG).defaultMinSize(minHeight = RoadlySpacing.touchTargetDriving), contentPadding = 12.dp, onClick = onClick) {
+    val street = bannerStreet(banner, roundabout)
+    val towardExit = roundabout?.exitStreet != null
+    GlassPanel(
+        modifier.testTag(BANNER_TAG).defaultMinSize(minHeight = RoadlySpacing.touchTargetDriving), contentPadding = 12.dp, onClick = onClick,
+        onClickLabel = stringResource(R.string.nav_preview_title), role = Role.Button,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (roundabout != null) {
                 RoundaboutManeuverView(roundabout, banner.roundaboutExit ?: roundabout.exitNumber, compact = true)
@@ -76,10 +84,16 @@ fun ManeuverBanner(
                         Text(stringResource(R.string.nav_exit_toward, it), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                // D2 : au rond-point, la rue de sortie, bandeau replié ou non (l'instruction sur 2 lignes la coupait).
+                if (towardExit && street != null) {
+                    Text(stringResource(R.string.nav_roundabout_toward, street), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 AnimatedVisibility(expanded) {
                     Column {
-                        Text(banner.instruction, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        banner.street?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        if (!signShownBelow) {
+                            Text(banner.instruction, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                        if (!towardExit) street?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     }
                 }
             }

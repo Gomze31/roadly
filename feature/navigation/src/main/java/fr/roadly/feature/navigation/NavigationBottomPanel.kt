@@ -62,11 +62,15 @@ internal const val PANEL_SUMMARY_TAG = "bottom_panel_summary"
 /** Glissement vertical minimal sur le panneau pour le déplier (vers le haut) ou le replier (vers le bas). */
 private val DRAG_THRESHOLD = 24.dp
 
+/** Hauteur de la bande de la poignée, touchable sur toute la largeur du panneau. */
+private val HANDLE_BAND_HEIGHT = 24.dp
+
 /**
  * D5 : panneau du bas du guidage.
  * - Replié : poignée, heure d'arrivée, temps et distance restants, voix (Recentrer à sa place quand la carte a été déplacée :
  *   trois boutons de 56 dp ne tiennent pas sur ~433 dp) et Arrêter (rouge).
- * - Déplié (toucher la ligne ETA, ou tirer la poignée vers le haut) : destination, « Trajet complet », « Itinéraires ».
+ * - Toucher la ligne ETA ouvre le trajet complet ([onTripDetails], spec D5).
+ * - Déplié (toucher la poignée, ou glisser le panneau vers le haut ; vers le bas pour replier) : destination, « Trajet complet », « Itinéraires ».
  * L'Horizon reste au-dessus, hors du panneau.
  */
 @Composable
@@ -95,16 +99,22 @@ fun NavigationBottomPanel(
         shape = RoadlyShapes.Panel, contentPadding = 0.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
+            // Poignée : bande touchable sur toute la largeur, centrée sur le panneau ; déplie / replie (comme le glissement vertical).
+            Box(
+                Modifier.fillMaxWidth().height(HANDLE_BAND_HEIGHT).clickable(onClickLabel = toggleLabel, role = Role.Button, onClick = onToggleExpanded),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.width(36.dp).height(4.dp).background(c.textTertiary.copy(alpha = 0.6f), RoundedCornerShape(2.dp)))
+            }
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Spec D5 : toucher l'ETA ouvre le trajet complet.
                 Column(
                     Modifier.weight(1f)
                         .testTag(PANEL_SUMMARY_TAG)
                         .defaultMinSize(minHeight = RoadlySpacing.touchTargetDriving)
-                        .clickable(onClickLabel = toggleLabel, role = Role.Button, onClick = onToggleExpanded),
+                        .clickable(onClickLabel = stringResource(R.string.nav_panel_open_trip), role = Role.Button, onClick = onTripDetails),
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp), contentAlignment = Alignment.Center) {
-                        Box(Modifier.width(36.dp).height(4.dp).background(c.textTertiary.copy(alpha = 0.6f), RoundedCornerShape(2.dp)))
-                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StatTile(state.etaClock, stringResource(R.string.nav_eta_label))
                         Spacer(Modifier.width(16.dp))
