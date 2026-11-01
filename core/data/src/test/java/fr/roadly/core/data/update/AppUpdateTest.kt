@@ -175,7 +175,9 @@ class GitHubReleaseSourceTest {
 
     @Test fun assetDownloadFollowsRedirectWithoutLeakingToken() = runTest {
         val bytes = ByteArray(300_000) { (it % 251).toByte() }
-        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", server.url("/signed/roadly.apk").toString().replace("localhost", "127.0.0.1")))
+        // Autre hôte que celui de l'API (localhost ⇄ 127.0.0.1, selon le nom que MockWebServer donne à la machine).
+        val signed = server.url("/signed/roadly.apk").let { it.newBuilder().host(if (it.host == "localhost") "127.0.0.1" else "localhost").build() }
+        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", signed.toString()))
         server.enqueue(MockResponse().setBody(okio.Buffer().write(bytes)))
         val asset = ReleaseAsset(9, "roadly.apk", bytes.size.toLong(), server.url("/repos/Gomze31/roadly/releases/assets/9").toString())
         var progress = 0L

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,7 +19,7 @@ val roadlyVersionName = (findProperty("roadly.versionName") as String?) ?: "0.1.
 
 // Signature : variables d'environnement (CI) ou local.properties (poste). Les mises à jour depuis GitHub exigent
 // que l'APK publié et l'application installée soient signés avec la même clé (docs/UPDATES.md).
-val localProps = java.util.Properties().apply {
+val localProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
 fun signing(env: String, prop: String): String? = System.getenv(env)?.takeIf { it.isNotBlank() } ?: localProps.getProperty(prop)?.takeIf { it.isNotBlank() }
