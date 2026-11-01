@@ -18,6 +18,13 @@
     <string name="home_permission_settings">Ouvrir les réglages système</string>
     <string name="home_picked_route">Itinéraire vers ce point</string>
     <string name="home_resume_guidance">Reprendre le guidage</string>
+    <string name="home_resume_last">Reprendre le dernier guidage</string>
+    <string name="home_resume_last_to">Reprendre le guidage vers %1$s</string>
+    <string name="home_resume_action">Reprendre</string>
+    <string name="home_resume_routing">Calcul de l\'itinéraire…</string>
+    <string name="home_resume_dismiss">Ignorer</string>
+    <string name="home_resume_failed">Itinéraire impossible pour l\'instant. Réessayez.</string>
+    <string name="home_resume_waiting_position">En attente de la position…</string>
     <string name="home_report">Signaler</string>
     <string name="report_sent">Signalement envoyé, merci !</string>
     <string name="report_rate_limited">Un signalement par minute au maximum.</string>

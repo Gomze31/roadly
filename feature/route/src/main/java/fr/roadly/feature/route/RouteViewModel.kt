@@ -30,6 +30,7 @@ import fr.roadly.core.scooter.guidance.CategoryAhead
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
@@ -53,7 +54,7 @@ class RouteViewModel @Inject constructor(
     private val location: LocationRepository,
     private val config: ProviderConfigRepository,
     private val prefs: UserPreferencesRepository,
-    private val session: NavigationSession,
+    private val guidance: GuidanceActions,
     private val routing: RoutingProvider,
     /** Services du mode trottinette ; null (tests existants) = seuls les modes voiture / moto existent. */
     private val scooter: ScooterServices? = null,
@@ -240,7 +241,7 @@ class RouteViewModel @Inject constructor(
         val content = computed.value as? RouteUiState.Content ?: return false
         val id = activeId.value ?: content.activeId
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
-        session.start(option, computedWith, computedVehicle, computedScooter)
+        guidance.start(option, computedWith, computedVehicle, stops.value, destName.ifBlank { null }, scooter = computedScooter)
         return true
     }
 

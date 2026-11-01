@@ -32,7 +32,7 @@ class ValhallaLanesTest {
             listOf(
                 Lane(setOf(LaneDirection.LEFT), true),
                 Lane(setOf(LaneDirection.STRAIGHT), false),
-                Lane(setOf(LaneDirection.STRAIGHT, LaneDirection.RIGHT), true),
+                Lane(setOf(LaneDirection.STRAIGHT, LaneDirection.RIGHT), valid = true, active = true),
                 Lane(setOf(LaneDirection.STRAIGHT), true),
             ),
             ValhallaLanes.parse(raw),

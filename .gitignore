@@ -8,3 +8,6 @@ captures/
 *.apk
 *.aab
 .superpowers/
+*.jks
+*.keystore
+keystore.properties

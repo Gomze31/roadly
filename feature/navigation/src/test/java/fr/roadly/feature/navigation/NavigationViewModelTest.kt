@@ -7,16 +7,25 @@ import fr.roadly.core.common.Formatters
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.config.ProviderConfigRepository
+import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
+import fr.roadly.core.model.CameraMode3D
+import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.location.testing.FakeLocationRepository
+import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Lane
 import fr.roadly.core.model.LaneDirection
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.navigation.GuidanceActions
+import fr.roadly.core.navigation.NavigationClock
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.navigation.NoopRainProvider
@@ -86,8 +95,8 @@ class NavigationViewModelTest {
 
     private fun fixAt(along: Double) = LocationFix(tracker.pointAt(along), 90f, 10f, 5f, 0L)
 
-    private fun NavigationViewModel(s: NavigationSession, p: FakeUserPreferencesRepository, c: ProviderConfigRepository) =
-        NavigationViewModel(s, p, c, RouteAlternativesUseCase(routing), routing, fakeVehicle, NoopCommunity)
+    private fun TestScope.NavigationViewModel(s: NavigationSession, p: FakeUserPreferencesRepository, c: ProviderConfigRepository, r: RoutingProvider = routing) =
+        NavigationViewModel(s, p, c, GuidanceActions(s, RouteAlternativesUseCase(r), r, location, p, fakeVehicle, NavigationClock { testScheduler.currentTime }), NoopCommunity)
 
     @Test fun `alternatives are computed from the snapped position and switching restarts guidance on the chosen route`() = runTest {
         val okRouting = object : RoutingProvider {
@@ -96,7 +105,7 @@ class NavigationViewModelTest {
             override suspend fun route(request: RouteRequest): Outcome<List<Route>> { origins += request.origin; return Outcome.Success(listOf(route.copy(id = "alt-" + request.costing.name))) }
         }
         val s = session()
-        val vm = NavigationViewModel(s, prefs, config, RouteAlternativesUseCase(okRouting), okRouting, fakeVehicle, NoopCommunity)
+        val vm = NavigationViewModel(s, prefs, config, okRouting)
         vm.uiState.test {
             s.start(option, RoutePreferences()); runCurrent()
             location.emit(fixAt(300.0)); runCurrent()
@@ -122,12 +131,12 @@ class NavigationViewModelTest {
             val g = s.state.value as NavigationState.Guiding
             assertEquals(NavigationPhase.GUIDING, ui.phase)
             assertEquals(ManeuverType.TURN_RIGHT, ui.banner!!.type)
-            assertEquals(Formatters.distance(g.progress.distanceToNextManeuverM), ui.banner!!.distanceText)
+            assertEquals(Formatters.maneuverDistance(g.progress.distanceToNextManeuverM), ui.banner!!.distanceText)
             assertEquals(route.maneuvers[1].instruction, ui.banner!!.instruction)
             assertEquals("Rue d'Essai", ui.banner!!.street)
             assertEquals(1, ui.upcoming.size)
             assertEquals(ManeuverType.ARRIVE, ui.upcoming[0].type)
-            assertEquals(Formatters.distance(g.progress.distanceToNextManeuverM + route.maneuvers[1].lengthMeters), ui.upcoming[0].distanceText)
+            assertEquals(Formatters.maneuverDistance(g.progress.distancesToManeuversM[0]), ui.upcoming[0].distanceText)
             assertEquals(Formatters.clockTime(g.etaEpochMs), ui.etaClock)
             assertEquals(Formatters.duration(g.progress.remainingDurationS), ui.remainingDuration)
             assertEquals(Formatters.distance(g.progress.remainingDistanceM), ui.remainingDistance)
@@ -152,6 +161,25 @@ class NavigationViewModelTest {
             assertEquals(2, vm.uiState.value.lanes.size)
             assertTrue(vm.uiState.value.lanes[1].valid)
             assertEquals("12", vm.uiState.value.banner!!.exitNumber)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `approach is flagged within 150 m of a turn and the exit direction reaches the banner`() = runTest {
+        val withSign = route.copy(maneuvers = route.maneuvers.mapIndexed { i, m -> if (i == 1) m.copy(exitNumber = "12", exitToward = "Lyon · Mâcon") else m })
+        val s = session()
+        val vm = NavigationViewModel(s, prefs, config)
+        vm.uiState.test {
+            s.start(option.copy(route = withSign), RoutePreferences()); runCurrent()
+            location.emit(fixAt(300.0)); runCurrent()
+            assertNull(vm.uiState.value.approach)
+            assertEquals("Lyon · Mâcon", vm.uiState.value.banner!!.exitToward)
+            location.emit(fixAt(650.0)); runCurrent()
+            val approach = vm.uiState.value.approach!!
+            assertEquals(ManeuverType.TURN_RIGHT, approach.type)
+            assertEquals("12", approach.exitNumber)
+            assertEquals("Lyon · Mâcon", approach.exitToward)
+            assertEquals(10, approach.maneuverShapeIndex)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -226,6 +254,147 @@ class NavigationViewModelTest {
             assertEquals(10, vm.uiState.value.toleranceKmh)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test fun `the auto recenter countdown ticks every second and can be cancelled`() = runTest {
+        val s = session()
+        val vm = NavigationViewModel(s, prefs, config)
+        vm.uiState.test {
+            s.start(option, RoutePreferences()); runCurrent()
+            assertNull(vm.recenterInSeconds.value)
+            vm.onUserGesture(); runCurrent()
+            assertEquals(8, vm.recenterInSeconds.value)
+            advanceTimeBy(1_000); runCurrent()
+            assertEquals(7, vm.recenterInSeconds.value)
+            advanceTimeBy(6_000); runCurrent()
+            assertEquals(1, vm.recenterInSeconds.value)
+            advanceTimeBy(1_000); runCurrent()
+            assertNull(vm.recenterInSeconds.value)
+            assertTrue(vm.uiState.value.following)
+            vm.onUserGesture(); runCurrent()
+            advanceTimeBy(3_000); runCurrent()
+            assertEquals(5, vm.recenterInSeconds.value)
+            vm.cancelAutoRecenter(); runCurrent()
+            assertNull(vm.recenterInSeconds.value)
+            advanceTimeBy(10_000); runCurrent()
+            assertFalse("annulé : la carte reste libre", vm.uiState.value.following)
+            vm.recenter(); runCurrent()
+            assertTrue(vm.uiState.value.following)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `map detail follows the setting and is reduced above 90 km per h`() = runTest {
+        val s = session()
+        val vm = NavigationViewModel(s, prefs, config)
+        vm.mapDetail.test {
+            s.start(option, RoutePreferences()); runCurrent()
+            location.emit(LocationFix(tracker.pointAt(300.0), 90f, 10f, 5f, 0L)); runCurrent()   // 36 km/h
+            assertEquals(MapDetail.NORMAL, vm.mapDetail.value)
+            prefs.setMapDetail(MapDetail.REDUCED); runCurrent()
+            assertEquals(MapDetail.REDUCED, vm.mapDetail.value)
+            prefs.setMapDetail(MapDetail.NORMAL); runCurrent()
+            assertEquals(MapDetail.NORMAL, vm.mapDetail.value)
+            location.emit(LocationFix(tracker.pointAt(330.0), 90f, (100 / 3.6).toFloat(), 5f, 0L)); runCurrent()   // 100 km/h
+            assertEquals(MapDetail.REDUCED, vm.mapDetail.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `the camera mode starts from the 3d setting and the buttons change it for the session`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_3D, vm.cameraMode.value)
+        vm.toggleCameraMode(); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        vm.toggleNorthUp(); runCurrent()
+        assertEquals(CameraMode3D.NORTH_UP, vm.cameraMode.value)
+        vm.toggleNorthUp(); runCurrent()
+        assertEquals("retour au mode d'avant", CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        vm.toggleNorthUp(); vm.toggleCameraMode(); runCurrent()
+        assertEquals("depuis le nord en haut, le bouton 3D repasse en 3D", CameraMode3D.FOLLOW_3D, vm.cameraMode.value)
+        prefs.setMap3dEnabled(false); runCurrent()
+        assertEquals("le choix de la session prime sur le réglage", CameraMode3D.FOLLOW_3D, vm.cameraMode.value)
+    }
+
+    @Test fun `with the 3d setting off the session starts in 2d, and the last camera is remembered`() = runTest {
+        prefs.setMap3dEnabled(false)
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        vm.rememberCamera(null)
+        assertNull(vm.lastCamera)
+        val snap = CameraSnapshot(48.8, 2.3, 17.0, 90.0, tilt = 58.0)
+        vm.rememberCamera(snap)
+        assertEquals(snap, vm.lastCamera)
+    }
+
+    @Test fun `sheets, the bottom panel and its measured height are kept by the view model`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(GuidanceSheet.NONE, vm.guidanceSheet.value)
+        vm.openManeuverPreview()
+        assertEquals(GuidanceSheet.MANEUVER_PREVIEW, vm.guidanceSheet.value)
+        vm.openTripDetails()
+        assertEquals(GuidanceSheet.TRIP_DETAILS, vm.guidanceSheet.value)
+        vm.closeSheet()
+        assertEquals(GuidanceSheet.NONE, vm.guidanceSheet.value)
+        assertFalse(vm.bottomPanelExpanded.value)
+        vm.toggleBottomPanel(); assertTrue(vm.bottomPanelExpanded.value)
+        vm.toggleBottomPanel(); assertFalse(vm.bottomPanelExpanded.value)
+        // Fin du guidage : le panneau est replié pour que le guidage suivant reparte replié (idempotent).
+        vm.toggleBottomPanel(); vm.collapseBottomPanel(); assertFalse(vm.bottomPanelExpanded.value)
+        vm.collapseBottomPanel(); assertFalse(vm.bottomPanelExpanded.value)
+        assertNull(vm.bottomPanelFraction.value)
+        vm.setBottomPanelFraction(0.3f)
+        assertEquals(0.3f, vm.bottomPanelFraction.value!!, 0f)
+        // Passe appareil : hauteur du bloc du bas (colonne d'actions portrait) et part de la pile du haut (marge haute de la caméra).
+        assertEquals(0, vm.bottomBlockHeightDp.value)
+        vm.setBottomBlockHeightDp(240)
+        assertEquals(240, vm.bottomBlockHeightDp.value)
+        assertNull(vm.topStackFraction.value)
+        vm.setTopStackFraction(0.36f)
+        assertEquals(0.36f, vm.topStackFraction.value!!, 0f)
+    }
+
+    @Test fun `the destination name comes from the remembered guidance`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config)
+        vm.destinationName.test {
+            assertNull(awaitItem())
+            prefs.setLastGuidance(LastGuidance(GeoPoint(43.6045, 1.4440), "Capitole", "r1", 0L))
+            assertEquals("Capitole", awaitItem())
+            prefs.setLastGuidance(null)
+            assertNull(awaitItem())
+        }
+    }
+
+    @Test fun `the start view and north up come from the settings, the session choice still wins`() = runTest {
+        prefs.setDefaultCameraMode(CameraMode3D.FOLLOW_2D)
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        prefs.setAutoRotate(false); runCurrent()
+        assertEquals(CameraMode3D.NORTH_UP, vm.cameraMode.value)
+        vm.toggleNorthUp(); runCurrent()
+        assertEquals("nord en haut quitté : vue au départ", CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        prefs.setAutoRotate(true); prefs.setDefaultCameraMode(CameraMode3D.FOLLOW_3D); runCurrent()
+        assertEquals("le choix de la session prime sur les réglages", CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+    }
+
+    @Test fun `zoom, pitch, the then row and power save settings are exposed for the screen`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(0, vm.zoomOffset.value)
+        assertEquals(PitchPreset.STANDARD, vm.pitchPreset.value)
+        assertTrue(vm.showNextManeuverPreview.value)
+        assertEquals(PowerSaveMode.AUTO, vm.powerSaveMode.value)
+        prefs.setZoomOffset(1); prefs.setPitchPreset(PitchPreset.LOW); prefs.setShowNextManeuverPreview(false); prefs.setPowerSaveMode(PowerSaveMode.ON); runCurrent()
+        assertEquals(1, vm.zoomOffset.value)
+        assertEquals(PitchPreset.LOW, vm.pitchPreset.value)
+        assertFalse(vm.showNextManeuverPreview.value)
+        assertEquals(PowerSaveMode.ON, vm.powerSaveMode.value)
+    }
+
+    @Test fun `without the next maneuver preview only the then row is dropped`() {
+        val s = NavigationUiState(then = ThenUi(ManeuverType.TURN_RIGHT, "Rue Médiane"))
+        assertNull(s.withNextManeuverPreview(false).then)
+        assertEquals(s.copy(then = null), s.withNextManeuverPreview(false))
+        assertEquals(s, s.withNextManeuverPreview(true))
     }
 }
 

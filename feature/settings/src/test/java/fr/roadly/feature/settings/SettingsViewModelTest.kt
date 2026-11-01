@@ -12,12 +12,18 @@ import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.FuelType
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
+import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
 import fr.roadly.core.navigation.testing.FakeSpeechService
+import fr.roadly.core.navigation.SpeechPriority
+import fr.roadly.core.navigation.VoiceChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -157,5 +163,49 @@ class SettingsViewModelTest {
         vm.testVoice("Essai de voix."); advanceUntilIdle()
         assertEquals(40, speech.volume)
         assertEquals(listOf("Essai de voix."), speech.spoken)
+    }
+
+    @Test fun `map detail level is exposed and persisted`() = runTest {
+        val vm = vm()
+        vm.mapDetail.test {
+            assertEquals(MapDetail.NORMAL, awaitItem())
+            vm.setMapDetail(MapDetail.REDUCED); advanceUntilIdle()
+            assertEquals(MapDetail.REDUCED, expectMostRecentItem())
+            assertEquals(MapDetail.REDUCED, prefs.detail.value)
+        }
+    }
+
+    @Test fun `the voice test is spoken on the assistant channel at low priority, so the guidance can pre-empt it`() = runTest {
+        val vm = vm()
+        vm.testVoice("Essai de voix."); advanceUntilIdle()
+        assertEquals(listOf(VoiceChannel.ASSISTANT), speech.channels)
+        assertEquals(listOf(SpeechPriority.LOW), speech.priorities)
+        assertEquals("flush : remplace un essai précédent, jamais le guidage", listOf(true), speech.flushes)
+    }
+
+    @Test fun `the navigation group exposes and persists its settings`() = runTest {
+        val vm = vm()
+        vm.navigation.test {
+            assertEquals(NavigationSettings(), awaitItem())
+            vm.setDefaultCameraMode(CameraMode3D.FOLLOW_2D); vm.setZoomOffset(1); vm.setPitchPreset(PitchPreset.LOW); vm.setAutoRotate(false)
+            vm.setShowNextManeuverPreview(false); vm.setPowerSaveMode(PowerSaveMode.OFF); vm.setMapDetail(MapDetail.REDUCED); advanceUntilIdle()
+            assertEquals(
+                NavigationSettings(
+                    defaultCameraMode = CameraMode3D.FOLLOW_2D, zoomOffset = 1, pitchPreset = PitchPreset.LOW, autoRotate = false,
+                    mapDetail = MapDetail.REDUCED, buildings3d = true, showNextManeuverPreview = false, powerSaveMode = PowerSaveMode.OFF,
+                ),
+                expectMostRecentItem(),
+            )
+            vm.setZoomOffset(3); advanceUntilIdle()
+            assertEquals("hors de −1 / 0 / +1 : ignoré", 1, prefs.zoom.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `turning 3d buildings off keeps the start view`() = runTest {
+        val vm = vm()
+        vm.setMap3d(false); advanceUntilIdle()
+        assertEquals(false, prefs.map3d.value)
+        assertEquals("vue au départ jamais choisie : figée en 3D avant le changement", CameraMode3D.FOLLOW_3D, prefs.cameraDefault.value)
     }
 }

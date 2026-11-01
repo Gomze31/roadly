@@ -19,6 +19,8 @@ import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
+import fr.roadly.core.navigation.GuidanceActions
+import fr.roadly.core.navigation.NavigationClock
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.navigation.NoopRainProvider
@@ -33,11 +35,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -88,7 +92,7 @@ class RouteViewModelTest {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
         session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
-        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, session, routing)
+        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing)
     }
 
     @Test fun `without known position state is NoOrigin`() = runTest {
@@ -216,6 +220,19 @@ class RouteViewModelTest {
             assertEquals(listOf(b, a), c.stops)
             vm.removeStop(0); advanceUntilIdle()
             assertEquals(listOf(a), (expectMostRecentItem().phase as RouteUiState.Content).stops)
+        }
+    }
+
+    @Test fun `start guidance remembers the destination name`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val vm = vm()
+        vm.uiState.test {
+            advanceUntilIdle()
+            expectMostRecentItem()
+            assertTrue(vm.startGuidance())
+            runCurrent()
+            assertEquals("Test", prefs.lastGuidance.first()?.destinationName)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 }

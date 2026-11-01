@@ -90,7 +90,8 @@ class ScooterNavigationSessionTest {
     }
 
     private fun config(battery: Double?) = ScooterGuidanceConfig(scooterRequest, battery, 20.0, RangeCalibration(), withOsmTags = false)
-    private fun fixAt(along: Double, northM: Double = 0.0) = LocationFix(TestRoutes.north(tracker.pointAt(along), northM), 90f, 5f, 5f, 0L)
+    // Hors tracé (northM > 0), cap écarté de la route (B6 : distance et cap pour sortir de l'itinéraire).
+    private fun fixAt(along: Double, northM: Double = 0.0) = LocationFix(TestRoutes.north(tracker.pointAt(along), northM), if (northM > 0.0) 20f else 90f, 5f, 5f, 0L)
     private fun guiding(s: NavigationSession) = s.state.value as NavigationState.Guiding
 
     @Test fun `turn onto a cycle track uses the scooter phrasing and tiers`() = runTest {

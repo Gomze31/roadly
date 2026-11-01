@@ -33,6 +33,8 @@ sealed interface NavigationState {
         val limitLoweredByRain: Boolean = false,
         /** Mode trottinette : voie courante, transitions, avertissements et autonomie estimée ; null sinon. */
         val scooter: ScooterNavigationUiState? = null,
+        /** B4 : rond-point de la prochaine manœuvre, ou dans lequel on se trouve ; null sinon. */
+        val roundabout: RoundaboutInfo? = null,
     ) : NavigationState
 
     data class Arrived(val route: Route) : NavigationState

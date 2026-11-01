@@ -169,7 +169,7 @@ object ScooterComfortAnalyzer {
         if (segments.isEmpty() || route.geometry.size < 2) return emptyList()
         val line = RouteLine(route.geometry)
         val scale = segments.last().endAlongM.takeIf { it > 0 }?.let { it / line.lengthM.coerceAtLeast(1e-9) } ?: 1.0
-        val risky = setOf(ManeuverType.TURN_LEFT, ManeuverType.SHARP_LEFT, ManeuverType.UTURN, ManeuverType.ROUNDABOUT_ENTER)
+        val risky = setOf(ManeuverType.TURN_LEFT, ManeuverType.SHARP_LEFT, ManeuverType.UTURN_LEFT, ManeuverType.UTURN_RIGHT, ManeuverType.ROUNDABOUT_ENTER)
         return route.maneuvers.mapNotNull { m ->
             if (m.type !in risky) return@mapNotNull null
             val along = line.alongAt(m.beginShapeIndex) * scale

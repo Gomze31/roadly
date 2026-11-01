@@ -27,6 +27,8 @@ import fr.roadly.core.model.TravelMode
 import fr.roadly.core.model.Trip
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
+import fr.roadly.core.navigation.GuidanceActions
+import fr.roadly.core.navigation.NavigationClock
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.navigation.NoopRainProvider
@@ -128,7 +130,7 @@ class ScooterRouteViewModelTest {
         }
         session = NavigationSession(location, routing, NoopSpeedLimitProvider(), speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
         val services = ScooterServices(mobility, profiles, ScooterRouteOptionsUseCase(routing, NoScooterRouteAnalyzer), trips, NoopTemperatureProvider(), pois, NoopTripRecorder(), speech, favorites)
-        return RouteViewModel(SavedStateHandle(mapOf("destLat" to 43.61, "destLon" to 1.45, "destName" to "Capitole")), RouteAlternativesUseCase(routing), vehicle, location, config, prefs, session, routing, services)
+        return RouteViewModel(SavedStateHandle(mapOf("destLat" to 43.61, "destLon" to 1.45, "destName" to "Capitole")), RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing, services)
     }
 
     @Test fun `car stays the default and switching to scooter really changes the calculation`() = runTest {

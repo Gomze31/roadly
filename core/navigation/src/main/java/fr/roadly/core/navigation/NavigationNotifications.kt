@@ -33,7 +33,7 @@ internal object NavigationNotifications {
         if (state == null) return ctx.getString(R.string.nav_notif_title_default) to ""
         if (state.rerouting) return ctx.getString(R.string.nav_notif_rerouting) to ""
         val m = state.route.maneuvers[state.progress.nextManeuverIndex.coerceIn(0, state.route.maneuvers.lastIndex)]
-        val text = ctx.getString(R.string.nav_notif_text, Formatters.distance(state.progress.distanceToNextManeuverM), Formatters.clockTime(state.etaEpochMs))
+        val text = ctx.getString(R.string.nav_notif_text, Formatters.maneuverDistance(state.progress.distanceToNextManeuverM), Formatters.clockTime(state.etaEpochMs))
         return m.instruction to text
     }
 

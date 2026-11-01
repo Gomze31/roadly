@@ -136,6 +136,10 @@ Limites : pas de trafic ; limitation de vitesse (et donc alerte de dépassement)
 
 Sélecteur Voiture / Moto / Trottinette sur l'écran d'itinéraires et dans Réglages › Trottinette. Routage Valhalla `bicycle` paramétré (pistes, pentes, revêtements, 25 km/h), analyse de chaque tracé (`trace_attributes` + tags OSM via Overpass) et vérification réglementaire France (R412-43-1), autonomie estimée à partir de la batterie **saisie** (Roadly n'est pas connecté à la trottinette), guidage et caméra 3D dédiés, Roadly AI par la reconnaissance vocale du système. Sources, limites et restrictions non vérifiables : `docs/SCOOTER.md`.
 
+## Mises à jour depuis GitHub
+
+Réglages › Mises à jour : Roadly compare sa version aux releases GitHub (`update.json`), télécharge l'APK, vérifie son SHA-256 et lance l'installation Android. Une release se publie en poussant un tag `v0.2.0` (workflow `.github/workflows/release.yml`). Mise en place (clé de signature, secrets, jeton du dépôt privé) : `docs/UPDATES.md`.
+
 ## Permissions Android
 
 | Permission | Pourquoi | Quand |
@@ -200,6 +204,7 @@ L'écran Réglages › À propos reproduit ces mentions. Le projet lui-même n'a
 
 ## Documentation complémentaire
 
+- `docs/UPDATES.md` : mises à jour depuis les releases GitHub (signature, secrets, jeton, publication).
 - `docs/SCOOTER.md` : mode trottinette (audit, architecture, sources, réglementation, autonomie, limites, essais).
 
 - [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md) : chaque API, ses endpoints, ses limites, le passage en production.

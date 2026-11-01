@@ -5,6 +5,7 @@ import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.di.ApplicationScope
 import fr.roadly.core.data.repository.GuidanceDefaults
+import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.location.LocationRepository
@@ -27,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -78,6 +80,30 @@ class NavigationSession @Inject constructor(
     /** Sourdine demandée par l'utilisateur pour la course (indépendante du réglage « voix »). */
     val muted: StateFlow<Boolean> = _muted.asStateFlow()
 
+    /**
+     * E3 : la reprise n'a de sens que pour une course héritée d'un processus précédent. Ouverte au démarrage du processus, fermée
+     * (définitivement, de façon synchrone) au premier départ, arrêt ou « Ignorer » : l'effacement DataStore étant asynchrone, la course
+     * qu'on vient d'arrêter n'est ainsi jamais proposée, même quelques images.
+     */
+    private val resumeOfferOpen = MutableStateFlow(true)
+
+    /**
+     * E3 : course mémorisée à proposer à la reprise (« Reprendre le guidage vers … »), seulement au repos et seulement si elle vient d'un
+     * processus précédent (mort du processus, redémarrage) — un arrêt ou une arrivée l'ont effacée. Null pendant un guidage.
+     * Les valeurs courantes de [resumeOfferOpen] et de l'état sont relues à chaque émission (pas celles, peut-être en retard, du `combine`).
+     * LIMITE : aucune limite d'âge.
+     */
+    val resumableGuidance: Flow<LastGuidance?> = combine(prefs.lastGuidance, resumeOfferOpen, state) { last, _, _ ->
+        last.takeIf { resumeOfferOpen.value && _state.value is NavigationState.Idle }
+    }.distinctUntilChanged()
+
+    /** E3 « Ignorer » : oublie la course mémorisée ; sans effet pendant un guidage, dont la course est celle qui est mémorisée. */
+    fun forgetLastGuidance() {
+        if (_state.value !is NavigationState.Idle) return
+        resumeOfferOpen.value = false
+        persistLastGuidance(null)
+    }
+
     private val confined = dispatchers.default.limitedParallelism(1)
     private var job: Job? = null
     /** Rend atomiques « incrémenter la génération » et « écrire l'état » : plus aucune publication périmée après un arrêt. */
@@ -86,27 +112,47 @@ class NavigationSession @Inject constructor(
     private var lastOption: RouteOption? = null
     private var lastPreferences = RoutePreferences()
     private var lastVehicle: VehicleProfile? = null
+    /** Nom de destination de la dernière course demandée : repris par [retry] pour ne pas l'effacer de `lastGuidance`. */
+    private var lastDestinationName: String? = null
     private var lastScooter: ScooterGuidanceConfig? = null
     /** Course en cours (lue et modifiée uniquement sur [confined]). */
     private var current: Run? = null
 
-    /** Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs. */
-    /** [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto. */
-    /** [scooter] non nul = guidage trottinette (costing vélo au recalcul, annonces et autonomie trottinette). */
-    fun start(option: RouteOption, preferences: RoutePreferences, vehicle: VehicleProfile? = null, scooter: ScooterGuidanceConfig? = null) {
+    /**
+     * Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs.
+     * [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto.
+     * [scooter] non nul = guidage trottinette (costing vélo au recalcul, annonces et autonomie trottinette). [destinationName] : nom mémorisé (B6) ;
+     * absent (alternative, étape ajoutée), le nom précédent est gardé si la destination est la même (à moins de 25 m).
+     * Un démarrage en échec efface la course mémorisée.
+     */
+    fun start(
+        option: RouteOption,
+        preferences: RoutePreferences,
+        vehicle: VehicleProfile? = null,
+        scooter: ScooterGuidanceConfig? = null,
+        destinationName: String? = null,
+    ) {
         cancelRun(null)
+        val previousDestination = lastOption?.route?.geometry?.lastOrNull()
+        val sameDestination = previousDestination != null &&
+            option.route.geometry.lastOrNull()?.let { it.distanceTo(previousDestination) <= GuidanceConstants.ARRIVAL_RADIUS_M } == true
+        val name = destinationName ?: lastDestinationName.takeIf { sameDestination }
         lastOption = option
         lastPreferences = preferences
         lastVehicle = vehicle
         lastScooter = scooter
+        lastDestinationName = name
+        resumeOfferOpen.value = false // E3 : avant tout changement d'état ; la course mémorisée sera remplacée ou effacée.
         if (location.permissionState.value != LocationPermissionState.GRANTED) {
             publishFailure(NavigationState.Failed(AppError.PermissionDenied))
+            persistLastGuidance(null)
             return
         }
         val tracker = try {
             RouteTracker(option.route)
         } catch (e: IllegalArgumentException) {
             publishFailure(NavigationState.Failed(AppError.NoResult))
+            persistLastGuidance(null)
             return
         }
         val run = synchronized(stateLock) {
@@ -121,6 +167,8 @@ class NavigationSession @Inject constructor(
         location.setGuidanceActive(true)
         serviceController.start()
         job = scope.launch(confined) { current = run; run.execute() }
+        // B6 : course mémorisée pour être proposée à la reprise après la mort du processus (bouton : Étape E3).
+        persistLastGuidance(LastGuidance(option.route.geometry.last(), name, option.route.id, clock.nowMs()))
     }
 
     /** Réglages trottinette de la course en cours (alternatives, ajout d'arrêt) ; null en voiture / moto. */
@@ -135,23 +183,39 @@ class NavigationSession @Inject constructor(
     /** Arrête la course : `Idle`, GPS relâché, parole coupée et moteur de synthèse libéré. */
     fun stop() {
         val wasGuiding = _state.value is NavigationState.Guiding
+        resumeOfferOpen.value = false // E3 : avant `Idle`, sinon la course arrêtée serait proposée le temps de l'effacement.
         cancelRun(NavigationState.Idle)
         speech.release()
+        persistLastGuidance(null)
         if (wasGuiding) scope.launch { tripRecorder.end(arrived = false, nowMs = clock.nowMs()) }
     }
 
     /** Relance la dernière course demandée (après un `Failed`, par exemple). */
     fun retry() {
-        lastOption?.let { start(it, lastPreferences, lastVehicle, lastScooter) }
+        lastOption?.let { start(it, lastPreferences, lastVehicle, lastScooter, lastDestinationName) }
     }
 
     fun setMuted(muted: Boolean) {
         _muted.value = muted
-        if (muted) speech.stop()
+        // E1 : seul le guidage se tait ; un message de l'assistant en cours ou en file n'est ni coupé ni effacé.
+        if (muted) speech.stop(VoiceChannel.GUIDANCE)
     }
 
     private fun publishFailure(failed: NavigationState.Failed) {
         synchronized(stateLock) { _state.value = failed }
+    }
+
+    /** Écrit ou efface ([value] null) la dernière course ; l'ordre est garanti par [confined], une erreur DataStore ne touche pas au guidage. */
+    private fun persistLastGuidance(value: LastGuidance?) {
+        scope.launch(confined) {
+            try {
+                prefs.setLastGuidance(value)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Mémoire non disponible : la reprise ne sera simplement pas proposée.
+            }
+        }
     }
 
     /** Invalide la course en cours ([generation]) et, si [state] n'est pas nul, l'écrit dans le même verrou. */
@@ -163,9 +227,9 @@ class NavigationSession @Inject constructor(
         job?.cancel()
         job = null
         location.setGuidanceActive(false)
-        speech.stop()
-        // La sourdine appartient à la course : le service de synthèse (singleton) est rendu tel quel.
-        speech.setMuted(false)
+        speech.stop(VoiceChannel.GUIDANCE)
+        // La sourdine appartient à la course : le canal du guidage est rendu tel quel, celui de l'assistant n'est pas touché (E1).
+        speech.setMuted(false, VoiceChannel.GUIDANCE)
     }
 
     /** Une course : son état n'est lu et écrit que sur [confined]. */
@@ -208,6 +272,11 @@ class NavigationSession @Inject constructor(
         private var hazards: List<RouteHazard> = emptyList()
         private var activeZone: RouteHazard? = null
         private val zonesAnnounced = mutableSetOf<Double>()
+        /** B4 : ronds-points du tracé courant, calculés une fois par tracé. */
+        private var roundabouts: Map<Int, RoundaboutInfo> = RoundaboutResolver.resolveAll(route)
+        /** B5 : dernier indice de manœuvre vu et instant de son changement (passage d'une manœuvre). */
+        private var lastNextIndex: Int? = null
+        private var indexChangedAtMs: Long? = null
         private var vigilanceOn = GuidanceDefaults.VIGILANCE_ENABLED
         private var raining: Boolean? = null
         private var rainLowersLimit = GuidanceDefaults.RAIN_LOWERS_LIMIT
@@ -236,7 +305,7 @@ class NavigationSession @Inject constructor(
             launch {
                 combine(prefs.voiceEnabled, _muted) { enabled, muted -> muted || !enabled }
                     .distinctUntilChanged()
-                    .collect { speech.setMuted(it) }
+                    .collect { speech.setMuted(it, VoiceChannel.GUIDANCE) }
             }
             launch { prefs.rainLowersLimit.collect { rainLowersLimit = it } }
             launch { prefs.vigilanceEnabled.collect { vigilanceOn = it; loadHazards() } }
@@ -289,7 +358,7 @@ class NavigationSession @Inject constructor(
             val zone = hazards.firstOrNull { it.kind == HazardKind.VIGILANCE_ZONE && it.contains(progress.distanceAlongM) }
             activeZone = zone
             if (zone != null && zonesAnnounced.add(zone.startAlongM)) {
-                say(SpokenPhrases.vigilanceZone(zone.speedLimitKmh), routeId = progress.routeId)
+                say(SpokenPhrases.vigilanceZone(zone.speedLimitKmh), routeId = progress.routeId, priority = SpeechPriority.LOW)
                 if (prefs.vigilanceSound.first() && !_muted.value && prefs.voiceEnabled.first()) speech.beep()
             }
         }
@@ -319,12 +388,20 @@ class NavigationSession @Inject constructor(
 
         private suspend fun announce(progress: RouteProgress) {
             if (rerouting || progress.routeId != route.id) return
+            val now = clock.nowMs()
+            if (progress.nextManeuverIndex != lastNextIndex) {
+                if (lastNextIndex != null) indexChangedAtMs = now
+                lastNextIndex = progress.nextManeuverIndex
+            }
             val c = coordinator
             val override: ((Int, Tier, Double) -> String?)? = c?.let { co -> { i, tier, d -> co.maneuverText(i, tier.toStage(), d) } }
-            val a = AnnouncementPolicy.next(progress, route.maneuvers, speedKmh, announced, scooter = scooter != null, textOverride = override)
+            val a = AnnouncementPolicy.next(
+                progress, route.maneuvers, speedKmh, announced,
+                scooter = scooter != null, textOverride = override, sincePreviousManeuverMs = indexChangedAtMs?.let { now - it },
+            )
             if (a != null) {
                 announced += a.maneuverIndex to a.tier
-                say(a.text, routeId = progress.routeId)
+                say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
             }
             if (c != null) scooterTick(c, progress)
         }
@@ -370,12 +447,13 @@ class NavigationSession @Inject constructor(
             if ((last to Tier.NOW) !in announced) {
                 announced += last to Tier.NOW
                 val m = route.maneuvers[last]
-                say(m.verbalPre ?: m.instruction)
+                say(m.verbalPre ?: m.instruction, priority = SpeechPriority.URGENT)
             }
             publish(NavigationState.Arrived(route))
             tripRecorder.end(arrived = true, nowMs = clock.nowMs())
             val current = synchronized(stateLock) {
-                (gen == generation).also { if (it) location.setGuidanceActive(false) }
+                // Course encore courante seulement : un nouveau départ survenu entre-temps a mémorisé sa propre course.
+                (gen == generation).also { if (it) { location.setGuidanceActive(false); persistLastGuidance(null) } }
             }
             if (current) {
                 // Le moteur vocal n'est libéré qu'après un délai : la phrase d'arrivée doit pouvoir se terminer.
@@ -424,8 +502,10 @@ class NavigationSession @Inject constructor(
                 if (fresh != null && freshTracker != null) {
                     route = fresh
                     tracker = freshTracker
+                    roundabouts = RoundaboutResolver.resolveAll(fresh)
                     announced.clear()
                     announced += 0 to Tier.NOW
+                    lastNextIndex = null; indexChangedAtMs = null
                     freshTracker.update(fix)
                     rerouteAnnounced = false
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
@@ -486,13 +566,14 @@ class NavigationSession @Inject constructor(
             }
         }
 
-        private suspend fun say(text: String, routeId: String? = null) {
+        /** [priority] : NOW et arrivée URGENT, NEAR / départ / recalcul NORMAL, FAR / vigilance LOW (B5). */
+        private suspend fun say(text: String, routeId: String? = null, priority: SpeechPriority = SpeechPriority.NORMAL) {
             if (text.isBlank() || _muted.value || !prefs.voiceEnabled.first()) return
             // Revérifié après la suspension : un arrêt ou un nouveau départ a pu survenir entre-temps.
             if (gen != generation) return
             // Idem pour un recalcul abouti entre-temps : une annonce issue de l'ancien tracé serait fausse.
             if (routeId != null && routeId != route.id) return
-            speech.speak(text)
+            speech.speak(text, priority = priority, channel = VoiceChannel.GUIDANCE)
         }
 
         private fun publish(s: NavigationState) {
@@ -518,6 +599,7 @@ class NavigationSession @Inject constructor(
                 gpsLost = gpsLost,
                 rerouting = rerouting,
                 scooter = scooterUi,
+                roundabout = RoundaboutResolver.current(roundabouts, next),
             )
         }
     }

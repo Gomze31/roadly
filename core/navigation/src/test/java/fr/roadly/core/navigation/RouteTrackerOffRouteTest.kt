@@ -11,7 +11,10 @@ import org.junit.Test
 
 class RouteTrackerOffRouteTest {
     private val route = TestRoutes.straight()
-    private fun fix(p: GeoPoint, accuracyM: Float = 5f) = LocationFix(p, null, null, accuracyM, 0L)
+    /** Cap et vitesse inconnus par défaut : seule la règle des 100 m peut alors déclencher (B6). */
+    private fun fix(p: GeoPoint, accuracyM: Float = 5f, bearing: Float? = null, speedMps: Float? = null) = LocationFix(p, bearing, speedMps, accuracyM, 0L)
+    /** Fix qui s'éloigne du tracé plein est : cap 20°, soit 70° d'écart (> 50°). */
+    private fun diverging(p: GeoPoint, accuracyM: Float = 5f) = fix(p, accuracyM, bearing = 20f, speedMps = 10f)
 
     @Test fun `30 m lateral offset is measured and tolerated`() {
         val t = RouteTracker(route)
@@ -24,19 +27,25 @@ class RouteTrackerOffRouteTest {
     @Test fun `five consecutive fixes beyond 40 m trigger off route`() {
         val t = RouteTracker(route)
         repeat(4) {
-            t.update(fix(TestRoutes.north(t.pointAt(300.0 + it * 10), 60.0)))
+            t.update(diverging(TestRoutes.north(t.pointAt(300.0 + it * 10), 60.0)))
             assertFalse("fix ${it + 1}", t.isOffRoute)
         }
-        t.update(fix(TestRoutes.north(t.pointAt(340.0), 60.0)))
+        t.update(diverging(TestRoutes.north(t.pointAt(340.0), 60.0)))
         assertTrue(t.isOffRoute)
+    }
+
+    @Test fun `five fixes beyond 40 m on the route heading are not off route`() {
+        val t = RouteTracker(route)
+        repeat(8) { t.update(fix(TestRoutes.north(t.pointAt(300.0 + it * 10), 60.0), bearing = 90f, speedMps = 10f)) }
+        assertFalse("route parallèle suivie dans le même sens", t.isOffRoute)
     }
 
     @Test fun `coming back on route resets the counter`() {
         val t = RouteTracker(route)
-        repeat(4) { t.update(fix(TestRoutes.north(t.pointAt(300.0), 60.0))) }
+        repeat(4) { t.update(diverging(TestRoutes.north(t.pointAt(300.0), 60.0))) }
         t.update(fix(t.pointAt(310.0)))
         assertFalse(t.isOffRoute)
-        repeat(4) { t.update(fix(TestRoutes.north(t.pointAt(320.0), 60.0))) }
+        repeat(4) { t.update(diverging(TestRoutes.north(t.pointAt(320.0), 60.0))) }
         assertFalse(t.isOffRoute)
     }
 
@@ -46,22 +55,23 @@ class RouteTrackerOffRouteTest {
         assertTrue(t.isOffRoute)
     }
 
-    @Test fun `a single imprecise fix beyond 100 m cannot trigger the hard rule`() {
+    @Test fun `imprecise fixes beyond 100 m are ignored by every off-route rule`() {
         val t = RouteTracker(route)
         t.update(fix(t.pointAt(300.0)))
         val far = TestRoutes.north(t.pointAt(300.0), 150.0)
-        repeat(4) {
-            t.update(fix(far, accuracyM = 80f))
+        repeat(6) {
+            t.update(diverging(far, accuracyM = 80f))
             assertFalse("fix imprécis ${it + 1}", t.isOffRoute)
         }
-        // il compte tout de même pour la règle des 5 fixes consécutifs à plus de 40 m
-        t.update(fix(far, accuracyM = 80f))
-        assertTrue(t.isOffRoute)
+        t.update(diverging(far, accuracyM = 10f))
+        assertTrue("un fix précis à 150 m déclenche", t.isOffRoute)
     }
 
-    @Test fun `a fix of exactly 50 m accuracy still triggers the hard rule`() {
+    @Test fun `a fix of exactly 30 m accuracy still decides, 31 m does not`() {
         val t = RouteTracker(route)
-        t.update(fix(TestRoutes.north(t.pointAt(300.0), 150.0), accuracyM = 50f))
+        t.update(fix(TestRoutes.north(t.pointAt(300.0), 150.0), accuracyM = 31f))
+        assertFalse(t.isOffRoute)
+        t.update(fix(TestRoutes.north(t.pointAt(300.0), 150.0), accuracyM = 30f))
         assertTrue(t.isOffRoute)
     }
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tête de la flèche de manœuvre : triangle blanc 28 dp, pointe vers le haut, liseré sombre. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp" android:height="28dp" android:viewportWidth="28" android:viewportHeight="28">
+    <path android:fillColor="#0E0B14" android:pathData="M14,2 L26,24 L14,18 L2,24 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M14,5 L23,22 L14,17.5 L5,22 Z" />
+</vector>

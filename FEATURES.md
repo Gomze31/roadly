@@ -203,3 +203,11 @@ Détail, sources et limites : `docs/SCOOTER.md`. « Code livré » = compilé et
 | Récapitulatif de trajet, bilan semaine / mois | en cours | Dénivelé et énergie estimés |
 | Carte hors connexion du trajet | en cours | Tuiles seulement ; calcul et recalcul en ligne |
 | Roadly AI en mode trottinette | en cours | Reconnaissance vocale du système + intentions locales ; copilote Gemini (spec AI-1) non implémenté |
+
+## Mises à jour depuis GitHub (2026-11-01)
+
+| Fonction | Statut | Notes |
+|---|---|---|
+| Vérification des releases GitHub (au lancement ≤ 1/12 h, ou manuelle) | en cours | Dépôt privé : jeton fine-grained lecture seule, chiffré (Keystore) ; testé JVM |
+| Téléchargement, contrôle SHA-256, installation PackageInstaller | en cours | Confirmation Android ; sans confirmation possible ensuite (Android 12+) ; non vérifié sur appareil |
+| Publication automatique (tag `v*` → APK signé + `update.json`) | en cours | Workflow non encore exécuté ; secrets de signature à créer (`docs/UPDATES.md`) |

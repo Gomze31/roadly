@@ -3,6 +3,7 @@ package fr.roadly.feature.navigation
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.SystemClock
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -13,22 +14,30 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
@@ -39,16 +48,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.State
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,7 +83,6 @@ import fr.roadly.core.designsystem.component.HorizonStrip
 import fr.roadly.core.designsystem.component.IconTile
 import fr.roadly.core.designsystem.component.IconTileStyle
 import fr.roadly.core.designsystem.component.LoadingRow
-import fr.roadly.core.designsystem.component.NavInfoBar
 import fr.roadly.core.designsystem.component.RoundButtonStyle
 import fr.roadly.core.designsystem.component.ReportSheet
 import fr.roadly.core.designsystem.component.horizonKind
@@ -76,8 +96,6 @@ import fr.roadly.core.designsystem.theme.RoadlyShapes
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
-import fr.roadly.core.map.CameraMode
-import fr.roadly.core.scooter.map.ScooterCamera
 import fr.roadly.core.scooter.map.ScooterRouteFeatures
 import fr.roadly.core.scooter.osm.ScooterPoiKind
 import fr.roadly.core.designsystem.component.BatteryDialog
@@ -85,30 +103,59 @@ import fr.roadly.core.designsystem.component.rememberVoiceInput
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.roundToInt
+import fr.roadly.core.map.AttributionPlacement
+import fr.roadly.core.model.CameraMode3D
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.map.MapController
+import fr.roadly.core.map.NavigationCameraController
+import fr.roadly.core.map.NavigationCameraInput
+import fr.roadly.core.map.ManeuverArrowBuilder
+import fr.roadly.core.map.MapRendering
 import fr.roadly.core.map.RoadlyMap
 import fr.roadly.core.map.rememberMapController
+import fr.roadly.core.map.rememberPowerSaveMode
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.HazardKind
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.Route
+import fr.roadly.core.model.RouteProgress
 import java.util.Locale
+import kotlin.math.ceil
+import kotlinx.coroutines.delay
 
 @Composable
-fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}, vm: NavigationViewModel = hiltViewModel()) {
+fun NavigationScreen(
+    isDark: Boolean,
+    onExit: () -> Unit,
+    onChangeDestination: () -> Unit,
+    onAddStop: () -> Unit = {},
+    assistantButton: @Composable () -> Unit = {},
+    assistantPanel: @Composable () -> Unit = {},
+    vm: NavigationViewModel = hiltViewModel(),
+) {
     // Mode conduite (spec §2) : typographie ×1,3 et cibles 56 dp via LocalDrivingMode = true.
     // Même teinte que le reste de l'app : le thème conduite est recomposé avec la teinte courante.
     val tint = LocalRoadlyColors.current.brand
     val cockpit = CockpitTint.entries.firstOrNull { (if (isDark) it.night else it.day).first == tint } ?: CockpitTint.VIOLET
     RoadlyTheme(darkTheme = isDark, drivingMode = true, tint = cockpit) {
-        NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm)
+        NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm, assistantButton, assistantPanel)
     }
 }
 
 @Composable
-private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit, vm: NavigationViewModel) {
-    val state by vm.uiState.collectAsStateWithLifecycle()
+private fun NavigationContent(
+    isDark: Boolean,
+    onExit: () -> Unit,
+    onChangeDestination: () -> Unit,
+    onAddStop: () -> Unit,
+    vm: NavigationViewModel,
+    assistantButton: @Composable () -> Unit,
+    assistantPanel: @Composable () -> Unit,
+) {
+    // C3 : l'état est lu deux fois — par délégation pour les overlays, par `snapshotFlow` (sans recomposition) pour la carte.
+    val uiState = vm.uiState.collectAsStateWithLifecycle()
+    val state by uiState
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
     var bannerExpanded by rememberSaveable { mutableStateOf(true) }
@@ -128,47 +175,66 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
             map.clearTraversed()
         }
     }
-    val progress = state.progress
-    val following = state.following
-    val scooterUi = state.scooter
-    // Caméra trottinette : position placée au tiers bas de l'écran pour voir la route devant soi.
-    val topPaddingPx = with(LocalDensity.current) { (LocalConfiguration.current.screenHeightDp.dp * 0.38f).roundToPx() }
-    LaunchedEffect(progress, following) {
-        if (route != null && progress != null) {
-            val fix = LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L)
-            map.setUserLocation(fix)
-            map.setTraversed(route.geometry, progress.segmentIndex, progress.snapped)
-            if (following) {
-                if (scooterUi != null) {
-                    // Perspective 3D adaptée à la ville, plus haute et plus proche à l'approche des intersections.
-                    val t = ScooterCamera.target(progress.distanceToNextManeuverM, state.speedKmh)
-                    map.followNavigation(fix, t.zoom, t.tiltDeg, topPaddingPx)
-                } else {
-                    // Suivi : zoom 17, cap, inclinaison 0 (CameraMode.FOLLOW de la v1).
-                    map.applyCameraMode(CameraMode.FOLLOW, fix)
-                }
-            }
-        }
+    val cameraMode = vm.cameraMode.collectAsStateWithLifecycle()
+    // E2 : économie d'énergie du réglage — Auto suit l'économiseur d'Android, Activée / Désactivée le forcent.
+    val systemSaver = rememberPowerSaveMode()
+    val powerSaveSetting = vm.powerSaveMode.collectAsStateWithLifecycle()
+    val powerSave = remember { derivedStateOf { powerSaveSetting.value.effective(systemSaver.value) } }
+    // E2 « Bâtiments 3D » : en mode 3D seulement, et jamais en économie d'énergie.
+    val buildings3d = vm.map3d.collectAsStateWithLifecycle()
+    LaunchedEffect(cameraMode.value, powerSave.value, buildings3d.value, c.buildings3d) {
+        map.setBuildings3d(buildings3d.value && cameraMode.value == CameraMode3D.FOLLOW_3D && !powerSave.value, c.buildings3d.toHex())
     }
+    LaunchedEffect(c.onBrand, c.brand) { map.setArrowColor(c.onBrand.toHex(), c.brand.toHex()) }
+    val approach = state.approach
+    LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
+        if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
+    }
+    val mapDetail by vm.mapDetail.collectAsStateWithLifecycle()
+    LaunchedEffect(mapDetail) { map.applyDetail(mapDetail) }
+    // Retour depuis la recherche : la dernière caméra du guidage revient avec son inclinaison, sans attendre la prochaine position.
+    DisposableEffect(map) { onDispose { vm.rememberCamera(map.cameraPosition()) } }
+    LaunchedEffect(map) { vm.lastCamera?.let { map.restore(it, keepTilt = true) } }
+    val camera = remember { NavigationCameraController() }
+    val bottomPanel = vm.bottomPanelFraction.collectAsStateWithLifecycle()
+    val topStack = vm.topStackFraction.collectAsStateWithLifecycle()
+    val zoomOffset = vm.zoomOffset.collectAsStateWithLifecycle()
+    val pitchPreset = vm.pitchPreset.collectAsStateWithLifecycle()
     // Tracé trottinette par type de voie (piste, bande, voie verte, route partagée, chemin, vigilance).
-    val analysis = scooterUi?.analysis
+    val analysis = state.scooter?.analysis
     LaunchedEffect(route?.id, analysis) {
         map.setScooterRoute(if (route != null && analysis != null) ScooterRouteFeatures.build(route.geometry, analysis) else ScooterRouteFeatures.EMPTY)
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
+        // D5 : icône d'attribution toujours accessible, en haut à droite, zone libre que le panneau du bas soit replié ou déplié.
+        // Portrait : sous le bouton « replier ». Paysage : à sa gauche (dessous, Signaler la couvrirait).
+        val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val navInsets = WindowInsets.navigationBars.asPaddingValues()
+        val attribution = if (landscape) {
+            AttributionPlacement.guidanceLandscape(statusTop, navInsets.calculateRightPadding(LayoutDirection.Ltr), RoadlySpacing.screenEdge, BANNER_TOGGLE_SIZE, RoadlySpacing.s)
+        } else {
+            AttributionPlacement.guidancePortrait(statusTop, RoadlySpacing.screenEdge, BANNER_TOGGLE_SIZE, RoadlySpacing.s, RoadlySpacing.sm)
+        }
+        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera, bottomPanel, topStack, zoomOffset, pitchPreset, buildings3d)
         // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
         val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
-        val full = state.copy(communityAhead = reportsAhead)
+        val showThen by vm.showNextManeuverPreview.collectAsStateWithLifecycle()
+        // E2 : la ligne « puis … » suit le réglage, pour les deux overlays (un seul point, `BannerStack` inchangé).
+        val full = state.copy(communityAhead = reportsAhead).withNextManeuverPreview(showThen)
         if (state.styleUrl.isNotEmpty()) {
-            RoadlyMap(styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture)
+            RoadlyMap(
+                styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture,
+                maximumFps = if (powerSave.value) MapRendering.MAX_FPS_POWER_SAVE else MapRendering.MAX_FPS,
+                attribution = attribution,
+            )
         }
         if (landscape) {
-            LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
+            LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel)
         } else {
-            PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm)
+            PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel)
         }
         ReportResultPillNav(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp))
     }
@@ -181,32 +247,38 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     if (pois != PoisUi.Hidden) ScooterPoiSheet(pois, onSelect = vm::navigateToPoi, onDismiss = vm::dismissPois)
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
     if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives, onAddStop = { vm.dismissAlternatives(); onAddStop() })
+    GuidanceSheets(state, vm)
 }
 
 /** Portrait : bandeau en haut (replier à droite), actions à droite, compteur + Horizon + barre d'information en bas. */
 @Composable
-private fun PortraitOverlay(
+internal fun PortraitOverlay(
     state: NavigationUiState,
     bannerExpanded: Boolean,
     onToggleBanner: () -> Unit,
     onReport: () -> Unit,
     onChangeDestination: () -> Unit,
     vm: NavigationViewModel,
+    assistantButton: @Composable () -> Unit,
+    assistantPanel: @Composable () -> Unit,
 ) {
     val c = LocalRoadlyColors.current
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // Passe appareil : bas de la pile du haut (bandeau, panneau de direction, voies, « puis », bouton « replier ») → marge haute de la caméra.
         Column(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(RoadlySpacing.screenEdge),
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(RoadlySpacing.screenEdge).onGloballyPositioned { coords ->
+                vm.setTopStackFraction(PanelGeometry.topFraction(coords.positionInRoot().y + coords.size.height, coords.findRootCoordinates().size.height.toFloat()))
+            },
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                    state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                    if (state.lanes.isNotEmpty() && bannerExpanded) LaneStrip(state.lanes)
+                    BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
                     if (state.rerouting) ReroutingPill()
                     ScooterExtras(state, vm)
                 }
-                Spacer(Modifier.width(RoadlySpacing.s))
+                // 16 dp : la pile s'arrête 4 dp avant la colonne d'actions (56 dp), qui peut monter à sa hauteur sans la chevaucher.
+                Spacer(Modifier.width(RoadlySpacing.m))
                 Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s), horizontalAlignment = Alignment.End) {
                     RoundIconButton(
                         if (bannerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -217,20 +289,31 @@ private fun PortraitOverlay(
             }
         }
 
-        // Colonne d'actions à droite : signaler, voix, changer de destination.
+        // Colonne d'actions à droite (signaler, voix, changer de destination, itinéraires, 2D/3D + Nord), posée 8 dp au-dessus du bloc
+        // du bas mesuré : elle monte avec le panneau déplié. Sans la place, les doublons du panneau cèdent d'abord (`portraitActionButtons`).
+        val blockDp by vm.bottomBlockHeightDp.collectAsStateWithLifecycle()
+        val panelExpanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
+        val guiding = state.phase == NavigationPhase.GUIDING
+        val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val available = portraitActionColumnAvailableDp(maxHeight.value.toInt(), statusTop.value.toInt(), blockDp)
+        val buttons = portraitActionButtons(available, guiding, panelExpanded, voiceInPanel = guiding && state.following)
         Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = RoadlySpacing.screenEdge),
+            Modifier.align(Alignment.BottomEnd).padding(end = RoadlySpacing.screenEdge, bottom = blockDp.dp + RoadlySpacing.s),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
-            ReportButton(onReport)
-            RoundIconButton(
-                if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute),
-                onClick = vm::toggleMute,
-            )
-            RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
-            if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
+            assistantButton()
+            for (button in buttons) when (button) {
+                ActionButton.REPORT -> ReportButton(onReport)
+                ActionButton.VOICE -> RoundIconButton(
+                    if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                    stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute),
+                    onClick = vm::toggleMute,
+                )
+                ActionButton.SEARCH -> RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
+                ActionButton.ALTERNATIVES -> RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
+                ActionButton.CAMERA -> CameraModeButtons(vm)
+            }
             if (state.scooter != null) ScooterActions(vm)
         }
 
@@ -238,13 +321,12 @@ private fun PortraitOverlay(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.screenEdge),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
+            assistantPanel()
+            // Pastilles d'état au-dessus du compteur, jamais à côté : la rangée 2D/3D + Nord de la colonne d'actions est à sa hauteur.
+            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
+                if (state.gpsLost) GpsLostPill()
+                StatusPills(state)
                 SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
-                Spacer(Modifier.width(RoadlySpacing.s))
-                Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
-                    if (state.gpsLost) GpsLostPill()
-                    StatusPills(state)
-                }
             }
             BottomBlock(state, vm, onChangeDestination)
         }
@@ -273,24 +355,39 @@ private fun ScooterActions(vm: NavigationViewModel) {
 
 /** Paysage : colonne gauche (bandeau, voies, Horizon, barre d'information) sur ~45 % ; compteur et actions à droite. */
 @Composable
-private fun LandscapeOverlay(
+internal fun LandscapeOverlay(
     state: NavigationUiState,
     bannerExpanded: Boolean,
     onToggleBanner: () -> Unit,
     onReport: () -> Unit,
     onChangeDestination: () -> Unit,
     vm: NavigationViewModel,
+    assistantButton: @Composable () -> Unit,
+    assistantPanel: @Composable () -> Unit,
 ) {
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         // Colonne gauche : bandeau en haut, Horizon + barre d'information calés en bas (pas de défilement : tout doit rester visible en conduite).
-        Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
-            Column(Modifier.align(Alignment.TopStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                state.banner?.let { ManeuverBanner(it, Modifier.fillMaxWidth(), expanded = bannerExpanded) }
-                if (state.lanes.isNotEmpty() && bannerExpanded) LaneStrip(state.lanes)
+        BoxWithConstraints(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
+            // Passe appareil : panneau déplié qui ne tient pas sous la pile du bandeau → replié (vérifié une fois les tailles stabilisées).
+            val density = LocalDensity.current
+            val panelExpanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
+            var stackPx by remember { mutableIntStateOf(0) }
+            var blockPx by remember { mutableIntStateOf(0) }
+            val columnDp = maxHeight.value.toInt()
+            LaunchedEffect(panelExpanded, stackPx, blockPx, columnDp) {
+                if (!panelExpanded || blockPx == 0) return@LaunchedEffect
+                delay(PANEL_SETTLE_MS)
+                val stackDp = with(density) { stackPx.toDp().value.toInt() }
+                val blockDp = with(density) { blockPx.toDp().value.toInt() }
+                if (!landscapePanelFits(columnDp, stackDp, blockDp)) vm.collapseBottomPanel()
+            }
+            Column(Modifier.align(Alignment.TopStart).onSizeChanged { stackPx = it.height }, verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
                 if (state.rerouting) ReroutingPill()
                 ScooterExtras(state, vm)
             }
-            Column(Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+            Column(Modifier.align(Alignment.BottomStart).onSizeChanged { blockPx = it.height }, verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                assistantPanel()
                 BottomBlock(state, vm, onChangeDestination)
             }
         }
@@ -299,6 +396,7 @@ private fun LandscapeOverlay(
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
+            assistantButton()
             RoundIconButton(
                 if (bannerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 stringResource(if (bannerExpanded) R.string.nav_collapse_banner else R.string.nav_expand_banner),
@@ -314,14 +412,20 @@ private fun LandscapeOverlay(
             if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
             if (state.scooter != null) ScooterActions(vm)
         }
-        // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges).
-        Row(Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm), verticalAlignment = Alignment.Bottom) {
-            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.End) {
-                if (state.gpsLost) GpsLostPill()
-                StatusPills(state)
+        // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges). La rangée ne garde que 2D/3D + Nord
+        // et le compteur ; les pastilles d'état passent au-dessus, calées à droite, pour ne jamais pousser 2D/3D vers « Arrêter ».
+        Column(
+            Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs),
+            horizontalAlignment = Alignment.End,
+        ) {
+            if (state.gpsLost) GpsLostPill()
+            StatusPills(state)
+            Row(verticalAlignment = Alignment.Bottom) {
+                CameraModeButtons(vm)
+                Spacer(Modifier.width(RoadlySpacing.s))
+                SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
             }
-            Spacer(Modifier.width(RoadlySpacing.s))
-            SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
         }
     }
 }
@@ -330,26 +434,57 @@ private fun LandscapeOverlay(
 @Composable
 private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onChangeDestination: () -> Unit) {
     val c = LocalRoadlyColors.current
+    val density = LocalDensity.current
+    // D5 : haut du bloc (Horizon + panneau, ou panneau d'arrivée / d'échec / de chargement) mesuré → marge basse de la caméra
+    // (portrait ; ignorée en paysage) et distance au bas de l'écran (dp) sous la colonne d'actions portrait.
+    val measured = Modifier.fillMaxWidth().onGloballyPositioned { coords ->
+        val rootHeight = coords.findRootCoordinates().size.height.toFloat()
+        val top = coords.positionInRoot().y
+        vm.setBottomPanelFraction(PanelGeometry.fraction(top, rootHeight))
+        vm.setBottomBlockHeightDp(ceil((rootHeight - top) / density.density).toInt().coerceAtLeast(0))
+    }
     when (state.phase) {
         NavigationPhase.GUIDING -> {
-            AnimatedVisibility(state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()) {
-                HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
+            val expanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
+            val destination by vm.destinationName.collectAsStateWithLifecycle()
+            val recenterIn by vm.recenterInSeconds.collectAsStateWithLifecycle()
+            // Retour système panneau déplié : le replier, pas arrêter le guidage (composé après le `BackHandler` de l'écran → prioritaire).
+            BackHandler(enabled = expanded) { vm.collapseBottomPanel() }
+            // Orientation lue ici (même critère largeur > hauteur que `NavigationContent`) : signatures et corps des overlays inchangés.
+            val configuration = LocalConfiguration.current
+            val landscape = configuration.screenWidthDp > configuration.screenHeightDp
+            Column(measured) {
+                AnimatedVisibility(horizonVisible(state, landscape, expanded)) {
+                    HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
+                }
+                recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }
+                NavigationBottomPanel(
+                    state = state, expanded = expanded, destinationName = destination,
+                    onToggleExpanded = vm::toggleBottomPanel, onToggleMute = vm::toggleMute, onRecenter = vm::recenter, onStop = vm::stop,
+                    onTripDetails = vm::openTripDetails, onAlternatives = vm::loadAlternatives, compact = landscape,
+                )
             }
-            NavInfoBar(
-                etaClock = state.etaClock, etaLabel = stringResource(R.string.nav_eta_label),
-                minutesValue = state.remainingDurationSplit.value, minutesLabel = state.remainingDurationSplit.unit,
-                kmValue = state.remainingDistanceSplit.value, kmLabel = state.remainingDistanceSplit.unit,
-                showRecenter = !state.following, onRecenter = vm::recenter, onStop = vm::stop,
-                recenterDescription = stringResource(R.string.nav_recenter), stopDescription = stringResource(R.string.nav_stop),
-            )
         }
-        NavigationPhase.ARRIVED -> if (vm.scooterMode) {
-            val trip by vm.lastTrip.collectAsStateWithLifecycle()
-            ScooterRecapPanel(trip, onArrivalBattery = vm::setArrivalBattery, onFinish = vm::stop)
-        } else ArrivedPanel(onFinish = vm::stop)
-        NavigationPhase.FAILED -> FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop)
-        NavigationPhase.LOADING, NavigationPhase.IDLE -> GlassPanel(Modifier.fillMaxWidth()) { LoadingRow(stringResource(R.string.nav_loading)) }
+        NavigationPhase.ARRIVED -> Box(measured) {
+            if (vm.scooterMode) {
+                val trip by vm.lastTrip.collectAsStateWithLifecycle()
+                ScooterRecapPanel(trip, onArrivalBattery = vm::setArrivalBattery, onFinish = vm::stop)
+            } else ArrivedPanel(onFinish = vm::stop)
+        }
+        NavigationPhase.FAILED -> Box(measured) { FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop) }
+        NavigationPhase.LOADING, NavigationPhase.IDLE -> GlassPanel(measured) { LoadingRow(stringResource(R.string.nav_loading)) }
     }
+}
+
+/**
+ * Ruban Horizon montré s'il a des éléments. En paysage, masqué tant que le panneau de direction (D3) ou les voies (D4) occupent
+ * la colonne gauche : bandeau + panneau + voies (≈ 350 dp) et bloc du bas ne tiennent pas ensemble sur ≈ 409 dp.
+ * Passe appareil : masqué aussi en paysage quand le panneau du bas est déplié ([panelExpanded]) ; masqué dans les deux orientations
+ * pendant le panneau de direction, pour raccourcir le bloc du bas et laisser la flèche de manœuvre visible entre les blocs.
+ */
+internal fun horizonVisible(state: NavigationUiState, landscape: Boolean, panelExpanded: Boolean = false): Boolean {
+    val hasItems = state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()
+    return hasItems && bannerSign(state) == null && !(landscape && (state.showLanes || panelExpanded))
 }
 
 /** Horizon : manœuvres et arrivée (Valhalla), virages (géométrie) et zones de vigilance (base officielle) ; pas de trafic (⛔ source). */
@@ -496,3 +631,158 @@ private fun ReportResultPillNav(message: String?, modifier: Modifier = Modifier)
         }
     }
 }
+
+/** Ce que la carte du guidage reflète ; comparé pour n'agir que sur un vrai changement (position, suivi, mode, économie, orientation). */
+private data class MapTick(
+    val route: Route?,
+    val progress: RouteProgress?,
+    val speedKmh: Double?,
+    val approaching: Boolean,
+    val following: Boolean,
+    val mode: CameraMode3D,
+    val powerSave: Boolean,
+    val landscape: Boolean,
+    /** D5 : part de l'écran sous le panneau du bas (quantifiée), null avant la première mesure. */
+    val bottomPanel: Float?,
+    /** Part de l'écran couverte par la pile du haut (portrait, quantifiée), null avant la première mesure. */
+    val topPanel: Float?,
+    /** E2 : décalage de zoom, inclinaison choisie, bâtiments 3D. */
+    val zoomOffset: Int,
+    val pitchPreset: PitchPreset,
+    val buildings3d: Boolean,
+)
+
+/**
+ * C3 : position, tronçon parcouru et caméra pilotés par un seul `snapshotFlow`, hors recomposition des overlays
+ * (au lieu de `LaunchedEffect` relancés à chaque position). C1 : caméra lissée, transitions, recentrage adouci.
+ */
+@Composable
+private fun GuidanceMapEffects(
+    ui: State<NavigationUiState>,
+    mode: State<CameraMode3D>,
+    powerSave: State<Boolean>,
+    landscape: Boolean,
+    map: MapController,
+    camera: NavigationCameraController,
+    bottomPanel: State<Float?>,
+    topPanel: State<Float?>,
+    zoomOffset: State<Int>,
+    pitchPreset: State<PitchPreset>,
+    buildings3d: State<Boolean>,
+) {
+    // Rotation (l'activité gère `orientation|screenSize`) : pas de relance de l'effet, juste une image de recadrage ordinaire.
+    val isLandscape = rememberUpdatedState(landscape)
+    LaunchedEffect(map, camera) {
+        var lastProgress: RouteProgress? = null
+        var wasFollowing = true
+        // `snapshotFlow` n'émet que si la valeur change (égalité) : pas besoin de `distinctUntilChanged`.
+        snapshotFlow {
+            ui.value.let { s ->
+                MapTick(
+                    s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value, bottomPanel.value, topPanel.value,
+                    zoomOffset.value, pitchPreset.value, buildings3d.value,
+                )
+            }
+        }
+            .collect { t ->
+                val route = t.route ?: return@collect
+                val progress = t.progress ?: return@collect
+                // Premier tracé : image immédiate ; recalcul ou alternative : transition douce, cap et zoom gardés (règle du contrôleur).
+                camera.onRouteChanged(route.id)
+                if (progress !== lastProgress) {
+                    lastProgress = progress
+                    map.setUserLocation(LocationFix(progress.snapped, progress.bearingDeg, null, 5f, 0L))
+                    map.setTraversed(route.geometry, progress.segmentIndex, progress.snapped)
+                }
+                if (!t.following) { wasFollowing = false; return@collect }
+                if (!wasFollowing) { wasFollowing = true; camera.requestTransition() }
+                val next = route.maneuvers.getOrNull(progress.nextManeuverIndex) ?: return@collect
+                val frame = camera.update(
+                    NavigationCameraInput(
+                        point = progress.snapped, bearingDeg = progress.bearingDeg, speedKmh = t.speedKmh,
+                        distanceToManeuverM = progress.distanceToNextManeuverM, maneuverType = next.type, approaching = t.approaching,
+                        mode = t.mode, powerSave = t.powerSave, landscape = t.landscape, nowMs = SystemClock.elapsedRealtime(),
+                        bottomPanelFraction = t.bottomPanel, topPanelFraction = t.topPanel,
+                        zoomOffset = t.zoomOffset, pitchPreset = t.pitchPreset, buildings3d = t.buildings3d,
+                    ),
+                )
+                map.applyGuidanceCamera(frame.point, frame.camera, frame.durationMs, frame.eased)
+            }
+    }
+}
+
+/** Boutons 2D / 3D et « nord en haut » (C1), côte à côte pour ne prendre qu'une rangée. */
+@Composable
+private fun CameraModeButtons(vm: NavigationViewModel) {
+    val mode by vm.cameraMode.collectAsStateWithLifecycle()
+    Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
+        val is3d = mode == CameraMode3D.FOLLOW_3D
+        RoundIconButton(
+            if (is3d) Icons.Default.Map else Icons.Default.ViewInAr,
+            stringResource(if (is3d) R.string.nav_view_2d else R.string.nav_view_3d),
+            onClick = vm::toggleCameraMode,
+        )
+        val northUp = mode == CameraMode3D.NORTH_UP
+        RoundIconButton(
+            if (northUp) Icons.Default.Navigation else Icons.Default.Explore,
+            stringResource(if (northUp) R.string.nav_heading_up else R.string.nav_north_up),
+            onClick = vm::toggleNorthUp,
+            style = if (northUp) RoundButtonStyle.Brand else RoundButtonStyle.Glass,
+        )
+    }
+}
+
+/** « Recentrage dans N s · Annuler » au-dessus de la barre d'information, pendant la reprise automatique (C1). */
+@Composable
+private fun RecenterCountdownPill(seconds: Int, onCancel: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    GlassPanel(Modifier.padding(bottom = RoadlySpacing.s), shape = RoadlyShapes.Chip, contentPadding = 8.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.nav_recenter_in, seconds), style = MaterialTheme.typography.labelLarge, color = c.textPrimary)
+            Spacer(Modifier.width(RoadlySpacing.s))
+            GlassButton(stringResource(R.string.nav_recenter_cancel), onClick = onCancel, style = GlassButtonStyle.Ghost)
+        }
+    }
+}
+
+/** D1 / D5 : feuilles ouvertes depuis le bandeau ou le panneau du bas ; le contenu suit l'état en direct, la carte continue derrière. */
+@Composable
+internal fun GuidanceSheets(state: NavigationUiState, vm: NavigationViewModel) {
+    val sheet by vm.guidanceSheet.collectAsStateWithLifecycle()
+    val destination by vm.destinationName.collectAsStateWithLifecycle()
+    // Fin du guidage (arrivée, échec, arrêt) : la feuille est refermée dans le ViewModel, pas seulement masquée, pour ne pas rouvrir au guidage suivant ;
+    // le panneau du bas est replié pour la même raison.
+    LaunchedEffect(state.phase) { if (closesGuidanceSheet(state.phase)) { vm.closeSheet(); vm.collapseBottomPanel() } }
+    // Début d'une approche (deux orientations) : le panneau du bas se replie pour laisser la place au panneau de direction et aux voies.
+    val approaching = state.approach != null
+    LaunchedEffect(approaching) { if (approaching) vm.collapseBottomPanel() }
+    // Manœuvre visée franchie : l'aperçu (modal, couvre compteur, Horizon et Arrêter) se referme ; le trajet complet reste ouvert.
+    val nextIndex = state.progress?.nextManeuverIndex
+    var lastIndex by remember { mutableStateOf(nextIndex) }
+    LaunchedEffect(nextIndex) {
+        if (closesPreviewOnIndexChange(lastIndex, nextIndex, visibleSheet(state.phase, sheet))) vm.closeSheet()
+        if (nextIndex != null) lastIndex = nextIndex
+    }
+    when (visibleSheet(state.phase, sheet)) {
+        GuidanceSheet.MANEUVER_PREVIEW -> ManeuverPreviewSheet(state, onDismiss = vm::closeSheet)
+        GuidanceSheet.TRIP_DETAILS -> TripDetailsSheet(state, destination, onDismiss = vm::closeSheet)
+        GuidanceSheet.NONE -> Unit
+    }
+}
+
+/** Feuille affichée : aucune hors guidage (chargement, arrivée, échec, arrêt). */
+internal fun visibleSheet(phase: NavigationPhase, sheet: GuidanceSheet): GuidanceSheet = if (phase == NavigationPhase.GUIDING) sheet else GuidanceSheet.NONE
+
+/** La feuille ouverte est refermée quand le guidage s'arrête ; pas pendant le chargement, qui précède le premier état. */
+internal fun closesGuidanceSheet(phase: NavigationPhase): Boolean =
+    phase == NavigationPhase.ARRIVED || phase == NavigationPhase.FAILED || phase == NavigationPhase.IDLE
+
+/** D1 : l'aperçu se referme quand la manœuvre visée change ([prev] → [next], tous deux connus) ; jamais le trajet complet. */
+internal fun closesPreviewOnIndexChange(prev: Int?, next: Int?, sheet: GuidanceSheet): Boolean =
+    sheet == GuidanceSheet.MANEUVER_PREVIEW && prev != null && next != null && prev != next
+
+/** Taille du bouton « replier le bandeau » des overlays (`size = 44.dp`) : l'attribution se place dessous en portrait, à sa gauche en paysage. */
+private val BANNER_TOGGLE_SIZE = 44.dp
+
+/** Paysage : délai sans changement de taille avant de vérifier que le panneau déplié tient (fin des animations du panneau et de l'Horizon). */
+private const val PANEL_SETTLE_MS = 400L

@@ -113,10 +113,17 @@ fun HomeScreen(
     onResumeGuidance: () -> Unit,
     onSearchCategory: (PoiCategory) -> Unit,
     onOpenProfile: () -> Unit = {},
+    assistantButton: @Composable () -> Unit = {},
+    assistantPanel: @Composable () -> Unit = {},
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val isGuiding by vm.isGuiding.collectAsStateWithLifecycle()
+    val resumeCard by vm.resumeCard.collectAsStateWithLifecycle()
+    // E3 : après « Reprendre », l'écran de guidage s'ouvre dès que la session guide (même chemin que « Reprendre le guidage »).
+    var resumeRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(resumeRequested, isGuiding) { if (resumeRequested && isGuiding) { resumeRequested = false; onResumeGuidance() } }
+    LaunchedEffect(resumeCard?.phase) { if (resumeCard?.phase == ResumePhase.FAILED) resumeRequested = false }
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
     var showReport by rememberSaveable { mutableStateOf(false) }
@@ -156,12 +163,13 @@ fun HomeScreen(
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
         ReportResultPill(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 76.dp))
 
-        // Colonne d'actions à droite : signaler (feuille des types), boussole si la carte est tournée.
+        // Colonne d'actions à droite : Roadly AI, signaler (feuille des types), boussole si la carte est tournée.
         Column(
             Modifier.align(if (landscape) Alignment.TopEnd else Alignment.CenterEnd).statusBarsPadding().padding(RoadlySpacing.screenEdge).padding(top = if (landscape) 60.dp else 0.dp),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
+            assistantButton()
             RoundIconButton(Icons.Default.Warning, stringResource(R.string.home_report), onClick = { showReport = true }, style = RoundButtonStyle.Accent)
             AnimatedVisibility(state.isRotated, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                 CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
@@ -194,6 +202,9 @@ fun HomeScreen(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.screenEdge)
         }
         Column(bottomModifier) {
+            // Fenêtre compacte Roadly AI, au-dessus du compteur ; invisible hors session.
+            assistantPanel()
+            Spacer(Modifier.height(RoadlySpacing.sm))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                 // Pas de source de limitation de vitesse hors guidage : le badge affiche « — ».
                 SpeedBadge(speedKmh = state.speedKmh, limitKmh = null)
@@ -212,7 +223,10 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(RoadlySpacing.sm))
             when (state.permission) {
-                LocationPermissionState.GRANTED -> BottomPanel(state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance, onPosition = { showPosition = true }, onCategory = onSearchCategory)
+                LocationPermissionState.GRANTED -> BottomPanel(
+                    state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance, onPosition = { showPosition = true }, onCategory = onSearchCategory,
+                    resumeCard = resumeCard, onResumeLast = { resumeRequested = vm.resumeLastGuidance() }, onDismissResume = { resumeRequested = false; vm.dismissResume() },
+                )
                 else -> PermissionPanel(state.permission, onRequestLocationPermission, onOpenAppSettings)
             }
         }
@@ -259,12 +273,20 @@ private fun BottomPanel(
     onResumeGuidance: () -> Unit,
     onPosition: () -> Unit,
     onCategory: (PoiCategory) -> Unit,
+    resumeCard: ResumeCardUi? = null,
+    onResumeLast: () -> Unit = {},
+    onDismissResume: () -> Unit = {},
 ) {
     val c = LocalRoadlyColors.current
     GlassPanel(Modifier.fillMaxWidth(), contentPadding = 14.dp) {
         Column {
             if (isGuiding) {
                 GlassButton(stringResource(R.string.home_resume_guidance), onClick = onResumeGuidance, icon = Icons.Default.Navigation, style = GlassButtonStyle.Brand, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(RoadlySpacing.sm))
+            }
+            // E3 : course interrompue (mort du processus, redémarrage) : reprise vers la même destination, depuis la position actuelle.
+            if (!isGuiding && resumeCard != null) {
+                ResumeGuidanceCard(resumeCard, canResume = state.fix != null, onResume = onResumeLast, onDismiss = onDismissResume)
                 Spacer(Modifier.height(RoadlySpacing.sm))
             }
             // Toucher sa position : adresse copiable et partageable (feuille).

@@ -21,6 +21,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.location.PermissionEvents
+import fr.roadly.core.navigation.AppNavigator
 import fr.roadly.core.navigation.NavigationService
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
@@ -29,6 +30,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject lateinit var location: LocationRepository
     @Inject lateinit var permissionEvents: PermissionEvents
+    @Inject lateinit var navigator: AppNavigator
     private val themeVm: ThemeViewModel by viewModels()
 
     /** Ouverture de l'écran de guidage demandée par la notification. */
@@ -72,6 +74,7 @@ class MainActivity : ComponentActivity() {
                     onOpenNavigationHandled = { openNavigation.value = false },
                     externalRequest = externalRequest,
                     onExternalHandled = { external.value = null },
+                    navRequests = navigator.requests,
                 )
             }
         }
