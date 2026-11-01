@@ -70,15 +70,27 @@ class NavigationSession @Inject constructor(
     val muted: StateFlow<Boolean> = _muted.asStateFlow()
 
     /**
-     * E3 : course mémorisée à proposer à la reprise (« Reprendre le guidage vers … »), seulement au repos — après la mort du processus ou un
-     * redémarrage (un arrêt ou une arrivée l'ont effacée). Null pendant un guidage. LIMITE : aucune limite d'âge.
+     * E3 : la reprise n'a de sens que pour une course héritée d'un processus précédent. Ouverte au démarrage du processus, fermée
+     * (définitivement, de façon synchrone) au premier départ, arrêt ou « Ignorer » : l'effacement DataStore étant asynchrone, la course
+     * qu'on vient d'arrêter n'est ainsi jamais proposée, même quelques images.
      */
-    val resumableGuidance: Flow<LastGuidance?> = combine(prefs.lastGuidance, state) { last, s -> last.takeIf { s is NavigationState.Idle } }
-        .distinctUntilChanged()
+    private val resumeOfferOpen = MutableStateFlow(true)
+
+    /**
+     * E3 : course mémorisée à proposer à la reprise (« Reprendre le guidage vers … »), seulement au repos et seulement si elle vient d'un
+     * processus précédent (mort du processus, redémarrage) — un arrêt ou une arrivée l'ont effacée. Null pendant un guidage.
+     * Les valeurs courantes de [resumeOfferOpen] et de l'état sont relues à chaque émission (pas celles, peut-être en retard, du `combine`).
+     * LIMITE : aucune limite d'âge.
+     */
+    val resumableGuidance: Flow<LastGuidance?> = combine(prefs.lastGuidance, resumeOfferOpen, state) { last, _, _ ->
+        last.takeIf { resumeOfferOpen.value && _state.value is NavigationState.Idle }
+    }.distinctUntilChanged()
 
     /** E3 « Ignorer » : oublie la course mémorisée ; sans effet pendant un guidage, dont la course est celle qui est mémorisée. */
     fun forgetLastGuidance() {
-        if (_state.value is NavigationState.Idle) persistLastGuidance(null)
+        if (_state.value !is NavigationState.Idle) return
+        resumeOfferOpen.value = false
+        persistLastGuidance(null)
     }
 
     private val confined = dispatchers.default.limitedParallelism(1)
@@ -108,6 +120,7 @@ class NavigationSession @Inject constructor(
         lastPreferences = preferences
         lastVehicle = vehicle
         lastDestinationName = name
+        resumeOfferOpen.value = false // E3 : avant tout changement d'état ; la course mémorisée sera remplacée ou effacée.
         if (location.permissionState.value != LocationPermissionState.GRANTED) {
             publishFailure(NavigationState.Failed(AppError.PermissionDenied))
             persistLastGuidance(null)
@@ -136,6 +149,7 @@ class NavigationSession @Inject constructor(
     /** Arrête la course : `Idle`, GPS relâché, parole coupée et moteur de synthèse libéré. */
     fun stop() {
         val wasGuiding = _state.value is NavigationState.Guiding
+        resumeOfferOpen.value = false // E3 : avant `Idle`, sinon la course arrêtée serait proposée le temps de l'effacement.
         cancelRun(NavigationState.Idle)
         speech.release()
         persistLastGuidance(null)

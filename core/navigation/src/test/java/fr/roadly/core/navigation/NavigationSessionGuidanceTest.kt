@@ -21,6 +21,7 @@ import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -240,5 +241,16 @@ class NavigationSessionGuidanceTest {
         assertNull(s.resumableGuidance.first())
         s.forgetLastGuidance(); runCurrent()
         assertNotNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `a normal stop never flashes the stopped run as resumable`() = runTest { // revue E3 : effacement asynchrone
+        val s = session(); s.start(option(TestRoutes.straight()), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
+        val seen = mutableListOf<LastGuidance?>()
+        backgroundScope.launch { s.resumableGuidance.collect { seen += it } }
+        runCurrent()
+        s.stop(); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+        assertTrue("aucune reprise proposée entre l'arrêt et l'effacement : $seen", seen.isNotEmpty() && seen.all { it == null })
     }
 }

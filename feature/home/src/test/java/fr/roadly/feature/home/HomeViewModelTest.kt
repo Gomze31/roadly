@@ -36,6 +36,7 @@ import fr.roadly.core.navigation.testing.TestRoutes
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,6 +51,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -89,9 +91,11 @@ class HomeViewModelTest {
     /** Itinéraires renvoyés par le faux fournisseur (échec par défaut) et requêtes reçues. */
     private var routeResult: Outcome<List<Route>> = Outcome.Failure(AppError.Network)
     private val requests = mutableListOf<RouteRequest>()
+    /** Si non nul, le calcul reste suspendu jusqu'à sa complétion (calcul en cours). */
+    private var routeGate: CompletableDeferred<Unit>? = null
     private val routing = object : RoutingProvider {
         override val id = "fake"
-        override suspend fun route(request: RouteRequest): Outcome<List<Route>> { requests += request; return routeResult }
+        override suspend fun route(request: RouteRequest): Outcome<List<Route>> { requests += request; routeGate?.await(); return routeResult }
     }
     private val prefs = FakeUserPreferencesRepository()
     private val vehicles = object : VehicleProfileRepository {
@@ -219,6 +223,38 @@ class HomeViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(saved, prefs.last.value)
+    }
+
+    @Test fun `ignore during the route calculation cancels the resume`() = runTest { // revue E3
+        routeResult = Outcome.Success(listOf(TestRoutes.straight()))
+        val gate = CompletableDeferred<Unit>(); routeGate = gate
+        prefs.setLastGuidance(LastGuidance(TestRoutes.straight().geometry.last(), "Capitole", "r-avant", 0L))
+        location.lastKnown = fix(48.85, 2.35)
+        val s = session()
+        val vm = vm(s)
+        vm.resumeCard.test {
+            runCurrent()
+            assertTrue(vm.resumeLastGuidance()); runCurrent()
+            assertEquals(ResumeCardUi("Capitole", ResumePhase.ROUTING), expectMostRecentItem())
+            vm.dismissResume(); runCurrent()
+            gate.complete(Unit); runCurrent()
+            assertNull(expectMostRecentItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals("« Ignorer » annule la reprise : aucun départ", NavigationState.Idle, s.state.value)
+        assertNull(prefs.last.value)
+    }
+
+    @Test fun `without a position, resume does nothing and says so`() = runTest {
+        prefs.setLastGuidance(LastGuidance(GeoPoint(43.6045, 1.4440), "Capitole", "r-avant", 0L))
+        val vm = vm()
+        vm.resumeCard.test {
+            runCurrent()
+            assertFalse(vm.resumeLastGuidance()); runCurrent()
+            assertEquals(ResumeCardUi("Capitole"), expectMostRecentItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertTrue(requests.isEmpty())
     }
 }
 

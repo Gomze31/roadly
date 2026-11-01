@@ -219,7 +219,7 @@ fun HomeScreen(
             when (state.permission) {
                 LocationPermissionState.GRANTED -> BottomPanel(
                     state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance, onPosition = { showPosition = true }, onCategory = onSearchCategory,
-                    resumeCard = resumeCard, onResumeLast = { resumeRequested = true; vm.resumeLastGuidance() }, onDismissResume = vm::dismissResume,
+                    resumeCard = resumeCard, onResumeLast = { resumeRequested = vm.resumeLastGuidance() }, onDismissResume = { resumeRequested = false; vm.dismissResume() },
                 )
                 else -> PermissionPanel(state.permission, onRequestLocationPermission, onOpenAppSettings)
             }

@@ -13,6 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import fr.roadly.core.designsystem.component.GlassButton
@@ -40,7 +43,12 @@ internal fun ResumeGuidanceCard(card: ResumeCardUi, canResume: Boolean, onResume
             !canResume -> R.string.home_resume_waiting_position
             else -> null
         }
-        status?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall, color = if (failed) c.danger else c.textSecondary) }
+        status?.let {
+            Text(
+                stringResource(it), style = MaterialTheme.typography.bodySmall, color = if (failed) c.danger else c.textSecondary,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }, // annoncé par TalkBack quand il change
+            )
+        }
         Spacer(Modifier.height(RoadlySpacing.s))
         Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
             val routing = card.phase == ResumePhase.ROUTING

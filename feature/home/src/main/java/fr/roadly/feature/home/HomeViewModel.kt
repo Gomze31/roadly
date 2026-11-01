@@ -31,6 +31,7 @@ import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -133,6 +134,7 @@ class HomeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val resumePhase = MutableStateFlow(ResumePhase.OFFER)
+    private var resumeJob: Job? = null
     private val resumable: StateFlow<LastGuidance?> = navigationSession.resumableGuidance.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** E3 : carte « Reprendre le guidage vers … » — course interrompue et session au repos ; null sinon. */
@@ -143,16 +145,19 @@ class HomeViewModel @Inject constructor(
      * E3 « Reprendre » : nouvel itinéraire depuis la position actuelle vers la destination mémorisée (pas le tracé enregistré), avec les
      * préférences et le véhicule du moment, puis départ comme « ROULER » (`session.start` avec le nom). Même calcul que
      * `GuidanceActions.startTo` de Roadly AI. Échec : la carte le dit, la course reste mémorisée. Sans position connue : rien.
+     * @return vrai si une reprise est en cours (l'écran attend alors le guidage), faux si rien n'a été lancé.
      */
-    fun resumeLastGuidance() {
-        val last = resumable.value ?: return
-        val origin = location.lastKnown?.point ?: return
-        if (resumePhase.value == ResumePhase.ROUTING) return
+    fun resumeLastGuidance(): Boolean {
+        val last = resumable.value ?: return false
+        val origin = location.lastKnown?.point ?: return false
+        if (resumePhase.value == ResumePhase.ROUTING) return true
         resumePhase.value = ResumePhase.ROUTING
-        viewModelScope.launch {
+        resumeJob = viewModelScope.launch {
             val p = prefs.routePreferences.first()
             val v = vehicles.profile.first()
-            when (val r = alternatives(origin, last.destination, v, System.currentTimeMillis(), p)) {
+            val r = alternatives(origin, last.destination, v, System.currentTimeMillis(), p)
+            ensureActive() // « Ignorer » pendant le calcul : un résultat tardif ne démarre rien.
+            when (r) {
                 is Outcome.Success -> {
                     val best = r.value.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: r.value.first()
                     resumePhase.value = ResumePhase.OFFER
@@ -161,10 +166,13 @@ class HomeViewModel @Inject constructor(
                 is Outcome.Failure -> resumePhase.value = ResumePhase.FAILED
             }
         }
+        return true
     }
 
-    /** E3 « Ignorer » : la course mémorisée est oubliée ; plus de carte jusqu'au prochain guidage interrompu. */
+    /** E3 « Ignorer » : annule une reprise en cours de calcul et oublie la course mémorisée ; plus de carte jusqu'au prochain guidage interrompu. */
     fun dismissResume() {
+        resumeJob?.cancel()
+        resumeJob = null
         resumePhase.value = ResumePhase.OFFER
         navigationSession.forgetLastGuidance()
     }
