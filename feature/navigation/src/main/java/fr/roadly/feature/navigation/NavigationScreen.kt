@@ -208,7 +208,7 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
 
 /** Portrait : bandeau en haut (replier à droite), actions à droite, compteur + Horizon + barre d'information en bas. */
 @Composable
-private fun PortraitOverlay(
+internal fun PortraitOverlay(
     state: NavigationUiState,
     bannerExpanded: Boolean,
     onToggleBanner: () -> Unit,
@@ -274,7 +274,7 @@ private fun PortraitOverlay(
 
 /** Paysage : colonne gauche (bandeau, voies, Horizon, barre d'information) sur ~45 % ; compteur et actions à droite. */
 @Composable
-private fun LandscapeOverlay(
+internal fun LandscapeOverlay(
     state: NavigationUiState,
     bannerExpanded: Boolean,
     onToggleBanner: () -> Unit,
