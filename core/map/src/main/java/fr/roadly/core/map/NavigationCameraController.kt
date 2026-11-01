@@ -1,21 +1,9 @@
 package fr.roadly.core.map
 
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.ManeuverType
 import kotlin.math.exp
-
-/** C1 : mode de caméra du guidage, choisi pour la session (bouton 2D/3D, « nord en haut ») ; départ = réglage « Carte 3D ». */
-enum class CameraMode3D {
-    FOLLOW_3D, FOLLOW_2D, NORTH_UP;
-
-    /** Bouton 2D/3D : 3D → 2D, sinon 3D (depuis « nord en haut », on repasse en 3D). */
-    fun toggled3d(): CameraMode3D = if (this == FOLLOW_3D) FOLLOW_2D else FOLLOW_3D
-
-    companion object {
-        /** Mode de départ d'une session : réglage « Carte 3D en guidage » activé → 3D, sinon 2D. */
-        fun default(map3dEnabled: Boolean): CameraMode3D = if (map3dEnabled) FOLLOW_3D else FOLLOW_2D
-    }
-}
 
 /** Entrée de la caméra à chaque position (temps [nowMs] monotone, ex. `SystemClock.elapsedRealtime()`). */
 data class NavigationCameraInput(

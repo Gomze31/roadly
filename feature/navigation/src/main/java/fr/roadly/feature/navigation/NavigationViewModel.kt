@@ -11,7 +11,7 @@ import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
-import fr.roadly.core.map.CameraMode3D
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.map.MapDetailPolicy
 import fr.roadly.core.model.CommunityReport

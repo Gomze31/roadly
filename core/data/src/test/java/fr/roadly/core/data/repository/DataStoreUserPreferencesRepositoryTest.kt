@@ -4,9 +4,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,5 +86,40 @@ class DataStoreUserPreferencesRepositoryTest {
         assertEquals(MapDetail.REDUCED, repo.mapDetail.first())
         store.edit { it[stringPreferencesKey("map.detail")] = "ULTRA" }
         assertEquals(MapDetail.NORMAL, repo.mapDetail.first())
+    }
+
+    @Test fun `navigation display settings default, persist and ignore invalid values`() = runTest {
+        assertEquals(CameraMode3D.FOLLOW_3D, repo.defaultCameraMode.first())
+        assertEquals(0, repo.zoomOffset.first())
+        assertEquals(PitchPreset.STANDARD, repo.pitchPreset.first())
+        assertEquals(true, repo.autoRotate.first())
+        assertEquals(true, repo.showNextManeuverPreview.first())
+        assertEquals(PowerSaveMode.AUTO, repo.powerSaveMode.first())
+        repo.setDefaultCameraMode(CameraMode3D.FOLLOW_2D); repo.setZoomOffset(-1); repo.setPitchPreset(PitchPreset.HIGH)
+        repo.setAutoRotate(false); repo.setShowNextManeuverPreview(false); repo.setPowerSaveMode(PowerSaveMode.ON)
+        assertEquals(CameraMode3D.FOLLOW_2D, repo.defaultCameraMode.first())
+        assertEquals(-1, repo.zoomOffset.first())
+        assertEquals(PitchPreset.HIGH, repo.pitchPreset.first())
+        assertEquals(false, repo.autoRotate.first())
+        assertEquals(false, repo.showNextManeuverPreview.first())
+        assertEquals(PowerSaveMode.ON, repo.powerSaveMode.first())
+        repo.setZoomOffset(2)
+        assertEquals("hors de −1 / 0 / +1 : ignoré", -1, repo.zoomOffset.first())
+        store.edit {
+            it[stringPreferencesKey("map.pitch")] = "VERTICAL"; it[stringPreferencesKey("power.save.mode")] = "TURBO"
+            it[stringPreferencesKey("map.camera.default")] = "ORBIT"; it[intPreferencesKey("map.zoom.offset")] = 5
+        }
+        assertEquals(PitchPreset.STANDARD, repo.pitchPreset.first())
+        assertEquals(PowerSaveMode.AUTO, repo.powerSaveMode.first())
+        assertEquals(CameraMode3D.FOLLOW_3D, repo.defaultCameraMode.first())
+        assertEquals(0, repo.zoomOffset.first())
+    }
+
+    @Test fun `without a chosen start view, the former 3d map setting decides it`() = runTest {
+        repo.setMap3dEnabled(false)
+        assertEquals(CameraMode3D.FOLLOW_2D, repo.defaultCameraMode.first())
+        repo.setDefaultCameraMode(CameraMode3D.FOLLOW_3D)
+        assertEquals("choix explicite : indépendant des bâtiments", CameraMode3D.FOLLOW_3D, repo.defaultCameraMode.first())
+        assertEquals(false, repo.map3dEnabled.first())
     }
 }

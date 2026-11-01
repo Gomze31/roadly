@@ -10,7 +10,7 @@ import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
-import fr.roadly.core.map.CameraMode3D
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.GeoPoint

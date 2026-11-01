@@ -8,8 +8,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -29,10 +32,23 @@ object GuidanceDefaults {
     const val VIGILANCE_ENABLED = true
     const val VIGILANCE_SOUND = true
     const val RAIN_LOWERS_LIMIT = false
-    /** Carte inclinée + bâtiments 3D pendant le guidage. */
+    /** E2 « Bâtiments 3D » (clé `map.3d`, ex-« Carte 3D en guidage ») : bâtiments extrudés en vue 3D. */
     const val MAP_3D = true
     /** Niveau de détail de la carte en guidage. */
     val MAP_DETAIL = MapDetail.NORMAL
+    /** E2 : vue au départ du guidage ; sans choix enregistré, elle suit [MAP_3D] (migration). */
+    val DEFAULT_CAMERA_MODE = CameraMode3D.FOLLOW_3D
+    /** E2 : décalage de zoom du guidage, et valeurs admises (plus large, normal, plus proche). */
+    const val ZOOM_OFFSET = 0
+    val ALLOWED_ZOOM_OFFSETS = listOf(-1, 0, 1)
+    /** E2 : inclinaison de croisière en 3D. */
+    val PITCH_PRESET = PitchPreset.STANDARD
+    /** E2 : carte orientée selon le cap ; non = nord en haut au départ. */
+    const val AUTO_ROTATE = true
+    /** E2 : ligne « puis … » sous le bandeau (D1). */
+    const val SHOW_NEXT_MANEUVER = true
+    /** E2 : économie d'énergie du guidage. */
+    val POWER_SAVE = PowerSaveMode.AUTO
 }
 
 /** B6 : course de guidage en cours ou interrompue (mort du processus) — base du « Reprendre le guidage » de l'Étape E3. */
@@ -69,12 +85,30 @@ interface UserPreferencesRepository {
     /** Limitation abaissée par temps de pluie (R413-2) quand une limitation est connue. */
     val rainLowersLimit: Flow<Boolean>
     suspend fun setRainLowersLimit(value: Boolean)
-    /** Perspective 3D et bâtiments extrudés pendant le guidage. */
+    /** E2 « Bâtiments 3D » (ex-« Carte 3D en guidage ») : bâtiments extrudés en vue 3D. */
     val map3dEnabled: Flow<Boolean>
     suspend fun setMap3dEnabled(value: Boolean)
     /** C2 : niveau de détail de la carte en guidage (REDUCED : sans points d'intérêt ni noms des petites rues). */
     val mapDetail: Flow<MapDetail>
     suspend fun setMapDetail(value: MapDetail)
+    /** E2 : vue au départ du guidage (3D / 2D) ; tant qu'elle n'a pas été choisie, elle suit [map3dEnabled] (migration de l'ancien réglage). */
+    val defaultCameraMode: Flow<CameraMode3D>
+    suspend fun setDefaultCameraMode(value: CameraMode3D)
+    /** E2 : décalage de zoom du guidage ; seules −1, 0 et +1 sont acceptées, toute autre valeur est ignorée. */
+    val zoomOffset: Flow<Int>
+    suspend fun setZoomOffset(value: Int)
+    /** E2 : inclinaison de croisière en 3D. */
+    val pitchPreset: Flow<PitchPreset>
+    suspend fun setPitchPreset(value: PitchPreset)
+    /** E2 : rotation automatique (cap en haut) ; non = nord en haut au départ. */
+    val autoRotate: Flow<Boolean>
+    suspend fun setAutoRotate(value: Boolean)
+    /** E2 : ligne « puis … » de la manœuvre d'après sous le bandeau. */
+    val showNextManeuverPreview: Flow<Boolean>
+    suspend fun setShowNextManeuverPreview(value: Boolean)
+    /** E2 : économie d'énergie du guidage (AUTO = économiseur d'Android). */
+    val powerSaveMode: Flow<PowerSaveMode>
+    suspend fun setPowerSaveMode(value: PowerSaveMode)
     /** Teinte du cockpit (nom de `CockpitTint`) ; null = violet par défaut. */
     val cockpitTint: Flow<String?>
     suspend fun setCockpitTint(name: String?)
@@ -101,6 +135,12 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kMap3d = booleanPreferencesKey("map.3d")
     private val kMapDetail = stringPreferencesKey("map.detail")
     private val kTint = stringPreferencesKey("cockpit.tint")
+    private val kCameraDefault = stringPreferencesKey("map.camera.default")
+    private val kZoomOffset = intPreferencesKey("map.zoom.offset")
+    private val kPitch = stringPreferencesKey("map.pitch")
+    private val kAutoRotate = booleanPreferencesKey("map.auto.rotate")
+    private val kThenPreview = booleanPreferencesKey("guidance.then.preview")
+    private val kPowerSave = stringPreferencesKey("power.save.mode")
     private val kLastLat = doublePreferencesKey("guidance.last.lat")
     private val kLastLon = doublePreferencesKey("guidance.last.lon")
     private val kLastName = stringPreferencesKey("guidance.last.name")
@@ -143,6 +183,23 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setMap3dEnabled(value: Boolean) { store.edit { it[kMap3d] = value } }
     override val mapDetail: Flow<MapDetail> = store.data.map { p -> p[kMapDetail]?.let { runCatching { MapDetail.valueOf(it) }.getOrNull() } ?: GuidanceDefaults.MAP_DETAIL }
     override suspend fun setMapDetail(value: MapDetail) { store.edit { it[kMapDetail] = value.name } }
+    override val defaultCameraMode: Flow<CameraMode3D> = store.data.map { p ->
+        p[kCameraDefault]?.let { runCatching { CameraMode3D.valueOf(it) }.getOrNull() } ?: CameraMode3D.default(p[kMap3d] ?: GuidanceDefaults.MAP_3D)
+    }
+    override suspend fun setDefaultCameraMode(value: CameraMode3D) { store.edit { it[kCameraDefault] = value.name } }
+    override val zoomOffset: Flow<Int> = store.data.map { p -> p[kZoomOffset]?.takeIf { it in GuidanceDefaults.ALLOWED_ZOOM_OFFSETS } ?: GuidanceDefaults.ZOOM_OFFSET }
+    override suspend fun setZoomOffset(value: Int) {
+        if (value !in GuidanceDefaults.ALLOWED_ZOOM_OFFSETS) return
+        store.edit { it[kZoomOffset] = value }
+    }
+    override val pitchPreset: Flow<PitchPreset> = store.data.map { p -> p[kPitch]?.let { runCatching { PitchPreset.valueOf(it) }.getOrNull() } ?: GuidanceDefaults.PITCH_PRESET }
+    override suspend fun setPitchPreset(value: PitchPreset) { store.edit { it[kPitch] = value.name } }
+    override val autoRotate: Flow<Boolean> = store.data.map { it[kAutoRotate] ?: GuidanceDefaults.AUTO_ROTATE }
+    override suspend fun setAutoRotate(value: Boolean) { store.edit { it[kAutoRotate] = value } }
+    override val showNextManeuverPreview: Flow<Boolean> = store.data.map { it[kThenPreview] ?: GuidanceDefaults.SHOW_NEXT_MANEUVER }
+    override suspend fun setShowNextManeuverPreview(value: Boolean) { store.edit { it[kThenPreview] = value } }
+    override val powerSaveMode: Flow<PowerSaveMode> = store.data.map { p -> p[kPowerSave]?.let { runCatching { PowerSaveMode.valueOf(it) }.getOrNull() } ?: GuidanceDefaults.POWER_SAVE }
+    override suspend fun setPowerSaveMode(value: PowerSaveMode) { store.edit { it[kPowerSave] = value.name } }
     override val cockpitTint: Flow<String?> = store.data.map { it[kTint] }
     override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
     override val lastGuidance: Flow<LastGuidance?> = store.data.map { p ->

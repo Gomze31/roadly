@@ -1,6 +1,7 @@
 package fr.roadly.core.map
 
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.ManeuverType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

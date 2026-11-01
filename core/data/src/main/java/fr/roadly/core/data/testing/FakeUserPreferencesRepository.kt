@@ -4,10 +4,14 @@ import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.UserPreferencesRepository
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.RoutePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 
 /** Double de test en mémoire, mêmes règles de bornage que l'implémentation DataStore. */
 class FakeUserPreferencesRepository : UserPreferencesRepository {
@@ -51,6 +55,25 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val detail = MutableStateFlow(GuidanceDefaults.MAP_DETAIL)
     override val mapDetail: Flow<MapDetail> = detail
     override suspend fun setMapDetail(value: MapDetail) { detail.value = value }
+    /** E2 : vue au départ choisie ; null = jamais choisie (elle suit alors [map3d], comme l'implémentation DataStore). */
+    val cameraDefault = MutableStateFlow<CameraMode3D?>(null)
+    override val defaultCameraMode: Flow<CameraMode3D> = combine(cameraDefault, map3d) { chosen, on -> chosen ?: CameraMode3D.default(on) }
+    override suspend fun setDefaultCameraMode(value: CameraMode3D) { cameraDefault.value = value }
+    val zoom = MutableStateFlow(GuidanceDefaults.ZOOM_OFFSET)
+    override val zoomOffset: Flow<Int> = zoom
+    override suspend fun setZoomOffset(value: Int) { if (value in GuidanceDefaults.ALLOWED_ZOOM_OFFSETS) zoom.value = value }
+    val pitch = MutableStateFlow(GuidanceDefaults.PITCH_PRESET)
+    override val pitchPreset: Flow<PitchPreset> = pitch
+    override suspend fun setPitchPreset(value: PitchPreset) { pitch.value = value }
+    val rotate = MutableStateFlow(GuidanceDefaults.AUTO_ROTATE)
+    override val autoRotate: Flow<Boolean> = rotate
+    override suspend fun setAutoRotate(value: Boolean) { rotate.value = value }
+    val thenPreview = MutableStateFlow(GuidanceDefaults.SHOW_NEXT_MANEUVER)
+    override val showNextManeuverPreview: Flow<Boolean> = thenPreview
+    override suspend fun setShowNextManeuverPreview(value: Boolean) { thenPreview.value = value }
+    val powerSave = MutableStateFlow(GuidanceDefaults.POWER_SAVE)
+    override val powerSaveMode: Flow<PowerSaveMode> = powerSave
+    override suspend fun setPowerSaveMode(value: PowerSaveMode) { powerSave.value = value }
     val tint = MutableStateFlow<String?>(null)
     override val cockpitTint: Flow<String?> = tint
     override suspend fun setCockpitTint(name: String?) { tint.value = name }

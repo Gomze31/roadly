@@ -96,7 +96,7 @@ import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.map.AttributionPlacement
-import fr.roadly.core.map.CameraMode3D
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.map.MapController
 import fr.roadly.core.map.NavigationCameraController
 import fr.roadly.core.map.NavigationCameraInput
