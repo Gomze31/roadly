@@ -3,6 +3,13 @@ package fr.roadly.core.designsystem.theme
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+
+/** Luminance relative maximale de [RoadlyColorScheme.brand] pour un texte blanc à 3:1 au moins (D3). */
+private const val ON_BRAND_WHITE_MAX_LUMINANCE = 0.30f
+
+/** Texte sombre sur les teintes claires du cockpit (ambre, menthe…) : même encre que le texte principal du jour. */
+private val ON_BRAND_DARK = Color(0xFF14101C)
 
 /**
  * Palette Roadly (identité propre, inspirée de l'organisation d'un cockpit GPS premium) :
@@ -42,6 +49,14 @@ data class RoadlyColorScheme(
     val accentSoft: Color get() = accent.copy(alpha = if (isDark) 0.20f else 0.14f)
     val dangerSoft: Color get() = danger.copy(alpha = if (isDark) 0.22f else 0.14f)
     val divider: Color get() = glassBorder
+
+    /**
+     * Texte posé sur un aplat [brand] plein (panneau de direction D3) : [onBrand] (blanc) tant qu'il garde un contraste d'au moins 3:1
+     * avec la teinte du cockpit, sinon un texte sombre ([ON_BRAND_DARK]). Suit [withTint] puisque calculé depuis [brand].
+     * Seuil : blanc à 3:1 ⇔ (1 + 0,05) / (L + 0,05) ≥ 3 ⇔ luminance relative L ≤ 0,30 ; au-delà (ambre, menthe, océan, corail de nuit,
+     * ambre de jour), le blanc tombe sous 3:1 et le texte sombre dépasse 6:1.
+     */
+    val onBrandAuto: Color get() = if (brand.luminance() <= ON_BRAND_WHITE_MAX_LUMINANCE) onBrand else ON_BRAND_DARK
 
     /** Teinte du cockpit (personnalisation) : remplace la couleur de marque et ses dérivés. */
     fun withTint(tint: CockpitTint): RoadlyColorScheme {
