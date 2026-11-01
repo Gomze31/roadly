@@ -35,6 +35,8 @@ abstract class RepositoryModule {
     @Binds abstract fun communityConfig(impl: DataStoreCommunityConfigRepository): CommunityConfigRepository
     @Binds abstract fun community(impl: SupabaseCommunityRepository): CommunityRepository
     @Binds abstract fun trips(impl: RoomTripRepository): TripRepository
+    @Binds abstract fun mobility(impl: DataStoreMobilityPreferencesRepository): MobilityPreferencesRepository
+    @Binds abstract fun scooterProfiles(impl: RoomScooterProfileRepository): ScooterProfileRepository
     @Binds abstract fun billing(impl: NoBillingProvider): BillingProvider
     @Binds abstract fun entitlements(impl: DefaultEntitlementsRepository): EntitlementsRepository
 }

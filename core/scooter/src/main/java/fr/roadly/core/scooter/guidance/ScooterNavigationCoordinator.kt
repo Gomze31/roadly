@@ -58,6 +58,10 @@ class ScooterNavigationCoordinator(
     startBatteryPct: Double?,
     private val temperatureC: Double?,
     private val cruiseSpeedKmh: Double,
+    /** Reprise après un recalcul : énergie et dénivelé déjà parcourus sur l'ancien tracé. */
+    carriedEnergyWh: Double = 0.0,
+    carriedModelEnergyWh: Double = 0.0,
+    carriedAscentM: Double = 0.0,
 ) {
     companion object {
         const val WARNING_WINDOW_M = 350.0
@@ -73,10 +77,12 @@ class ScooterNavigationCoordinator(
     private val announced = mutableSetOf<String>()
     private var batteryBasePct: Double? = startBatteryPct
     private var energySinceBaseWh = 0.0
-    private var energyTotalWh = 0.0
+    private var energyTotalWh = carriedEnergyWh
+    private var modelEnergyTotalWh = carriedModelEnergyWh
     private var lastAlongM: Double? = null
     private var worstRiskAnnounced: RangeRisk? = null
-    private var ascentDoneM = 0.0
+    private var ascentDoneM = carriedAscentM
+    private var descentDoneM = 0.0
 
     /** Nouvelle valeur de batterie saisie en cours de route : devient la référence. */
     fun setBattery(pct: Double) {
@@ -86,7 +92,18 @@ class ScooterNavigationCoordinator(
     }
 
     val energyUsedWh: Double get() = energyTotalWh
+    /** Énergie du modèle non calibré : enregistrée avec le trajet pour la calibration. */
+    val modelEnergyUsedWh: Double get() = modelEnergyTotalWh
     val ascentDone: Double get() = ascentDoneM
+    val descentDone: Double get() = descentDoneM
+    val hasGradeData: Boolean get() = segments.any { it.gradePct != null }
+
+    /** Batterie estimée maintenant (%), null sans saisie ou sans capacité connue. */
+    fun currentBatteryPct(): Double? {
+        val base = batteryBasePct ?: return null
+        val used = estimator?.pctFor(energySinceBaseWh, temperatureC) ?: return null
+        return (base - used).coerceAtLeast(0.0)
+    }
 
     fun segmentAt(alongM: Double): ScooterRouteSegment? = analysis?.segmentAt(alongM)
 
@@ -188,7 +205,9 @@ class ScooterNavigationCoordinator(
         val wh = est.energyWh(legs, speedKmh, temperatureC)
         energySinceBaseWh += wh
         energyTotalWh += wh
+        modelEnergyTotalWh += est.modelEnergyWh(legs, speedKmh, temperatureC)
         ascentDoneM += legs.filter { it.gradePct > 0 }.sumOf { it.gradePct / 100.0 * it.lengthM }
+        descentDoneM += legs.filter { it.gradePct < 0 }.sumOf { -it.gradePct / 100.0 * it.lengthM }
     }
 
     internal fun legsBetween(fromM: Double, toM: Double): List<EnergyLeg> {

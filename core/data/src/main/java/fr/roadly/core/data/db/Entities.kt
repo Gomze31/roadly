@@ -79,4 +79,39 @@ data class TripEntity(
     val arrived: Boolean,
     /** Points `t,lat,lon,speedKmh` séparés par `;` (échantillonnés tous les ≥ 20 m). */
     val pointsCsv: String,
+    /** v5 : mode de déplacement (nom de `TravelMode`) ; null = trajet antérieur, voiture. */
+    val travelMode: String? = null,
+    val ascentM: Double? = null,
+    val descentM: Double? = null,
+    val energyModelWh: Double? = null,
+    val batteryStartPct: Int? = null,
+    val batteryEndPct: Int? = null,
+    val scooterProfileId: Long? = null,
+)
+
+/** Fiche trottinette (v5) ; plusieurs profils possibles, le profil actif est mémorisé dans DataStore. */
+@Entity(tableName = "scooter_profiles")
+data class ScooterProfileEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val brand: String?,
+    val model: String?,
+    val maxSpeedKmh: Double,
+    val cruiseSpeedKmh: Double?,
+    val claimedRangeKm: Double?,
+    val claimedRangeConditions: String?,
+    val batteryWh: Double?,
+    val batteryVoltage: Double?,
+    val scooterWeightKg: Double?,
+    val riderWeightKg: Double?,
+    val maxLoadKg: Double?,
+    val wheelSizeInch: Double?,
+    val tireType: String,
+    val suspension: String,
+    val comfort: String,
+    val maxGradePct: Double?,
+    val motorRatedW: Double?,
+    val hasRegenerativeBraking: Boolean?,
+    val specSource: String?,
+    val updatedAt: Long,
 )

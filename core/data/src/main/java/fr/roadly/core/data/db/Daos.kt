@@ -74,4 +74,13 @@ interface TripDao {
     @Insert suspend fun insert(trip: TripEntity): Long
     @Query("DELETE FROM trips WHERE id = :id") suspend fun delete(id: Long)
     @Query("DELETE FROM trips") suspend fun clear()
+    @Query("UPDATE trips SET batteryEndPct = :pct WHERE id = :id") suspend fun setBatteryEnd(id: Long, pct: Int?)
+}
+
+@Dao
+interface ScooterProfileDao {
+    @Query("SELECT * FROM scooter_profiles ORDER BY id") fun observeAll(): Flow<List<ScooterProfileEntity>>
+    @Query("SELECT COUNT(*) FROM scooter_profiles") suspend fun count(): Int
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(entity: ScooterProfileEntity): Long
+    @Query("DELETE FROM scooter_profiles WHERE id = :id") suspend fun delete(id: Long)
 }

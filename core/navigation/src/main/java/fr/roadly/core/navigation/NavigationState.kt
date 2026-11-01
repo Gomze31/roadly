@@ -6,6 +6,7 @@ import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteHazard
 import fr.roadly.core.model.RouteProgress
+import fr.roadly.core.scooter.guidance.ScooterNavigationUiState
 
 /** État publié par `NavigationSession` (spec §4 ; dans core:navigation car il porte un AppError). */
 sealed interface NavigationState {
@@ -30,6 +31,8 @@ sealed interface NavigationState {
         val raining: Boolean? = null,
         /** `speedLimitKmh` a été abaissé pour la pluie (option). */
         val limitLoweredByRain: Boolean = false,
+        /** Mode trottinette : voie courante, transitions, avertissements et autonomie estimée ; null sinon. */
+        val scooter: ScooterNavigationUiState? = null,
     ) : NavigationState
 
     data class Arrived(val route: Route) : NavigationState

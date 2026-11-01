@@ -37,7 +37,16 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import fr.roadly.core.model.TravelMode
+import fr.roadly.core.routing.NoScooterRouteAnalyzer
+import fr.roadly.core.routing.ScooterRouteAnalyzer
+import fr.roadly.core.scooter.analysis.ScooterRouteAnalysis
+import fr.roadly.core.scooter.guidance.AnnouncementStage
+import fr.roadly.core.scooter.guidance.ScooterNavigationCoordinator
+import fr.roadly.core.scooter.guidance.ScooterNavigationUiState
+import fr.roadly.core.scooter.range.ScooterRangeEstimator
 
 /**
  * Session de guidage unique de l'application (spec §2, §4). Logique pure Kotlin testée sur JVM ;
@@ -58,6 +67,8 @@ class NavigationSession @Inject constructor(
     private val tripRecorder: TripRecorder,
     dispatchers: DispatcherProvider,
     @param:ApplicationScope private val scope: CoroutineScope,
+    /** Analyse des voies après un recalcul en mode trottinette ; sans elle, le guidage reste générique. */
+    private val scooterAnalyzer: ScooterRouteAnalyzer = NoScooterRouteAnalyzer,
 ) {
     private val _state = MutableStateFlow<NavigationState>(NavigationState.Idle)
     val state: StateFlow<NavigationState> = _state.asStateFlow()
@@ -75,14 +86,19 @@ class NavigationSession @Inject constructor(
     private var lastOption: RouteOption? = null
     private var lastPreferences = RoutePreferences()
     private var lastVehicle: VehicleProfile? = null
+    private var lastScooter: ScooterGuidanceConfig? = null
+    /** Course en cours (lue et modifiée uniquement sur [confined]). */
+    private var current: Run? = null
 
     /** Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs. */
     /** [vehicle] : profil transmis au recalcul (costing poids lourd / moto / taxi) ; null = auto. */
-    fun start(option: RouteOption, preferences: RoutePreferences, vehicle: VehicleProfile? = null) {
+    /** [scooter] non nul = guidage trottinette (costing vélo au recalcul, annonces et autonomie trottinette). */
+    fun start(option: RouteOption, preferences: RoutePreferences, vehicle: VehicleProfile? = null, scooter: ScooterGuidanceConfig? = null) {
         cancelRun(null)
         lastOption = option
         lastPreferences = preferences
         lastVehicle = vehicle
+        lastScooter = scooter
         if (location.permissionState.value != LocationPermissionState.GRANTED) {
             publishFailure(NavigationState.Failed(AppError.PermissionDenied))
             return
@@ -94,14 +110,23 @@ class NavigationSession @Inject constructor(
             return
         }
         val run = synchronized(stateLock) {
-            Run(++generation, option.route, tracker, preferences, vehicle).also {
+            Run(++generation, option.route, tracker, preferences, vehicle, scooter, option.scooter?.analysis).also {
                 _state.value = it.guiding(tracker.initialProgress(), it.startedAtMs, gpsLost = false)
             }
         }
         tripRecorder.begin(option.label, clock.nowMs())
+        if (scooter != null) {
+            tripRecorder.setContext(TripContext(TravelMode.ELECTRIC_SCOOTER, scooter.request.profile.id.takeIf { it != 0L }, scooter.batteryPct?.roundToInt()))
+        }
         location.setGuidanceActive(true)
         serviceController.start()
-        job = scope.launch(confined) { run.execute() }
+        job = scope.launch(confined) { current = run; run.execute() }
+    }
+
+    /** Niveau de batterie saisi en cours de route (trottinette) : devient la référence de l'estimation. */
+    fun setScooterBattery(pct: Double) {
+        lastScooter = lastScooter?.copy(batteryPct = pct)
+        scope.launch(confined) { current?.setBattery(pct) }
     }
 
     /** Arrête la course : `Idle`, GPS relâché, parole coupée et moteur de synthèse libéré. */
@@ -114,7 +139,7 @@ class NavigationSession @Inject constructor(
 
     /** Relance la dernière course demandée (après un `Failed`, par exemple). */
     fun retry() {
-        lastOption?.let { start(it, lastPreferences, lastVehicle) }
+        lastOption?.let { start(it, lastPreferences, lastVehicle, lastScooter) }
     }
 
     fun setMuted(muted: Boolean) {
@@ -141,7 +166,19 @@ class NavigationSession @Inject constructor(
     }
 
     /** Une course : son état n'est lu et écrit que sur [confined]. */
-    private inner class Run(val gen: Int, var route: Route, var tracker: RouteTracker, val routePreferences: RoutePreferences, val vehicle: VehicleProfile?) {
+    private inner class Run(
+        val gen: Int,
+        var route: Route,
+        var tracker: RouteTracker,
+        val routePreferences: RoutePreferences,
+        val vehicle: VehicleProfile?,
+        val scooter: ScooterGuidanceConfig?,
+        initialAnalysis: ScooterRouteAnalysis?,
+    ) {
+        private val estimator = scooter?.let { ScooterRangeEstimator(it.request.profile, it.calibration) }
+        /** Coordinateur trottinette du tracé courant (remplacé après un recalcul). */
+        private var coordinator: ScooterNavigationCoordinator? = scooter?.let { newCoordinator(route, initialAnalysis, it.batteryPct, null) }
+        private var scooterUi: ScooterNavigationUiState? = null
         private val destination: GeoPoint = route.geometry.last()
         private val costing = route.costing
         private val announced = mutableSetOf<Pair<Int, Tier>>()
@@ -277,9 +314,50 @@ class NavigationSession @Inject constructor(
 
         private suspend fun announce(progress: RouteProgress) {
             if (rerouting || progress.routeId != route.id) return
-            val a = AnnouncementPolicy.next(progress, route.maneuvers, speedKmh, announced) ?: return
-            announced += a.maneuverIndex to a.tier
-            say(a.text, routeId = progress.routeId)
+            val c = coordinator
+            val override: ((Int, Tier, Double) -> String?)? = c?.let { co -> { i, tier, d -> co.maneuverText(i, tier.toStage(), d) } }
+            val a = AnnouncementPolicy.next(progress, route.maneuvers, speedKmh, announced, scooter = scooter != null, textOverride = override)
+            if (a != null) {
+                announced += a.maneuverIndex to a.tier
+                say(a.text, routeId = progress.routeId)
+            }
+            if (c != null) scooterTick(c, progress)
+        }
+
+        /** Transitions de voie, avertissements anticipés et autonomie (trottinette). */
+        private suspend fun scooterTick(c: ScooterNavigationCoordinator, progress: RouteProgress) {
+            val u = c.update(progress.distanceAlongM, speedKmh, extrapolated = progress.extrapolated)
+            scooterUi = u.ui
+            tripRecorder.setExtras(TripExtras(c.ascentDone.takeIf { c.hasGradeData }, c.descentDone.takeIf { c.hasGradeData }, c.modelEnergyUsedWh.takeIf { estimator != null && it > 0 }))
+            u.speech.forEach { say(it, routeId = progress.routeId) }
+        }
+
+        fun setBattery(pct: Double) { coordinator?.setBattery(pct) }
+
+        private fun newCoordinator(r: Route, analysis: ScooterRouteAnalysis?, batteryPct: Double?, previous: ScooterNavigationCoordinator?): ScooterNavigationCoordinator {
+            val cfg = scooter!!
+            return ScooterNavigationCoordinator(
+                r, analysis, estimator, batteryPct, cfg.temperatureC, cfg.request.profile.effectiveCruiseKmh,
+                carriedEnergyWh = previous?.energyUsedWh ?: 0.0,
+                carriedModelEnergyWh = previous?.modelEnergyUsedWh ?: 0.0,
+                carriedAscentM = previous?.ascentDone ?: 0.0,
+            )
+        }
+
+        /** Après un recalcul : coordinateur sans analyse tout de suite, puis analyse des voies du nouveau tracé. */
+        private fun refreshScooterAfterReroute(fresh: Route) {
+            val cfg = scooter ?: return
+            val previous = coordinator
+            coordinator = newCoordinator(fresh, null, previous?.currentBatteryPct() ?: cfg.batteryPct, previous)
+            runScope.launch {
+                val analysis = try {
+                    (scooterAnalyzer.analyze(fresh, cfg.request, cfg.withOsmTags) as? Outcome.Success)?.value
+                } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                if (analysis != null && route.id == fresh.id) {
+                    val interim = coordinator
+                    coordinator = newCoordinator(fresh, analysis, interim?.currentBatteryPct() ?: cfg.batteryPct, interim)
+                }
+            }
         }
 
         private suspend fun arrive() {
@@ -324,6 +402,7 @@ class NavigationSession @Inject constructor(
                             RouteRequest(
                                 origin = fix.point, destination = destination, costing = costing,
                                 preferences = routePreferences, originHeadingDeg = heading, vehicle = vehicle,
+                                scooter = scooter?.request,
                             ),
                         )
                     }
@@ -346,6 +425,7 @@ class NavigationSession @Inject constructor(
                     rerouteAnnounced = false
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
                     hazards = emptyList(); activeZone = null; zonesAnnounced.clear()
+                    refreshScooterAfterReroute(fresh)
                     loadHazards()
                 }
                 // Échec : on continue sur l'ancien tracé ; un nouveau recalcul sera tenté après 10 s.
@@ -432,7 +512,24 @@ class NavigationSession @Inject constructor(
                 etaEpochMs = now + (progress.remainingDurationS * 1000).roundToLong(),
                 gpsLost = gpsLost,
                 rerouting = rerouting,
+                scooter = scooterUi,
             )
         }
     }
+}
+
+/** Réglages d'une course trottinette transmis par l'écran d'itinéraires. */
+data class ScooterGuidanceConfig(
+    val request: fr.roadly.core.model.ScooterRouteRequest,
+    /** Batterie saisie par l'utilisateur (%), null = inconnue : aucune autonomie n'est alors affichée. */
+    val batteryPct: Double?,
+    val temperatureC: Double?,
+    val calibration: fr.roadly.core.scooter.range.RangeCalibration,
+    val withOsmTags: Boolean,
+)
+
+internal fun Tier.toStage(): AnnouncementStage = when (this) {
+    Tier.FAR -> AnnouncementStage.FAR
+    Tier.NEAR -> AnnouncementStage.NEAR
+    Tier.NOW -> AnnouncementStage.NOW
 }

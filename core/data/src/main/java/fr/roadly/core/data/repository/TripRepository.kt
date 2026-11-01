@@ -3,6 +3,7 @@ package fr.roadly.core.data.repository
 import fr.roadly.core.data.db.TripDao
 import fr.roadly.core.data.db.TripEntity
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.TravelMode
 import fr.roadly.core.model.Trip
 import fr.roadly.core.model.TripPoint
 import fr.roadly.core.model.TripStats
@@ -18,6 +19,8 @@ interface TripRepository {
     suspend fun save(trip: Trip): Long
     suspend fun delete(id: Long)
     suspend fun clear()
+    /** Niveau de batterie saisi à l'arrivée (trottinette) : sert à calibrer l'estimation d'autonomie. */
+    suspend fun setBatteryEnd(id: Long, pct: Int?) {}
 }
 
 @Singleton
@@ -27,6 +30,7 @@ class RoomTripRepository @Inject constructor(private val dao: TripDao) : TripRep
     override suspend fun save(trip: Trip): Long = dao.insert(trip.toEntity())
     override suspend fun delete(id: Long) = dao.delete(id)
     override suspend fun clear() = dao.clear()
+    override suspend fun setBatteryEnd(id: Long, pct: Int?) = dao.setBatteryEnd(id, pct?.coerceIn(0, 100))
 }
 
 /** Points sérialisés en `t,lat,lon,v;…` : compact, lisible, sans dépendance JSON dans la base. */
@@ -51,5 +55,14 @@ fun List<Trip>.statsSince(sinceEpochMs: Long): TripStats {
     return TripStats(sel.size, sel.sumOf { it.distanceM }, sel.sumOf { it.durationS }, sel.sumOf { it.costEur ?: 0.0 })
 }
 
-internal fun TripEntity.toModel() = Trip(id, startedAt, endedAt, destinationName, distanceM, durationS, maxSpeedKmh, costEur, arrived, TripPointsCodec.decode(pointsCsv))
-internal fun Trip.toEntity() = TripEntity(id, startedAtEpochMs, endedAtEpochMs, destinationName, distanceM, durationS, maxSpeedKmh, costEur, arrived, TripPointsCodec.encode(points))
+internal fun TripEntity.toModel() = Trip(
+    id, startedAt, endedAt, destinationName, distanceM, durationS, maxSpeedKmh, costEur, arrived, TripPointsCodec.decode(pointsCsv),
+    travelMode = travelMode?.let { m -> runCatching { TravelMode.valueOf(m) }.getOrNull() } ?: TravelMode.CAR,
+    ascentM = ascentM, descentM = descentM, energyModelWh = energyModelWh,
+    batteryStartPct = batteryStartPct, batteryEndPct = batteryEndPct, scooterProfileId = scooterProfileId,
+)
+internal fun Trip.toEntity() = TripEntity(
+    id, startedAtEpochMs, endedAtEpochMs, destinationName, distanceM, durationS, maxSpeedKmh, costEur, arrived, TripPointsCodec.encode(points),
+    travelMode = travelMode.name, ascentM = ascentM, descentM = descentM, energyModelWh = energyModelWh,
+    batteryStartPct = batteryStartPct, batteryEndPct = batteryEndPct, scooterProfileId = scooterProfileId,
+)

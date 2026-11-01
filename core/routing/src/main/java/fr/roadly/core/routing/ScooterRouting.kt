@@ -51,6 +51,11 @@ interface ScooterRouteAnalyzer {
     suspend fun analyze(route: Route, request: ScooterRouteRequest, withOsmTags: Boolean): Outcome<ScooterRouteAnalysis>
 }
 
+/** Aucune analyse (tests, ou instance sans `/trace_attributes`) : le guidage trottinette reste générique. */
+object NoScooterRouteAnalyzer : ScooterRouteAnalyzer {
+    override suspend fun analyze(route: Route, request: ScooterRouteRequest, withOsmTags: Boolean): Outcome<ScooterRouteAnalysis> = Outcome.Failure(AppError.NoResult)
+}
+
 /**
  * Valhalla `/trace_attributes` (une requête par itinéraire, `edge_walk` sur le tracé calculé) puis, si demandé,
  * Overpass pour les tags OSM des voies (une requête par itinéraire, tags mis en cache). Échec Overpass : analyse

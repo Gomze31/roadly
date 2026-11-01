@@ -6,8 +6,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [FavoritePlaceEntity::class, RecentSearchEntity::class, VehicleProfileEntity::class, SavedRouteEntity::class, VigilanceZoneEntity::class, TripEntity::class],
-    version = 4,
+    entities = [FavoritePlaceEntity::class, RecentSearchEntity::class, VehicleProfileEntity::class, SavedRouteEntity::class, VigilanceZoneEntity::class, TripEntity::class, ScooterProfileEntity::class],
+    version = 5,
     exportSchema = false,
 )
 abstract class RoadlyDatabase : RoomDatabase() {
@@ -16,6 +16,7 @@ abstract class RoadlyDatabase : RoomDatabase() {
     abstract fun vehicleProfileDao(): VehicleProfileDao
     abstract fun vigilanceZoneDao(): VigilanceZoneDao
     abstract fun tripDao(): TripDao
+    abstract fun scooterProfileDao(): ScooterProfileDao
 
     companion object {
         /** v1 → v2 : table des zones de vigilance (LOT 4) ; les favoris et récents sont conservés. */
@@ -39,6 +40,20 @@ abstract class RoadlyDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `trips` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER NOT NULL, `destinationName` TEXT NOT NULL, `distanceM` REAL NOT NULL, `durationS` INTEGER NOT NULL, `maxSpeedKmh` REAL NOT NULL, `costEur` REAL, `arrived` INTEGER NOT NULL, `pointsCsv` TEXT NOT NULL)")
+            }
+        }
+
+        /** v4 → v5 : mode trottinette (LOT 13) — fiches trottinette, colonnes trajet (mode, dénivelé, énergie, batterie). */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("travelMode TEXT", "ascentM REAL", "descentM REAL", "energyModelWh REAL", "batteryStartPct INTEGER", "batteryEndPct INTEGER", "scooterProfileId INTEGER")
+                    .forEach { column -> db.execSQL("ALTER TABLE `trips` ADD COLUMN $column") }
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `scooter_profiles` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `brand` TEXT, `model` TEXT, " +
+                        "`maxSpeedKmh` REAL NOT NULL, `cruiseSpeedKmh` REAL, `claimedRangeKm` REAL, `claimedRangeConditions` TEXT, `batteryWh` REAL, `batteryVoltage` REAL, " +
+                        "`scooterWeightKg` REAL, `riderWeightKg` REAL, `maxLoadKg` REAL, `wheelSizeInch` REAL, `tireType` TEXT NOT NULL, `suspension` TEXT NOT NULL, " +
+                        "`comfort` TEXT NOT NULL, `maxGradePct` REAL, `motorRatedW` REAL, `hasRegenerativeBraking` INTEGER, `specSource` TEXT, `updatedAt` INTEGER NOT NULL)",
+                )
             }
         }
     }

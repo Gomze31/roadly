@@ -13,10 +13,12 @@ data class Announcement(val text: String, val tier: Tier, val maneuverIndex: Int
 internal enum class SpeedClass(val farM: Double, val nearM: Double, val nowM: Double) {
     HIGHWAY(2000.0, 300.0, 40.0),
     ROAD(600.0, 150.0, 40.0),
-    CITY(300.0, 80.0, 40.0);
+    CITY(300.0, 80.0, 40.0),
+    /** Trottinette (≤ 25 km/h) : annonces plus proches, adaptées aux intersections urbaines. */
+    SCOOTER(200.0, 80.0, 20.0);
 
     companion object {
-        fun of(speedKmh: Double?): SpeedClass = when {
+        fun of(speedKmh: Double?, scooter: Boolean = false): SpeedClass = if (scooter) SCOOTER else when {
             speedKmh == null -> CITY
             speedKmh >= 90.0 -> HIGHWAY
             speedKmh >= 50.0 -> ROAD
@@ -27,11 +29,22 @@ internal enum class SpeedClass(val farM: Double, val nearM: Double, val nowM: Do
 
 /** Décide quoi annoncer pour la prochaine manœuvre ; pur et sans état (l'anti-répétition est portée par [already]). */
 object AnnouncementPolicy {
-    fun next(progress: RouteProgress, maneuvers: List<Maneuver>, speedKmh: Double?, already: Set<Pair<Int, Tier>>): Announcement? {
+    /**
+     * [scooter] = paliers trottinette ; [textOverride] (manœuvre, palier, distance) remplace le texte Valhalla quand il
+     * renvoie une phrase (p. ex. « Dans 100 mètres, prenez la piste cyclable à droite. »).
+     */
+    fun next(
+        progress: RouteProgress,
+        maneuvers: List<Maneuver>,
+        speedKmh: Double?,
+        already: Set<Pair<Int, Tier>>,
+        scooter: Boolean = false,
+        textOverride: ((Int, Tier, Double) -> String?)? = null,
+    ): Announcement? {
         val k = progress.nextManeuverIndex
         val m = maneuvers.getOrNull(k) ?: return null
         val d = progress.distanceToNextManeuverM
-        val c = SpeedClass.of(speedKmh)
+        val c = SpeedClass.of(speedKmh, scooter)
         val tier = when {
             d < c.nowM -> Tier.NOW
             d <= c.nearM -> Tier.NEAR
@@ -41,7 +54,7 @@ object AnnouncementPolicy {
         // Position extrapolée (GPS perdu) : jamais d'annonce « maintenant », trop risquée sans fix réel.
         if (tier == Tier.NOW && progress.extrapolated) return null
         if (already.any { (i, t) -> i == k && t.ordinal >= tier.ordinal }) return null
-        val text = when (tier) {
+        val text = textOverride?.invoke(k, tier, d) ?: when (tier) {
             Tier.NOW -> m.verbalPre ?: m.instruction
             Tier.NEAR, Tier.FAR -> SpokenPhrases.inDistance(d, m.verbalAlert ?: m.verbalPre ?: m.instruction)
         }

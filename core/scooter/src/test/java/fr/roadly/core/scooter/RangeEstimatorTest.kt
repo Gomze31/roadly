@@ -75,3 +75,21 @@ class RangeEstimatorTest {
         assertTrue(calibrated.uncertainty < ScooterRangeEstimator(g2).uncertainty)
     }
 }
+
+class TripCalibrationTest {
+    @Test fun usesOnlyCompleteScooterTripsOfTheProfile() {
+        val p = ScooterPresets.NINEBOT_MAX_G2.copy(id = 3)
+        fun t(mode: fr.roadly.core.model.TravelMode, profile: Long?, s: Int?, e: Int?, wh: Double?) =
+            fr.roadly.core.model.Trip(0, 0, 1, "x", 5000.0, 900, 25.0, null, true, emptyList(), mode, energyModelWh = wh, batteryStartPct = s, batteryEndPct = e, scooterProfileId = profile)
+        val trips = listOf(
+            t(fr.roadly.core.model.TravelMode.ELECTRIC_SCOOTER, 3, 80, 70, 40.0),
+            t(fr.roadly.core.model.TravelMode.ELECTRIC_SCOOTER, 3, 80, null, 40.0),
+            t(fr.roadly.core.model.TravelMode.ELECTRIC_SCOOTER, 9, 80, 60, 40.0),
+            t(fr.roadly.core.model.TravelMode.CAR, null, null, null, null),
+        )
+        val samples = fr.roadly.core.scooter.range.TripCalibration.samples(trips, p)
+        assertEquals(1, samples.size)
+        // 10 % de 551 Wh × 0,9 = 49,6 Wh observés pour 40 Wh prévus.
+        assertEquals(49.59, samples.single().second, 0.01)
+    }
+}
