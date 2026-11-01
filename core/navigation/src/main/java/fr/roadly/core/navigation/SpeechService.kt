@@ -3,6 +3,12 @@ package fr.roadly.core.navigation
 /** Priorité d'une annonce (B5) : URGENT (« maintenant ») vide la file ; LOW / NORMAL périment après 8 s d'attente. */
 enum class SpeechPriority { URGENT, NORMAL, LOW }
 
+/**
+ * Canal d'une annonce (E1) : le guidage (session) ou l'assistant (Roadly AI, essai de voix des Réglages). Un seul moteur de parole :
+ * urgence GPS > guidage > assistant ; l'arrêt et la sourdine de la session ne touchent que [GUIDANCE].
+ */
+enum class VoiceChannel { GUIDANCE, ASSISTANT }
+
 /** Synthèse vocale du guidage ; aucune voix serveur (spec §2). */
 interface SpeechService {
     /** [flush] = interrompt ce qui est en cours ; sinon mise en file. */
