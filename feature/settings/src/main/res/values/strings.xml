@@ -31,7 +31,7 @@
     <string name="settings_map_detail_normal">Normal</string>
     <string name="settings_map_detail_reduced">Réduit</string>
     <string name="settings_group_navigation">Navigation</string>
-    <string name="settings_nav_footer">Appliqués au prochain guidage. Les boutons 2D / 3D et « nord en haut » restent disponibles pendant la course.</string>
+    <string name="settings_nav_footer">Appliqués immédiatement au guidage en cours. Les boutons 2D / 3D et « nord en haut » restent disponibles pendant la course.</string>
     <string name="settings_nav_view">Vue au départ</string>
     <string name="settings_nav_view_3d">3D</string>
     <string name="settings_nav_view_2d">2D</string>

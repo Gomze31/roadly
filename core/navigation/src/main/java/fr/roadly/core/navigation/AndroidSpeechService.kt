@@ -66,6 +66,11 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     private var releasePending = false
     private val ids = AtomicLong(0)
     private var engine: TextToSpeech? = null
+    /**
+     * Génération du moteur courant (sous [lock]) : incrémentée à chaque création et à chaque libération. Un `onInit` d'une autre génération
+     * (moteur déjà libéré) est ignoré : il ne peut ni rendre le service indisponible ni déclarer prêt un moteur encore en création.
+     */
+    private var engineGeneration = 0L
     @Volatile private var ready = false
     @Volatile private var unavailable = false
     @Volatile private var volume = 1f
@@ -74,7 +79,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     /** Relance programmée : fin du délai de reprise avant un message de l'assistant. */
     private val drainTask = Runnable { drain() }
     /** Libération différée forcée : l'assistant n'a pas fini en [VoiceArbiter.RELEASE_DEFER_MAX_MS]. */
-    private val forcedRelease = Runnable { releaseNow() }
+    private val forcedRelease = Runnable { releaseNow(onlyIfPending = true) }
 
     private val listener = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) = Unit
@@ -165,21 +170,34 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     }
 
     override fun release() {
-        val defer = synchronized(lock) { queue.hasAssistantWork(activeItem).also { releasePending = it } }
-        if (!defer) { releaseNow(); return }
+        val defer = synchronized(lock) {
+            queue.hasAssistantWork(activeItem).also { defer ->
+                releasePending = defer
+                // Programmée dans la même section que [releasePending] : un `speak` du guidage qui suit l'annule forcément.
+                main.removeCallbacks(forcedRelease)
+                if (defer) main.postDelayed(forcedRelease, VoiceArbiter.RELEASE_DEFER_MAX_MS)
+            }
+        }
+        if (!defer) { releaseNow(onlyIfPending = false); return }
         // Fin de course pendant un message de l'assistant : le guidage se tait, le message finit, le moteur est libéré ensuite.
         stop(VoiceChannel.GUIDANCE)
-        main.removeCallbacks(forcedRelease)
-        main.postDelayed(forcedRelease, VoiceArbiter.RELEASE_DEFER_MAX_MS)
     }
 
-    private fun releaseNow() {
-        main.removeCallbacks(forcedRelease)
+    /**
+     * Libère le moteur. [onlyIfPending] (libération différée : délai forcé ou [settle]) : [releasePending] est relu sous [lock] et rien n'est
+     * fait s'il a été annulé entre-temps (le guidage a repris la parole).
+     */
+    private fun releaseNow(onlyIfPending: Boolean) {
+        synchronized(lock) {
+            if (onlyIfPending && !releasePending) return
+            main.removeCallbacks(forcedRelease)
+        }
         stop()
         val tts = synchronized(lock) {
             releasePending = false
             ready = false
             unavailable = false
+            engineGeneration++
             engine.also { engine = null }
         }
         tts?.shutdown()
@@ -187,7 +205,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
 
     /** Crée le moteur au premier usage ; `null` si l'initialisation a déjà échoué de façon synchrone. */
     private fun ensureEngine(): TextToSpeech? = synchronized(lock) {
-        engine ?: TextToSpeech(ctx) { status -> onInit(status) }.let {
+        engine ?: (++engineGeneration).let { gen -> TextToSpeech(ctx) { status -> onInit(status, gen) } }.let {
             if (unavailable) {
                 it.shutdown()
                 null
@@ -200,14 +218,17 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         }
     }
 
-    private fun onInit(status: Int) {
-        // Certains moteurs rappellent onInit(ERROR) de façon synchrone dans le constructeur (engine encore null).
-        val tts = synchronized(lock) { engine }
+    /** Rappel d'initialisation du moteur de génération [gen] ; ignoré si ce moteur n'est plus le moteur courant (libéré ou remplacé). */
+    private fun onInit(status: Int, gen: Long) {
+        // Certains moteurs rappellent onInit(ERROR) de façon synchrone dans le constructeur (engine encore null, même génération).
+        val tts = synchronized(lock) { if (gen != engineGeneration) return; engine }
         val lang = if (status == TextToSpeech.SUCCESS && tts != null) tts.setLanguage(Locale.FRANCE) else TextToSpeech.LANG_NOT_SUPPORTED
         if (tts == null || lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.w(TAG, "Voix française indisponible (statut $status, langue $lang)")
-            unavailable = true
             synchronized(lock) {
+                // Libéré pendant setLanguage : ce moteur est déjà arrêté, le service reste disponible pour le suivant.
+                if (gen != engineGeneration) return
+                Log.w(TAG, "Voix française indisponible (statut $status, langue $lang)")
+                unavailable = true
                 queue.clear()
                 engine = null
                 refreshSpeaking()
@@ -216,7 +237,11 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
             return
         }
         // Annonces mises en file avant que le moteur soit prêt : la première encore valable part, les suivantes via finished().
-        val first = synchronized(lock) { ready = true; if (activeId == null) nextStart(SystemClock.elapsedRealtime(), flush = false) else null }
+        val first = synchronized(lock) {
+            if (gen != engineGeneration) return
+            ready = true
+            if (activeId == null) nextStart(SystemClock.elapsedRealtime(), flush = false) else null
+        }
         first?.let { say(tts, it) }
     }
 
@@ -296,7 +321,10 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
             activeItem?.let { queue.onFinished(it.channel, now); Log.d(TAG, "Fini : ${it.channel}") }
             activeId = null
             activeItem = null
-            engine to (if (ready) nextStart(now, flush = false) else null)
+            val upcoming = if (ready) nextStart(now, flush = false) else null
+            // Toujours, même moteur pas prêt (énoncé réservé pendant une libération, échoué sur le moteur arrêté) : sinon `speaking` resterait vrai.
+            refreshSpeaking()
+            engine to upcoming
         }
         if (tts != null && next != null) say(tts, next) else settle()
     }
@@ -324,7 +352,8 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
                 (activeId == null && queue.isEmpty) to (releasePending && !queue.hasAssistantWork(activeItem))
             }
             if (idle) audio.abandonAudioFocusRequest(focusRequest)
-            if (release) releaseNow()
+            // Relue sous le verrou : un `speak` du guidage arrivé depuis la lecture ci-dessus a pu annuler la libération.
+            if (release) releaseNow(onlyIfPending = true)
         }
     }
 

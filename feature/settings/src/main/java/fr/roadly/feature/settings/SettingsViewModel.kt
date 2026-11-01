@@ -105,11 +105,9 @@ class SettingsViewModel @Inject constructor(
     /** État du dernier téléchargement manuel des zones de vigilance. */
     val vigilanceRefresh: StateFlow<RefreshState> = _vigilanceRefresh.asStateFlow()
 
-    /** E2 « Bâtiments 3D » (clé `map.3d`, ex-« Carte 3D en guidage ») ; l'écran passe par [navigation]. */
-    val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_3D)
     /** Niveau de détail de la carte en guidage (Normal / Réduit). */
     val mapDetail: StateFlow<MapDetail> = prefs.mapDetail.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_DETAIL)
-    /** E2 : réglages du groupe « Navigation », appliqués au prochain guidage. */
+    /** E2 : réglages du groupe « Navigation », appliqués immédiatement au guidage en cours (flux `Eagerly` du guidage). */
     val navigation: StateFlow<NavigationSettings> = combine(
         prefs.defaultCameraMode, prefs.zoomOffset, prefs.pitchPreset, prefs.autoRotate,
         prefs.mapDetail, prefs.map3dEnabled, prefs.showNextManeuverPreview, prefs.powerSaveMode,
