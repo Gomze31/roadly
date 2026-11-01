@@ -9,7 +9,7 @@
 - Aucune donnée inventée : ce qui n'a pas de source s'affiche « — » ou « Bientôt ».
 - Les `feature:*` ne dépendent que de `core:*`. `core:model` et `core:common` sont des modules JVM purs.
 
-## 2. Modules (15)
+## 2. Modules (16)
 
 ```
 app                 Application Hilt, MainActivity, NavHost typé, résolution du thème, permission localisation
@@ -30,6 +30,8 @@ feature:route       comparaison 3 itinéraires, heure de départ, coût, préfé
 feature:settings    véhicule, thème, voix et sons, alertes de vitesse, préférences d'itinéraire, données, fournisseurs, à propos
 feature:navigation  écran de guidage en mode conduite : bandeau, voies, Horizon, ETA, vitesse/limitation, arrivée
 feature:trips       historique des trajets (bilan, liste) et Replay (timeline, vitesse de lecture)
+core:scooter        mode trottinette (JVM pur) : profil de routage, réglementation par pays, classification des voies,
+                    confort / sécurité, autonomie, phrases, coordinateur de guidage, intentions Roadly AI (docs/SCOOTER.md)
 ```
 
 ## 3. Flux principaux
@@ -41,9 +43,15 @@ feature:trips       historique des trajets (bilan, liste) et Replay (timeline, v
 - **Permission** : `MainActivity` (launcher) → `LocationRepository.refreshPermission / markDeniedForever` (DENIED_FOREVER persisté) → `PermissionEvents.changed` → `HomeViewModel`.
 - **Guidage** : « Démarrer » → (API 33+ POST_NOTIFICATIONS) → `NavigationSession.start` → `LocationRepository.setGuidanceActive(true)` (1 Hz) + `NavigationService` (premier plan `location`) → pour chaque fix : `SpeedSmoother` → `RouteTracker.update` → `AnnouncementPolicy` → `SpeechService` ; hors itinéraire → `RoutingProvider.route` (≤ 1/10 s) ; > 3 s sans fix → extrapolation ; `StateFlow<NavigationState>` → `NavigationViewModel` / notification. Arrivée ou « Arrêter » → GPS relâché, service arrêté.
 
+## 3 bis. Mode trottinette (LOT 13)
+
+- **Itinéraires** : `RouteViewModel` → `ScooterRouteOptionsUseCase` (3 variantes Valhalla `bicycle` + `elevation_interval`) → `ValhallaScooterRouteAnalyzer` (`/trace_attributes` edge_walk + Overpass) → `ScooterRouteAnalysisBuilder` (classification, réglementation, confort) → contournement éventuel des portions interdites (`exclude_polygons`) → `ScooterRangeEstimator` → badges.
+- **Guidage** : `NavigationSession.start(..., ScooterGuidanceConfig)` → `ScooterNavigationCoordinator` à chaque progression (phrases, transitions, alertes, autonomie) → `NavigationState.Guiding.scooter` ; recalcul en costing vélo puis nouvelle analyse.
+- **Isolation** : préférences trottinette dans `MobilityPreferencesRepository` ; `ScooterServices?` injecté (nul = parcours voiture / moto d'origine). Détail : `docs/SCOOTER.md`.
+
 ## 4. Données locales
 
-Room `roadly.db` : `favorite_places` (dont domicile/travail), `recent_searches` (50), `vehicle_profile` (1 ligne), `saved_routes` (Phase 4). DataStore : thème, URLs fournisseurs, drapeaux permission, réglages de guidage (voix, volume, son et tolérance de dépassement, préférences d'itinéraire). `allowBackup=false`.
+Room `roadly.db` (v5) : `favorite_places` (dont domicile/travail), `recent_searches` (50), `vehicle_profile` (1 ligne), `saved_routes` (Phase 4), `vigilance_zones`, `trips` (+ mode, dénivelé, énergie, batterie), `scooter_profiles`. DataStore : thème, URLs fournisseurs, drapeaux permission, réglages de guidage (voix, volume, son et tolérance de dépassement, préférences d'itinéraire). `allowBackup=false`.
 
 ## 5. Erreurs
 

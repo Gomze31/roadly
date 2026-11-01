@@ -132,6 +132,10 @@ Détails par fournisseur : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 
 Limites : pas de trafic ; limitation de vitesse (et donc alerte de dépassement) seulement avec un Valhalla auto-hébergé ; les voies ne s'affichent que si la réponse Valhalla en contient (aucune dans les réponses FOSSGIS observées) ; changer de destination est possible, ajouter un arrêt pas encore (Phase 4) ; voix muette si aucune voix française n'est installée sur l'appareil.
 
+## Mode trottinette électrique (LOT 13)
+
+Sélecteur Voiture / Moto / Trottinette sur l'écran d'itinéraires et dans Réglages › Trottinette. Routage Valhalla `bicycle` paramétré (pistes, pentes, revêtements, 25 km/h), analyse de chaque tracé (`trace_attributes` + tags OSM via Overpass) et vérification réglementaire France (R412-43-1), autonomie estimée à partir de la batterie **saisie** (Roadly n'est pas connecté à la trottinette), guidage et caméra 3D dédiés, Roadly AI par la reconnaissance vocale du système. Sources, limites et restrictions non vérifiables : `docs/SCOOTER.md`.
+
 ## Permissions Android
 
 | Permission | Pourquoi | Quand |
@@ -195,6 +199,8 @@ La spec est [`docs/superpowers/specs/2026-10-30-roadly-v1-design.md`](docs/super
 L'écran Réglages › À propos reproduit ces mentions. Le projet lui-même n'a pas encore de licence déclarée.
 
 ## Documentation complémentaire
+
+- `docs/SCOOTER.md` : mode trottinette (audit, architecture, sources, réglementation, autonomie, limites, essais).
 
 - [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md) : chaque API, ses endpoints, ses limites, le passage en production.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) : Phase 2 livrée, Phases 3 à 5.

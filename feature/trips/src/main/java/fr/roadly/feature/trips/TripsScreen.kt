@@ -41,6 +41,9 @@ import fr.roadly.core.designsystem.component.SurfaceCard
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.model.Trip
+import fr.roadly.core.model.TravelMode
+import androidx.compose.material.icons.filled.ElectricScooter
+import kotlin.math.roundToInt
 import fr.roadly.core.model.TripStats
 import java.text.DateFormat
 import java.util.Date
@@ -86,10 +89,12 @@ private fun TripRow(t: Trip, onOpen: () -> Unit, onDelete: () -> Unit, divider: 
     val c = LocalRoadlyColors.current
     val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale.FRANCE).format(Date(t.startedAtEpochMs))
     val cost = t.costEur?.let { " · " + Formatters.euros(it) } ?: ""
+    // Trottinette : vitesse moyenne et dénivelé (estimé d'après l'analyse de l'itinéraire) en plus.
+    val scooter = if (t.travelMode == TravelMode.ELECTRIC_SCOOTER) " · ${t.averageSpeedKmh.roundToInt()} km/h" + (t.ascentM?.let { " · D+ ${it.roundToInt()} m" } ?: "") else ""
     ListRow(
-        title = t.destinationName,
-        subtitle = "$date · ${Formatters.distance(t.distanceM)} · ${Formatters.duration(t.durationS.toDouble())}$cost · " + stringResource(if (t.arrived) R.string.trips_arrived else R.string.trips_stopped),
-        icon = if (t.arrived) Icons.Default.Flag else Icons.Default.Route,
+        title = (if (t.travelMode == TravelMode.ELECTRIC_SCOOTER) "Trottinette · " else "") + t.destinationName,
+        subtitle = "$date · ${Formatters.distance(t.distanceM)} · ${Formatters.duration(t.durationS.toDouble())}$cost$scooter · " + stringResource(if (t.arrived) R.string.trips_arrived else R.string.trips_stopped),
+        icon = if (t.travelMode == TravelMode.ELECTRIC_SCOOTER) Icons.Default.ElectricScooter else if (t.arrived) Icons.Default.Flag else Icons.Default.Route,
         iconStyle = if (t.arrived) IconTileStyle.Brand else IconTileStyle.Neutral,
         onClick = onOpen, divider = divider,
         trailing = { RoundIconButton(Icons.Default.Delete, stringResource(R.string.trips_delete), onClick = onDelete, size = 36.dp) },

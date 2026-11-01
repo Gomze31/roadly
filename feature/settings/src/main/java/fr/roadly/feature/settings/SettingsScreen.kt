@@ -116,7 +116,7 @@ import kotlin.math.roundToInt
 private val RowContentInset = 64.dp
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, onOpenPremium: () -> Unit = {}, onOpenAssistance: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, onOpenPremium: () -> Unit = {}, onOpenAssistance: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel(), scooterVm: ScooterSettingsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
     val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
@@ -132,6 +132,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             DrivingGroup(state, vm)
+            ScooterSettingsGroup(scooterVm)
             SettingsGroup(stringResource(R.string.settings_group_trips)) {
                 ListRow(stringResource(R.string.settings_profile), subtitle = stringResource(R.string.settings_profile_subtitle), icon = Icons.Default.Person, onClick = onOpenProfile)
                 ListRow(stringResource(R.string.settings_trips), subtitle = stringResource(R.string.settings_trips_subtitle), icon = Icons.Default.History, onClick = onOpenTrips, divider = false)
@@ -159,7 +160,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
 // ── Briques communes ────────────────────────────────────────────────────────
 
 @Composable
-private fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
+internal fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
     OutlinedTextFieldDefaults.colors(
         focusedTextColor = c.textPrimary, unfocusedTextColor = c.textPrimary,
         focusedBorderColor = c.brand, unfocusedBorderColor = c.glassBorder,
@@ -170,7 +171,7 @@ private fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
 }
 
 @Composable
-private fun SettingsField(label: String, value: String, onValueChange: (String) -> Unit, keyboardType: KeyboardType) {
+internal fun SettingsField(label: String, value: String, onValueChange: (String) -> Unit, keyboardType: KeyboardType) {
     OutlinedTextField(
         value = value, onValueChange = onValueChange, label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
@@ -180,7 +181,7 @@ private fun SettingsField(label: String, value: String, onValueChange: (String) 
 
 /** Flèche de repli/dépli placée à droite d'une ligne qui ouvre un éditeur en ligne. */
 @Composable
-private fun ExpandArrow(expanded: Boolean) {
+internal fun ExpandArrow(expanded: Boolean) {
     Icon(
         if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
         contentDescription = null, tint = LocalRoadlyColors.current.textTertiary, modifier = Modifier.size(22.dp),
@@ -189,7 +190,7 @@ private fun ExpandArrow(expanded: Boolean) {
 
 /** Zone dépliable sous une ligne : même carte, retrait horizontal standard. */
 @Composable
-private fun ExpandableContent(expanded: Boolean, content: @Composable () -> Unit) {
+internal fun ExpandableContent(expanded: Boolean, content: @Composable () -> Unit) {
     AnimatedVisibility(visible = expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
         Column(
             Modifier.fillMaxWidth().padding(start = RoadlySpacing.m, end = RoadlySpacing.m, top = RoadlySpacing.xs, bottom = RoadlySpacing.m),
@@ -199,7 +200,7 @@ private fun ExpandableContent(expanded: Boolean, content: @Composable () -> Unit
 }
 
 @Composable
-private fun FieldCaption(text: String) {
+internal fun FieldCaption(text: String) {
     Text(text, style = MaterialTheme.typography.labelMedium, color = LocalRoadlyColors.current.textSecondary)
 }
 
@@ -495,6 +496,7 @@ private fun ProvidersGroup(providers: ProviderConfig, error: String?, onSave: (P
     var valhalla by remember(providers) { mutableStateOf(providers.valhallaBaseUrl) }
     var styleLight by remember(providers) { mutableStateOf(providers.mapStyleLightUrl) }
     var styleDark by remember(providers) { mutableStateOf(providers.mapStyleDarkUrl) }
+    var overpass by remember(providers) { mutableStateOf(providers.overpassBaseUrl) }
     // Réglage avancé : replié par défaut pour ne pas encombrer l'écran.
     var expanded by remember { mutableStateOf(false) }
 
@@ -515,14 +517,15 @@ private fun ProvidersGroup(providers: ProviderConfig, error: String?, onSave: (P
             SettingsField(stringResource(R.string.settings_provider_valhalla), valhalla, { valhalla = it }, KeyboardType.Uri)
             SettingsField(stringResource(R.string.settings_provider_style_light), styleLight, { styleLight = it }, KeyboardType.Uri)
             SettingsField(stringResource(R.string.settings_provider_style_dark), styleDark, { styleDark = it }, KeyboardType.Uri)
+            SettingsField(stringResource(R.string.settings_provider_overpass), overpass, { overpass = it }, KeyboardType.Uri)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 GlassButton(
                     stringResource(R.string.settings_save),
                     onClick = {
-                        onSave(ProviderConfig(ban.trim(), photon.trim(), valhalla.trim(), styleLight.trim(), styleDark.trim()))
+                        onSave(ProviderConfig(ban.trim(), photon.trim(), valhalla.trim(), styleLight.trim(), styleDark.trim(), overpass.trim()))
                     },
                     // Une URL vide casserait la recherche ou la carte : on ne l'enregistre pas.
-                    enabled = listOf(ban, photon, valhalla, styleLight, styleDark).all { it.isNotBlank() },
+                    enabled = listOf(ban, photon, valhalla, styleLight, styleDark, overpass).all { it.isNotBlank() },
                 )
                 GlassButton(stringResource(R.string.settings_reset), onClick = onReset, style = GlassButtonStyle.Secondary)
             }
@@ -606,4 +609,4 @@ internal fun CritAir.label(): String = when (this) {
     CritAir.NONE -> stringResource(R.string.settings_critair_none)
 }
 
-private fun String.toFrDoubleOrNull(): Double? = trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
+internal fun String.toFrDoubleOrNull(): Double? = trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }

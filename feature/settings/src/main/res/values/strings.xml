@@ -177,4 +177,5 @@
     <string name="assist_group_history">Mes demandes</string>
     <string name="assist_history">Fil des demandes</string>
     <string name="assist_history_subtitle">Nécessite un compte Roadly</string>
+    <string name="settings_provider_overpass">Données OSM détaillées (Overpass API)</string>
 </resources>

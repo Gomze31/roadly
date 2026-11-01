@@ -181,3 +181,25 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Raccourcis statiques, intents geo: / google.navigation: | fonctionnelle | `ExternalIntents`, 4 tests (LOT 12) |
 | Android Auto | non commencée | `androidx.car.app` absent hors ligne ; `docs/ANDROID.md` |
 | Backend Supabase | fonctionnelle | Schéma + client (LOT 8) ; projet à créer par l'exploitant |
+
+## Mode trottinette électrique (LOT 13, 2026-11-01)
+
+Détail, sources et limites : `docs/SCOOTER.md`. « Code livré » = compilé et testé sur JVM dans l'environnement de développement ; les écrans Compose restent à compiler et vérifier sur le HONOR.
+
+| Fonction | Statut | Notes |
+|---|---|---|
+| Sélecteur Voiture / Moto / Trottinette / Vélo, mode mémorisé | en cours | Vélo « Bientôt » (prévu : même costing) ; écran non vérifié sur appareil |
+| Routage trottinette (Valhalla `bicycle` paramétré) | en cours | Testé JVM ; préférences voiture jamais transmises |
+| Classification piste / bande / voie verte / route partagée / chemin | en cours | `trace_attributes` + tags OSM (Overpass) ; voie verte et agglomération seulement si taguées |
+| Vérification réglementaire France (R412-43-1) + registre par pays | en cours | « Autorisé d'après les données », jamais une garantie ; autres pays : non vérifiable |
+| Contournement des portions interdites détectées | en cours | `exclude_polygons`, un second calcul |
+| Objectifs rapide / sécurisé / confort / court + préférences | en cours | Trafic : aucune source, approximation par classe de route |
+| Comparaison (part de pistes, D+/D−, portions partagées, alertes) | en cours | Couverture des données affichée |
+| Fiches trottinette (plusieurs), préréglage MAX G2 | en cours | Room v5 ; migration à vérifier sur appareil (`ScooterMigrationTest`) |
+| Estimation d'autonomie, batterie saisie, calibration par trajets | en cours | Modèle physique ; aucune lecture de la batterie réelle |
+| Guidage trottinette (paliers 200/80/20 m, phrases, alertes vocales) | en cours | Testé JVM (session de guidage) |
+| Caméra 3D trottinette, tracé coloré par type de voie | en cours | Compilé contre MapLibre 11.13.5 ; non vu sur appareil |
+| Stationnement / recharge trottinette | en cours | Overpass ; uniquement les lieux présents dans OSM |
+| Récapitulatif de trajet, bilan semaine / mois | en cours | Dénivelé et énergie estimés |
+| Carte hors connexion du trajet | en cours | Tuiles seulement ; calcul et recalcul en ligne |
+| Roadly AI en mode trottinette | en cours | Reconnaissance vocale du système + intentions locales ; copilote Gemini (spec AI-1) non implémenté |
