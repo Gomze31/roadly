@@ -1,6 +1,7 @@
 package fr.roadly.core.map
 
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.PitchPreset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -106,5 +107,33 @@ class GuidanceCameraPolicyTest {
             val pitch = GuidanceCameraPolicy.compute(input(speed = speed, distance = distance, powerSave = powerSave).copy(buildingsVisible = buildings), null).pitch
             assertTrue("$speed $buildings $powerSave $distance → $pitch", pitch <= GuidanceCameraPolicy.MAX_PITCH)
         }
+    }
+
+    @Test fun `the pitch preset sets the cruise pitch, the approach stays at 50 and power save at 45`() {
+        assertEquals(45.0, GuidanceCameraPolicy.compute(input().copy(pitchPreset = PitchPreset.LOW), null).pitch, 1e-9)
+        assertEquals(60.0, GuidanceCameraPolicy.compute(input().copy(pitchPreset = PitchPreset.HIGH), null).pitch, 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_APPROACH, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(pitchPreset = PitchPreset.HIGH), null).pitch, 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_POWER_SAVE, GuidanceCameraPolicy.compute(input(powerSave = true).copy(pitchPreset = PitchPreset.HIGH), null).pitch, 1e-9)
+    }
+
+    @Test fun `dense city tilt needs the standard or high preset`() {
+        fun pitch(p: PitchPreset) = GuidanceCameraPolicy.compute(input(speed = 20.0).copy(buildingsVisible = true, pitchPreset = p), null).pitch
+        assertEquals("inclinaison basse choisie : pas de 60° en ville", 45.0, pitch(PitchPreset.LOW), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(PitchPreset.STANDARD), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(PitchPreset.HIGH), 1e-9)
+    }
+
+    @Test fun `the zoom offset shifts cruise and 2d zoom, widens the approach but never tightens it`() {
+        assertEquals(18.0, GuidanceCameraPolicy.compute(input(speed = 50.0).copy(zoomOffset = 1), null).zoom, 1e-9)
+        assertEquals(16.0, GuidanceCameraPolicy.compute(input(speed = 50.0).copy(zoomOffset = -1), null).zoom, 1e-9)
+        assertEquals(18.0, GuidanceCameraPolicy.compute(input(threeD = false).copy(zoomOffset = 1), null).zoom, 1e-9)
+        assertEquals("flèche entière à l'approche (3c02729)", 17.5, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(zoomOffset = 1), null).zoom, 1e-9)
+        assertEquals(16.5, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(zoomOffset = -1), null).zoom, 1e-9)
+    }
+
+    @Test fun `pitch presets match the policy constants`() {
+        assertEquals(GuidanceCameraPolicy.PITCH_POWER_SAVE, PitchPreset.LOW.degrees, 0.0)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, PitchPreset.STANDARD.degrees, 0.0)
+        assertEquals(GuidanceCameraPolicy.MAX_PITCH, PitchPreset.HIGH.degrees, 0.0)
     }
 }

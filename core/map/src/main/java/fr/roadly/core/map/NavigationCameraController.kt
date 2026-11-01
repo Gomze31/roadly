@@ -3,6 +3,7 @@ package fr.roadly.core.map
 import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.PitchPreset
 import kotlin.math.exp
 
 /** Entrée de la caméra à chaque position (temps [nowMs] monotone, ex. `SystemClock.elapsedRealtime()`). */
@@ -22,6 +23,12 @@ data class NavigationCameraInput(
     val bottomPanelFraction: Float? = null,
     /** Bas de la pile du haut (bandeau, panneau de direction, voies) / hauteur de la vue (portrait) ; null = marges par défaut. */
     val topPanelFraction: Float? = null,
+    /** E2 : décalage de zoom choisi. */
+    val zoomOffset: Int = 0,
+    /** E2 : inclinaison de croisière choisie. */
+    val pitchPreset: PitchPreset = PitchPreset.STANDARD,
+    /** E2 « Bâtiments 3D » : sans bâtiments, pas d'inclinaison « ville dense ». */
+    val buildings3d: Boolean = true,
 )
 
 /** Commande caméra : cible, caméra, durée (0 = déplacement immédiat) et courbe ([eased] = accélération / décélération MapLibre, sinon linéaire). */
@@ -50,7 +57,8 @@ class NavigationCameraController {
             GuidanceCameraInput(
                 speedKmh = input.speedKmh, bearingDeg = bearing?.toFloat(), distanceToManeuverM = input.distanceToManeuverM,
                 maneuverType = input.maneuverType, threeD = threeD, powerSave = input.powerSave, landscape = input.landscape,
-                approaching = input.approaching, buildingsVisible = threeD && !input.powerSave,
+                approaching = input.approaching, buildingsVisible = threeD && !input.powerSave && input.buildings3d,
+                zoomOffset = input.zoomOffset, pitchPreset = input.pitchPreset,
             ),
             previous,
         )

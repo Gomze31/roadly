@@ -3,6 +3,7 @@ package fr.roadly.core.map
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.PitchPreset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -193,5 +194,13 @@ class NavigationCameraControllerTest {
         assertEquals(CameraMode3D.FOLLOW_2D, CameraMode3D.FOLLOW_3D.toggled3d())
         assertEquals(CameraMode3D.FOLLOW_3D, CameraMode3D.FOLLOW_2D.toggled3d())
         assertEquals(CameraMode3D.FOLLOW_3D, CameraMode3D.NORTH_UP.toggled3d())
+    }
+
+    @Test fun `the zoom offset, the pitch preset and the buildings setting reach the policy`() {
+        val noBuildings = NavigationCameraController().update(input(speed = 20.0).copy(zoomOffset = -1, buildings3d = false)).camera
+        assertEquals("bâtiments coupés : pas d'inclinaison « ville dense »", 58.0, noBuildings.pitch, 1e-9)
+        assertEquals(16.5, noBuildings.zoom, 1e-9)
+        assertEquals(60.0, NavigationCameraController().update(input(speed = 20.0)).camera.pitch, 1e-9)
+        assertEquals(45.0, NavigationCameraController().update(input().copy(pitchPreset = PitchPreset.LOW)).camera.pitch, 1e-9)
     }
 }

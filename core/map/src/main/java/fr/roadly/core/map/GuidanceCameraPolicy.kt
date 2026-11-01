@@ -1,6 +1,7 @@
 package fr.roadly.core.map
 
 import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.PitchPreset
 
 /** Marges de la caméra en fractions de la vue (0..1) : gauche, haut, droite, bas. */
 data class CameraPadding(val left: Float, val top: Float, val right: Float, val bottom: Float) {
@@ -14,22 +15,27 @@ data class GuidanceCameraInput(
     val bearingDeg: Float?,
     val distanceToManeuverM: Double,
     val maneuverType: ManeuverType,
-    /** Réglage « Carte 3D en guidage ». */
+    /** Vue 3D (mode de caméra `FOLLOW_3D` de la session). */
     val threeD: Boolean,
-    /** Économiseur de batterie Android actif. */
+    /** Économie d'énergie effective (E2 : `PowerSaveMode.effective`, économiseur d'Android en AUTO). */
     val powerSave: Boolean,
     val landscape: Boolean,
     /** Approche décidée par l'écran (hystérésis B1) ; null = règle de distance [GuidanceCameraPolicy.isApproaching]. */
     val approaching: Boolean? = null,
     /** Bâtiments 3D affichés (mode 3D hors économie d'énergie) : autorise l'inclinaison « ville dense ». */
     val buildingsVisible: Boolean = false,
+    /** E2 : décalage de zoom choisi (−1, 0, +1) ; à l'approche, seul −1 s'applique. */
+    val zoomOffset: Int = 0,
+    /** E2 : inclinaison de croisière choisie. */
+    val pitchPreset: PitchPreset = PitchPreset.STANDARD,
 )
 
 /**
- * Caméra de guidage (spec guidage 3D §1, C1) : inclinaison 58° (50° à l'approche, 60° en ville dense, 45° en économie, 0° en 2D),
+ * Caméra de guidage (spec guidage 3D §1, C1) : inclinaison 58° ou celle choisie (E2 ; 50° à l'approche, 60° en ville dense, 45° en économie, 0° en 2D),
  * zoom de croisière selon la vitesse, vue serrée à l'approche d'une manœuvre, cap conservé à l'arrêt, voiture décalée vers le bas.
  */
 object GuidanceCameraPolicy {
+    /** Inclinaison de croisière par défaut (= `PitchPreset.STANDARD`) ; E2 : remplacée par le preset choisi. */
     const val PITCH_3D = 58.0
     const val PITCH_POWER_SAVE = 45.0
     const val PITCH_APPROACH = 50.0
@@ -72,15 +78,16 @@ object GuidanceCameraPolicy {
             (input.speedKmh ?: 0.0) < STOPPED_KMH && previous != null -> previous.bearing
             else -> input.bearingDeg.toDouble()
         }
-        if (!input.threeD) return GuidanceCamera(ZOOM_2D, 0.0, bearing, CameraPadding.NONE)
+        if (!input.threeD) return GuidanceCamera(ZOOM_2D + input.zoomOffset, 0.0, bearing, CameraPadding.NONE)
         val approaching = input.approaching ?: isApproaching(input.distanceToManeuverM, input.maneuverType, input.speedKmh)
         val pitch = when {
             input.powerSave -> PITCH_POWER_SAVE
             approaching -> PITCH_APPROACH
-            input.buildingsVisible && input.speedKmh != null && input.speedKmh < DENSE_CITY_MAX_KMH -> PITCH_DENSE_CITY
-            else -> PITCH_3D
+            input.buildingsVisible && input.pitchPreset != PitchPreset.LOW && input.speedKmh != null && input.speedKmh < DENSE_CITY_MAX_KMH -> PITCH_DENSE_CITY
+            else -> input.pitchPreset.degrees
         }
-        val target = if (approaching) ZOOM_APPROACH else zoomForSpeed(input.speedKmh)
+        // E2 : +1 ne resserre pas l'approche — ZOOM_APPROACH garde la flèche entière sous la pile du bandeau (3c02729).
+        val target = if (approaching) ZOOM_APPROACH + minOf(input.zoomOffset, 0) else zoomForSpeed(input.speedKmh) + input.zoomOffset
         val zoom = if (approaching || previous == null) target else previous.zoom + (target - previous.zoom).coerceIn(-MAX_ZOOM_STEP, MAX_ZOOM_STEP)
         return GuidanceCamera(zoom, pitch, bearing, if (input.landscape) PADDING_LANDSCAPE else PADDING_PORTRAIT)
     }
