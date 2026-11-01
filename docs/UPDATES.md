@@ -69,6 +69,10 @@ Dans Roadly : Réglages › Mises à jour › toucher la ligne de version › co
 
 ## Publier une version
 
+**Automatique :** chaque push sur `main` (hors changements limités à la documentation) publie la release `v0.1.<nombre de commits>`. Le téléphone la propose ensuite dans Réglages › Mises à jour (ou au lancement, au plus toutes les 12 h).
+
+**Version nommée :**
+
 ```bash
 git tag v0.2.0
 ```

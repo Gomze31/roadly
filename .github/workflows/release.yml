@@ -1,12 +1,14 @@
 # Publie une release installable par la mise à jour intégrée de Roadly (Réglages › Mises à jour).
-# Déclenchement : pousser un tag « v0.2.0 », ou lancer le workflow à la main avec une version.
+# Déclenchement : chaque push sur main (version 0.1.<nombre de commits>), un tag « v0.2.0 », ou le workflow lancé à la main.
 # Secrets requis (Settings › Secrets and variables › Actions) : ROADLY_KEYSTORE_BASE64, ROADLY_KEYSTORE_PASSWORD,
 # ROADLY_KEY_ALIAS, ROADLY_KEY_PASSWORD — voir docs/UPDATES.md.
 name: Release Android
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
+    paths-ignore: ['**.md', 'docs/**']
   workflow_dispatch:
     inputs:
       version:
@@ -41,10 +43,14 @@ jobs:
       - name: Version
         id: v
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then V="${GITHUB_REF_NAME#v}"; else V="${{ inputs.version }}"; fi
+          CODE=$(git rev-list --count HEAD)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then V="${{ inputs.version }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then V="${GITHUB_REF_NAME#v}"
+          else V="0.1.$CODE"   # push sur main : même versionName qu'une compilation locale du même commit
+          fi
           echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' || { echo "::error::Version invalide : $V"; exit 1; }
           echo "name=$V" >> "$GITHUB_OUTPUT"
-          echo "code=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
 
       - name: Clé de signature
         env:
@@ -79,6 +85,8 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           name: Roadly ${{ steps.v.outputs.name }}
           generate_release_notes: true
           files: |
