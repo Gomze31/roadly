@@ -47,6 +47,11 @@ data class Route(
     val maneuvers: List<Maneuver>,
     val hasToll: Boolean,
     val providerId: String,
+    /** Altitudes (m) échantillonnées tous les [elevationIntervalM] le long du tracé (`elevation_interval` Valhalla) ; null = non fournies. */
+    val elevationM: List<Double>? = null,
+    val elevationIntervalM: Double? = null,
+    /** Variante trottinette calculée (null = itinéraire motorisé). */
+    val scooterGoal: ScooterRouteGoal? = null,
 )
 
 data class RouteRequest(
@@ -59,4 +64,8 @@ data class RouteRequest(
     val preferences: RoutePreferences = RoutePreferences(),
     /** Cap de l'utilisateur en degrés (0..360) : utilisé au recalcul pour éviter un demi-tour imposé ; null = inconnu. */
     val originHeadingDeg: Float? = null,
+    /** Non nul = itinéraire trottinette (costing Valhalla `bicycle` paramétré par le profil et les préférences trottinette). */
+    val scooter: ScooterRouteRequest? = null,
+    /** Zones à éviter (`exclude_polygons` Valhalla), anneaux fermés ; vide = aucune. */
+    val excludePolygons: List<List<GeoPoint>> = emptyList(),
 )

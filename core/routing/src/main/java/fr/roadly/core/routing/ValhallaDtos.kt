@@ -9,7 +9,14 @@ import kotlinx.serialization.json.JsonElement
 /** `original_index` n'est renvoyé que par `/optimized_route` : position du point dans la demande. */
 @Serializable internal data class ValhallaLocation(@SerialName("original_index") val originalIndex: Int? = null)
 @Serializable internal data class ValhallaSummary(val length: Double = 0.0, val time: Double = 0.0, @SerialName("has_toll") val hasToll: Boolean = false)
-@Serializable internal data class ValhallaLeg(val shape: String = "", val maneuvers: List<ValhallaManeuver> = emptyList(), val summary: ValhallaSummary = ValhallaSummary())
+@Serializable internal data class ValhallaLeg(
+    val shape: String = "",
+    val maneuvers: List<ValhallaManeuver> = emptyList(),
+    val summary: ValhallaSummary = ValhallaSummary(),
+    /** Présents seulement si la requête contient `elevation_interval` (m) ; altitudes en mètres. */
+    val elevation: List<Double>? = null,
+    @SerialName("elevation_interval") val elevationInterval: Double? = null,
+)
 @Serializable internal data class ValhallaManeuver(
     val type: Int = 0,
     val instruction: String = "",

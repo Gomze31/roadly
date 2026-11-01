@@ -12,9 +12,13 @@ import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleType
+import fr.roadly.core.scooter.routing.ScooterRoutingProfile
+import fr.roadly.core.scooter.valhalla.TraceAttributes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -59,6 +63,21 @@ class ValhallaRoutingProvider @Inject constructor(
                     }
                 }
             }
+            if (request.excludePolygons.isNotEmpty()) {
+                putJsonArray("exclude_polygons") {
+                    request.excludePolygons.forEach { ring -> add(JsonArray(ring.map { p -> JsonArray(listOf(JsonPrimitive(p.lon), JsonPrimitive(p.lat))) })) }
+                }
+            }
+            val scooter = request.scooter
+            if (scooter != null) {
+                // Trottinette : costing vélo paramétré (fr.roadly.core.scooter.routing.ScooterRoutingProfile) + profil d'altitude.
+                put("costing", ScooterRoutingProfile.COSTING)
+                putJsonObject("costing_options") { put(ScooterRoutingProfile.COSTING, TraceAttributes.mapToJson(ScooterRoutingProfile.costingOptions(scooter))) }
+                put("elevation_interval", ELEVATION_INTERVAL_M)
+                put("units", "kilometers")
+                put("language", "fr-FR")
+                return@buildJsonObject
+            }
             val costingName = costingFor(request.vehicle?.type)
             put("costing", costingName)
             putJsonObject("costing_options") {
@@ -84,9 +103,16 @@ class ValhallaRoutingProvider @Inject constructor(
             put("language", "fr-FR")
         }
         return when (val r = api.postJson(url, body.toString())) {
-            is Outcome.Success -> parse(r.value, request.costing)
+            is Outcome.Success -> parse(r.value, request.costing).let { out ->
+                if (out is Outcome.Success && request.scooter != null) Outcome.Success(out.value.map { it.copy(scooterGoal = request.scooter!!.goal) }) else out
+            }
             is Outcome.Failure -> Outcome.Failure(mapError(r.error))
         }
+    }
+
+    companion object {
+        /** Pas du profil d'altitude demandé pour les itinéraires trottinette (valeur recommandée par Valhalla). */
+        const val ELEVATION_INTERVAL_M = 30
     }
 
     /** Costing Valhalla selon le type de véhicule : poids lourd (gabarit, interdictions PL), moto, taxi (voies réservées si taguées), sinon auto. */
@@ -141,7 +167,13 @@ class ValhallaRoutingProvider @Inject constructor(
         val trip = json.decodeFromString(ValhallaResponse.serializer(), body).trip
         val geometry = ArrayList<GeoPoint>()
         val maneuvers = ArrayList<Maneuver>()
+        val elevation = ArrayList<Double>()
+        var elevationInterval: Double? = null
         trip.legs.forEach { leg ->
+            leg.elevation?.takeIf { it.isNotEmpty() }?.let { e ->
+                elevationInterval = leg.elevationInterval
+                if (elevation.isNotEmpty()) elevation.addAll(e.drop(1)) else elevation.addAll(e)
+            }
             val pts = Polyline6.decode(leg.shape)
             val offset = if (geometry.isEmpty()) 0 else geometry.size - 1
             if (geometry.isNotEmpty() && pts.isNotEmpty()) geometry.addAll(pts.drop(1)) else geometry.addAll(pts)
@@ -171,6 +203,8 @@ class ValhallaRoutingProvider @Inject constructor(
                 maneuvers = maneuvers,
                 hasToll = trip.summary.hasToll || trip.legs.any { l -> l.maneuvers.any { it.toll } },
                 providerId = id,
+                elevationM = elevation.takeIf { it.size >= 2 && elevationInterval != null },
+                elevationIntervalM = elevationInterval.takeIf { elevation.size >= 2 },
             ),
         ))
     } catch (e: Exception) {

@@ -38,6 +38,11 @@ class ApiClient @Inject constructor(
             .apply { headers.forEach { (k, v) -> header(k, v) } }.build(),
     )
 
+    /** Formulaire `application/x-www-form-urlencoded` (Overpass : champ `data`). */
+    suspend fun postForm(url: HttpUrl, fields: Map<String, String>): Outcome<String> = execute(
+        Request.Builder().url(url).post(okhttp3.FormBody.Builder().apply { fields.forEach { (k, v) -> add(k, v) } }.build()).build(),
+    )
+
     private suspend fun execute(request: Request): Outcome<String> {
         var attempt = 0
         while (true) {

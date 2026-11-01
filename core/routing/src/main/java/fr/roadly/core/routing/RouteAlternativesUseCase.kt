@@ -20,6 +20,8 @@ data class RouteOption(
     val arrivalEpochMs: Long,
     val cost: CostEstimate?,
     val sameAsFastest: Boolean,
+    /** Mode trottinette : analyse des voies, autonomie et classement ; null pour un itinéraire motorisé. */
+    val scooter: ScooterOptionInfo? = null,
 )
 
 /** Calcule en parallèle les trois variantes (rapide, court, sans péage) et signale celles qui reprennent le tracé du plus rapide. */

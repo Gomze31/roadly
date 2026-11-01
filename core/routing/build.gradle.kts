@@ -16,6 +16,7 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 dependencies {
     api(project(":core:model"))
     api(project(":core:common"))
+    api(project(":core:scooter"))
     implementation(project(":core:data"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.coroutines.android)

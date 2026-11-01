@@ -24,6 +24,7 @@ class DataStoreProviderConfigRepository @Inject constructor(
     private val kValhalla = stringPreferencesKey("provider.valhalla")
     private val kLight = stringPreferencesKey("provider.style.light")
     private val kDark = stringPreferencesKey("provider.style.dark")
+    private val kOverpass = stringPreferencesKey("provider.overpass")
 
     override val config: Flow<ProviderConfig> = store.data.map { p ->
         val d = ProviderConfig.DEFAULT
@@ -33,6 +34,7 @@ class DataStoreProviderConfigRepository @Inject constructor(
             valhallaBaseUrl = p[kValhalla] ?: d.valhallaBaseUrl,
             mapStyleLightUrl = p[kLight] ?: d.mapStyleLightUrl,
             mapStyleDarkUrl = p[kDark] ?: d.mapStyleDarkUrl,
+            overpassBaseUrl = p[kOverpass] ?: d.overpassBaseUrl,
         )
     }
 
@@ -40,9 +42,9 @@ class DataStoreProviderConfigRepository @Inject constructor(
         val config = config.normalized()
         store.edit { p ->
             p[kBan] = config.banBaseUrl; p[kPhoton] = config.photonBaseUrl; p[kValhalla] = config.valhallaBaseUrl
-            p[kLight] = config.mapStyleLightUrl; p[kDark] = config.mapStyleDarkUrl
+            p[kLight] = config.mapStyleLightUrl; p[kDark] = config.mapStyleDarkUrl; p[kOverpass] = config.overpassBaseUrl
         }
     }
 
-    override suspend fun reset() { store.edit { p -> listOf(kBan, kPhoton, kValhalla, kLight, kDark).forEach { p.remove(it) } } }
+    override suspend fun reset() { store.edit { p -> listOf(kBan, kPhoton, kValhalla, kLight, kDark, kOverpass).forEach { p.remove(it) } } }
 }
