@@ -116,7 +116,7 @@ import kotlin.math.roundToInt
 private val RowContentInset = 64.dp
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, onOpenPremium: () -> Unit = {}, onOpenAssistance: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel(), scooterVm: ScooterSettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, onOpenPremium: () -> Unit = {}, onOpenAssistance: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel(), scooterVm: ScooterSettingsViewModel = hiltViewModel(), updatesVm: UpdatesViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val providerError by vm.providerError.collectAsStateWithLifecycle()
     val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
@@ -151,6 +151,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
             PrivacyGroup()
             CommunityGroup(community, onSave = vm::saveCommunity, onClear = vm::clearCommunity)
             ProvidersGroup(state.providers, providerError, onSave = vm::saveProviders, onReset = vm::resetProviders)
+            UpdatesGroup(updatesVm)
             AboutGroup()
             Spacer(Modifier.height(RoadlySpacing.s))
         }

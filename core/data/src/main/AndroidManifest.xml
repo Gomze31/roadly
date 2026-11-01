@@ -1,1 +1,10 @@
-<manifest/>
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Mises à jour depuis les releases GitHub : installation de l'APK téléchargé (confirmation Android). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Android 12+ : mise à jour sans confirmation quand Roadly a installé la version en place. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <application>
+        <receiver android:name="fr.roadly.core.data.update.UpdateInstallReceiver" android:exported="false" />
+    </application>
+</manifest>

@@ -3,6 +3,11 @@ package fr.roadly.app
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -98,6 +103,17 @@ fun RoadlyNavHost(
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
             onChangeDestination = { nav.navigate(SearchRoute()) },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
+        )
+    }
+    // Mise à jour disponible (release GitHub) : proposée au lancement ; le suivi détaillé est dans Réglages › Mises à jour.
+    val update by launch.updatePrompt.collectAsStateWithLifecycle()
+    update?.let { u ->
+        AlertDialog(
+            onDismissRequest = launch::dismiss,
+            title = { Text("Roadly ${u.manifest.versionName} disponible") },
+            text = { Text((u.notes.takeIf { it.isNotBlank() }?.take(600) ?: "Nouvelle version publiée sur GitHub.") + "\n\nLe téléchargement se poursuit dans Réglages › Mises à jour ; Android demande ensuite de confirmer l'installation.") },
+            confirmButton = { TextButton(onClick = { launch.installUpdate(u); nav.navigate(SettingsRoute) }) { Text("Mettre à jour") } },
+            dismissButton = { TextButton(onClick = { launch.later(u) }) { Text("Ignorer cette version") } },
         )
     }
     // Après NavHost : le graphe est posé avant de traiter une ouverture demandée par la notification.

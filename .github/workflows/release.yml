@@ -1,0 +1,90 @@
+# Publie une release installable par la mise à jour intégrée de Roadly (Réglages › Mises à jour).
+# Déclenchement : pousser un tag « v0.2.0 », ou lancer le workflow à la main avec une version.
+# Secrets requis (Settings › Secrets and variables › Actions) : ROADLY_KEYSTORE_BASE64, ROADLY_KEYSTORE_PASSWORD,
+# ROADLY_KEY_ALIAS, ROADLY_KEY_PASSWORD — voir docs/UPDATES.md.
+name: Release Android
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version à publier (ex. 0.2.0) ; le tag v<version> est créé'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # versionCode = nombre de commits : l'historique complet est nécessaire
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then V="${GITHUB_REF_NAME#v}"; else V="${{ inputs.version }}"; fi
+          echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' || { echo "::error::Version invalide : $V"; exit 1; }
+          echo "name=$V" >> "$GITHUB_OUTPUT"
+          echo "code=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Clé de signature
+        env:
+          KEYSTORE_B64: ${{ secrets.ROADLY_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Secret ROADLY_KEYSTORE_BASE64 absent : sans la clé, Android refuserait la mise à jour (docs/UPDATES.md)."
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/roadly.jks"
+
+      - name: Tests unitaires
+        run: ./gradlew testDebugUnitTest :core:model:test :core:common:test :core:scooter:test --stacktrace
+
+      - name: APK signé
+        env:
+          ROADLY_KEYSTORE: ${{ runner.temp }}/roadly.jks
+          ROADLY_KEYSTORE_PASSWORD: ${{ secrets.ROADLY_KEYSTORE_PASSWORD }}
+          ROADLY_KEY_ALIAS: ${{ secrets.ROADLY_KEY_ALIAS }}
+          ROADLY_KEY_PASSWORD: ${{ secrets.ROADLY_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease -Proadly.versionCode=${{ steps.v.outputs.code }} -Proadly.versionName=${{ steps.v.outputs.name }} --stacktrace
+
+      - name: Manifeste de mise à jour
+        run: |
+          APK="roadly-${{ steps.v.outputs.name }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          printf '{"versionCode":%s,"versionName":"%s","apk":"%s","sha256":"%s","minSdk":29}\n' \
+            "${{ steps.v.outputs.code }}" "${{ steps.v.outputs.name }}" "$APK" "$SHA" > update.json
+          cat update.json
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.name }}
+          name: Roadly ${{ steps.v.outputs.name }}
+          generate_release_notes: true
+          files: |
+            roadly-${{ steps.v.outputs.name }}.apk
+            update.json
+
+      - name: Nettoyage
+        if: always()
+        run: rm -f "$RUNNER_TEMP/roadly.jks"

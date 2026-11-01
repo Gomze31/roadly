@@ -22,6 +22,7 @@ dependencies {
     implementation(project(":core:routing"))
     implementation(project(":core:navigation"))
     implementation(libs.hilt.android)
+    implementation(libs.androidx.activity.compose)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
