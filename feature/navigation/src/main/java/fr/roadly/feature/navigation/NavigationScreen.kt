@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,9 +62,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -108,6 +111,8 @@ import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteProgress
 import java.util.Locale
+import kotlin.math.ceil
+import kotlinx.coroutines.delay
 
 @Composable
 fun NavigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}, vm: NavigationViewModel = hiltViewModel()) {
@@ -162,22 +167,20 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     LaunchedEffect(map) { vm.lastCamera?.let { map.restore(it, keepTilt = true) } }
     val camera = remember { NavigationCameraController() }
     val bottomPanel = vm.bottomPanelFraction.collectAsStateWithLifecycle()
+    val topStack = vm.topStackFraction.collectAsStateWithLifecycle()
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
-        // D5 : icône d'attribution toujours accessible. Portrait : sous le bouton « replier » (en haut à droite), zone libre que le panneau
-        // du bas soit replié ou déplié. Paysage : en bas, juste à droite de la colonne gauche.
+        // D5 : icône d'attribution toujours accessible, en haut à droite, zone libre que le panneau du bas soit replié ou déplié.
+        // Portrait : sous le bouton « replier ». Paysage : à sa gauche (dessous, Signaler la couvrirait).
         val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val navInsets = WindowInsets.navigationBars.asPaddingValues()
         val attribution = if (landscape) {
-            AttributionPlacement(
-                top = false, end = false, vertical = navInsets.calculateBottomPadding() + RoadlySpacing.xs,
-                side = navInsets.calculateLeftPadding(LayoutDirection.Ltr) + maxWidth * LANDSCAPE_LEFT_COLUMN + RoadlySpacing.s,
-            )
+            AttributionPlacement.guidanceLandscape(statusTop, navInsets.calculateRightPadding(LayoutDirection.Ltr), RoadlySpacing.screenEdge, BANNER_TOGGLE_SIZE, RoadlySpacing.s)
         } else {
-            AttributionPlacement(top = true, end = true, vertical = statusTop + RoadlySpacing.screenEdge + BANNER_TOGGLE_SIZE + RoadlySpacing.s, side = RoadlySpacing.screenEdge + RoadlySpacing.sm)
+            AttributionPlacement.guidancePortrait(statusTop, RoadlySpacing.screenEdge, BANNER_TOGGLE_SIZE, RoadlySpacing.s, RoadlySpacing.sm)
         }
-        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera, bottomPanel)
+        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera, bottomPanel, topStack)
         // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
         val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
@@ -217,9 +220,12 @@ internal fun PortraitOverlay(
     vm: NavigationViewModel,
 ) {
     val c = LocalRoadlyColors.current
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // Passe appareil : bas de la pile du haut (bandeau, panneau de direction, voies, « puis », bouton « replier ») → marge haute de la caméra.
         Column(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(RoadlySpacing.screenEdge),
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(RoadlySpacing.screenEdge).onGloballyPositioned { coords ->
+                vm.setTopStackFraction(PanelGeometry.topFraction(coords.positionInRoot().y + coords.size.height, coords.findRootCoordinates().size.height.toFloat()))
+            },
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
         ) {
             Row(verticalAlignment = Alignment.Top) {
@@ -227,7 +233,8 @@ internal fun PortraitOverlay(
                     BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
                     if (state.rerouting) ReroutingPill()
                 }
-                Spacer(Modifier.width(RoadlySpacing.s))
+                // 16 dp : la pile s'arrête 4 dp avant la colonne d'actions (56 dp), qui peut monter à sa hauteur sans la chevaucher.
+                Spacer(Modifier.width(RoadlySpacing.m))
                 Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s), horizontalAlignment = Alignment.End) {
                     RoundIconButton(
                         if (bannerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -238,34 +245,41 @@ internal fun PortraitOverlay(
             }
         }
 
-        // Colonne d'actions à droite : signaler, voix, changer de destination.
+        // Colonne d'actions à droite (signaler, voix, changer de destination, itinéraires, 2D/3D + Nord), posée 8 dp au-dessus du bloc
+        // du bas mesuré : elle monte avec le panneau déplié. Sans la place, les doublons du panneau cèdent d'abord (`portraitActionButtons`).
+        val blockDp by vm.bottomBlockHeightDp.collectAsStateWithLifecycle()
+        val panelExpanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
+        val guiding = state.phase == NavigationPhase.GUIDING
+        val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val available = portraitActionColumnAvailableDp(maxHeight.value.toInt(), statusTop.value.toInt(), blockDp)
+        val buttons = portraitActionButtons(available, guiding, panelExpanded, voiceInPanel = guiding && state.following)
         Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = RoadlySpacing.screenEdge),
+            Modifier.align(Alignment.BottomEnd).padding(end = RoadlySpacing.screenEdge, bottom = blockDp.dp + RoadlySpacing.s),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
-            ReportButton(onReport)
-            RoundIconButton(
-                if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute),
-                onClick = vm::toggleMute,
-            )
-            RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
-            if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
-            CameraModeButtons(vm)
+            for (button in buttons) when (button) {
+                ActionButton.REPORT -> ReportButton(onReport)
+                ActionButton.VOICE -> RoundIconButton(
+                    if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                    stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute),
+                    onClick = vm::toggleMute,
+                )
+                ActionButton.SEARCH -> RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
+                ActionButton.ALTERNATIVES -> RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
+                ActionButton.CAMERA -> CameraModeButtons(vm)
+            }
         }
 
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.screenEdge),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
+            // Pastilles d'état au-dessus du compteur, jamais à côté : la rangée 2D/3D + Nord de la colonne d'actions est à sa hauteur.
+            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
+                if (state.gpsLost) GpsLostPill()
+                StatusPills(state)
                 SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
-                Spacer(Modifier.width(RoadlySpacing.s))
-                Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
-                    if (state.gpsLost) GpsLostPill()
-                    StatusPills(state)
-                }
             }
             BottomBlock(state, vm, onChangeDestination)
         }
@@ -284,12 +298,25 @@ internal fun LandscapeOverlay(
 ) {
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         // Colonne gauche : bandeau en haut, Horizon + barre d'information calés en bas (pas de défilement : tout doit rester visible en conduite).
-        Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
-            Column(Modifier.align(Alignment.TopStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+        BoxWithConstraints(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
+            // Passe appareil : panneau déplié qui ne tient pas sous la pile du bandeau → replié (vérifié une fois les tailles stabilisées).
+            val density = LocalDensity.current
+            val panelExpanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
+            var stackPx by remember { mutableIntStateOf(0) }
+            var blockPx by remember { mutableIntStateOf(0) }
+            val columnDp = maxHeight.value.toInt()
+            LaunchedEffect(panelExpanded, stackPx, blockPx, columnDp) {
+                if (!panelExpanded || blockPx == 0) return@LaunchedEffect
+                delay(PANEL_SETTLE_MS)
+                val stackDp = with(density) { stackPx.toDp().value.toInt() }
+                val blockDp = with(density) { blockPx.toDp().value.toInt() }
+                if (!landscapePanelFits(columnDp, stackDp, blockDp)) vm.collapseBottomPanel()
+            }
+            Column(Modifier.align(Alignment.TopStart).onSizeChanged { stackPx = it.height }, verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
                 if (state.rerouting) ReroutingPill()
             }
-            Column(Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+            Column(Modifier.align(Alignment.BottomStart).onSizeChanged { blockPx = it.height }, verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 BottomBlock(state, vm, onChangeDestination)
             }
         }
@@ -312,16 +339,20 @@ internal fun LandscapeOverlay(
             RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
             if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
         }
-        // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges).
-        Row(Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm), verticalAlignment = Alignment.Bottom) {
-            CameraModeButtons(vm)
-            Spacer(Modifier.width(RoadlySpacing.s))
-            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.End) {
-                if (state.gpsLost) GpsLostPill()
-                StatusPills(state)
+        // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges). La rangée ne garde que 2D/3D + Nord
+        // et le compteur ; les pastilles d'état passent au-dessus, calées à droite, pour ne jamais pousser 2D/3D vers « Arrêter ».
+        Column(
+            Modifier.align(Alignment.BottomEnd).padding(start = RoadlySpacing.screenEdge, bottom = RoadlySpacing.screenEdge, end = RoadlySpacing.screenEdge + RoadlySpacing.touchTargetDriving + RoadlySpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs),
+            horizontalAlignment = Alignment.End,
+        ) {
+            if (state.gpsLost) GpsLostPill()
+            StatusPills(state)
+            Row(verticalAlignment = Alignment.Bottom) {
+                CameraModeButtons(vm)
+                Spacer(Modifier.width(RoadlySpacing.s))
+                SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
             }
-            Spacer(Modifier.width(RoadlySpacing.s))
-            SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
         }
     }
 }
@@ -330,6 +361,15 @@ internal fun LandscapeOverlay(
 @Composable
 private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onChangeDestination: () -> Unit) {
     val c = LocalRoadlyColors.current
+    val density = LocalDensity.current
+    // D5 : haut du bloc (Horizon + panneau, ou panneau d'arrivée / d'échec / de chargement) mesuré → marge basse de la caméra
+    // (portrait ; ignorée en paysage) et distance au bas de l'écran (dp) sous la colonne d'actions portrait.
+    val measured = Modifier.fillMaxWidth().onGloballyPositioned { coords ->
+        val rootHeight = coords.findRootCoordinates().size.height.toFloat()
+        val top = coords.positionInRoot().y
+        vm.setBottomPanelFraction(PanelGeometry.fraction(top, rootHeight))
+        vm.setBottomBlockHeightDp(ceil((rootHeight - top) / density.density).toInt().coerceAtLeast(0))
+    }
     when (state.phase) {
         NavigationPhase.GUIDING -> {
             val expanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
@@ -340,36 +380,32 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
             // Orientation lue ici (même critère largeur > hauteur que `NavigationContent`) : signatures et corps des overlays inchangés.
             val configuration = LocalConfiguration.current
             val landscape = configuration.screenWidthDp > configuration.screenHeightDp
-            // D5 : hauteur du bloc (Horizon + panneau) mesurée → marge basse de la caméra (portrait ; ignorée en paysage).
-            Column(
-                Modifier.fillMaxWidth().onGloballyPositioned { coords ->
-                    vm.setBottomPanelFraction(BottomPanelGeometry.fraction(coords.positionInRoot().y, coords.findRootCoordinates().size.height.toFloat()))
-                },
-            ) {
-                AnimatedVisibility(horizonVisible(state, landscape)) {
+            Column(measured) {
+                AnimatedVisibility(horizonVisible(state, landscape, expanded)) {
                     HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
                 }
                 recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }
                 NavigationBottomPanel(
                     state = state, expanded = expanded, destinationName = destination,
                     onToggleExpanded = vm::toggleBottomPanel, onToggleMute = vm::toggleMute, onRecenter = vm::recenter, onStop = vm::stop,
-                    onTripDetails = vm::openTripDetails, onAlternatives = vm::loadAlternatives,
+                    onTripDetails = vm::openTripDetails, onAlternatives = vm::loadAlternatives, compact = landscape,
                 )
             }
         }
-        NavigationPhase.ARRIVED -> ArrivedPanel(onFinish = vm::stop)
-        NavigationPhase.FAILED -> FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop)
-        NavigationPhase.LOADING, NavigationPhase.IDLE -> GlassPanel(Modifier.fillMaxWidth()) { LoadingRow(stringResource(R.string.nav_loading)) }
+        NavigationPhase.ARRIVED -> Box(measured) { ArrivedPanel(onFinish = vm::stop) }
+        NavigationPhase.FAILED -> Box(measured) { FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop) }
+        NavigationPhase.LOADING, NavigationPhase.IDLE -> GlassPanel(measured) { LoadingRow(stringResource(R.string.nav_loading)) }
     }
 }
 
 /**
  * Ruban Horizon montré s'il a des éléments. En paysage, masqué tant que le panneau de direction (D3) ou les voies (D4) occupent
  * la colonne gauche : bandeau + panneau + voies (≈ 350 dp) et bloc du bas ne tiennent pas ensemble sur ≈ 409 dp.
+ * Passe appareil : masqué aussi en paysage quand le panneau du bas est déplié ([panelExpanded]).
  */
-internal fun horizonVisible(state: NavigationUiState, landscape: Boolean): Boolean {
+internal fun horizonVisible(state: NavigationUiState, landscape: Boolean, panelExpanded: Boolean = false): Boolean {
     val hasItems = state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()
-    return hasItems && !(landscape && (bannerSign(state) != null || state.showLanes))
+    return hasItems && !(landscape && (bannerSign(state) != null || state.showLanes || panelExpanded))
 }
 
 /** Horizon : manœuvres et arrivée (Valhalla), virages (géométrie) et zones de vigilance (base officielle) ; pas de trafic (⛔ source). */
@@ -529,6 +565,8 @@ private data class MapTick(
     val landscape: Boolean,
     /** D5 : part de l'écran sous le panneau du bas (quantifiée), null avant la première mesure. */
     val bottomPanel: Float?,
+    /** Part de l'écran couverte par la pile du haut (portrait, quantifiée), null avant la première mesure. */
+    val topPanel: Float?,
 )
 
 /**
@@ -544,6 +582,7 @@ private fun GuidanceMapEffects(
     map: MapController,
     camera: NavigationCameraController,
     bottomPanel: State<Float?>,
+    topPanel: State<Float?>,
 ) {
     // Rotation (l'activité gère `orientation|screenSize`) : pas de relance de l'effet, juste une image de recadrage ordinaire.
     val isLandscape = rememberUpdatedState(landscape)
@@ -551,7 +590,7 @@ private fun GuidanceMapEffects(
         var lastProgress: RouteProgress? = null
         var wasFollowing = true
         // `snapshotFlow` n'émet que si la valeur change (égalité) : pas besoin de `distinctUntilChanged`.
-        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value, bottomPanel.value) } }
+        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value, bottomPanel.value, topPanel.value) } }
             .collect { t ->
                 val route = t.route ?: return@collect
                 val progress = t.progress ?: return@collect
@@ -570,7 +609,7 @@ private fun GuidanceMapEffects(
                         point = progress.snapped, bearingDeg = progress.bearingDeg, speedKmh = t.speedKmh,
                         distanceToManeuverM = progress.distanceToNextManeuverM, maneuverType = next.type, approaching = t.approaching,
                         mode = t.mode, powerSave = t.powerSave, landscape = t.landscape, nowMs = SystemClock.elapsedRealtime(),
-                        bottomPanelFraction = t.bottomPanel,
+                        bottomPanelFraction = t.bottomPanel, topPanelFraction = t.topPanel,
                     ),
                 )
                 map.applyGuidanceCamera(frame.point, frame.camera, frame.durationMs, frame.eased)
@@ -648,8 +687,8 @@ internal fun closesGuidanceSheet(phase: NavigationPhase): Boolean =
 internal fun closesPreviewOnIndexChange(prev: Int?, next: Int?, sheet: GuidanceSheet): Boolean =
     sheet == GuidanceSheet.MANEUVER_PREVIEW && prev != null && next != null && prev != next
 
-/** Part de la largeur occupée par la colonne gauche de `LandscapeOverlay` (même valeur que `fillMaxWidth(0.46f)`). */
-private const val LANDSCAPE_LEFT_COLUMN = 0.46f
-
-/** Taille du bouton « replier le bandeau » des overlays (`size = 44.dp`) : l'attribution se place dessous en portrait. */
+/** Taille du bouton « replier le bandeau » des overlays (`size = 44.dp`) : l'attribution se place dessous en portrait, à sa gauche en paysage. */
 private val BANNER_TOGGLE_SIZE = 44.dp
+
+/** Paysage : délai sans changement de taille avant de vérifier que le panneau déplié tient (fin des animations du panneau et de l'Horizon). */
+private const val PANEL_SETTLE_MS = 400L

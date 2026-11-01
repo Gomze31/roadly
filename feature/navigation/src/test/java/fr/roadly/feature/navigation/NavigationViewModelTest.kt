@@ -341,6 +341,13 @@ class NavigationViewModelTest {
         assertNull(vm.bottomPanelFraction.value)
         vm.setBottomPanelFraction(0.3f)
         assertEquals(0.3f, vm.bottomPanelFraction.value!!, 0f)
+        // Passe appareil : hauteur du bloc du bas (colonne d'actions portrait) et part de la pile du haut (marge haute de la caméra).
+        assertEquals(0, vm.bottomBlockHeightDp.value)
+        vm.setBottomBlockHeightDp(240)
+        assertEquals(240, vm.bottomBlockHeightDp.value)
+        assertNull(vm.topStackFraction.value)
+        vm.setTopStackFraction(0.36f)
+        assertEquals(0.36f, vm.topStackFraction.value!!, 0f)
     }
 
     @Test fun `the destination name comes from the remembered guidance`() = runTest {

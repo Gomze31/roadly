@@ -71,6 +71,8 @@ private val HANDLE_BAND_HEIGHT = 24.dp
  *   trois boutons de 56 dp ne tiennent pas sur ~433 dp) et Arrêter (rouge).
  * - Toucher la ligne ETA ouvre le trajet complet ([onTripDetails], spec D5).
  * - Déplié (toucher la poignée, ou glisser le panneau vers le haut ; vers le bas pour replier) : destination, « Trajet complet », « Itinéraires ».
+ * - [compact] (paysage, passe appareil) : la partie dépliée tient sur une rangée d'environ 64 dp — destination tronquée, puis
+ *   « Trajet complet » et « Itinéraires » en boutons ronds de 56 dp, libellés en descriptions.
  * L'Horizon reste au-dessus, hors du panneau.
  */
 @Composable
@@ -85,6 +87,7 @@ fun NavigationBottomPanel(
     onTripDetails: () -> Unit,
     onAlternatives: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val c = LocalRoadlyColors.current
     val threshold = with(LocalDensity.current) { DRAG_THRESHOLD.toPx() }
@@ -137,7 +140,10 @@ fun NavigationBottomPanel(
                     RoundIconButton(Icons.Default.Close, stringResource(R.string.nav_stop), onClick = onStop, style = RoundButtonStyle.Danger)
                 }
             }
-            AnimatedVisibility(expanded) {
+            AnimatedVisibility(expanded && compact) {
+                CompactExpandedRow(destinationName, onTripDetails, onAlternatives)
+            }
+            AnimatedVisibility(expanded && !compact) {
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
                     RowDivider(inset = 0.dp)
                     destinationName?.let { name ->
@@ -157,6 +163,25 @@ fun NavigationBottomPanel(
                 }
             }
         }
+    }
+}
+
+/** Paysage : partie dépliée sur une rangée (destination tronquée, « Trajet complet », « Itinéraires »), 56 dp + 8 dp de marge. */
+@Composable
+private fun CompactExpandedRow(destinationName: String?, onTripDetails: () -> Unit, onAlternatives: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    Row(Modifier.fillMaxWidth().padding(start = RoadlySpacing.m, end = RoadlySpacing.sm, bottom = RoadlySpacing.s), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            destinationName?.let { name ->
+                IconTile(Icons.Default.Flag, style = IconTileStyle.BrandFilled, size = 32.dp)
+                Spacer(Modifier.width(RoadlySpacing.s))
+                Text(name, style = MaterialTheme.typography.titleMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.width(RoadlySpacing.s))
+        RoundIconButton(Icons.AutoMirrored.Filled.List, stringResource(R.string.nav_trip_details), onClick = onTripDetails)
+        Spacer(Modifier.width(RoadlySpacing.s))
+        RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = onAlternatives)
     }
 }
 

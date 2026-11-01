@@ -128,6 +128,9 @@ class BannerStackLogicTest {
         assertFalse(horizonVisible(signed, landscape = true))
         assertFalse(horizonVisible(items.copy(showLanes = true), landscape = true))
         assertFalse("rien à montrer", horizonVisible(NavigationUiState(phase = NavigationPhase.GUIDING), landscape = false))
+        // Passe appareil : en paysage, l'Horizon laisse sa place au panneau déplié ; en portrait, il reste.
+        assertFalse("paysage, panneau déplié", horizonVisible(items, landscape = true, panelExpanded = true))
+        assertTrue("portrait, panneau déplié", horizonVisible(items, landscape = false, panelExpanded = true))
     }
 
     @Test

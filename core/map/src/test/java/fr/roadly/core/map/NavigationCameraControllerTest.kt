@@ -12,10 +12,11 @@ class NavigationCameraControllerTest {
     private fun input(
         bearing: Float? = 90f, speed: Double? = 50.0, nowMs: Long = 0L, mode: CameraMode3D = CameraMode3D.FOLLOW_3D,
         approaching: Boolean? = false, powerSave: Boolean = false, landscape: Boolean = false, bottomPanel: Float? = null,
+        topPanel: Float? = null,
     ) = NavigationCameraInput(
         point = GeoPoint(48.85, 2.35), bearingDeg = bearing, speedKmh = speed, distanceToManeuverM = 2_000.0,
         maneuverType = ManeuverType.TURN_RIGHT, approaching = approaching, mode = mode, powerSave = powerSave,
-        landscape = landscape, nowMs = nowMs, bottomPanelFraction = bottomPanel,
+        landscape = landscape, nowMs = nowMs, bottomPanelFraction = bottomPanel, topPanelFraction = topPanel,
     )
 
     private fun assertPadding(expected: CameraPadding, actual: CameraPadding) {
@@ -152,6 +153,24 @@ class NavigationCameraControllerTest {
         assertPadding(CameraPadding(0f, 0.35f, 0f, 0.50f), NavigationCameraController().update(input(bottomPanel = 0.50f)).camera.padding)
         assertPadding(GuidanceCameraPolicy.PADDING_PORTRAIT, NavigationCameraController().update(input(bottomPanel = 0.05f)).camera.padding)
         assertPadding(GuidanceCameraPolicy.PADDING_LANDSCAPE, NavigationCameraController().update(input(bottomPanel = 0.30f, landscape = true)).camera.padding)
+    }
+
+    @Test fun `the top stack pushes the car down by its height plus 4 percent, in portrait only`() {
+        // 2D : marges de la règle nulles → la pile du haut (36 %) impose 40 % en haut ; le bas suit le panneau.
+        assertPadding(CameraPadding(0f, 0.40f, 0f, 0.30f), NavigationCameraController().update(input(mode = CameraMode3D.FOLLOW_2D, topPanel = 0.36f, bottomPanel = 0.30f)).camera.padding)
+        // 3D : la règle (45 %) l'emporte sur une pile basse ; une pile haute la dépasse.
+        assertPadding(CameraPadding(0f, 0.45f, 0f, 0.30f), NavigationCameraController().update(input(topPanel = 0.36f, bottomPanel = 0.30f)).camera.padding)
+        assertPadding(CameraPadding(0f, 0.54f, 0f, 0.30f), NavigationCameraController().update(input(topPanel = 0.50f, bottomPanel = 0.30f)).camera.padding)
+        // Pile seule, panneau du bas pas encore mesuré : marge basse de la règle.
+        assertPadding(CameraPadding(0f, 0.54f, 0f, 0.12f), NavigationCameraController().update(input(topPanel = 0.50f)).camera.padding)
+        // Paysage : ignorée.
+        assertPadding(GuidanceCameraPolicy.PADDING_LANDSCAPE, NavigationCameraController().update(input(topPanel = 0.50f, bottomPanel = 0.30f, landscape = true)).camera.padding)
+    }
+
+    @Test fun `top and bottom margins stay under 85 percent together, the bottom panel first`() {
+        // 0,54 + 0,50 > 0,85 : la voiture reste au-dessus du panneau du bas, la marge haute cède.
+        assertPadding(CameraPadding(0f, 0.35f, 0f, 0.50f), NavigationCameraController().update(input(topPanel = 0.50f, bottomPanel = 0.50f)).camera.padding)
+        assertPadding(CameraPadding(0f, 0.25f, 0f, 0.60f), NavigationCameraController().update(input(mode = CameraMode3D.FOLLOW_2D, topPanel = 0.40f, bottomPanel = 0.60f)).camera.padding)
     }
 
     @Test fun `the 2d button and the session default`() {

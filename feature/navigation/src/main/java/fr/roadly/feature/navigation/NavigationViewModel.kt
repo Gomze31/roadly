@@ -149,10 +149,25 @@ class NavigationViewModel @Inject constructor(
     fun collapseBottomPanel() { _panelExpanded.value = false }
 
     private val _panelFraction = MutableStateFlow<Float?>(null)
-    /** D5 : part de l'écran couverte par le bloc du bas, mesurée par l'écran (`BottomPanelGeometry`) → marge basse de la caméra. */
+    /** D5 : part de l'écran couverte par le bloc du bas, mesurée par l'écran (`PanelGeometry`) → marge basse de la caméra. */
     val bottomPanelFraction: StateFlow<Float?> = _panelFraction
 
     fun setBottomPanelFraction(fraction: Float?) { _panelFraction.value = fraction }
+
+    private val _bottomBlockHeight = MutableStateFlow(0)
+    /**
+     * Passe appareil : distance (dp, arrondie au-dessus) entre le haut du bloc du bas et le bas de l'écran, mesurée avec la fraction ;
+     * la colonne d'actions portrait se pose au-dessus. 0 avant la première mesure.
+     */
+    val bottomBlockHeightDp: StateFlow<Int> = _bottomBlockHeight
+
+    fun setBottomBlockHeightDp(heightDp: Int) { _bottomBlockHeight.value = heightDp }
+
+    private val _topStackFraction = MutableStateFlow<Float?>(null)
+    /** Passe appareil : part de l'écran couverte par la pile du haut (portrait, `PanelGeometry.topFraction`) → marge haute de la caméra. */
+    val topStackFraction: StateFlow<Float?> = _topStackFraction
+
+    fun setTopStackFraction(fraction: Float?) { _topStackFraction.value = fraction }
 
     /** D5 : nom de la destination mémorisé par la session (B6, `lastGuidance`) ; null si la course a démarré sans nom. */
     val destinationName: StateFlow<String?> = prefs.lastGuidance.map { it?.destinationName }.distinctUntilChanged()

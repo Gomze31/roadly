@@ -32,6 +32,8 @@ data class NavigationCameraInput(
     val nowMs: Long,
     /** Hauteur du panneau inférieur / hauteur de la vue (portrait) ; null = marges par défaut. Mesure branchée à l'Étape D5. */
     val bottomPanelFraction: Float? = null,
+    /** Bas de la pile du haut (bandeau, panneau de direction, voies) / hauteur de la vue (portrait) ; null = marges par défaut. */
+    val topPanelFraction: Float? = null,
 )
 
 /** Commande caméra : cible, caméra, durée (0 = déplacement immédiat) et courbe ([eased] = accélération / décélération MapLibre, sinon linéaire). */
@@ -66,7 +68,7 @@ class NavigationCameraController {
         )
         // La caméra « cap en haut » est gardée comme référence : en sortant du nord en haut, cap et zoom repartent d'elle.
         previous = headingUp
-        val padded = withBottomPanel(headingUp, input)
+        val padded = withPanels(headingUp, input)
         val camera = if (input.mode == CameraMode3D.NORTH_UP) padded.copy(bearing = 0.0) else padded
         val first = lastMode == null
         val transition = !first && (transitionRequested || lastMode != input.mode)
@@ -113,11 +115,20 @@ class NavigationCameraController {
         return Bearings.normalize(current + alpha * Bearings.delta(current, raw)).also { filteredBearing = it }
     }
 
-    private fun withBottomPanel(cam: GuidanceCamera, input: NavigationCameraInput): GuidanceCamera {
-        val fraction = input.bottomPanelFraction ?: return cam
+    /**
+     * Portrait : marges haute et basse étendues aux blocs de l'overlay mesurés par l'écran. En bas, au moins le bloc du bas ;
+     * en haut, au moins la pile du haut + [TOP_STACK_MARGIN] (la pointe de la flèche de manœuvre reste sous la pile, pas dessous).
+     * Somme plafonnée à [MAX_VERTICAL_PADDING] : la marge haute cède d'abord, la voiture reste au-dessus du panneau du bas.
+     * Paysage : marges de la règle, inchangées.
+     */
+    private fun withPanels(cam: GuidanceCamera, input: NavigationCameraInput): GuidanceCamera {
         if (input.landscape) return cam
-        val bottom = maxOf(cam.padding.bottom, fraction)
-        val top = cam.padding.top.coerceAtMost(MAX_VERTICAL_PADDING - bottom).coerceAtLeast(0f)
+        val bottomFraction = input.bottomPanelFraction
+        val topFraction = input.topPanelFraction
+        if (bottomFraction == null && topFraction == null) return cam
+        val bottom = maxOf(cam.padding.bottom, bottomFraction ?: 0f)
+        val wantedTop = if (topFraction == null) cam.padding.top else maxOf(cam.padding.top, topFraction + TOP_STACK_MARGIN)
+        val top = wantedTop.coerceAtMost(MAX_VERTICAL_PADDING - bottom).coerceAtLeast(0f)
         return cam.copy(padding = cam.padding.copy(top = top, bottom = bottom))
     }
 
@@ -132,5 +143,7 @@ class NavigationCameraController {
         const val TRANSITION_MS = 600
         /** Somme maximale des marges haute et basse (fraction de la hauteur de la vue). */
         const val MAX_VERTICAL_PADDING = 0.85f
+        /** Écart (fraction de la hauteur de la vue) ajouté sous la pile du haut pour la marge haute. */
+        const val TOP_STACK_MARGIN = 0.04f
     }
 }
