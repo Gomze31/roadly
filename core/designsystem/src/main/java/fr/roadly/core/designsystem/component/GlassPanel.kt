@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,7 @@ import fr.roadly.core.designsystem.theme.softShadow
  * Panneau « verre » posé sur la carte : surface translucide, reflet, bord fin, ombre douce.
  * Le flou d'arrière-plan réel n'existe pas nativement en Compose sans bibliothèque tierce ;
  * l'opacité de `glass` est calibrée pour rester lisible sur la carte claire comme sombre.
+ * Panneau touchable ([onClick]) : [onClickLabel] et [role] sont annoncés par TalkBack (« Toucher deux fois pour … »).
  */
 @Composable
 fun GlassPanel(
@@ -34,6 +36,8 @@ fun GlassPanel(
     contentPadding: Dp = RoadlySpacing.m,
     onClick: (() -> Unit)? = null,
     elevated: Boolean = true,
+    onClickLabel: String? = null,
+    role: Role? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val c = LocalRoadlyColors.current
@@ -41,7 +45,7 @@ fun GlassPanel(
         modifier
             .then(if (elevated) Modifier.softShadow(shape, if (c.isDark) c.background else c.textPrimary, 10.dp) else Modifier)
             .clip(shape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(onClickLabel = onClickLabel, role = role, onClick = onClick) else Modifier)
             .background(c.glass)
             .glassHighlight()
             .border(1.dp, c.glassBorder, shape)

@@ -33,11 +33,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -216,6 +218,19 @@ class RouteViewModelTest {
             assertEquals(listOf(b, a), c.stops)
             vm.removeStop(0); advanceUntilIdle()
             assertEquals(listOf(a), (expectMostRecentItem().phase as RouteUiState.Content).stops)
+        }
+    }
+
+    @Test fun `start guidance remembers the destination name`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val vm = vm()
+        vm.uiState.test {
+            advanceUntilIdle()
+            expectMostRecentItem()
+            assertTrue(vm.startGuidance())
+            runCurrent()
+            assertEquals("Test", prefs.lastGuidance.first()?.destinationName)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 }

@@ -22,6 +22,9 @@ internal object MapIds {
     const val SRC_SCOOTER = "roadly-scooter"
     const val LYR_SCOOTER_PREFIX = "roadly-scooter-"
     const val LYR_SCOOTER_CAUTION = "roadly-scooter-caution"
+    /** C3 : queue du tronçon parcouru (dernier point du tracé → position projetée), seule mise à jour à chaque position. */
+    const val SRC_TRAVERSED_TAIL = "roadly-traversed-tail"
+    const val LYR_ROUTE_TRAVERSED_TAIL = "roadly-route-traversed-tail"
     const val LYR_ACCURACY = "roadly-accuracy"
     const val LYR_USER = "roadly-user-arrow"
     const val LYR_ROUTE_GLOW = "roadly-route-glow"
@@ -34,6 +37,18 @@ internal object MapIds {
     const val IMG_ARROW = "roadly-img-arrow"
     const val IMG_PIN = "roadly-img-pin"
     const val IMG_REPORT = "roadly-img-report"
+    const val SRC_ARROW = "roadly-arrow"
+    const val LYR_ARROW_CASING = "roadly-arrow-casing"
+    const val LYR_ARROW = "roadly-arrow-line"
+    const val LYR_ARROW_HEAD = "roadly-arrow-head"
+    const val LYR_BUILDINGS_3D = "roadly-buildings-3d"
+    const val IMG_ARROW_HEAD = "roadly-img-arrow-head"
+    /** Source vecteur OpenMapTiles des styles OpenFreeMap ; absente = pas de bâtiments 3D. */
+    const val STYLE_SRC_OPENMAPTILES = "openmaptiles"
+    const val STYLE_LYR_BUILDING = "building"
+    /** Calques de points d'intérêt et de noms de rues des tuiles OpenMapTiles (niveau de détail, C2). */
+    const val STYLE_LYR_POI = "poi"
+    const val STYLE_LYR_TRANSPORTATION_NAME = "transportation_name"
 }
 
 /** GeoJSON FeatureCollection des tracés ; l'itinéraire actif est placé en dernier (dessiné au-dessus). */
@@ -60,10 +75,13 @@ object RouteFeatureBuilder {
 
 /** Builders GeoJSON des points : position de l'utilisateur et marqueurs de lieux. */
 internal object PointFeatureBuilder {
-    fun user(fix: LocationFix): String = buildJsonObject {
+    fun user(fix: LocationFix): String = user(MarkerInterpolation.pose(fix), fix.accuracyM)
+
+    /** Marqueur à une pose interpolée (C1). */
+    fun user(pose: MarkerPose, accuracyM: Float): String = buildJsonObject {
         put("type", "Feature")
-        putJsonObject("properties") { put("bearing", (fix.bearingDeg ?: 0f).toDouble()); put("accuracy", fix.accuracyM.toDouble()) }
-        putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(fix.point.lon), JsonPrimitive(fix.point.lat)))) }
+        putJsonObject("properties") { put("bearing", pose.bearingDeg); put("accuracy", accuracyM.toDouble()) }
+        putJsonObject("geometry") { put("type", "Point"); put("coordinates", JsonArray(listOf(JsonPrimitive(pose.lon), JsonPrimitive(pose.lat)))) }
     }.toString()
 
     fun reports(reports: List<CommunityReport>): String = buildJsonObject {

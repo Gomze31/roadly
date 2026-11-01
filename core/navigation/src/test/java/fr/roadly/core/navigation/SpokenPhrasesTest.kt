@@ -18,4 +18,9 @@ class SpokenPhrasesTest {
 
     @Test fun `in distance lowercases the instruction`() =
         assertEquals("Dans 300 mètres, tournez à droite.", SpokenPhrases.inDistance(300.0, "Tournez à droite."))
+
+    @Test fun `430 m is spoken 450 meters like the banner shows 450 m`() {
+        assertEquals("450 mètres", SpokenPhrases.distance(430.0))
+        assertEquals("450 m", fr.roadly.core.common.Formatters.maneuverDistance(430.0))
+    }
 }

@@ -1,0 +1,139 @@
+package fr.roadly.core.map
+
+import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.PitchPreset
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class GuidanceCameraPolicyTest {
+    private fun input(
+        speed: Double? = 50.0, bearing: Float? = 90f, distance: Double = 2_000.0, type: ManeuverType = ManeuverType.TURN_RIGHT,
+        threeD: Boolean = true, powerSave: Boolean = false, landscape: Boolean = false,
+    ) = GuidanceCameraInput(speed, bearing, distance, type, threeD, powerSave, landscape)
+
+    @Test fun `cruise zoom follows speed between the anchor points`() {
+        assertEquals(17.5, GuidanceCameraPolicy.compute(input(speed = 10.0), null).zoom, 1e-9)
+        assertEquals(17.5, GuidanceCameraPolicy.compute(input(speed = 30.0), null).zoom, 1e-9)
+        assertEquals(17.0, GuidanceCameraPolicy.compute(input(speed = 50.0), null).zoom, 1e-9)
+        assertEquals(16.65, GuidanceCameraPolicy.compute(input(speed = 70.0), null).zoom, 1e-9)
+        assertEquals(16.3, GuidanceCameraPolicy.compute(input(speed = 90.0), null).zoom, 1e-9)
+        assertEquals(15.8, GuidanceCameraPolicy.compute(input(speed = 130.0), null).zoom, 1e-9)
+        assertEquals(17.0, GuidanceCameraPolicy.compute(input(speed = null), null).zoom, 1e-9)
+    }
+
+    @Test fun `3d cruise is pitched 58 and the car sits in the lower third in portrait`() {
+        val cam = GuidanceCameraPolicy.compute(input(), null)
+        assertEquals(58.0, cam.pitch, 1e-9)
+        assertEquals(90.0, cam.bearing, 1e-9)
+        assertEquals(CameraPadding(0f, 0.45f, 0f, 0.12f), cam.padding)
+    }
+
+    @Test fun `landscape pads the left side for the overlay column`() {
+        assertEquals(CameraPadding(0.40f, 0.25f, 0f, 0f), GuidanceCameraPolicy.compute(input(landscape = true), null).padding)
+    }
+
+    @Test fun `2d keeps the legacy follow camera`() {
+        val cam = GuidanceCameraPolicy.compute(input(threeD = false, speed = 120.0, distance = 50.0), null)
+        assertEquals(17.0, cam.zoom, 1e-9)
+        assertEquals(0.0, cam.pitch, 1e-9)
+        assertEquals(CameraPadding(0f, 0f, 0f, 0f), cam.padding)
+    }
+
+    @Test fun `power save lowers the pitch to 45`() {
+        assertEquals(45.0, GuidanceCameraPolicy.compute(input(powerSave = true), null).pitch, 1e-9)
+    }
+
+    @Test fun `motorway exits are approached from 400 m only at speed`() {
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT_RIGHT, 100.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT_RIGHT, 50.0))
+        assertTrue(GuidanceCameraPolicy.isApproaching(140.0, ManeuverType.EXIT_RIGHT, 50.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(410.0, ManeuverType.EXIT_RIGHT, 100.0))
+        // scénario 7 : approche à 400 m pour toute sortie / bretelle, quel que soit le côté
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.EXIT_LEFT, 100.0))
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.RAMP_LEFT, 100.0))
+        assertTrue(GuidanceCameraPolicy.isApproaching(390.0, ManeuverType.MERGE_RIGHT, 100.0))
+    }
+
+    @Test fun `turns and roundabouts are approached from 150 m, departure and arrival never`() {
+        assertTrue(GuidanceCameraPolicy.isApproaching(140.0, ManeuverType.ROUNDABOUT_ENTER, 40.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(160.0, ManeuverType.TURN_LEFT, 40.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(50.0, ManeuverType.ARRIVE, 40.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(50.0, ManeuverType.DEPART, 40.0))
+        assertFalse(GuidanceCameraPolicy.isApproaching(50.0, ManeuverType.CONTINUE, 40.0))
+    }
+
+    @Test fun `approach zooms to 17,5 with a flatter pitch and skips smoothing`() {
+        // Passe appareil : 17,5 (et non 18) pour que la flèche de manœuvre tienne, pointe comprise, sous la pile du bandeau.
+        val previous = GuidanceCameraPolicy.compute(input(speed = 90.0), null)
+        val cam = GuidanceCameraPolicy.compute(input(speed = 90.0, distance = 100.0), previous)
+        assertEquals(17.5, cam.zoom, 1e-9)
+        assertEquals(50.0, cam.pitch, 1e-9)
+        assertEquals(45.0, GuidanceCameraPolicy.compute(input(distance = 100.0, powerSave = true), null).pitch, 1e-9)
+    }
+
+    @Test fun `zoom moves at most half a level per update while cruising`() {
+        val previous = GuidanceCameraPolicy.compute(input(speed = 10.0), null) // 17.5
+        val cam = GuidanceCameraPolicy.compute(input(speed = 130.0), previous)   // cible 15.8
+        assertEquals(17.0, cam.zoom, 1e-9)
+    }
+
+    @Test fun `bearing is kept from the previous camera when stopped or unknown`() {
+        val previous = GuidanceCameraPolicy.compute(input(bearing = 135f), null)
+        assertEquals(135.0, GuidanceCameraPolicy.compute(input(speed = 2.0, bearing = 10f), previous).bearing, 1e-9)
+        assertEquals(135.0, GuidanceCameraPolicy.compute(input(bearing = null), previous).bearing, 1e-9)
+        assertEquals(0.0, GuidanceCameraPolicy.compute(input(bearing = null), null).bearing, 1e-9)
+    }
+
+    @Test fun `an approach decided by the screen overrides the distance rule`() {
+        assertEquals(GuidanceCameraPolicy.PITCH_APPROACH, GuidanceCameraPolicy.compute(input(distance = 160.0).copy(approaching = true), null).pitch, 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(approaching = false), null).pitch, 1e-9)
+    }
+
+    @Test fun `dense city tilts to the MapLibre maximum below 30 km per h when buildings are visible`() {
+        fun pitch(speed: Double?, buildings: Boolean, distance: Double = 2_000.0) =
+            GuidanceCameraPolicy.compute(input(speed = speed, distance = distance).copy(buildingsVisible = buildings), null).pitch
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(20.0, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(2.0, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, pitch(20.0, false), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, pitch(30.0, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, pitch(null, true), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_APPROACH, pitch(20.0, true, distance = 100.0), 1e-9)
+    }
+
+    @Test fun `no pitch goes beyond what MapLibre Android renders`() {
+        for (speed in listOf(null, 0.0, 20.0, 50.0, 130.0)) for (buildings in listOf(true, false)) for (powerSave in listOf(true, false)) for (distance in listOf(100.0, 2_000.0)) {
+            val pitch = GuidanceCameraPolicy.compute(input(speed = speed, distance = distance, powerSave = powerSave).copy(buildingsVisible = buildings), null).pitch
+            assertTrue("$speed $buildings $powerSave $distance → $pitch", pitch <= GuidanceCameraPolicy.MAX_PITCH)
+        }
+    }
+
+    @Test fun `the pitch preset sets the cruise pitch, the approach stays at 50 and power save at 45`() {
+        assertEquals(45.0, GuidanceCameraPolicy.compute(input().copy(pitchPreset = PitchPreset.LOW), null).pitch, 1e-9)
+        assertEquals(60.0, GuidanceCameraPolicy.compute(input().copy(pitchPreset = PitchPreset.HIGH), null).pitch, 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_APPROACH, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(pitchPreset = PitchPreset.HIGH), null).pitch, 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_POWER_SAVE, GuidanceCameraPolicy.compute(input(powerSave = true).copy(pitchPreset = PitchPreset.HIGH), null).pitch, 1e-9)
+    }
+
+    @Test fun `dense city tilt needs the standard or high preset`() {
+        fun pitch(p: PitchPreset) = GuidanceCameraPolicy.compute(input(speed = 20.0).copy(buildingsVisible = true, pitchPreset = p), null).pitch
+        assertEquals("inclinaison basse choisie : pas de 60° en ville", 45.0, pitch(PitchPreset.LOW), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(PitchPreset.STANDARD), 1e-9)
+        assertEquals(GuidanceCameraPolicy.PITCH_DENSE_CITY, pitch(PitchPreset.HIGH), 1e-9)
+    }
+
+    @Test fun `the zoom offset shifts cruise and 2d zoom, widens the approach but never tightens it`() {
+        assertEquals(18.0, GuidanceCameraPolicy.compute(input(speed = 50.0).copy(zoomOffset = 1), null).zoom, 1e-9)
+        assertEquals(16.0, GuidanceCameraPolicy.compute(input(speed = 50.0).copy(zoomOffset = -1), null).zoom, 1e-9)
+        assertEquals(18.0, GuidanceCameraPolicy.compute(input(threeD = false).copy(zoomOffset = 1), null).zoom, 1e-9)
+        assertEquals("flèche entière à l'approche (3c02729)", 17.5, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(zoomOffset = 1), null).zoom, 1e-9)
+        assertEquals(16.5, GuidanceCameraPolicy.compute(input(distance = 100.0).copy(zoomOffset = -1), null).zoom, 1e-9)
+    }
+
+    @Test fun `pitch presets match the policy constants`() {
+        assertEquals(GuidanceCameraPolicy.PITCH_POWER_SAVE, PitchPreset.LOW.degrees, 0.0)
+        assertEquals(GuidanceCameraPolicy.PITCH_3D, PitchPreset.STANDARD.degrees, 0.0)
+        assertEquals(GuidanceCameraPolicy.MAX_PITCH, PitchPreset.HIGH.degrees, 0.0)
+    }
+}

@@ -1,0 +1,256 @@
+package fr.roadly.core.navigation
+
+import fr.roadly.core.common.AppError
+import fr.roadly.core.common.DispatcherProvider
+import fr.roadly.core.common.Outcome
+import fr.roadly.core.data.repository.LastGuidance
+import fr.roadly.core.data.testing.FakeUserPreferencesRepository
+import fr.roadly.core.location.LocationPermissionState
+import fr.roadly.core.location.testing.FakeLocationRepository
+import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.LocationFix
+import fr.roadly.core.model.Route
+import fr.roadly.core.model.RoutePreferences
+import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.navigation.testing.FakeNavigationServiceController
+import fr.roadly.core.navigation.testing.FakeSpeechService
+import fr.roadly.core.navigation.testing.FixScript
+import fr.roadly.core.navigation.testing.TestRoutes
+import fr.roadly.core.routing.RouteOption
+import fr.roadly.core.routing.RoutingProvider
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Session de bout en bout sur trajets simulés (`FixScript`) : ronds-points, annonces, recalcul, persistance (Étape B). */
+@OptIn(ExperimentalCoroutinesApi::class)
+class NavigationSessionGuidanceTest {
+    private val location = FakeLocationRepository()
+    private val prefs = FakeUserPreferencesRepository()
+    private val speech = FakeSpeechService()
+    private val requests = mutableListOf<RouteRequest>()
+    private var routingResult: Outcome<List<Route>> = Outcome.Failure(AppError.Network)
+    private val routing = object : RoutingProvider {
+        override val id = "fake"
+        override suspend fun route(request: RouteRequest): Outcome<List<Route>> { requests += request; return routingResult }
+    }
+
+    private fun TestScope.session(): NavigationSession {
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        return NavigationSession(location, routing, NoopSpeedLimitProvider(), speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
+    }
+
+    private fun option(route: Route) = RouteOption(route, "Le plus rapide", 0L, null, sameAsFastest = false)
+    private fun guiding(s: NavigationSession) = s.state.value as NavigationState.Guiding
+
+    /** Émet [fixes] une par seconde (horodatage = horloge de test) ; [onEach] est appelé après le traitement de chaque fix. */
+    private suspend fun TestScope.play(fixes: List<LocationFix>, onEach: (LocationFix) -> Unit = {}) {
+        fixes.forEach { f ->
+            advanceTimeBy(1_000)
+            location.emit(f.copy(timestampMs = testScheduler.currentTime)); runCurrent()
+            onEach(f)
+        }
+    }
+
+    @Test fun `the guiding state exposes the roundabout ahead and keeps it inside the ring`() = runTest {
+        val route = TestRoutes.twoRoundabouts()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(150.0, 150.0, speedKmh = 30.0))
+        assertEquals(2, guiding(s).roundabout!!.exitNumber)
+        play(FixScript(route).drive(215.0, 215.0, speedKmh = 30.0))
+        assertEquals(2, guiding(s).progress.nextManeuverIndex)
+        assertEquals("cible figée dans l'anneau", 2, guiding(s).roundabout!!.exitNumber)
+        play(FixScript(route).drive(260.0, 260.0, speedKmh = 30.0))
+        assertEquals(1, guiding(s).roundabout!!.exitNumber)
+        play(FixScript(route).drive(400.0, 400.0, speedKmh = 30.0))
+        assertNull(guiding(s).roundabout)
+    }
+
+    @Test fun `announcements carry their priority - now urgent, near normal, far low`() = runTest {
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        // turnAt + 200 : manœuvre passée, arrivée encore au-delà du FAR ; sans ce relais, le saut jusqu'au bout sort de la fenêtre de suivi (recalcul).
+        play(listOf(turnAt - 250.0, turnAt - 70.0, turnAt - 30.0, turnAt + 200.0).map { FixScript(route).drive(it, it, speedKmh = 36.0).single() })
+        play(FixScript(route).drive(RouteTracker(route).totalGeometryM, RouteTracker(route).totalGeometryM, speedKmh = 36.0))
+        assertEquals(
+            listOf(SpeechPriority.NORMAL, SpeechPriority.LOW, SpeechPriority.NORMAL, SpeechPriority.URGENT, SpeechPriority.URGENT),
+            speech.priorities,
+        )
+    }
+
+    @Test fun `straight drive - distances decrease and no announcement is repeated`() = runTest { // scénario 1
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        val distances = mutableListOf<Pair<Int, Double>>()
+        play(FixScript(route).drive(0.0, route.distanceMeters - 30.0, speedKmh = 50.0)) {
+            val p = guiding(s).progress
+            distances += p.nextManeuverIndex to p.distanceToNextManeuverM
+        }
+        assertEquals(speech.spoken.distinct(), speech.spoken)
+        distances.groupBy { it.first }.values.forEach { d -> assertTrue(d.map { it.second }.zipWithNext().all { (a, b) -> b <= a }) }
+    }
+
+    @Test fun `130 km h at 1 Hz - the now announcement comes at least 3 s ahead, once`() = runTest {
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val now = route.maneuvers[1].verbalPre!!
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        var nowSpokenAt: Double? = null
+        play(FixScript(route).drive(0.0, turnAt + 30.0, speedKmh = 130.0)) {
+            if (nowSpokenAt == null && now in speech.spoken) nowSpokenAt = turnAt - guiding(s).progress.distanceAlongM
+        }
+        assertNotNull(nowSpokenAt)
+        assertTrue("NOW à $nowSpokenAt m", nowSpokenAt!! >= 3 * 130 / 3.6)
+        assertEquals(1, speech.spoken.count { it == now })
+    }
+
+    @Test fun `jitter at the turn never repeats an announcement over 10 fixes`() = runTest {
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(turnAt - 200.0, turnAt - 20.0, speedKmh = 30.0))
+        play(FixScript(route, seed = 4).jitter(turnAt, count = 10, amplitudeM = 8.0))
+        assertEquals(speech.spoken.distinct(), speech.spoken)
+    }
+
+    @Test fun `two close roundabouts - each entry said once, exit chained with puis, no doubled far`() = runTest { // scénario 6
+        val route = TestRoutes.twoRoundabouts()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route, seed = 9).drive(0.0, route.distanceMeters - 40.0, speedKmh = 30.0, noiseM = 2.0))
+        assertEquals(speech.spoken.distinct(), speech.spoken)
+        assertEquals(1, speech.spoken.count { it == "Entrez dans le rond-point et prenez la 2e sortie." })
+        assertEquals(1, speech.spoken.count { it == "Entrez dans le rond-point et prenez la 1re sortie." })
+        assertTrue(speech.spoken.any { it == "Quittez le rond-point dans Rue Médiane, puis entrez dans le rond-point et prenez la 1re sortie." })
+        val second = route.maneuvers[3].verbalAlert!!.replaceFirstChar { it.lowercase() }
+        assertTrue(
+            "pas de FAR (LOW) pour le 2e rond-point, manœuvre 3 (moins de 10 s après la sortie du 1er)",
+            speech.spoken.zip(speech.priorities).none { (text, p) -> p == SpeechPriority.LOW && text.endsWith(second) },
+        )
+    }
+
+    @Test fun `a turn crossed only by extrapolation still gets its now announcement`() = runTest { // revue finale B : extrapolation × indice monotone
+        val route = TestRoutes.straight()
+        val turnAt = RouteTracker(route).maneuverStartM[1]
+        val now = route.maneuvers[1].verbalPre!!
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(turnAt - 200.0, turnAt - 58.0, speedKmh = 50.0))
+        assertTrue("NEAR dit, pas encore de NOW", now !in speech.spoken)
+        // 5 s sans fix : l'extrapolation à la vitesse lissée (50 km/h) passe le virage alors que le conducteur freine.
+        advanceTimeBy(5_000); runCurrent()
+        assertEquals("avance provisoire", 2, guiding(s).progress.nextManeuverIndex)
+        val back = FixScript(route).drive(turnAt - 5.0, turnAt - 5.0, speedKmh = 20.0).single()
+        location.emit(back.copy(timestampMs = testScheduler.currentTime)); runCurrent()
+        assertEquals(1, guiding(s).progress.nextManeuverIndex)
+        assertEquals(1, speech.spoken.count { it == now })
+    }
+
+    @Test fun `an alternative to the same destination without a name keeps the remembered name`() = runTest {
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        // Alternative ou étape ajoutée : NavigationViewModel relance sans nom, vers la même destination.
+        val alternative = TestRoutes.straight("alternative")
+        s.start(option(alternative), RoutePreferences()); runCurrent()
+        assertEquals(LastGuidance(alternative.geometry.last(), "Maison", "alternative", 0L), prefs.lastGuidance.first())
+    }
+
+    @Test fun `a failed replacement start forgets the previous run`() = runTest {
+        val s = session(); s.start(option(TestRoutes.straight()), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
+        location.permission.value = LocationPermissionState.DENIED
+        s.start(option(TestRoutes.straight("other")), RoutePreferences()); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `8 s on a parallel road 45 m away do not trigger a reroute`() = runTest { // scénario 9
+        val route = TestRoutes.parallelRoads()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(100.0, 100.0 + 7 * 50 / 3.6, speedKmh = 50.0, lateralM = 45.0))
+        assertTrue(requests.isEmpty())
+        assertFalse(guiding(s).rerouting)
+    }
+
+    @Test fun `after a reroute the maneuver index and the announcements start over`() = runTest { // scénario 12
+        val route = TestRoutes.straight()
+        routingResult = Outcome.Success(listOf(TestRoutes.straight("rerouted")))
+        val tracker = RouteTracker(route)
+        val turnAt = tracker.maneuverStartM[1]
+        val near = "Dans 70 mètres, tournez à droite dans Rue d'Essai."
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        play(FixScript(route).drive(turnAt - 70.0, turnAt - 70.0, speedKmh = 36.0))
+        assertEquals(1, speech.spoken.count { it == near })
+        play(listOf(LocationFix(TestRoutes.north(tracker.pointAt(turnAt - 60.0), 150.0), 20f, 10f, 5f, 0L)))
+        assertEquals("rerouted", guiding(s).route.id)
+        play(FixScript(route).drive(turnAt - 66.0, turnAt - 66.0, speedKmh = 36.0))
+        assertEquals(1, guiding(s).progress.nextManeuverIndex)
+        assertEquals("annonces réinitialisées : NEAR redit sur le nouveau tracé", 2, speech.spoken.count { it == near })
+    }
+
+    @Test fun `the run is remembered at start and forgotten at stop`() = runTest { // scénario 14 (JVM)
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertEquals(LastGuidance(route.geometry.last(), "Maison", route.id, 0L), prefs.lastGuidance.first())
+        s.stop(); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `the run is forgotten at arrival`() = runTest {
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences()); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
+        play(FixScript(route).drive(RouteTracker(route).totalGeometryM, RouteTracker(route).totalGeometryM, speedKmh = 36.0))
+        assertTrue(s.state.value is NavigationState.Arrived)
+        assertNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `nothing is remembered when the run cannot start`() = runTest {
+        location.permission.value = LocationPermissionState.DENIED
+        val s = session(); s.start(option(TestRoutes.straight()), RoutePreferences()); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `after a process death the remembered run is offered while idle and forgotten on ignore`() = runTest { // scénario 14 (E3)
+        val saved = LastGuidance(GeoPoint(43.6045, 1.4440), "Capitole", "r-avant", 0L)
+        prefs.setLastGuidance(saved)
+        val s = session(); runCurrent()
+        assertEquals(NavigationState.Idle, s.state.value)
+        assertEquals(saved, s.resumableGuidance.first())
+        s.forgetLastGuidance(); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+        assertNull(s.resumableGuidance.first())
+    }
+
+    @Test fun `no resume is offered while guiding, and ignore keeps the current run`() = runTest {
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertNull(s.resumableGuidance.first())
+        s.forgetLastGuidance(); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `a normal stop never flashes the stopped run as resumable`() = runTest { // revue E3 : effacement asynchrone
+        val s = session(); s.start(option(TestRoutes.straight()), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
+        val seen = mutableListOf<LastGuidance?>()
+        backgroundScope.launch { s.resumableGuidance.collect { seen += it } }
+        runCurrent()
+        s.stop(); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+        assertTrue("aucune reprise proposée entre l'arrêt et l'effacement : $seen", seen.isNotEmpty() && seen.all { it == null })
+    }
+}

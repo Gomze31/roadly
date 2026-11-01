@@ -16,6 +16,19 @@ object Formatters {
         else -> "${(meters / 1000).roundToInt()} km"
     }
 
+    /** Table d'arrondi commune à la voix et à l'écran (B2) : < 100 m → 10 m près (min. 10) ; < 1 km → 50 m près ; au-delà → 100 m près. */
+    fun roundManeuverMeters(meters: Double): Int = when {
+        meters < 100.0 -> ((meters / 10.0).roundToInt() * 10).coerceAtLeast(10)
+        meters < 1000.0 -> (meters / 50.0).roundToInt() * 50
+        else -> (meters / 100.0).roundToInt() * 100
+    }
+
+    /** Distance à une manœuvre (bandeau, Horizon, notification), même arrondi que la voix : « 450 m », « 1,2 km ». */
+    fun maneuverDistance(meters: Double): String {
+        val r = roundManeuverMeters(meters)
+        return if (r < 1000) "$r m" else String.format(fr, "%.1f km", r / 1000.0)
+    }
+
     fun duration(seconds: Double): String {
         val totalMin = (seconds / 60).roundToInt()
         val h = totalMin / 60

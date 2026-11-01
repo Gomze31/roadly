@@ -24,3 +24,9 @@ data class HomeUiState(
     /** Vitesse en km/h, `null` tant qu'aucune vitesse n'est connue. */
     val speedKmh: Double? get() = fix?.speedMps?.let { it * 3.6 }
 }
+
+/** E3 : étape de la reprise proposée par l'accueil. */
+enum class ResumePhase { OFFER, ROUTING, FAILED }
+
+/** E3 : carte « Reprendre le guidage vers … » ; [destinationName] null si la course avait démarré sans nom. */
+data class ResumeCardUi(val destinationName: String?, val phase: ResumePhase = ResumePhase.OFFER)

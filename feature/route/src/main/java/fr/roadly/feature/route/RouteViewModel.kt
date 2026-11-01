@@ -240,7 +240,7 @@ class RouteViewModel @Inject constructor(
         val content = computed.value as? RouteUiState.Content ?: return false
         val id = activeId.value ?: content.activeId
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
-        session.start(option, computedWith, computedVehicle, computedScooter)
+        session.start(option, computedWith, computedVehicle, computedScooter, destinationName = destName.ifBlank { null })
         return true
     }
 

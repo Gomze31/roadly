@@ -9,7 +9,7 @@ plugins {
 android {
     namespace = "fr.roadly.feature.navigation"
     compileSdk = 36
-    defaultConfig { minSdk = 29 }
+    defaultConfig { minSdk = 29; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildFeatures { compose = true }
 }
@@ -29,7 +29,14 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.serialization.json)
+    // Aperçus Compose des composants D (rendu dans Android Studio).
+    debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    // Compose tire espresso-core 3.5.0, qui plante sur Android 16+ (InputManager.getInstance retiré) : même parade que core:designsystem.
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

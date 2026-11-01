@@ -28,13 +28,24 @@ object GuidanceConstants {
     /** Extrapolation GPS plafonnée : au plus 10 s et 150 m après le dernier fix réel. */
     const val EXTRAPOLATION_MAX_MS = 10_000L
     const val EXTRAPOLATION_MAX_M = 150.0
-    /** Un fix de précision > 50 m ne peut pas déclencher seul la règle « hors itinéraire > 100 m ». */
-    const val HARD_RULE_MAX_ACCURACY_M = 50f
+    /** B6 : un fix de précision > 30 m est ignoré par toute décision « hors itinéraire » (compteurs inchangés). */
+    const val OFF_ROUTE_MAX_ACCURACY_M = 30f
+    /** B6 : la règle des 5 fixes > 40 m exige aussi un cap écarté de plus de 50° du tracé sur 3 fixes consécutifs (route parallèle). */
+    const val OFF_ROUTE_HEADING_DEG = 50.0
+    const val OFF_ROUTE_HEADING_FIXES = 3
     /** Filtre de cap : au-delà de 2,5 m/s, les segments à plus de 90° du cap GPS sont écartés. */
     const val HEADING_FILTER_MIN_SPEED_MPS = 2.5f
     const val HEADING_MAX_DIFF_DEG = 90.0
-    /** Quasi-égalité de distance perpendiculaire (m) : on préfère alors la continuité le long du tracé. */
-    const val SEGMENT_TIE_M = 10.0
+    /** B1 : l'indice de manœuvre ne recule que sur un recul de plus de 30 m sous l'abscisse maximale atteinte… */
+    const val BACKTRACK_CONFIRM_M = 30.0
+    /** … confirmé par 2 fixes consécutifs. */
+    const val BACKTRACK_CONFIRM_FIXES = 2
+    /** B6 : à écart perpendiculaire quasi égal (≤ 15 m), un autre passage du tracé proche de la dernière abscisse l'emporte (pont, échangeur)… */
+    const val CONTINUITY_TIE_M = 15.0
+    /** … s'il est à plus de 50 m le long du tracé (en deçà : simple angle du même passage)… */
+    const val CONTINUITY_MIN_GAP_M = 50.0
+    /** … et ne recule pas de plus de 30 m (même valeur que le recul confirmé de B1). */
+    const val CONTINUITY_BACK_M = BACKTRACK_CONFIRM_M
     /** Un saut global de plus de 100 m le long du tracé doit être confirmé par un second fix (à 50 m près). */
     const val GLOBAL_JUMP_M = 100.0
     const val GLOBAL_CONFIRM_RADIUS_M = 50.0
@@ -46,4 +57,25 @@ object GuidanceConstants {
     const val STALE_FIX_TOLERANCE_MS = 2_000L
     /** Pluie (Open-Meteo) : au plus une requête toutes les 10 min. */
     const val RAIN_CHECK_INTERVAL_MS = 600_000L
+    /** B1 : une manœuvre est passée quand `along` dépasse son début de max(10 m, 2 × précision du fix), marge plafonnée (voir ci-dessous). */
+    const val MANEUVER_PASSED_MIN_M = 10.0
+    /** B1 : facteur appliqué à la précision du fix dans la marge de passage. */
+    const val MANEUVER_PASSED_ACCURACY_FACTOR = 2.0
+    /** B1 : plafond de la marge de passage, elle-même bornée à la moitié du tronçon de la manœuvre (un dernier tronçon court doit pouvoir arriver). */
+    const val MANEUVER_PASSED_MAX_M = 60.0
+    /** B5 : une annonce LOW / NORMAL restée plus de 8 s en file n'est plus dite (palier dépassé). */
+    const val SPEECH_STALE_AFTER_MS = 8_000L
+    /**
+     * Garde-fou du moteur de synthèse : un énoncé dont le rappel de fin (`onDone` / `onStop` / `onError`) n'arrive pas est réputé fini
+     * au bout de 3 s + 100 ms par caractère ; sans cela la file resterait bloquée et le focus audio tenu.
+     */
+    const val SPEECH_UTTERANCE_TIMEOUT_MS = 3_000L
+    const val SPEECH_MS_PER_CHAR = 100L
+    /** B5 : l'annonce « maintenant » part à max(40 m, 4 s de trajet à la vitesse lissée). */
+    const val NOW_MIN_M = 40.0
+    const val NOW_LEAD_S = 4.0
+    /** B5 : une manœuvre suivante à moins de 200 m est annoncée avec la courante (« …, puis … »). */
+    const val COMBINE_NEXT_MANEUVER_M = 200.0
+    /** B5 : pas d'annonce lointaine (FAR) dans les 10 s qui suivent le passage d'une manœuvre. */
+    const val FAR_QUIET_AFTER_MANEUVER_MS = 10_000L
 }

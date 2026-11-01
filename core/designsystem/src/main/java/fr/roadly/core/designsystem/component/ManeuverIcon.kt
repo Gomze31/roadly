@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.ForkLeft
 import androidx.compose.material.icons.filled.ForkRight
 import androidx.compose.material.icons.filled.Merge
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.RampLeft
 import androidx.compose.material.icons.filled.RampRight
 import androidx.compose.material.icons.filled.RoundaboutRight
 import androidx.compose.material.icons.filled.Straight
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.TurnSharpRight
 import androidx.compose.material.icons.filled.TurnSlightLeft
 import androidx.compose.material.icons.filled.TurnSlightRight
 import androidx.compose.material.icons.filled.UTurnLeft
+import androidx.compose.material.icons.filled.UTurnRight
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -40,12 +42,18 @@ fun ManeuverType.icon(): ImageVector = when (this) {
     ManeuverType.SLIGHT_RIGHT -> Icons.Default.TurnSlightRight
     ManeuverType.SHARP_LEFT -> Icons.Default.TurnSharpLeft
     ManeuverType.SHARP_RIGHT -> Icons.Default.TurnSharpRight
-    ManeuverType.UTURN -> Icons.Default.UTurnLeft
+    ManeuverType.UTURN_LEFT -> Icons.Default.UTurnLeft
+    ManeuverType.UTURN_RIGHT -> Icons.Default.UTurnRight
     ManeuverType.ROUNDABOUT_ENTER, ManeuverType.ROUNDABOUT_EXIT -> Icons.Default.RoundaboutRight
     ManeuverType.MERGE -> Icons.Default.Merge
-    ManeuverType.RAMP -> Icons.Default.RampRight
-    ManeuverType.EXIT, ManeuverType.KEEP_RIGHT -> Icons.Default.ForkRight
-    ManeuverType.KEEP_LEFT -> Icons.Default.ForkLeft
+    // Pas d'icône Material « fusion à gauche / à droite » : la flèche légère du bon côté.
+    ManeuverType.MERGE_LEFT -> Icons.Default.TurnSlightLeft
+    ManeuverType.MERGE_RIGHT -> Icons.Default.TurnSlightRight
+    ManeuverType.RAMP -> Icons.Default.Straight
+    ManeuverType.RAMP_LEFT -> Icons.Default.RampLeft
+    ManeuverType.RAMP_RIGHT -> Icons.Default.RampRight
+    ManeuverType.EXIT_LEFT, ManeuverType.KEEP_LEFT -> Icons.Default.ForkLeft
+    ManeuverType.EXIT_RIGHT, ManeuverType.KEEP_RIGHT -> Icons.Default.ForkRight
     ManeuverType.FERRY -> Icons.Default.DirectionsBoat
     ManeuverType.OTHER -> Icons.Default.Navigation
 }
