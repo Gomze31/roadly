@@ -52,7 +52,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Toll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -78,6 +77,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -146,6 +147,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
             TintGroup(tint, onSelect = vm::setTint)
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
+            AssistantGroup()
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
             AlertsGroup(state.alerts, vigilanceRefresh, onVigilance = vm::setVigilanceEnabled, onSound = vm::setVigilanceSound, onRain = vm::setRainLowersLimit, onRefresh = vm::refreshVigilance)
             RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
@@ -174,10 +176,11 @@ internal fun settingsFieldColors() = LocalRoadlyColors.current.let { c ->
 }
 
 @Composable
-internal fun SettingsField(label: String, value: String, onValueChange: (String) -> Unit, keyboardType: KeyboardType) {
+internal fun SettingsField(label: String, value: String, onValueChange: (String) -> Unit, keyboardType: KeyboardType, masked: Boolean = false) {
     OutlinedTextField(
         value = value, onValueChange = onValueChange, label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        visualTransformation = if (masked) PasswordVisualTransformation() else VisualTransformation.None,
         singleLine = true, colors = settingsFieldColors(), shape = RoadlyShapes.Tile, modifier = Modifier.fillMaxWidth(),
     )
 }

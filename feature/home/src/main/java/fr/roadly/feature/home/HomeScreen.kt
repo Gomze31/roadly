@@ -113,6 +113,8 @@ fun HomeScreen(
     onResumeGuidance: () -> Unit,
     onSearchCategory: (PoiCategory) -> Unit,
     onOpenProfile: () -> Unit = {},
+    assistantButton: @Composable () -> Unit = {},
+    assistantPanel: @Composable () -> Unit = {},
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -161,12 +163,13 @@ fun HomeScreen(
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
         ReportResultPill(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 76.dp))
 
-        // Colonne d'actions à droite : signaler (feuille des types), boussole si la carte est tournée.
+        // Colonne d'actions à droite : Roadly AI, signaler (feuille des types), boussole si la carte est tournée.
         Column(
             Modifier.align(if (landscape) Alignment.TopEnd else Alignment.CenterEnd).statusBarsPadding().padding(RoadlySpacing.screenEdge).padding(top = if (landscape) 60.dp else 0.dp),
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
+            assistantButton()
             RoundIconButton(Icons.Default.Warning, stringResource(R.string.home_report), onClick = { showReport = true }, style = RoundButtonStyle.Accent)
             AnimatedVisibility(state.isRotated, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                 CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
@@ -199,6 +202,9 @@ fun HomeScreen(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.screenEdge)
         }
         Column(bottomModifier) {
+            // Fenêtre compacte Roadly AI, au-dessus du compteur ; invisible hors session.
+            assistantPanel()
+            Spacer(Modifier.height(RoadlySpacing.sm))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                 // Pas de source de limitation de vitesse hors guidage : le badge affiche « — ».
                 SpeedBadge(speedKmh = state.speedKmh, limitKmh = null)

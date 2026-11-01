@@ -206,4 +206,22 @@
     <string name="assist_history">Fil des demandes</string>
     <string name="assist_history_subtitle">Nécessite un compte Roadly</string>
     <string name="settings_provider_overpass">Données OSM détaillées (Overpass API)</string>
+    <string name="settings_group_assistant">Roadly AI</string>
+    <string name="settings_assistant_footer">Copilote vocal Gemini Live. Le guidage reste prioritaire et fonctionne sans l\'assistant, même hors ligne. La clé n\'est jamais affichée.</string>
+    <string name="settings_assistant_enabled">Activer Roadly AI</string>
+    <string name="settings_assistant_consent">Partager ma position et mon trajet avec Gemini</string>
+    <string name="settings_assistant_consent_subtitle">Seulement quand l\'assistant en a besoin pour répondre (position, destination, itinéraire, véhicule).</string>
+    <string name="settings_assistant_key">Clé API Gemini</string>
+    <string name="settings_assistant_key_override">Clé saisie ici (chiffrée sur le téléphone)</string>
+    <string name="settings_assistant_key_build">Clé de local.properties</string>
+    <string name="settings_assistant_key_none">Aucune clé</string>
+    <string name="settings_assistant_key_field">Nouvelle clé</string>
+    <string name="settings_assistant_key_clear">Oublier la clé saisie</string>
+    <string name="settings_assistant_verify">Vérifier la clé</string>
+    <string name="settings_assistant_verify_running">Vérification…</string>
+    <string name="settings_assistant_verify_ok">Clé acceptée par Gemini.</string>
+    <string name="settings_assistant_verify_failed">Échec : %1$s</string>
+    <string name="settings_assistant_cap">Plafond quotidien d\'écoute</string>
+    <string name="settings_assistant_cap_minutes">%1$d min</string>
+    <string name="settings_assistant_usage">Aujourd\'hui : %1$d / %2$d min d\'écoute · ≈ %3$d tokens</string>
 </resources>

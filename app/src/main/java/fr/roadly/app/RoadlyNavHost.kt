@@ -10,9 +10,14 @@ import androidx.compose.material3.TextButton
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Modifier
+import fr.roadly.feature.assistant.AssistantMicButton
+import fr.roadly.feature.assistant.AssistantOverlay
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import fr.roadly.core.navigation.NavRequest
 import fr.roadly.feature.home.HomeRoute
 import fr.roadly.feature.home.homeScreen
 import fr.roadly.feature.navigation.NavigationRoute
@@ -20,6 +25,8 @@ import fr.roadly.feature.navigation.navigationScreen
 import fr.roadly.core.model.Place
 import fr.roadly.feature.route.PICKED_STOP_KEY
 import fr.roadly.feature.route.RouteRoute
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.json.Json
 import fr.roadly.feature.route.routeScreen
 import fr.roadly.feature.search.SearchRoute
@@ -49,6 +56,7 @@ fun RoadlyNavHost(
     externalRequest: ExternalRequest? = null,
     onExternalHandled: () -> Unit = {},
     launch: LaunchViewModel = hiltViewModel(),
+    navRequests: Flow<NavRequest> = emptyFlow(),
 ) {
     val nav = rememberNavController()
     val context = LocalContext.current
@@ -63,6 +71,8 @@ fun RoadlyNavHost(
             onResumeGuidance = { nav.navigate(NavigationRoute) { launchSingleTop = true } },
             onSearchCategory = { cat -> nav.navigate(SearchRoute(category = cat.name)) },
             onOpenProfile = { nav.navigate(ProfileRoute) },
+            assistantButton = { AssistantMicButton() },
+            assistantPanel = { AssistantOverlay(Modifier.fillMaxWidth()) },
         )
         searchScreen(
             onBack = { nav.popBackStack() },
@@ -103,6 +113,8 @@ fun RoadlyNavHost(
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
             onChangeDestination = { nav.navigate(SearchRoute()) },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
+            assistantButton = { AssistantMicButton() },
+            assistantPanel = { AssistantOverlay(Modifier.fillMaxWidth()) },
         )
     }
     // Mise à jour disponible (release GitHub) : proposée au lancement ; le suivi détaillé est dans Réglages › Mises à jour.
@@ -138,5 +150,15 @@ fun RoadlyNavHost(
             is ExternalRequest.Destination -> nav.navigate(RouteRoute(r.lat, r.lon, r.label ?: context.getString(R.string.external_destination))) { popUpTo(HomeRoute); launchSingleTop = true }
         }
         onExternalHandled()
+    }
+    // Demandes de l'assistant (ouvrir la recherche filtrée, le guidage, les réglages).
+    LaunchedEffect(navRequests) {
+        navRequests.collect { r ->
+            when (r) {
+                is NavRequest.OpenSearch -> nav.navigate(SearchRoute(category = r.category))
+                NavRequest.OpenGuidance -> nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
+                NavRequest.OpenSettings -> nav.navigate(SettingsRoute) { launchSingleTop = true }
+            }
+        }
     }
 }

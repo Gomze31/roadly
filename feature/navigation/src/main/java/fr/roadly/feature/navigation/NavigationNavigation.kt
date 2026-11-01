@@ -1,5 +1,6 @@
 package fr.roadly.feature.navigation
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -16,7 +17,14 @@ import kotlinx.serialization.json.Json
 const val NAV_PICKED_STOP_KEY = "pickedStop"
 
 /** [onAddStop] ouvre la recherche en mode « choisir un arrêt » ; le lieu revient par [NAV_PICKED_STOP_KEY] et relance le guidage via cet arrêt. */
-fun NavGraphBuilder.navigationScreen(isDark: Boolean, onExit: () -> Unit, onChangeDestination: () -> Unit, onAddStop: () -> Unit = {}) {
+fun NavGraphBuilder.navigationScreen(
+    isDark: Boolean,
+    onExit: () -> Unit,
+    onChangeDestination: () -> Unit,
+    onAddStop: () -> Unit = {},
+    assistantButton: @Composable () -> Unit = {},
+    assistantPanel: @Composable () -> Unit = {},
+) {
     composable<NavigationRoute> { entry ->
         val vm: NavigationViewModel = hiltViewModel()
         val picked by entry.savedStateHandle.getStateFlow<String?>(NAV_PICKED_STOP_KEY, null).collectAsStateWithLifecycle()
@@ -25,6 +33,9 @@ fun NavGraphBuilder.navigationScreen(isDark: Boolean, onExit: () -> Unit, onChan
             entry.savedStateHandle[NAV_PICKED_STOP_KEY] = null
             runCatching { Json.decodeFromString(Place.serializer(), raw) }.getOrNull()?.let { vm.addStop(it) }
         }
-        NavigationScreen(isDark = isDark, onExit = onExit, onChangeDestination = onChangeDestination, onAddStop = onAddStop, vm = vm)
+        NavigationScreen(
+            isDark = isDark, onExit = onExit, onChangeDestination = onChangeDestination, onAddStop = onAddStop,
+            assistantButton = assistantButton, assistantPanel = assistantPanel, vm = vm,
+        )
     }
 }

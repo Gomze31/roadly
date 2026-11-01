@@ -15,13 +15,13 @@ import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.map.MapDetailPolicy
 import fr.roadly.core.model.CommunityReport
+import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.PitchPreset
 import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.ReportKind
-import fr.roadly.core.model.RoutePreferences
-import fr.roadly.core.model.RouteRequest
+import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.routing.RouteAlternativesUseCase
@@ -38,6 +38,7 @@ import fr.roadly.core.scooter.assistant.ScooterAssistantContext
 import fr.roadly.core.scooter.osm.ScooterPoi
 import fr.roadly.core.scooter.osm.ScooterPoiKind
 import kotlinx.coroutines.flow.first
+import fr.roadly.core.navigation.reportsAhead
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,9 +66,7 @@ class NavigationViewModel @Inject constructor(
     private val session: NavigationSession,
     prefs: UserPreferencesRepository,
     config: ProviderConfigRepository,
-    private val alternatives: RouteAlternativesUseCase,
-    private val routing: RoutingProvider,
-    vehicleRepo: VehicleProfileRepository,
+    private val guidance: GuidanceActions,
     private val community: CommunityRepository,
     /** Services du mode trottinette ; null (tests existants) = guidage voiture / moto inchangé. */
     private val scooter: ScooterServices? = null,
@@ -98,13 +97,11 @@ class NavigationViewModel @Inject constructor(
         val g = s as? NavigationState.Guiding ?: return@combine emptyList()
         reportsProjector.ahead(g.route, g.progress.distanceAlongM, list)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    private val vehicle = vehicleRepo.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val isDark = MutableStateFlow(true)
     private val following = MutableStateFlow(true)
     private var refollowJob: Job? = null
     private var alternativesJob: Job? = null
     private val styleUrl = combine(isDark, config.config) { dark, cfg -> if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl }
-    private val routePreferences = prefs.routePreferences.stateIn(viewModelScope, SharingStarted.Eagerly, RoutePreferences())
 
     private val _alternatives = MutableStateFlow<AlternativesUi>(AlternativesUi.Hidden)
     val alternativesUi: StateFlow<AlternativesUi> = _alternatives
@@ -212,7 +209,7 @@ class NavigationViewModel @Inject constructor(
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
     fun toggleMute() = session.setMuted(!session.muted.value)
-    fun stop() = session.stop()
+    fun stop() = guidance.stop()
     fun retry() = session.retry()
 
     private val _recenterIn = MutableStateFlow<Int?>(null)
@@ -256,7 +253,7 @@ class NavigationViewModel @Inject constructor(
             val result = if (sc != null && cfg != null) {
                 // Trottinette : variantes trottinette depuis la position (jamais les variantes voiture).
                 sc.options(scooterParams(sc, cfg, g.progress.snapped, g.route.geometry.last(), emptyList()))
-            } else alternatives(g.progress.snapped, g.route.geometry.last(), vehicle.value, System.currentTimeMillis(), routePreferences.value)
+            } else guidance.alternativesFromHere()
             when (val r = result) {
                 is Outcome.Success -> _alternatives.value = AlternativesUi.Content(r.value, g.route.id)
                 is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
@@ -272,32 +269,17 @@ class NavigationViewModel @Inject constructor(
 
     /** Ajoute un arrêt en cours de trajet : position projetée → arrêt → destination courante, puis bascule du guidage. */
     fun addStop(place: Place) {
-        val g = session.state.value as? NavigationState.Guiding ?: return
-        if (_addingStop.value) return
+        if (session.state.value !is NavigationState.Guiding || _addingStop.value) return
         viewModelScope.launch {
             _addingStop.value = true
-            val cfg = session.scooterConfig
-            val request = RouteRequest(
-                origin = g.progress.snapped, destination = g.route.geometry.last(), waypoints = listOf(place.point),
-                costing = g.route.costing, preferences = if (cfg != null) RoutePreferences() else routePreferences.value,
-                originHeadingDeg = g.progress.bearingDeg, vehicle = if (cfg != null) null else vehicle.value, scooter = cfg?.request,
-            )
-            when (val r = routing.route(request)) {
-                is Outcome.Success -> r.value.firstOrNull()?.let { route ->
-                    val cfgNow = session.scooterConfig?.let { it.copy(batteryPct = g.scooter?.range?.batteryNowPct ?: it.batteryPct) }
-                    session.start(RouteOption(route.copy(costing = g.route.costing), "Via ${place.name}", System.currentTimeMillis() + (route.durationSeconds * 1000).toLong(), null, sameAsFastest = false), routePreferences.value, vehicle.value, cfgNow)
-                }
-                is Outcome.Failure -> _alternatives.value = AlternativesUi.Error(r.error)
-            }
+            (guidance.addStop(place) as? Outcome.Failure)?.let { _alternatives.value = AlternativesUi.Error(it.error) }
             _addingStop.value = false
         }
     }
 
     /** Bascule le guidage sur [option] : la course est remplacée, la voix et le service continuent. */
     fun switchTo(option: RouteOption) {
-        val g = session.state.value as? NavigationState.Guiding
-        val cfg = session.scooterConfig?.let { it.copy(batteryPct = g?.scooter?.range?.batteryNowPct ?: it.batteryPct) }
-        if (cfg != null) session.start(option, RoutePreferences(), null, cfg) else session.start(option, routePreferences.value, vehicle.value)
+        viewModelScope.launch { guidance.select(option) }
         dismissAlternatives()
     }
 
