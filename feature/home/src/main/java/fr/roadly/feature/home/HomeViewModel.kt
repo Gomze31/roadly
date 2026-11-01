@@ -10,6 +10,9 @@ import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.pollNearby
 import fr.roadly.core.data.connectivity.ConnectivityObserver
 import fr.roadly.core.data.repository.FavoritesRepository
+import fr.roadly.core.data.repository.LastGuidance
+import fr.roadly.core.data.repository.UserPreferencesRepository
+import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.geocoding.GeocodingProvider
 import fr.roadly.core.location.LocationMode
 import fr.roadly.core.location.LocationPermissionState
@@ -23,8 +26,10 @@ import fr.roadly.core.model.ReportKind
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
+import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.routing.RouteAlternativesUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +37,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
@@ -51,8 +57,11 @@ class HomeViewModel @Inject constructor(
     connectivity: ConnectivityObserver,
     config: ProviderConfigRepository,
     permissionEvents: PermissionEvents,
-    navigationSession: NavigationSession,
+    private val navigationSession: NavigationSession,
     private val community: CommunityRepository,
+    private val prefs: UserPreferencesRepository,
+    private val alternatives: RouteAlternativesUseCase,
+    private val vehicles: VehicleProfileRepository,
 ) : ViewModel() {
 
     /** Service communautaire configuré (Réglages → Communauté) : feuille « Signaler » active, signalements sur la carte. */
@@ -122,6 +131,43 @@ class HomeViewModel @Inject constructor(
         .map { it is NavigationState.Guiding }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private val resumePhase = MutableStateFlow(ResumePhase.OFFER)
+    private val resumable: StateFlow<LastGuidance?> = navigationSession.resumableGuidance.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** E3 : carte « Reprendre le guidage vers … » — course interrompue et session au repos ; null sinon. */
+    val resumeCard: StateFlow<ResumeCardUi?> = combine(resumable, resumePhase) { last, phase -> last?.let { ResumeCardUi(it.destinationName, phase) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * E3 « Reprendre » : nouvel itinéraire depuis la position actuelle vers la destination mémorisée (pas le tracé enregistré), avec les
+     * préférences et le véhicule du moment, puis départ comme « ROULER » (`session.start` avec le nom). Même calcul que
+     * `GuidanceActions.startTo` de Roadly AI. Échec : la carte le dit, la course reste mémorisée. Sans position connue : rien.
+     */
+    fun resumeLastGuidance() {
+        val last = resumable.value ?: return
+        val origin = location.lastKnown?.point ?: return
+        if (resumePhase.value == ResumePhase.ROUTING) return
+        resumePhase.value = ResumePhase.ROUTING
+        viewModelScope.launch {
+            val p = prefs.routePreferences.first()
+            val v = vehicles.profile.first()
+            when (val r = alternatives(origin, last.destination, v, System.currentTimeMillis(), p)) {
+                is Outcome.Success -> {
+                    val best = r.value.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: r.value.first()
+                    resumePhase.value = ResumePhase.OFFER
+                    navigationSession.start(best, p, v, last.destinationName)
+                }
+                is Outcome.Failure -> resumePhase.value = ResumePhase.FAILED
+            }
+        }
+    }
+
+    /** E3 « Ignorer » : la course mémorisée est oubliée ; plus de carte jusqu'au prochain guidage interrompu. */
+    fun dismissResume() {
+        resumePhase.value = ResumePhase.OFFER
+        navigationSession.forgetLastGuidance()
+    }
 
     /** Relance le géocodage inverse seulement si l'on s'est déplacé de plus de 50 m. */
     private fun maybeReverse(fix: LocationFix) {

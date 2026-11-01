@@ -7,6 +7,7 @@ import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.location.testing.FakeLocationRepository
+import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RoutePreferences
@@ -220,5 +221,24 @@ class NavigationSessionGuidanceTest {
         location.permission.value = LocationPermissionState.DENIED
         val s = session(); s.start(option(TestRoutes.straight()), RoutePreferences()); runCurrent()
         assertNull(prefs.lastGuidance.first())
+    }
+
+    @Test fun `after a process death the remembered run is offered while idle and forgotten on ignore`() = runTest { // scénario 14 (E3)
+        val saved = LastGuidance(GeoPoint(43.6045, 1.4440), "Capitole", "r-avant", 0L)
+        prefs.setLastGuidance(saved)
+        val s = session(); runCurrent()
+        assertEquals(NavigationState.Idle, s.state.value)
+        assertEquals(saved, s.resumableGuidance.first())
+        s.forgetLastGuidance(); runCurrent()
+        assertNull(prefs.lastGuidance.first())
+        assertNull(s.resumableGuidance.first())
+    }
+
+    @Test fun `no resume is offered while guiding, and ignore keeps the current run`() = runTest {
+        val route = TestRoutes.straight()
+        val s = session(); s.start(option(route), RoutePreferences(), destinationName = "Maison"); runCurrent()
+        assertNull(s.resumableGuidance.first())
+        s.forgetLastGuidance(); runCurrent()
+        assertNotNull(prefs.lastGuidance.first())
     }
 }

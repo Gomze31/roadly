@@ -28,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -67,6 +68,18 @@ class NavigationSession @Inject constructor(
 
     /** Sourdine demandée par l'utilisateur pour la course (indépendante du réglage « voix »). */
     val muted: StateFlow<Boolean> = _muted.asStateFlow()
+
+    /**
+     * E3 : course mémorisée à proposer à la reprise (« Reprendre le guidage vers … »), seulement au repos — après la mort du processus ou un
+     * redémarrage (un arrêt ou une arrivée l'ont effacée). Null pendant un guidage. LIMITE : aucune limite d'âge.
+     */
+    val resumableGuidance: Flow<LastGuidance?> = combine(prefs.lastGuidance, state) { last, s -> last.takeIf { s is NavigationState.Idle } }
+        .distinctUntilChanged()
+
+    /** E3 « Ignorer » : oublie la course mémorisée ; sans effet pendant un guidage, dont la course est celle qui est mémorisée. */
+    fun forgetLastGuidance() {
+        if (_state.value is NavigationState.Idle) persistLastGuidance(null)
+    }
 
     private val confined = dispatchers.default.limitedParallelism(1)
     private var job: Job? = null
