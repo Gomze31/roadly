@@ -68,7 +68,8 @@ class NavigationCameraController {
         )
         // La caméra « cap en haut » est gardée comme référence : en sortant du nord en haut, cap et zoom repartent d'elle.
         previous = headingUp
-        val padded = withPanels(headingUp, input)
+        val approaching = input.approaching ?: GuidanceCameraPolicy.isApproaching(input.distanceToManeuverM, input.maneuverType, input.speedKmh)
+        val padded = withPanels(headingUp, input, approach3d = approaching && threeD)
         val camera = if (input.mode == CameraMode3D.NORTH_UP) padded.copy(bearing = 0.0) else padded
         val first = lastMode == null
         val transition = !first && (transitionRequested || lastMode != input.mode)
@@ -118,16 +119,19 @@ class NavigationCameraController {
     /**
      * Portrait : marges haute et basse étendues aux blocs de l'overlay mesurés par l'écran. En bas, au moins le bloc du bas ;
      * en haut, au moins la pile du haut + [TOP_STACK_MARGIN] (la pointe de la flèche de manœuvre reste sous la pile, pas dessous).
+     * À l'approche en 3D ([approach3d]), au moins [APPROACH_TOP_PADDING] en haut.
      * Somme plafonnée à [MAX_VERTICAL_PADDING] : la marge haute cède d'abord, la voiture reste au-dessus du panneau du bas.
      * Paysage : marges de la règle, inchangées.
      */
-    private fun withPanels(cam: GuidanceCamera, input: NavigationCameraInput): GuidanceCamera {
+    private fun withPanels(cam: GuidanceCamera, input: NavigationCameraInput, approach3d: Boolean): GuidanceCamera {
         if (input.landscape) return cam
         val bottomFraction = input.bottomPanelFraction
         val topFraction = input.topPanelFraction
-        if (bottomFraction == null && topFraction == null) return cam
+        if (bottomFraction == null && topFraction == null && !approach3d) return cam
         val bottom = maxOf(cam.padding.bottom, bottomFraction ?: 0f)
-        val wantedTop = if (topFraction == null) cam.padding.top else maxOf(cam.padding.top, topFraction + TOP_STACK_MARGIN)
+        var wantedTop = cam.padding.top
+        if (topFraction != null) wantedTop = maxOf(wantedTop, topFraction + TOP_STACK_MARGIN)
+        if (approach3d) wantedTop = maxOf(wantedTop, APPROACH_TOP_PADDING)
         val top = wantedTop.coerceAtMost(MAX_VERTICAL_PADDING - bottom).coerceAtLeast(0f)
         return cam.copy(padding = cam.padding.copy(top = top, bottom = bottom))
     }
@@ -145,5 +149,11 @@ class NavigationCameraController {
         const val MAX_VERTICAL_PADDING = 0.85f
         /** Écart (fraction de la hauteur de la vue) ajouté sous la pile du haut pour la marge haute. */
         const val TOP_STACK_MARGIN = 0.04f
+        /**
+         * Marge haute minimale (fraction de la hauteur de la vue) à l'approche d'une manœuvre, en portrait et en 3D : la voiture
+         * descend vers 0,64 de la hauteur et la manœuvre arrive en milieu d'écran, sous la pile du bandeau et du panneau de direction,
+         * pointe de la flèche comprise. Plafond [MAX_VERTICAL_PADDING] respecté.
+         */
+        const val APPROACH_TOP_PADDING = 0.58f
     }
 }

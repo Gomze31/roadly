@@ -173,6 +173,19 @@ class NavigationCameraControllerTest {
         assertPadding(CameraPadding(0f, 0.25f, 0f, 0.60f), NavigationCameraController().update(input(mode = CameraMode3D.FOLLOW_2D, topPanel = 0.40f, bottomPanel = 0.60f)).camera.padding)
     }
 
+    @Test fun `approach in portrait 3d lowers the car with a 58 percent top margin, under the cap`() {
+        // Approche, portrait, 3D : marge haute 0,58 (voiture vers 0,64 H, manœuvre en milieu d'écran).
+        assertPadding(CameraPadding(0f, NavigationCameraController.APPROACH_TOP_PADDING, 0f, 0.12f), NavigationCameraController().update(input(approaching = true)).camera.padding)
+        // Croisière : inchangée.
+        assertPadding(GuidanceCameraPolicy.PADDING_PORTRAIT, NavigationCameraController().update(input(approaching = false)).camera.padding)
+        // Paysage : inchangé.
+        assertPadding(GuidanceCameraPolicy.PADDING_LANDSCAPE, NavigationCameraController().update(input(approaching = true, landscape = true)).camera.padding)
+        // 2D : pas de marge d'approche (la règle 2D n'a pas de marge).
+        assertPadding(CameraPadding.NONE, NavigationCameraController().update(input(approaching = true, mode = CameraMode3D.FOLLOW_2D)).camera.padding)
+        // Panneau du bas à 0,30 : 0,58 + 0,30 > 0,85 → marge haute ramenée à 0,55, le bas reste au panneau.
+        assertPadding(CameraPadding(0f, 0.55f, 0f, 0.30f), NavigationCameraController().update(input(approaching = true, bottomPanel = 0.30f, topPanel = 0.36f)).camera.padding)
+    }
+
     @Test fun `the 2d button and the session default`() {
         assertEquals(CameraMode3D.FOLLOW_3D, CameraMode3D.default(map3dEnabled = true))
         assertEquals(CameraMode3D.FOLLOW_2D, CameraMode3D.default(map3dEnabled = false))
