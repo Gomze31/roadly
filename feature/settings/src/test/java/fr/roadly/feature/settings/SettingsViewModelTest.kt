@@ -12,7 +12,10 @@ import fr.roadly.core.data.repository.RecentSearchRepository
 import fr.roadly.core.data.repository.ThemeMode
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
+import fr.roadly.core.model.CameraMode3D
 import fr.roadly.core.model.FuelType
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.MapDetail
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.RoutePreferences
@@ -178,5 +181,31 @@ class SettingsViewModelTest {
         assertEquals(listOf(VoiceChannel.ASSISTANT), speech.channels)
         assertEquals(listOf(SpeechPriority.LOW), speech.priorities)
         assertEquals("flush : remplace un essai précédent, jamais le guidage", listOf(true), speech.flushes)
+    }
+
+    @Test fun `the navigation group exposes and persists its settings`() = runTest {
+        val vm = vm()
+        vm.navigation.test {
+            assertEquals(NavigationSettings(), awaitItem())
+            vm.setDefaultCameraMode(CameraMode3D.FOLLOW_2D); vm.setZoomOffset(1); vm.setPitchPreset(PitchPreset.LOW); vm.setAutoRotate(false)
+            vm.setShowNextManeuverPreview(false); vm.setPowerSaveMode(PowerSaveMode.OFF); vm.setMapDetail(MapDetail.REDUCED); advanceUntilIdle()
+            assertEquals(
+                NavigationSettings(
+                    defaultCameraMode = CameraMode3D.FOLLOW_2D, zoomOffset = 1, pitchPreset = PitchPreset.LOW, autoRotate = false,
+                    mapDetail = MapDetail.REDUCED, buildings3d = true, showNextManeuverPreview = false, powerSaveMode = PowerSaveMode.OFF,
+                ),
+                expectMostRecentItem(),
+            )
+            vm.setZoomOffset(3); advanceUntilIdle()
+            assertEquals("hors de −1 / 0 / +1 : ignoré", 1, prefs.zoom.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `turning 3d buildings off keeps the start view`() = runTest {
+        val vm = vm()
+        vm.setMap3d(false); advanceUntilIdle()
+        assertEquals(false, prefs.map3d.value)
+        assertEquals("vue au départ jamais choisie : figée en 3D avant le changement", CameraMode3D.FOLLOW_3D, prefs.cameraDefault.value)
     }
 }

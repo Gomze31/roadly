@@ -20,6 +20,9 @@ import fr.roadly.core.data.vigilance.VigilanceRepository
 import fr.roadly.core.model.CritAir
 import fr.roadly.core.model.FuelType
 import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.CameraMode3D
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.VehicleDimensions
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
@@ -69,6 +72,18 @@ data class SettingsUiState(
     val alerts: AlertSettings = AlertSettings(),
 )
 
+/** E2 : groupe « Navigation » — vue au départ, zoom, inclinaison, rotation, détail, bâtiments 3D, ligne « puis », économie d'énergie. */
+data class NavigationSettings(
+    val defaultCameraMode: CameraMode3D = GuidanceDefaults.DEFAULT_CAMERA_MODE,
+    val zoomOffset: Int = GuidanceDefaults.ZOOM_OFFSET,
+    val pitchPreset: PitchPreset = GuidanceDefaults.PITCH_PRESET,
+    val autoRotate: Boolean = GuidanceDefaults.AUTO_ROTATE,
+    val mapDetail: MapDetail = GuidanceDefaults.MAP_DETAIL,
+    val buildings3d: Boolean = GuidanceDefaults.MAP_3D,
+    val showNextManeuverPreview: Boolean = GuidanceDefaults.SHOW_NEXT_MANEUVER,
+    val powerSaveMode: PowerSaveMode = GuidanceDefaults.POWER_SAVE,
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val vehicleRepo: VehicleProfileRepository,
@@ -90,10 +105,27 @@ class SettingsViewModel @Inject constructor(
     /** État du dernier téléchargement manuel des zones de vigilance. */
     val vigilanceRefresh: StateFlow<RefreshState> = _vigilanceRefresh.asStateFlow()
 
-    /** Carte 3D pendant le guidage. */
+    /** E2 « Bâtiments 3D » (clé `map.3d`, ex-« Carte 3D en guidage ») ; l'écran passe par [navigation]. */
     val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_3D)
     /** Niveau de détail de la carte en guidage (Normal / Réduit). */
     val mapDetail: StateFlow<MapDetail> = prefs.mapDetail.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_DETAIL)
+    /** E2 : réglages du groupe « Navigation », appliqués au prochain guidage. */
+    val navigation: StateFlow<NavigationSettings> = combine(
+        prefs.defaultCameraMode, prefs.zoomOffset, prefs.pitchPreset, prefs.autoRotate,
+        prefs.mapDetail, prefs.map3dEnabled, prefs.showNextManeuverPreview, prefs.powerSaveMode,
+    ) { v ->
+        NavigationSettings(v[0] as CameraMode3D, v[1] as Int, v[2] as PitchPreset, v[3] as Boolean, v[4] as MapDetail, v[5] as Boolean, v[6] as Boolean, v[7] as PowerSaveMode)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NavigationSettings())
+
+    fun setDefaultCameraMode(value: CameraMode3D) { viewModelScope.launch { prefs.setDefaultCameraMode(value) } }
+    fun setZoomOffset(value: Int) {
+        if (value !in GuidanceDefaults.ALLOWED_ZOOM_OFFSETS) return
+        viewModelScope.launch { prefs.setZoomOffset(value) }
+    }
+    fun setPitchPreset(value: PitchPreset) { viewModelScope.launch { prefs.setPitchPreset(value) } }
+    fun setAutoRotate(value: Boolean) { viewModelScope.launch { prefs.setAutoRotate(value) } }
+    fun setShowNextManeuverPreview(value: Boolean) { viewModelScope.launch { prefs.setShowNextManeuverPreview(value) } }
+    fun setPowerSaveMode(value: PowerSaveMode) { viewModelScope.launch { prefs.setPowerSaveMode(value) } }
 
     private val voice = combine(prefs.voiceEnabled, prefs.voiceVolume, prefs.speedAlertToleranceKmh, prefs.speedAlertSound) { e, v, t, s -> VoiceSettings(e, v, t, s) }
 
@@ -142,7 +174,13 @@ class SettingsViewModel @Inject constructor(
     // ── Alertes (zones de vigilance, pluie) ──
     fun setVigilanceEnabled(value: Boolean) { viewModelScope.launch { prefs.setVigilanceEnabled(value) } }
     fun setVigilanceSound(value: Boolean) { viewModelScope.launch { prefs.setVigilanceSound(value) } }
-    fun setMap3d(value: Boolean) { viewModelScope.launch { prefs.setMap3dEnabled(value) } }
+    /** E2 « Bâtiments 3D » : la vue au départ, qui suivait l'ancien réglage tant qu'elle n'était pas choisie, est d'abord figée (écart 8). */
+    fun setMap3d(value: Boolean) {
+        viewModelScope.launch {
+            prefs.setDefaultCameraMode(prefs.defaultCameraMode.first())
+            prefs.setMap3dEnabled(value)
+        }
+    }
     fun setMapDetail(value: MapDetail) { viewModelScope.launch { prefs.setMapDetail(value) } }
     fun setRainLowersLimit(value: Boolean) { viewModelScope.launch { prefs.setRainLowersLimit(value) } }
     fun refreshVigilance() {
