@@ -19,6 +19,8 @@ import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
 import fr.roadly.core.navigation.testing.FakeSpeechService
+import fr.roadly.core.navigation.SpeechPriority
+import fr.roadly.core.navigation.VoiceChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -168,5 +170,13 @@ class SettingsViewModelTest {
             assertEquals(MapDetail.REDUCED, expectMostRecentItem())
             assertEquals(MapDetail.REDUCED, prefs.detail.value)
         }
+    }
+
+    @Test fun `the voice test is spoken on the assistant channel at low priority, so the guidance can pre-empt it`() = runTest {
+        val vm = vm()
+        vm.testVoice("Essai de voix."); advanceUntilIdle()
+        assertEquals(listOf(VoiceChannel.ASSISTANT), speech.channels)
+        assertEquals(listOf(SpeechPriority.LOW), speech.priorities)
+        assertEquals("flush : remplace un essai précédent, jamais le guidage", listOf(true), speech.flushes)
     }
 }

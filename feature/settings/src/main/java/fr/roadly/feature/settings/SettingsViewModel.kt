@@ -25,6 +25,8 @@ import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.VehicleProfile
 import fr.roadly.core.model.VehicleType
 import fr.roadly.core.navigation.SpeechService
+import fr.roadly.core.navigation.SpeechPriority
+import fr.roadly.core.navigation.VoiceChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -126,11 +128,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { prefs.setSpeedAlertToleranceKmh(kmh) }
     }
 
-    /** Prononce [phrase] au volume enregistré, même si la voix du guidage est désactivée (test explicite). */
+    /**
+     * Prononce [phrase] au volume enregistré, même si la voix du guidage est désactivée (test explicite). E1 : sur le canal de l'assistant,
+     * en priorité basse — la sourdine du guidage ne la coupe pas, une annonce du guidage la préempte (essai de l'arbitrage sur appareil).
+     */
     fun testVoice(phrase: String) {
         viewModelScope.launch {
             speech.setVolume(prefs.voiceVolume.first())
-            speech.speak(phrase, flush = true)
+            speech.speak(phrase, flush = true, priority = SpeechPriority.LOW, channel = VoiceChannel.ASSISTANT)
         }
     }
 

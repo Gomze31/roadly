@@ -136,7 +136,8 @@ class NavigationSession @Inject constructor(
 
     fun setMuted(muted: Boolean) {
         _muted.value = muted
-        if (muted) speech.stop()
+        // E1 : seul le guidage se tait ; un message de l'assistant en cours ou en file n'est ni coupé ni effacé.
+        if (muted) speech.stop(VoiceChannel.GUIDANCE)
     }
 
     private fun publishFailure(failed: NavigationState.Failed) {
@@ -165,9 +166,9 @@ class NavigationSession @Inject constructor(
         job?.cancel()
         job = null
         location.setGuidanceActive(false)
-        speech.stop()
-        // La sourdine appartient à la course : le service de synthèse (singleton) est rendu tel quel.
-        speech.setMuted(false)
+        speech.stop(VoiceChannel.GUIDANCE)
+        // La sourdine appartient à la course : le canal du guidage est rendu tel quel, celui de l'assistant n'est pas touché (E1).
+        speech.setMuted(false, VoiceChannel.GUIDANCE)
     }
 
     /** Une course : son état n'est lu et écrit que sur [confined]. */
@@ -229,7 +230,7 @@ class NavigationSession @Inject constructor(
             launch {
                 combine(prefs.voiceEnabled, _muted) { enabled, muted -> muted || !enabled }
                     .distinctUntilChanged()
-                    .collect { speech.setMuted(it) }
+                    .collect { speech.setMuted(it, VoiceChannel.GUIDANCE) }
             }
             launch { prefs.rainLowersLimit.collect { rainLowersLimit = it } }
             launch { prefs.vigilanceEnabled.collect { vigilanceOn = it; loadHazards() } }
@@ -451,7 +452,7 @@ class NavigationSession @Inject constructor(
             if (gen != generation) return
             // Idem pour un recalcul abouti entre-temps : une annonce issue de l'ancien tracé serait fausse.
             if (routeId != null && routeId != route.id) return
-            speech.speak(text, priority = priority)
+            speech.speak(text, priority = priority, channel = VoiceChannel.GUIDANCE)
         }
 
         private fun publish(s: NavigationState) {
