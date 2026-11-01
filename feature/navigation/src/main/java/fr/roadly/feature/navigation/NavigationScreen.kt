@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -97,6 +98,7 @@ import fr.roadly.core.designsystem.theme.CockpitTint
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.map.AttributionPlacement
 import fr.roadly.core.model.CameraMode3D
+import fr.roadly.core.model.PitchPreset
 import fr.roadly.core.map.MapController
 import fr.roadly.core.map.NavigationCameraController
 import fr.roadly.core.map.NavigationCameraInput
@@ -150,10 +152,14 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
         }
     }
     val cameraMode = vm.cameraMode.collectAsStateWithLifecycle()
-    val powerSave = rememberPowerSaveMode()
-    // Bâtiments 3D : en mode 3D seulement, et jamais en économie d'énergie.
-    LaunchedEffect(cameraMode.value, powerSave.value, c.buildings3d) {
-        map.setBuildings3d(cameraMode.value == CameraMode3D.FOLLOW_3D && !powerSave.value, c.buildings3d.toHex())
+    // E2 : économie d'énergie du réglage — Auto suit l'économiseur d'Android, Activée / Désactivée le forcent.
+    val systemSaver = rememberPowerSaveMode()
+    val powerSaveSetting = vm.powerSaveMode.collectAsStateWithLifecycle()
+    val powerSave = remember { derivedStateOf { powerSaveSetting.value.effective(systemSaver.value) } }
+    // E2 « Bâtiments 3D » : en mode 3D seulement, et jamais en économie d'énergie.
+    val buildings3d = vm.map3d.collectAsStateWithLifecycle()
+    LaunchedEffect(cameraMode.value, powerSave.value, buildings3d.value, c.buildings3d) {
+        map.setBuildings3d(buildings3d.value && cameraMode.value == CameraMode3D.FOLLOW_3D && !powerSave.value, c.buildings3d.toHex())
     }
     LaunchedEffect(c.onBrand, c.brand) { map.setArrowColor(c.onBrand.toHex(), c.brand.toHex()) }
     val approach = state.approach
@@ -168,6 +174,8 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
     val camera = remember { NavigationCameraController() }
     val bottomPanel = vm.bottomPanelFraction.collectAsStateWithLifecycle()
     val topStack = vm.topStackFraction.collectAsStateWithLifecycle()
+    val zoomOffset = vm.zoomOffset.collectAsStateWithLifecycle()
+    val pitchPreset = vm.pitchPreset.collectAsStateWithLifecycle()
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val landscape = maxWidth > maxHeight
@@ -180,11 +188,13 @@ private fun NavigationContent(isDark: Boolean, onExit: () -> Unit, onChangeDesti
         } else {
             AttributionPlacement.guidancePortrait(statusTop, RoadlySpacing.screenEdge, BANNER_TOGGLE_SIZE, RoadlySpacing.s, RoadlySpacing.sm)
         }
-        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera, bottomPanel, topStack)
+        GuidanceMapEffects(uiState, cameraMode, powerSave, landscape, map, camera, bottomPanel, topStack, zoomOffset, pitchPreset, buildings3d)
         // Signalements communautaires devant soi (projetés sur le tracé) et retour du dernier envoi.
         val reportsAhead by vm.reportsAhead.collectAsStateWithLifecycle()
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
-        val full = state.copy(communityAhead = reportsAhead)
+        val showThen by vm.showNextManeuverPreview.collectAsStateWithLifecycle()
+        // E2 : la ligne « puis … » suit le réglage, pour les deux overlays (un seul point, `BannerStack` inchangé).
+        val full = state.copy(communityAhead = reportsAhead).withNextManeuverPreview(showThen)
         if (state.styleUrl.isNotEmpty()) {
             RoadlyMap(
                 styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture,
@@ -568,6 +578,10 @@ private data class MapTick(
     val bottomPanel: Float?,
     /** Part de l'écran couverte par la pile du haut (portrait, quantifiée), null avant la première mesure. */
     val topPanel: Float?,
+    /** E2 : décalage de zoom, inclinaison choisie, bâtiments 3D. */
+    val zoomOffset: Int,
+    val pitchPreset: PitchPreset,
+    val buildings3d: Boolean,
 )
 
 /**
@@ -584,6 +598,9 @@ private fun GuidanceMapEffects(
     camera: NavigationCameraController,
     bottomPanel: State<Float?>,
     topPanel: State<Float?>,
+    zoomOffset: State<Int>,
+    pitchPreset: State<PitchPreset>,
+    buildings3d: State<Boolean>,
 ) {
     // Rotation (l'activité gère `orientation|screenSize`) : pas de relance de l'effet, juste une image de recadrage ordinaire.
     val isLandscape = rememberUpdatedState(landscape)
@@ -591,7 +608,14 @@ private fun GuidanceMapEffects(
         var lastProgress: RouteProgress? = null
         var wasFollowing = true
         // `snapshotFlow` n'émet que si la valeur change (égalité) : pas besoin de `distinctUntilChanged`.
-        snapshotFlow { ui.value.let { s -> MapTick(s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value, bottomPanel.value, topPanel.value) } }
+        snapshotFlow {
+            ui.value.let { s ->
+                MapTick(
+                    s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value, bottomPanel.value, topPanel.value,
+                    zoomOffset.value, pitchPreset.value, buildings3d.value,
+                )
+            }
+        }
             .collect { t ->
                 val route = t.route ?: return@collect
                 val progress = t.progress ?: return@collect
@@ -611,6 +635,7 @@ private fun GuidanceMapEffects(
                         distanceToManeuverM = progress.distanceToNextManeuverM, maneuverType = next.type, approaching = t.approaching,
                         mode = t.mode, powerSave = t.powerSave, landscape = t.landscape, nowMs = SystemClock.elapsedRealtime(),
                         bottomPanelFraction = t.bottomPanel, topPanelFraction = t.topPanel,
+                        zoomOffset = t.zoomOffset, pitchPreset = t.pitchPreset, buildings3d = t.buildings3d,
                     ),
                 )
                 map.applyGuidanceCamera(frame.point, frame.camera, frame.durationMs, frame.eased)

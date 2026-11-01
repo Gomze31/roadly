@@ -254,3 +254,6 @@ internal fun tripSteps(route: Route, nextIndex: Int): List<TripStepUi> = route.m
         passed = i < nextIndex, isNext = i == nextIndex,
     )
 }
+
+/** E2 « Aperçu de la manœuvre suivante » coupé : la ligne « puis … » disparaît ; le reste de l'état (aperçu, trajet complet) est intact. */
+internal fun NavigationUiState.withNextManeuverPreview(show: Boolean): NavigationUiState = if (show) this else copy(then = null)

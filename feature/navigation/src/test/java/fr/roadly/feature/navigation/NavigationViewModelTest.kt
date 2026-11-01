@@ -19,6 +19,8 @@ import fr.roadly.core.model.LaneDirection
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.Route
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
@@ -359,6 +361,38 @@ class NavigationViewModelTest {
             prefs.setLastGuidance(null)
             assertNull(awaitItem())
         }
+    }
+
+    @Test fun `the start view and north up come from the settings, the session choice still wins`() = runTest {
+        prefs.setDefaultCameraMode(CameraMode3D.FOLLOW_2D)
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        prefs.setAutoRotate(false); runCurrent()
+        assertEquals(CameraMode3D.NORTH_UP, vm.cameraMode.value)
+        vm.toggleNorthUp(); runCurrent()
+        assertEquals("nord en haut quitté : vue au départ", CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+        prefs.setAutoRotate(true); prefs.setDefaultCameraMode(CameraMode3D.FOLLOW_3D); runCurrent()
+        assertEquals("le choix de la session prime sur les réglages", CameraMode3D.FOLLOW_2D, vm.cameraMode.value)
+    }
+
+    @Test fun `zoom, pitch, the then row and power save settings are exposed for the screen`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config); runCurrent()
+        assertEquals(0, vm.zoomOffset.value)
+        assertEquals(PitchPreset.STANDARD, vm.pitchPreset.value)
+        assertTrue(vm.showNextManeuverPreview.value)
+        assertEquals(PowerSaveMode.AUTO, vm.powerSaveMode.value)
+        prefs.setZoomOffset(1); prefs.setPitchPreset(PitchPreset.LOW); prefs.setShowNextManeuverPreview(false); prefs.setPowerSaveMode(PowerSaveMode.ON); runCurrent()
+        assertEquals(1, vm.zoomOffset.value)
+        assertEquals(PitchPreset.LOW, vm.pitchPreset.value)
+        assertFalse(vm.showNextManeuverPreview.value)
+        assertEquals(PowerSaveMode.ON, vm.powerSaveMode.value)
+    }
+
+    @Test fun `without the next maneuver preview only the then row is dropped`() {
+        val s = NavigationUiState(then = ThenUi(ManeuverType.TURN_RIGHT, "Rue Médiane"))
+        assertNull(s.withNextManeuverPreview(false).then)
+        assertEquals(s.copy(then = null), s.withNextManeuverPreview(false))
+        assertEquals(s, s.withNextManeuverPreview(true))
     }
 }
 

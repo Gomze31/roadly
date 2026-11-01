@@ -16,6 +16,8 @@ import fr.roadly.core.map.CameraSnapshot
 import fr.roadly.core.map.MapDetailPolicy
 import fr.roadly.core.model.CommunityReport
 import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.PitchPreset
+import fr.roadly.core.model.PowerSaveMode
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.ReportKind
 import fr.roadly.core.model.RoutePreferences
@@ -94,27 +96,36 @@ class NavigationViewModel @Inject constructor(
     private val _alternatives = MutableStateFlow<AlternativesUi>(AlternativesUi.Hidden)
     val alternativesUi: StateFlow<AlternativesUi> = _alternatives
 
-    /** Réglage « Carte 3D en guidage » : mode de départ de la caméra (lu sans attendre par les boutons, d'où `Eagerly`). */
+    /** E2 « Bâtiments 3D » (clé `map.3d`, ex-« Carte 3D en guidage ») : bâtiments extrudés en vue 3D ; lu sans attendre, d'où `Eagerly`. */
     val map3d: StateFlow<Boolean> = prefs.map3dEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.MAP_3D)
 
-    /** C1 : mode choisi par les boutons pour cette session ; null = mode du réglage. */
+    /** E2 : vue au départ (3D / 2D ; suit `map.3d` tant qu'elle n'a pas été choisie) et rotation automatique (non = nord en haut). */
+    private val startView: StateFlow<CameraMode3D> = prefs.defaultCameraMode.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.DEFAULT_CAMERA_MODE)
+    private val autoRotate: StateFlow<Boolean> = prefs.autoRotate.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.AUTO_ROTATE)
+
+    /** C1 : mode choisi par les boutons pour cette session ; null = mode des réglages. */
     private val cameraChoice = MutableStateFlow<CameraMode3D?>(null)
-    /** Mode quitté en passant « nord en haut », rétabli au second appui. */
-    private var modeBeforeNorthUp: CameraMode3D = CameraMode3D.FOLLOW_3D
+    /** Mode quitté en passant « nord en haut », rétabli au second appui ; null = vue au départ des réglages. */
+    private var modeBeforeNorthUp: CameraMode3D? = null
 
-    /** C1 : mode de caméra du guidage (3D, 2D, nord en haut), pour la session seulement. */
-    val cameraMode: StateFlow<CameraMode3D> = combine(map3d, cameraChoice) { on, choice -> choice ?: CameraMode3D.default(on) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, CameraMode3D.default(GuidanceDefaults.MAP_3D))
+    /** C1 / E2 : mode de caméra du guidage (3D, 2D, nord en haut), pour la session seulement ; départ = réglages. */
+    val cameraMode: StateFlow<CameraMode3D> = combine(startView, autoRotate, cameraChoice) { view, rotate, choice -> choice ?: CameraMode3D.initial(view, rotate) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, CameraMode3D.initial(GuidanceDefaults.DEFAULT_CAMERA_MODE, GuidanceDefaults.AUTO_ROTATE))
 
-    private fun currentMode(): CameraMode3D = cameraChoice.value ?: CameraMode3D.default(map3d.value)
+    private fun currentMode(): CameraMode3D = cameraChoice.value ?: CameraMode3D.initial(startView.value, autoRotate.value)
 
     /** Bouton 2D / 3D. */
     fun toggleCameraMode() { cameraChoice.value = currentMode().toggled3d() }
 
-    /** Bouton « nord en haut » : bascule, puis retour au mode d'avant. */
+    /** Bouton « nord en haut » : bascule, puis retour au mode d'avant (session partie en nord en haut : la vue au départ). */
     fun toggleNorthUp() {
         val current = currentMode()
-        cameraChoice.value = if (current == CameraMode3D.NORTH_UP) modeBeforeNorthUp else { modeBeforeNorthUp = current; CameraMode3D.NORTH_UP }
+        cameraChoice.value = if (current == CameraMode3D.NORTH_UP) {
+            modeBeforeNorthUp ?: startView.value.takeIf { it != CameraMode3D.NORTH_UP } ?: CameraMode3D.FOLLOW_3D
+        } else {
+            modeBeforeNorthUp = current
+            CameraMode3D.NORTH_UP
+        }
     }
 
     /** Dernière caméra de l'écran de guidage, restaurée avec son inclinaison au retour sur l'écran. */
@@ -128,6 +139,12 @@ class NavigationViewModel @Inject constructor(
         .scan(MapDetail.NORMAL) { current, (setting, speed) -> MapDetailPolicy.effective(setting, speed, current) }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapDetail.NORMAL)
+
+    /** E2 : réglages lus par l'écran (caméra, ligne « puis », économie d'énergie), en `StateFlow` séparées : le `combine` de `uiState` n'est pas touché. */
+    val zoomOffset: StateFlow<Int> = prefs.zoomOffset.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.ZOOM_OFFSET)
+    val pitchPreset: StateFlow<PitchPreset> = prefs.pitchPreset.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.PITCH_PRESET)
+    val showNextManeuverPreview: StateFlow<Boolean> = prefs.showNextManeuverPreview.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.SHOW_NEXT_MANEUVER)
+    val powerSaveMode: StateFlow<PowerSaveMode> = prefs.powerSaveMode.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.POWER_SAVE)
 
     private val _sheet = MutableStateFlow(GuidanceSheet.NONE)
     /**
