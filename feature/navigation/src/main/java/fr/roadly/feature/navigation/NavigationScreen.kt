@@ -401,11 +401,12 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
 /**
  * Ruban Horizon montré s'il a des éléments. En paysage, masqué tant que le panneau de direction (D3) ou les voies (D4) occupent
  * la colonne gauche : bandeau + panneau + voies (≈ 350 dp) et bloc du bas ne tiennent pas ensemble sur ≈ 409 dp.
- * Passe appareil : masqué aussi en paysage quand le panneau du bas est déplié ([panelExpanded]).
+ * Passe appareil : masqué aussi en paysage quand le panneau du bas est déplié ([panelExpanded]) ; masqué dans les deux orientations
+ * pendant le panneau de direction, pour raccourcir le bloc du bas et laisser la flèche de manœuvre visible entre les blocs.
  */
 internal fun horizonVisible(state: NavigationUiState, landscape: Boolean, panelExpanded: Boolean = false): Boolean {
     val hasItems = state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()
-    return hasItems && !(landscape && (bannerSign(state) != null || state.showLanes || panelExpanded))
+    return hasItems && bannerSign(state) == null && !(landscape && (state.showLanes || panelExpanded))
 }
 
 /** Horizon : manœuvres et arrivée (Valhalla), virages (géométrie) et zones de vigilance (base officielle) ; pas de trafic (⛔ source). */

@@ -63,10 +63,11 @@ class GuidanceCameraPolicyTest {
         assertFalse(GuidanceCameraPolicy.isApproaching(50.0, ManeuverType.CONTINUE, 40.0))
     }
 
-    @Test fun `approach zooms to 18 with a flatter pitch and skips smoothing`() {
+    @Test fun `approach zooms to 17,5 with a flatter pitch and skips smoothing`() {
+        // Passe appareil : 17,5 (et non 18) pour que la flèche de manœuvre tienne, pointe comprise, sous la pile du bandeau.
         val previous = GuidanceCameraPolicy.compute(input(speed = 90.0), null)
         val cam = GuidanceCameraPolicy.compute(input(speed = 90.0, distance = 100.0), previous)
-        assertEquals(18.0, cam.zoom, 1e-9)
+        assertEquals(17.5, cam.zoom, 1e-9)
         assertEquals(50.0, cam.pitch, 1e-9)
         assertEquals(45.0, GuidanceCameraPolicy.compute(input(distance = 100.0, powerSave = true), null).pitch, 1e-9)
     }

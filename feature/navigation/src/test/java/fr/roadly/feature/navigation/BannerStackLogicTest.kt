@@ -124,8 +124,10 @@ class BannerStackLogicTest {
         assertTrue(horizonVisible(items, landscape = false))
         assertTrue(horizonVisible(items, landscape = true))
         val signed = items.copy(sign = sign, approach = approach)
-        assertTrue("portrait : gardé", horizonVisible(signed, landscape = false))
+        // Passe appareil : masqué aussi en portrait pendant le panneau de direction (bloc du bas plus court, flèche visible).
+        assertFalse("portrait : masqué pendant le panneau", horizonVisible(signed, landscape = false))
         assertFalse(horizonVisible(signed, landscape = true))
+        assertTrue("portrait : voies seules, gardé", horizonVisible(items.copy(showLanes = true), landscape = false))
         assertFalse(horizonVisible(items.copy(showLanes = true), landscape = true))
         assertFalse("rien à montrer", horizonVisible(NavigationUiState(phase = NavigationPhase.GUIDING), landscape = false))
         // Passe appareil : en paysage, l'Horizon laisse sa place au panneau déplié ; en portrait, il reste.

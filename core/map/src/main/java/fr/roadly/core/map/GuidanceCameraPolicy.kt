@@ -40,7 +40,8 @@ object GuidanceCameraPolicy {
     /** Vitesse (km/h) sous laquelle, bâtiments visibles, la caméra passe en inclinaison « ville dense ». */
     const val DENSE_CITY_MAX_KMH = 30.0
     const val ZOOM_2D = 17.0
-    const val ZOOM_APPROACH = 18.0
+    /** Zoom d'approche : 17,5 (passe appareil de l'étape D, 18 auparavant) pour que la flèche de manœuvre tienne sous la pile du bandeau. */
+    const val ZOOM_APPROACH = 17.5
     const val MAX_ZOOM_STEP = 0.5
     const val STOPPED_KMH = 5.0
     const val EXIT_APPROACH_M = 400.0
