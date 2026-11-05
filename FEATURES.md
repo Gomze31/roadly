@@ -180,7 +180,7 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
 | Widget (domicile, travail, rechercher) | fonctionnelle | 4×1, jour / nuit (LOT 12) |
 | Raccourcis statiques, intents geo: / google.navigation: | fonctionnelle | `ExternalIntents`, 4 tests (LOT 12) |
-| Android Auto | non commencée | `androidx.car.app` absent hors ligne ; `docs/ANDROID.md` |
+| Android Auto | en cours | Code livré : `feature:car` (Car App 1.7.0, navigation) : accueil, recherche, itinéraires, guidage, conduite libre, zones de danger et limitation sur la carte, « Navigue vers » ; même session que le téléphone. Testé JVM, **non vérifié sur DHU ni en voiture** ; hors Play Store : « Sources inconnues » d'Android Auto requis (`docs/ANDROID-AUTO.md`) |
 | Backend Supabase | fonctionnelle | Schéma + client (LOT 8) ; projet à créer par l'exploitant |
 
 ## Mode trottinette électrique (LOT 13, 2026-11-01)

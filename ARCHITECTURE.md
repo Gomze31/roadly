@@ -9,7 +9,7 @@
 - Aucune donnée inventée : ce qui n'a pas de source s'affiche « — » ou « Bientôt ».
 - Les `feature:*` ne dépendent que de `core:*`. `core:model` et `core:common` sont des modules JVM purs.
 
-## 2. Modules (20 : `app`, 12 `core:*` dont `core:assistant` et `core:radar`, 7 `feature:*` dont `feature:assistant`)
+## 2. Modules (21 : `app`, 12 `core:*` dont `core:assistant` et `core:radar`, 8 `feature:*` dont `feature:assistant` et `feature:car`)
 
 `core:radar` (JVM pur) : modèle radar, parseurs des jeux officiels, fusion, moteur géospatial et machine à états des alertes — voir `docs/RADAR-INTELLIGENCE.md`.
 
@@ -32,6 +32,8 @@ feature:route       comparaison 3 itinéraires, heure de départ, coût, préfé
 feature:settings    véhicule, thème, voix et sons, alertes de vitesse, préférences d'itinéraire, données, fournisseurs, à propos
 feature:navigation  écran de guidage en mode conduite : bandeau, voies, Horizon, ETA, vitesse/limitation, arrivée
 feature:trips       historique des trajets (bilan, liste) et Replay (timeline, vitesse de lecture)
+feature:car         Android Auto (Car App 1.7, navigation) : accueil, recherche, itinéraires, guidage, conduite libre ; carte MapLibre
+                    rendue sur la surface de l'hôte (core:map SurfaceMapHost) — voir docs/ANDROID-AUTO.md
 core:scooter        mode trottinette (JVM pur) : profil de routage, réglementation par pays, classification des voies,
                     confort / sécurité, autonomie, phrases, coordinateur de guidage, intentions Roadly AI (docs/SCOOTER.md)
 ```

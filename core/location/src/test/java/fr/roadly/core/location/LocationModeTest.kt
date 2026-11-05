@@ -17,6 +17,10 @@ class LocationModeTest {
         assertEquals(LocationMode.GUIDANCE, effectiveMode(LocationMode.FOLLOW, guidanceActive = true, permission = LocationPermissionState.GRANTED))
         assertEquals(LocationMode.MAP, effectiveMode(LocationMode.MAP, guidanceActive = false, permission = LocationPermissionState.GRANTED))
         assertEquals(LocationMode.OFF, effectiveMode(LocationMode.MAP, guidanceActive = true, permission = LocationPermissionState.DENIED))
+        // Android Auto : la carte de la voiture garde le GPS même quand le téléphone ne demande rien.
+        assertEquals(LocationMode.MAP, effectiveMode(LocationMode.OFF, guidanceActive = false, permission = LocationPermissionState.GRANTED, carDisplayActive = true))
+        assertEquals(LocationMode.FOLLOW, effectiveMode(LocationMode.FOLLOW, guidanceActive = false, permission = LocationPermissionState.GRANTED, carDisplayActive = true))
+        assertEquals(LocationMode.OFF, effectiveMode(LocationMode.OFF, guidanceActive = false, permission = LocationPermissionState.DENIED, carDisplayActive = true))
     }
 
     @Test fun `fake records the guidance flag`() {

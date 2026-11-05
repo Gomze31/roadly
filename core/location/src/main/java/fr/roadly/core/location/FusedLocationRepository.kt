@@ -43,6 +43,7 @@ class FusedLocationRepository @Inject constructor(
     private val fused = LocationServices.getFusedLocationProviderClient(ctx)
     private val mode = MutableStateFlow(LocationMode.OFF)
     private val guidance = MutableStateFlow(false)
+    private val car = MutableStateFlow(false)
     // Doit être déclaré AVANT _permission : les initialiseurs s'exécutent dans l'ordre de déclaration.
     private var _permissionInitialized = false
     private val _permission = MutableStateFlow(readPermission())
@@ -60,7 +61,7 @@ class FusedLocationRepository @Inject constructor(
     @Volatile override var lastKnown: LocationFix? = null
         private set
 
-    override val fixes: Flow<LocationFix> = combine(mode, guidance, _permission) { m, g, p -> effectiveMode(m, g, p) }
+    override val fixes: Flow<LocationFix> = combine(mode, guidance, car, _permission) { m, g, c, p -> effectiveMode(m, g, p, c) }
         .flatMapLatest { m -> if (m == LocationMode.OFF) emptyFlow() else updates(m) }
         .onEach { lastKnown = it }
         .shareIn(scope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), replay = 1)
@@ -82,6 +83,8 @@ class FusedLocationRepository @Inject constructor(
     override fun setMode(mode: LocationMode) { this.mode.value = mode }
 
     override fun setGuidanceActive(active: Boolean) { guidance.value = active }
+
+    override fun setCarDisplayActive(active: Boolean) { car.value = active }
 
     override fun refreshPermission() {
         val fresh = readPermission()
@@ -113,10 +116,16 @@ class FusedLocationRepository @Inject constructor(
     )
 }
 
-/** Mode réellement demandé au GPS : rien sans permission ; le guidage l'emporte sur l'écran. */
-internal fun effectiveMode(requested: LocationMode, guidanceActive: Boolean, permission: LocationPermissionState): LocationMode = when {
+/** Mode réellement demandé au GPS : rien sans permission ; le guidage l'emporte sur l'écran ; la carte Android Auto garde au moins MAP. */
+internal fun effectiveMode(
+    requested: LocationMode,
+    guidanceActive: Boolean,
+    permission: LocationPermissionState,
+    carDisplayActive: Boolean = false,
+): LocationMode = when {
     permission != LocationPermissionState.GRANTED -> LocationMode.OFF
     guidanceActive -> LocationMode.GUIDANCE
+    carDisplayActive && requested == LocationMode.OFF -> LocationMode.MAP
     else -> requested
 }
 

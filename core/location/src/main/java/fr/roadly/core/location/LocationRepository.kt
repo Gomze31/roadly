@@ -17,6 +17,8 @@ interface LocationRepository {
     fun setMode(mode: LocationMode)
     /** Guidage actif : impose [LocationMode.GUIDANCE] tant que la permission est accordée, quel que soit [setMode]. */
     fun setGuidanceActive(active: Boolean)
+    /** Android Auto : la carte de la voiture est affichée ; garantit au moins [LocationMode.MAP] quel que soit l'écran du téléphone. */
+    fun setCarDisplayActive(active: Boolean) = Unit
     /** À appeler après le retour du dialogue système de permission. */
     fun refreshPermission()
     /** À appeler quand `shouldShowRequestPermissionRationale` est false après un refus. */

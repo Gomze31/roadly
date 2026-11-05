@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name_car" translatable="false">Roadly</string>
+    <string name="car_search">Rechercher</string>
+    <string name="car_search_hint">Adresse, lieu, ville</string>
+    <string name="car_home">Domicile</string>
+    <string name="car_work">Travail</string>
+    <string name="car_favorite">Favori</string>
+    <string name="car_recent">Récent</string>
+    <string name="car_free_drive">Conduite libre</string>
+    <string name="car_free_drive_detail">Vitesse, limitation et zones de danger sans itinéraire</string>
+    <string name="car_free_drive_refused">Conduite libre impossible : guidage en cours ou position refusée</string>
+    <string name="car_free_drive_unknown_road">Route inconnue</string>
+    <string name="car_no_places">Aucun lieu enregistré : recherchez une destination</string>
+    <string name="car_location_title">Position nécessaire</string>
+    <string name="car_location_text">Roadly a besoin de la position du téléphone pour la carte et le guidage.</string>
+    <string name="car_location_allow">Autoriser</string>
+    <string name="car_location_on_phone">Acceptez la demande sur le téléphone</string>
+    <string name="car_location_unknown">Position inconnue pour le moment</string>
+    <string name="car_routes_title">Itinéraires vers %1$s</string>
+    <string name="car_route_line">%1$s · %2$s</string>
+    <string name="car_route_arrival">Arrivée %1$s</string>
+    <string name="car_route_toll">Péage</string>
+    <string name="car_route_start">Démarrer</string>
+    <string name="car_retry">Réessayer</string>
+    <string name="car_close">Fermer</string>
+    <string name="car_stop">Arrêter</string>
+    <string name="car_finish">Terminer</string>
+    <string name="car_mute">Couper la voix</string>
+    <string name="car_unmute">Activer la voix</string>
+    <string name="car_recenter">Recentrer</string>
+    <string name="car_zoom_in">Zoom avant</string>
+    <string name="car_zoom_out">Zoom arrière</string>
+    <string name="car_arrived">Vous êtes arrivé</string>
+    <string name="car_guidance_failed">Guidage interrompu</string>
+    <string name="car_rerouting">Recalcul de l\'itinéraire</string>
+    <string name="car_gps_lost">Signal GPS perdu</string>
+    <string name="car_searching">Recherche…</string>
+    <string name="car_no_result">Aucun résultat</string>
+    <string name="car_destination">Destination</string>
+    <string name="car_zone_title">Zone de danger</string>
+    <string name="car_zone_in">dans %1$s</string>
+    <string name="car_zone_remaining">encore %1$s</string>
+    <string name="car_zone_low_confidence">fiabilité faible</string>
+    <string name="car_kmh">km/h</string>
+</resources>

@@ -32,7 +32,7 @@ Points forts : `NavigationSession` confinée (parallélisme 1, générations con
 | 5 | Badge de vitesse de l'accueil sans limitation (« — » en dur). | Mineure (couverte par la conduite libre) |
 | 6 | Voies : décodées, mais FOSSGIS n'en renvoie pas (donnée absente). | Dépend du serveur |
 | 7 | Trafic, prix des péages, bornes IRVE, parkings : aucune source sans convention ou intégration. | Bloqué (externe) |
-| 8 | Android Auto : `androidx.car.app` absent du cache hors ligne. | P2 |
+| 8 | Android Auto : `androidx.car.app` absent du cache hors ligne. **Livré le 2026-11-05** (`feature:car`, `docs/ANDROID-AUTO.md`), non vérifié sur DHU ni en voiture. | P2 |
 | 9 | Dette de vérification sur appareil : écrans trottinette, mises à jour, tests instrumentés ; le HONOR n'était pas connecté (ADB) pendant cette passe. | Risque |
 | 10 | Overpass public saturé : l'enrichissement OSM du mode trottinette est fragile. | Risque |
 | 11 | Documentation : `FEATURES.md` corrompu ligne 24 (titre recollé), `ARCHITECTURE.md` daté. | Mineure (corrigé) |
@@ -108,7 +108,7 @@ Carburant (déjà calculé sur le profil véhicule) + historique mensuel des dé
 
 ### P2 — premium / expérimental
 
-- Android Auto (Car App Library, catégorie navigation ; validation Google).
+- Android Auto (Car App Library, catégorie navigation) — **fait** (`docs/ANDROID-AUTO.md`) ; reste la passe DHU / voiture ; publication Play Store hors champ (revue Google).
 - Coût réel et historique des dépenses (S7).
 - Carte hors connexion du corridor pour tous les modes (existe pour la trottinette).
 - Widget « Conduite libre » et tuile Réglages rapides.

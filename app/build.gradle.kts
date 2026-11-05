@@ -81,6 +81,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:navigation"))
     implementation(project(":feature:trips"))
+    implementation(project(":feature:car"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
