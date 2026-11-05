@@ -108,7 +108,7 @@ Carburant (déjà calculé sur le profil véhicule) + historique mensuel des dé
 
 ### P2 — premium / expérimental
 
-- Android Auto (Car App Library, catégorie navigation) — **fait** (`docs/ANDROID-AUTO.md`) ; reste la passe DHU / voiture ; publication Play Store hors champ (revue Google).
+- Android Auto (Car App Library, catégorie navigation) — **fait** (`docs/ANDROID-AUTO.md`) ; passe DHU faite le 2026-11-05 (téléphone verrouillé compris), reste l'essai en voiture ; publication Play Store hors champ (revue Google).
 - Coût réel et historique des dépenses (S7).
 - Carte hors connexion du corridor pour tous les modes (existe pour la trottinette).
 - Widget « Conduite libre » et tuile Réglages rapides.

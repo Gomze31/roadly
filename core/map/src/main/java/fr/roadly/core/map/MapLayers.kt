@@ -52,6 +52,8 @@ internal object MapIds {
     const val STYLE_LYR_BUILDING = "building"
     /** Calques de points d'intérêt et de noms de rues des tuiles OpenMapTiles (niveau de détail, C2). */
     const val STYLE_LYR_POI = "poi"
+    /** Routes (lignes) ; ses calques de symboles sont les flèches de sens unique. */
+    const val STYLE_LYR_TRANSPORTATION = "transportation"
     const val STYLE_LYR_TRANSPORTATION_NAME = "transportation_name"
 }
 

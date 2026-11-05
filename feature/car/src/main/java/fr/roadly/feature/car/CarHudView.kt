@@ -46,7 +46,7 @@ internal class CarHudView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val a = area ?: SurfaceArea(0, 0, width, height)
         if (a.width <= 0 || a.height <= 0) return
-        val margin = 12 * dp
+        val margin = MARGIN_DP * dp
         model.zone?.let { drawZone(canvas, it, a, margin) }
         drawSpeed(canvas, a, margin)
     }
@@ -77,7 +77,7 @@ internal class CarHudView(context: Context) : View(context) {
     }
 
     private fun drawSpeed(canvas: Canvas, a: SurfaceArea, margin: Float) {
-        val size = 64 * dp
+        val size = SPEED_SIZE_DP * dp
         var x = a.left + margin
         val bottom = a.bottom - margin
         val top = bottom - size
@@ -101,8 +101,14 @@ internal class CarHudView(context: Context) : View(context) {
         canvas.drawText(context.getString(R.string.car_kmh), cx, numberBase + unitText.textSize + 2 * dp, unitText)
     }
 
-    private companion object {
-        const val WHITE = 0xFFFFFFFF.toInt()
+    companion object {
+        private const val MARGIN_DP = 12
+        private const val SPEED_SIZE_DP = 64
+
+        /** Hauteur réservée en bas à gauche de la zone libre (limitation, vitesse et marge) : l'attribution de la carte passe au-dessus. */
+        fun bottomStartHeightPx(context: Context): Int = ((SPEED_SIZE_DP + MARGIN_DP) * context.resources.displayMetrics.density).toInt()
+
+        private const val WHITE = 0xFFFFFFFF.toInt()
         const val BLACK = 0xFF111111.toInt()
         const val MUTED = 0xFFB8C0CC.toInt()
         const val PANEL = 0xE60B0F14.toInt()

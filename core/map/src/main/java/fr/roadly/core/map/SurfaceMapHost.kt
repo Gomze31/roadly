@@ -68,10 +68,15 @@ class SurfaceMapHost(
         applyAttributionPlacement()
     }
 
-    /** L'attribution OpenStreetMap reste visible, en bas à gauche de la zone libre. */
+    /** Hauteur occupée en bas à gauche de la zone libre par les vues de l'appelant (compteur de vitesse) : l'attribution passe au-dessus. */
+    var bottomStartReservePx: Int = 0
+        set(value) { field = value; applyAttributionPlacement() }
+
+    /** L'attribution OpenStreetMap reste visible, en bas à gauche de la zone libre, au-dessus de [bottomStartReservePx]. */
     private fun applyAttributionPlacement() {
         val a = visibleArea
-        controller.setAttribution(top = false, end = false, verticalPx = (height - a.bottom).coerceAtLeast(0) + EDGE_PX, sidePx = a.left + EDGE_PX)
+        val vertical = (height - a.bottom).coerceAtLeast(0) + EDGE_PX + bottomStartReservePx
+        controller.setAttribution(top = false, end = false, verticalPx = vertical, sidePx = a.left + EDGE_PX)
     }
 
     /** Suit [point] : centré horizontalement dans la zone libre, à [anchorY] (0 = haut, 1 = bas) de sa hauteur. */

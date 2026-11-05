@@ -16,6 +16,7 @@
     <string name="car_location_text">Roadly a besoin de la position du téléphone pour la carte et le guidage.</string>
     <string name="car_location_allow">Autoriser</string>
     <string name="car_location_on_phone">Acceptez la demande sur le téléphone</string>
+    <string name="car_search_empty">Saisissez au moins 3 caractères, ou utilisez le micro</string>
     <string name="car_location_off_title">Localisation du téléphone désactivée</string>
     <string name="car_location_off_text">Activez « Localisation » dans les réglages rapides du téléphone</string>
     <string name="car_location_unknown">Position inconnue pour le moment</string>
@@ -23,6 +24,7 @@
     <string name="car_route_line">%1$s · %2$s</string>
     <string name="car_route_arrival">Arrivée %1$s</string>
     <string name="car_route_toll">Péage</string>
+    <string name="car_danger_zones_none">Aucune zone de danger</string>
     <plurals name="car_danger_zones">
         <item quantity="one">%d zone de danger</item>
         <item quantity="many">%d zones de danger</item>

@@ -14,6 +14,9 @@ import fr.roadly.core.map.SurfaceArea
 import fr.roadly.core.map.SurfaceMapHost
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.LocationFix
+import fr.roadly.core.model.MapDetail
+import fr.roadly.core.model.Place
+import fr.roadly.core.model.PlaceKind
 import fr.roadly.core.model.Route
 import kotlin.math.ln
 
@@ -63,7 +66,14 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         this.routes = routes
         activeRouteId = activeId
         host?.controller?.setRoutes(routes, activeId)
+        host?.controller?.setMarkers(destinationMarkers())
         if (routes.isEmpty()) setTraversed(null, null)
+    }
+
+    /** Repère sur l'arrivée du tracé actif (aperçu et guidage) : le dernier point réel de la géométrie, rien sans tracé. */
+    private fun destinationMarkers(): List<Place> {
+        val end = (routes.firstOrNull { it.id == activeRouteId } ?: routes.firstOrNull())?.geometry?.lastOrNull() ?: return emptyList()
+        return listOf(Place(id = "car-destination", name = "", address = null, point = end, kind = PlaceKind.COORDINATES, source = "android-auto"))
     }
 
     /** Portion parcourue du tracé actif (segment courant et point projeté) ; null = rien d'atténué. */
@@ -151,10 +161,14 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         val view = CarHudView(h.overlay.context)
         h.overlay.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         hud = view
+        h.bottomStartReservePx = CarHudView.bottomStartHeightPx(view.context)
         visible?.let { h.setVisibleArea(it); view.setArea(it) }
         view.update(hudModel)
+        // Écran de voiture : lu d'un coup d'œil. Ni points d'intérêt (icônes « P » à chaque parking), ni sens uniques, ni noms de petites rues.
+        h.controller.applyDetail(MapDetail.REDUCED)
         if (styleUrl.isNotEmpty()) h.controller.setStyle(styleUrl)
         h.controller.setRoutes(routes, activeRouteId)
+        h.controller.setMarkers(destinationMarkers())
         setTraversed(traversed?.first, traversed?.second)
         h.controller.setManeuverArrow(arrow)
         h.controller.setDangerZones(danger)

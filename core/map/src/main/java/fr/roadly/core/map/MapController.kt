@@ -453,7 +453,7 @@ class MapController(internal val context: Context) {
     }
 
     /**
-     * C2 : niveau de détail. REDUCED masque les points d'intérêt et les noms des rues `minor` / `service` / `track` ; les calques
+     * C2 : niveau de détail. REDUCED masque les points d'intérêt, les flèches de sens unique et les noms des rues `minor` / `service` / `track` ; les calques
      * sont repérés par leur `source-layer` (pas par leur identifiant, propre à chaque style). Rejoué après un changement de style.
      */
     fun applyDetail(level: MapDetail) {
@@ -467,7 +467,8 @@ class MapController(internal val context: Context) {
         for (layer in style.layers) {
             if (layer !is SymbolLayer) continue
             when (layer.sourceLayer) {
-                MapIds.STYLE_LYR_POI -> {
+                // Flèches de sens unique (symboles du calque des routes) : bruit visuel en vue réduite (écran de voiture).
+                MapIds.STYLE_LYR_POI, MapIds.STYLE_LYR_TRANSPORTATION -> {
                     val base = baseVisibility.getOrPut(layer.id) { layer.visibility.value ?: Property.VISIBLE }
                     layer.setProperties(visibility(if (reduced) Property.NONE else base))
                 }

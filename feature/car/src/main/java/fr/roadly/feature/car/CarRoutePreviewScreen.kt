@@ -105,7 +105,7 @@ internal class CarRoutePreviewScreen(
                 val second = listOfNotNull(
                     carContext.getString(R.string.car_route_arrival, Formatters.clockTime(o.arrivalEpochMs)),
                     carContext.getString(R.string.car_route_toll).takeIf { r.hasToll },
-                    zones[r.id]?.let { n -> carContext.resources.getQuantityString(R.plurals.car_danger_zones, n, n) },
+                    zones[r.id]?.let { n -> if (n == 0) carContext.getString(R.string.car_danger_zones_none) else carContext.resources.getQuantityString(R.plurals.car_danger_zones, n, n) },
                 ).joinToString(" · ")
                 items.addItem(
                     Row.Builder()

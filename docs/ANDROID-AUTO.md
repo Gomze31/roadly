@@ -83,6 +83,14 @@ Installée : 0.1.178 (par la mise à jour intégrée), Android Auto 17.9, mode d
 | Aucune explication quand la localisation est coupée | — | Ligne « Localisation du téléphone désactivée » en tête de l'accueil voiture (`CarLocationSwitch`, mise à jour à chaud) ; carte centrée sur le domicile (sinon le travail) tant qu'aucune position n'arrive |
 | « Ouvrir Android Auto » ouvrait la fiche Infos de l'appli | Android Auto n'a pas d'activité de lancement | Intent `APPLICATION_PREFERENCES` sur le paquet d'Android Auto : ouvre ses réglages (vérifié) |
 | DHU 2.0 : « Waiting for phone », lien coupé après TLS | DHU 2.0 (2022) trop ancien pour Android Auto 17.9 | DHU 2.1 : `sdkmanager --channel=3 "extras;google;auto"` |
+| Carte saturée d'icônes « P » de parking | Style commun : points d'intérêt dès le zoom 14 | Carte voiture en détail réduit (`MapDetail.REDUCED`) : ni points d'intérêt, ni flèches de sens unique, ni noms de petites rues |
+| Aucune marque sur l'arrivée (aperçu, guidage) | — | Repère au dernier point du tracé actif |
+| Attribution « i » sous le compteur de vitesse | Même coin (bas gauche de la zone libre) | `SurfaceMapHost.bottomStartReservePx` : l'attribution passe au-dessus du compteur |
+| Recherche vide : « Aucun élément » | — | Lieux récents tant que moins de 3 caractères, sinon consigne |
+| « 0 zone de danger » | — | « Aucune zone de danger » |
+| Petits blocs blancs carrés sur la carte | Artefacts de décodage vidéo de la DHU (macroblocs) : absents du téléphone, identiques en SurfaceView et TextureView | Aucune (à confirmer sur un vrai écran de voiture) |
+
+Parcours vérifié sur la DHU (2026-11-05, soir), téléphone **verrouillé** : accueil, recherche (clavier, résultats), aperçu des deux variantes, guidage (manœuvre, suivante, arrivée, Arrêter), conduite libre, retour à l'accueil. Service de premier plan démarré et position active téléphone verrouillé. Non vérifié : zoom au pincement et défilement (les taps de la DHU sont décalés près du bord droit), alertes de zone, recalcul, vraie voiture. Le classement des résultats de recherche (« gare » : Teulat avant Toulouse-Matabiau) vient du géocodeur commun au téléphone.
 
 Pour la DHU : Android Auto › ⋮ › « Démarrer serveur unité princ. », `adb forward tcp:5277 tcp:5277`, puis `desktop-head-unit.exe`. À la première connexion, Android Auto demande sur le téléphone d'accepter la « voiture ».
 
@@ -93,10 +101,10 @@ Pour la DHU : Android Auto › ⋮ › « Démarrer serveur unité princ. », `a
 | Compilation, fusion du manifeste, APK | Fait |
 | Lint `feature:car` | 0 erreur. 4 avertissements : ressource privée `hosts_allowlist_sample` (usage documenté par Google), service exporté (obligatoire pour l'hôte), allocation dans `onDraw`, extensions KTX |
 | Tests JVM | Correspondance des manœuvres (circulation à droite, ronds-points), distances, indications (zone traversée avant la suivante, tolérance, GPS perdu), intentions `geo:`, marges de caméra |
-| Affichage réel sur la DHU | Fait (accueil, carte, suivi de position) ; recherche, itinéraire, guidage et conduite libre **non parcourus** ; en voiture : **non vérifié** |
+| Affichage réel sur la DHU | Fait : accueil, recherche, aperçu, guidage, conduite libre, téléphone verrouillé ; en voiture : **non vérifié** |
 | Sens du défilement (`onScroll`) et zoom au pincement | Convention `GestureDetector` supposée, **à vérifier sur la DHU** |
-| Rendu MapLibre dans `Presentation` (SurfaceView) | Fait : la carte s'affiche. À revoir : nombreuses icônes « P » de parking dès le zoom 14 et petits points blancs (style commun) |
-| Démarrage du service de premier plan depuis la voiture | Fait, téléphone déverrouillé sur l'écran d'accueil ; téléphone verrouillé : **à vérifier** |
+| Rendu MapLibre dans `Presentation` (SurfaceView) | Fait : la carte s'affiche, détail réduit |
+| Démarrage du service de premier plan depuis la voiture | Fait, téléphone déverrouillé puis verrouillé |
 
 ## 5. Limites et suite
 

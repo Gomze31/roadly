@@ -29,9 +29,12 @@ internal class CarSearchScreen(
     private var loading = false
     private var searched = false
     private var job: Job? = null
+    /** Champ vide ou trop court : les lieux récents (déjà choisis sur le téléphone ou dans la voiture) plutôt qu'une liste vide. */
+    private var recents: List<Place> = emptyList()
 
     init {
         if (!initialQuery.isNullOrBlank()) search(initialQuery, 0)
+        lifecycleScope.launch { deps.recents.observe().collect { recents = it; if (query.trim().length < MIN_QUERY) invalidate() } }
     }
 
     private fun search(text: String, debounceMs: Long) {
@@ -72,7 +75,9 @@ internal class CarSearchScreen(
         if (loading) return builder.setLoading(true).build()
         val items = ItemList.Builder()
         val here = deps.location.lastKnown?.point
-        for (place in results) {
+        val short = query.trim().length < MIN_QUERY
+        val shown = if (short) recents.take(MAX_RESULTS) else results
+        for (place in shown) {
             val detail = listOfNotNull(here?.let { Formatters.distance(it.distanceTo(place.point)) }, place.address?.takeIf { it != place.name })
                 .joinToString(" · ")
             items.addItem(
@@ -80,7 +85,10 @@ internal class CarSearchScreen(
                     .setOnClickListener { choose(place) }.build(),
             )
         }
-        if (searched && results.isEmpty()) items.setNoItemsMessage(carContext.getString(R.string.car_no_result))
+        when {
+            short && shown.isEmpty() -> items.setNoItemsMessage(carContext.getString(R.string.car_search_empty))
+            searched && results.isEmpty() -> items.setNoItemsMessage(carContext.getString(R.string.car_no_result))
+        }
         return builder.setItemList(items.build()).build()
     }
 
