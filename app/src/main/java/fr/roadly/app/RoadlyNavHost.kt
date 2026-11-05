@@ -40,7 +40,7 @@ import fr.roadly.feature.settings.RadarSettingsRoute
 import fr.roadly.feature.settings.radarSettingsScreen
 import fr.roadly.feature.settings.PremiumRoute
 import fr.roadly.feature.settings.SettingsRoute
-import fr.roadly.feature.settings.SettingsSection
+import fr.roadly.feature.settings.SettingsPage
 import fr.roadly.feature.settings.assistanceScreen
 import fr.roadly.feature.settings.premiumScreen
 import fr.roadly.feature.settings.settingsScreen
@@ -102,7 +102,8 @@ fun RoadlyNavHost(
         routeScreen(
             isDark = isDark,
             onBack = { nav.popBackStack() },
-            onOpenSettings = { nav.navigate(SettingsRoute(section = SettingsSection.NAVIGATION.name)) },
+            // « Renseigner le véhicule » / coût carburant : directement la page du véhicule (Retour mène au sous-menu).
+            onOpenSettings = { nav.navigate(SettingsRoute(section = SettingsPage.VEHICLE.name)) },
             onStartNavigation = { begin ->
                 // API 33+ : POST_NOTIFICATIONS demandée avant de démarrer le service (spec §2) ; refus = notification masquée seulement.
                 withNotificationPermission {
@@ -136,7 +137,7 @@ fun RoadlyNavHost(
             onDismissRequest = launch::dismiss,
             title = { Text("Roadly ${u.manifest.versionName} disponible") },
             text = { Text((u.notes.takeIf { it.isNotBlank() }?.take(600) ?: "Nouvelle version publiée sur GitHub.") + "\n\nLe téléchargement se poursuit dans Réglages › Mises à jour ; Android demande ensuite de confirmer l'installation.") },
-            confirmButton = { TextButton(onClick = { launch.installUpdate(u); nav.navigate(SettingsRoute(section = SettingsSection.UPDATES.name)) }) { Text("Mettre à jour") } },
+            confirmButton = { TextButton(onClick = { launch.installUpdate(u); nav.navigate(SettingsRoute(section = SettingsPage.UPDATES.name)) }) { Text("Mettre à jour") } },
             dismissButton = { TextButton(onClick = { launch.later(u) }) { Text("Ignorer cette version") } },
         )
     }
