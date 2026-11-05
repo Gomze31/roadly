@@ -33,6 +33,9 @@ class RadarSyncTest {
     private var apiBody = api("2025-12-30T13:42:47")
     private var csv = fixed
     private var offline = false
+    /** Instantané MapAtlas réel (21/05/2024, CC BY 4.0) ; null = source communautaire indisponible. */
+    private var mapAtlas: String? = null
+    private val mapAtlasFile = String(javaClass.classLoader!!.getResourceAsStream("mapatlas-fr-2024-05-21.geojson")!!.readBytes(), Charsets.UTF_8)
     private val calls = ArrayList<String>()
     private val fetch: suspend (String) -> Outcome<String> = { url ->
         calls += url
@@ -40,6 +43,7 @@ class RadarSyncTest {
             offline -> Outcome.Failure(AppError.Network)
             url == RadarSourceUrls.FIXED_DATASET_API -> Outcome.Success(apiBody)
             url == RadarSourceUrls.ENRICH_2018_CSV -> Outcome.Success(y2018)
+            url == RadarSourceUrls.MAPATLAS_FR_GEOJSON -> mapAtlas?.let { Outcome.Success(it) } ?: Outcome.Failure(AppError.Network)
             else -> Outcome.Success(csv)
         }
     }
@@ -107,5 +111,53 @@ class RadarSyncTest {
         RadarSync(fetch, store).sync(force = false)
         val r = store.rows.values.first { it.direction?.bearingDeg != null }
         assertEquals(r, RadarMapping.toRadar(RadarMapping.toEntity(r)))
+    }
+
+    @Test fun `community reports corroborate, hint directions and stay out of the official count`() = runTest {
+        mapAtlas = mapAtlasFile
+        val store = MemoryStore()
+        val v = (RadarSync(fetch, store, clock = { 1L }).sync(force = false) as Outcome.Success).value
+        val c = v.community!!
+        println("MapAtlas réel : $c ; ${v.message}")
+        assertEquals(3853, c.read)
+        assertTrue("confirmés : ${c.corroborated}", c.corroborated >= 2_500)
+        assertTrue("sens indicatifs : ${c.directionHints}", c.directionHints >= 200)
+        assertTrue("en plus : ${c.added}", c.added in 300..1_000)
+        // Le total et le contrôle qualité portent sur la seule liste officielle.
+        assertEquals(3309, v.total)
+        val community = store.rows.values.filter { it.source == fr.roadly.core.radar.RadarSourceIds.MAPATLAS }
+        assertEquals(c.added, community.size)
+        assertTrue(community.all { it.confidence < fr.roadly.core.radar.RadarQuality.MIN_VOICE && it.id.startsWith("MA-") })
+        assertTrue(store.rows.values.filter { it.direction?.hint == true }.none { it.direction!!.isKnownOneWay })
+        assertEquals("2018+mapatlas:2024-05-21", v.enrichment)
+        // Aller-retour Room : le sens indicatif reste indicatif.
+        val hinted = store.rows.values.first { it.direction?.hint == true && it.source != fr.roadly.core.radar.RadarSourceIds.MAPATLAS }
+        assertEquals(hinted, RadarMapping.toRadar(RadarMapping.toEntity(hinted)))
+    }
+
+    @Test fun `a base synced before mapatlas is redone once even if the official list did not change`() = runTest {
+        val store = MemoryStore()
+        store.log += RadarVersion(0L, RadarSyncStatus.APPLIED, "https://static.data.gouv.fr/x.csv", "2025-12-30T13:42:47", total = 3309)
+        mapAtlas = mapAtlasFile
+        val v = (RadarSync(fetch, store).sync(force = false) as Outcome.Success).value
+        assertEquals(RadarSyncStatus.APPLIED, v.status)
+        val again = (RadarSync(fetch, store).sync(force = false) as Outcome.Success).value
+        assertEquals(RadarSyncStatus.UNCHANGED, again.status)
+    }
+
+    @Test fun `mapatlas parsing keeps only regulatory limits and known classes`() {
+        val body = """{"snapshot":"2024-05-21","features":[
+            {"type":"Feature","geometry":{"type":"Point","coordinates":[2.35,48.85]},"properties":{"ref":"a","class":"spot","limitKph":140,"approach":"N"}},
+            {"type":"Feature","geometry":{"type":"Point","coordinates":[2.35,48.86]},"properties":{"ref":"b","class":"signal","limitKph":50,"approach":"both"}},
+            {"type":"Feature","geometry":{"type":"Point","coordinates":[2.35,48.87]},"properties":{"ref":"c","class":"mobile"}},
+            {"type":"Feature","geometry":{"type":"Point","coordinates":[-74.0,40.7]},"properties":{"ref":"d","class":"spot"}}
+        ]}"""
+        val (snapshot, cams) = RadarSync({ Outcome.Failure(AppError.Network) }, MemoryStore()).parseMapAtlas(body)!!
+        assertEquals("2024-05-21", snapshot)
+        assertEquals(listOf("a", "b"), cams.map { it.ref })
+        assertEquals(null, cams[0].limitKmh)
+        assertEquals(0.0, cams[0].approachDeg!!, 0.0)
+        assertEquals(null, cams[1].approachDeg)
+        assertEquals(fr.roadly.core.radar.RadarKind.RED_LIGHT, cams[1].kind)
     }
 }

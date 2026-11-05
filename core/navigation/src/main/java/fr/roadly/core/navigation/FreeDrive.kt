@@ -307,6 +307,7 @@ class FreeDriveSession @Inject constructor(
             maybeReloadZones(fix.point)
             updateZone(fix, now)
             checkOverSpeed()
+            coachTick(now)
             publish()
         }
 
@@ -338,7 +339,8 @@ class FreeDriveSession @Inject constructor(
                 val radars = try {
                     vigilance.radarsIn(BoundingBox(at.lat - h, at.lon - h, at.lat + h, at.lon + h))
                 } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
-                radarIndex = RadarIndex(radars)
+                val accepted = radarSettings.settings.first()
+                radarIndex = RadarIndex(radars.filter(accepted::accepts))
             }
         }
 
@@ -381,6 +383,18 @@ class FreeDriveSession @Inject constructor(
                 overSpeedAlerted = true
                 if (prefs.speedAlertSound.first() && prefs.voiceEnabled.first()) speech.beep()
             } else if (!over) overSpeedAlerted = false
+        }
+
+        private val coach = DrivingCoach()
+
+        /** Baisse de limitation (map matching) et rappel de pause, comme en guidage. */
+        private suspend fun coachTick(now: Long) {
+            for (advice in coach.update(now, current.speedLimitKmh, current.speedKmh)) {
+                when (advice) {
+                    is DrivingCoach.Advice.LimitDropped -> if (prefs.limitDropVoice.first()) say(SpokenPhrases.limitDrop(advice.kmh))
+                    DrivingCoach.Advice.TakeABreak -> if (prefs.breakReminder.first()) say(SpokenPhrases.TAKE_A_BREAK)
+                }
+            }
         }
 
         private suspend fun watchdog() {

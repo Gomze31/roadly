@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [FavoritePlaceEntity::class, RecentSearchEntity::class, VehicleProfileEntity::class, SavedRouteEntity::class, VigilanceZoneEntity::class, TripEntity::class, ScooterProfileEntity::class, RadarVersionEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class RoadlyDatabase : RoomDatabase() {
@@ -33,6 +33,14 @@ abstract class RoadlyDatabase : RoomDatabase() {
                         "`limitChanged` INTEGER NOT NULL, `enriched` INTEGER NOT NULL, `withDirection` INTEGER NOT NULL, `highPrecision` INTEGER NOT NULL, " +
                         "`rejected` INTEGER NOT NULL, `message` TEXT)",
                 )
+            }
+        }
+
+        /** v6 → v7 : sens indicatif des signalements communautaires, sources d'enrichissement de chaque synchronisation. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `vigilance_zones` ADD COLUMN directionHint INTEGER")
+                db.execSQL("ALTER TABLE `radar_versions` ADD COLUMN enrichment TEXT")
             }
         }
 

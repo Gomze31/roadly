@@ -84,6 +84,8 @@ data class VigilanceZoneEntity(
     val precisionM: Double? = null,
     val confidence: Int? = null,
     val status: String? = null,
+    /** v7 : [bearingDeg] n'est qu'un sens indicatif (source communautaire) : jamais utilisé pour écarter l'équipement. */
+    val directionHint: Boolean? = null,
 )
 
 /** Une synchronisation de la base radar (appliquée, inchangée, rejetée ou en échec) : historique et état affichés. */
@@ -104,6 +106,8 @@ data class RadarVersionEntity(
     val highPrecision: Int,
     val rejected: Int,
     val message: String?,
+    /** v7 : sources d'enrichissement appliquées (« 2018+mapatlas:2024-05-21 ») ; null = antérieur à la v7. */
+    val enrichment: String? = null,
 )
 
 /** Trajet guidé terminé (historique, Replay) ; coût estimé d'après le profil véhicule au moment du trajet, null sans profil. */

@@ -82,11 +82,11 @@ class RoomVigilanceRepository @Inject constructor(
 
 internal fun RadarVersionEntity.toModel() = RadarVersion(
     fetchedAt, runCatching { RadarSyncStatus.valueOf(status) }.getOrDefault(RadarSyncStatus.FAILED), sourceUrl, sourceModified, total,
-    RadarDiff(added, removed, moved, limitChanged), enriched, withDirection, highPrecision, rejected, message,
+    RadarDiff(added, removed, moved, limitChanged), enriched, withDirection, highPrecision, rejected, message, enrichment = enrichment,
 )
 
 internal fun RadarVersion.toEntity() = RadarVersionEntity(
     fetchedAt = fetchedAtMs, status = status.name, sourceUrl = sourceUrl, sourceModified = sourceModified, total = total,
     added = diff.added, removed = diff.removed, moved = diff.moved, limitChanged = diff.limitChanged, enriched = enriched,
-    withDirection = withDirection, highPrecision = highPrecision, rejected = rejected, message = message,
+    withDirection = withDirection, highPrecision = highPrecision, rejected = rejected, message = message, enrichment = enrichment,
 )

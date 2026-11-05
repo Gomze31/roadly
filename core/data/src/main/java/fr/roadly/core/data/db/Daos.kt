@@ -59,7 +59,8 @@ interface VigilanceZoneDao {
     /** Équipements actifs (les retirés restent en base pour l'historique, jamais alertés). */
     @Query("SELECT * FROM vigilance_zones WHERE lat BETWEEN :south AND :north AND lon BETWEEN :west AND :east AND (status IS NULL OR status = 'ACTIVE')")
     suspend fun inBox(south: Double, west: Double, north: Double, east: Double): List<VigilanceZoneEntity>
-    @Query("SELECT COUNT(*) FROM vigilance_zones WHERE status IS NULL OR status = 'ACTIVE'") fun observeCount(): Flow<Int>
+    /** Équipements officiels actifs (les signalements communautaires ajoutés ne sont pas comptés). */
+    @Query("SELECT COUNT(*) FROM vigilance_zones WHERE (status IS NULL OR status = 'ACTIVE') AND (source IS NULL OR source != 'mapatlas-camera-index')") fun observeCount(): Flow<Int>
     /** Lignes issues d'une synchronisation (source renseignée), y compris retirées. */
     @Query("SELECT * FROM vigilance_zones WHERE source IS NOT NULL") suspend fun synced(): List<VigilanceZoneEntity>
     @Query("DELETE FROM vigilance_zones WHERE source IS NULL") suspend fun deleteLegacy()

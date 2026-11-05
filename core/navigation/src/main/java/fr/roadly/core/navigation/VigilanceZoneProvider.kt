@@ -80,7 +80,7 @@ class RepositoryVigilanceZoneProvider @Inject constructor(
         val m = VigilanceZones.BOX_MARGIN_DEG
         val s = settings.settings.first()
         // Fausses alertes signalées par l'utilisateur : écartées avant le rapprochement (pas de fusion avec une zone voisine).
-        val candidates = repository.radarsIn(BoundingBox(box.south - m, box.west - m, box.north + m, box.east + m)).filter { it.id !in s.hiddenZones }
+        val candidates = repository.radarsIn(BoundingBox(box.south - m, box.west - m, box.north + m, box.east + m)).filter(s::accepts)
         if (candidates.isEmpty()) return emptyList()
         val enabled = s.enabledKinds
         val line = Polyline(route.geometry)

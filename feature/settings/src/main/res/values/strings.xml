@@ -260,7 +260,7 @@
     <string name="radar_status_unchanged">Vérifiée le %1$s : source inchangée</string>
     <string name="radar_status_rejected">Version rejetée le %1$s, base conservée</string>
     <string name="radar_status_failed">Échec le %1$s, base conservée</string>
-    <string name="radar_sources_footer">Sources : %1$s. Sens, route et longueur des tronçons : « Radars automatiques » (2018), appariés à moins de 50 m. Vérification hebdomadaire, liste publiée chaque année.</string>
+    <string name="radar_sources_footer">Sources : %1$s. Sens, route et longueur des tronçons : « Radars automatiques » (2018), appariés à moins de 50 m. Confirmation et sens indicatif : MapAtlas Camera Index (signalements de conducteurs, mapatlas.eu, CC BY 4.0). Vérification hebdomadaire, liste publiée chaque année.</string>
     <string name="radar_offline_note">Les alertes sont calculées sur le téléphone, sans réseau. La base n\'est téléchargée que lorsqu\'une nouvelle liste est publiée.</string>
     <string name="radar_group_hidden">Fausses alertes</string>
     <string name="radar_hidden_footer">Touchez la pastille « Zone de danger » (ou « Fausse alerte » sur Android Auto) pour masquer une zone qui n\'existe plus. Le masquage reste sur ce téléphone.</string>
@@ -270,4 +270,12 @@
         <item quantity="other">%d zones masquées</item>
     </plurals>
     <string name="radar_hidden_reset">Toucher pour tout réafficher</string>
+    <string name="radar_group_community">Signalements de conducteurs</string>
+    <string name="radar_community">Équipements hors liste officielle</string>
+    <string name="radar_community_subtitle">MapAtlas : appariés à la liste officielle, sens indicatif, équipements en plus</string>
+    <string name="radar_community_footer">Points signalés par des conducteurs (MapAtlas, instantané de 2024) à plus de 100 m de tout équipement officiel : radars récents, mais aussi radars démontés ou erreurs. Alerte visuelle seulement, sans voix. Les signalements qui confirment un équipement officiel servent toujours.</string>
+    <string name="settings_limit_drop">Annoncer les baisses de limitation</string>
+    <string name="settings_limit_drop_subtitle">« Limitation 70. » quand la limitation baisse, en guidage et en conduite libre.</string>
+    <string name="settings_break_reminder">Rappel de pause</string>
+    <string name="settings_break_reminder_subtitle">Toutes les deux heures de conduite, comme le recommande la Sécurité routière.</string>
 </resources>

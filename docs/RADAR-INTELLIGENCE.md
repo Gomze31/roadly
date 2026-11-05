@@ -136,7 +136,18 @@ Les faux positifs restants concernent tous le même piège : la chaussée oppos�
 
 Écarté : la vitesse moyenne sur les tronçons. Elle désignerait un contrôle de vitesse moyenne et son étendue, et son statut au regard de l'article R413-15 n'a pas pu être vérifié.
 
-## 11. Roadmap
+## 11. Radar Intelligence 3 (2026-11-05, même jour)
+
+| Élément | Détail | Vérifié |
+|---|---|---|
+| Source communautaire MapAtlas | Téléchargée à chaque synchronisation complète (CC BY 4.0), facultative : son absence ne bloque rien. Contrôle qualité et décompte sur la seule liste officielle | JVM sur l'instantané réel (`RadarSyncTest`) : 2 633 confirmés, 364 sens indicatifs, 781 en plus |
+| Sens indicatif | `ControlledDirection.hint` : avance l'alerte quand le cap concorde (± 45°), traité comme inconnu sinon ; jamais une cause de rejet, avec ou sans itinéraire | JVM (`CommunityMergeTest`) |
+| Équipements hors liste officielle | Option « Signalements de conducteurs » (désactivée par défaut), confiance 45 : alerte visuelle sans voix | JVM |
+| Base refaite une fois | `radar_versions.enrichment` (Room v7, `MIGRATION_6_7`) : une base synchronisée avant MapAtlas est refaite à la vérification suivante | JVM ; migration **non exécutée sur appareil** |
+| Baisse de limitation | « Limitation 70. », confirmée sur deux positions, en guidage et en conduite libre (option) | JVM (`DrivingCoachTest`) |
+| Rappel de pause | Après deux heures de conduite, puis toutes les 30 min ; un arrêt de 15 min remet à zéro (option) | JVM |
+
+## 12. Roadmap
 
 - **P0** : passe sur le HONOR (guidage réel, conduite libre, écran éteint) ; exécuter `RadarMigrationTest` ; vérifier les longueurs de zone sur Légifrance.
 - **P1** : affiner le sens des « PARIS vers LYON » (géocodage des deux villes → cap) ; enrichissement OSM par extraction hebdomadaire hors application (Geofabrik, ODbL) ; tronçons ETVM : point d'entrée et de sortie.

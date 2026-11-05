@@ -262,8 +262,10 @@ data class ZoneObservation(
  * ouverte ([openKeys]) reste suivie à la distance seule, même si le cap devient incertain.
  */
 object FreeRadarMatcher {
-    /** Rayon de recherche : la plus longue zone (4 km) plus une marge. */
-    const val SEARCH_RADIUS_M = 4_500.0
+    /** Rayon de recherche : la plus longue zone (4 km × 1,15) plus une marge. */
+    const val SEARCH_RADIUS_M = 5_200.0
+    /** Écart maximal entre le cap et un sens indicatif pour qu'il confirme une zone. */
+    const val HINT_AGREE_DEG = 45.0
 
     data class Result(val observations: List<ZoneObservation>, val rejected: Map<String, RejectReason>)
 
@@ -303,7 +305,9 @@ object FreeRadarMatcher {
             // Arc : décalage latéral attendu à `along` mètres pour la courbure mesurée (positif = vers la droite).
             val expectedCross = if (along > 0) s.curvaturePerM * along * along / 2.0 else 0.0
             val dir = r.direction
-            val ambiguous = !open && (dir == null || (!dir.bothWays && dir.bearingDeg == null))
+            // Sens indicatif (communautaire) : confirme seulement s'il concorde avec le cap ; sinon traité comme inconnu.
+            val hintAgrees = dir != null && dir.hint && dir.bearingDeg != null && GeoMath.angleDiff(heading, dir.bearingDeg) <= HINT_AGREE_DEG
+            val ambiguous = !open && !hintAgrees && (dir == null || dir.hint || (!dir.bothWays && dir.bearingDeg == null))
             if (ambiguous && along > params.ambiguousConfirmM) { rejected[r.id] = RejectReason.AMBIGUOUS_FAR; continue }
             val perAlong = if (ambiguous) params.ambiguousCrossPerAlongM else params.crossPerAlongM
             val allowed = params.offsetLimit(r) + perAlong * along.coerceAtLeast(0.0)

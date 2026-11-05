@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -149,7 +150,11 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
             VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
             AssistantGroup()
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
-            AlertsGroup(state.alerts, vigilanceRefresh, onRain = vm::setRainLowersLimit, onOpenRadar = onOpenRadar)
+            val coach by vm.coach.collectAsStateWithLifecycle()
+            AlertsGroup(
+                state.alerts, vigilanceRefresh, onRain = vm::setRainLowersLimit, onOpenRadar = onOpenRadar,
+                limitDropVoice = coach.first, onLimitDropVoice = vm::setLimitDropVoice, breakReminder = coach.second, onBreakReminder = vm::setBreakReminder,
+            )
             RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
             DataGroup(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
             PrivacyGroup()
@@ -363,7 +368,10 @@ private fun SpeedAlertGroup(toleranceKmh: Int, onSelect: (Int) -> Unit) {
 // ── Alertes : zones de vigilance, pluie ─────────────────────────────────────
 
 @Composable
-private fun AlertsGroup(alerts: AlertSettings, refresh: RefreshState, onRain: (Boolean) -> Unit, onOpenRadar: () -> Unit) {
+private fun AlertsGroup(
+    alerts: AlertSettings, refresh: RefreshState, onRain: (Boolean) -> Unit, onOpenRadar: () -> Unit,
+    limitDropVoice: Boolean = true, onLimitDropVoice: (Boolean) -> Unit = {}, breakReminder: Boolean = true, onBreakReminder: (Boolean) -> Unit = {},
+) {
     val c = LocalRoadlyColors.current
     val updated = alerts.zonesUpdatedAtMs?.let { java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, java.util.Locale.FRANCE).format(java.util.Date(it)) }
     val subtitle = when {
@@ -379,7 +387,9 @@ private fun AlertsGroup(alerts: AlertSettings, refresh: RefreshState, onRain: (B
             subtitle = if (alerts.vigilanceEnabled) subtitle else stringResource(R.string.settings_vigilance_off),
             icon = Icons.Default.Shield, iconStyle = IconTileStyle.Warning, onClick = onOpenRadar,
         )
-        ToggleRow(stringResource(R.string.settings_rain_limit), checked = alerts.rainLowersLimit, onCheckedChange = onRain, icon = Icons.Default.WaterDrop, subtitle = stringResource(R.string.settings_rain_limit_subtitle), divider = false)
+        ToggleRow(stringResource(R.string.settings_rain_limit), checked = alerts.rainLowersLimit, onCheckedChange = onRain, icon = Icons.Default.WaterDrop, subtitle = stringResource(R.string.settings_rain_limit_subtitle))
+        ToggleRow(stringResource(R.string.settings_limit_drop), checked = limitDropVoice, onCheckedChange = onLimitDropVoice, icon = Icons.Default.Speed, subtitle = stringResource(R.string.settings_limit_drop_subtitle))
+        ToggleRow(stringResource(R.string.settings_break_reminder), checked = breakReminder, onCheckedChange = onBreakReminder, icon = Icons.Default.LocalCafe, subtitle = stringResource(R.string.settings_break_reminder_subtitle), divider = false)
     }
 }
 

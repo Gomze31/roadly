@@ -22,6 +22,7 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Limitation de vitesse de la route | G | fonctionnelle | 1.0 | Profil du tracé : une requête `trace_attributes` (`edge_walk`) par tracé, y compris FOSSGIS ; « — » là où OSM n'a pas de `maxspeed` ; repli fix par fix sur un Valhalla auto-hébergé. Testé JVM, non vérifié en conduite |
 | Prochaine limitation (« 50 dans 300 m ») | G | fonctionnelle | 1.0 | Lue dans le profil, horizon 20 s de trajet (250 m–1,5 km) ; testé JVM |
 | Alerte sonore de dépassement (option) | G | fonctionnelle | 2 | Bip + badge rouge, tolérance 0/5/10 km/h ; active dès qu'une limitation est connue (profil 1.0) |
+| Annonce des baisses de limitation (option) | — | fonctionnelle | Radar 3 | « Limitation 70. » une fois, confirmée sur deux positions, en guidage et en conduite libre ; jamais pour une hausse ; testé JVM |
 | Limitation abaissée par pluie (option) | G | fonctionnelle | 2 | Open-Meteo (CC BY 4.0, sans clé) ; effet visible seulement si une limitation est connue (LOT 4) |
 | Changer de destination / ajouter un arrêt en guidage | G | fonctionnelle | 2 | Destination, itinéraire alternatif, ajout d'arrêt (LOT 6) |
 | Jusqu'à 10 arrêts réordonnables | G | fonctionnelle | 4 | Écran d'itinéraires (LOT 6) |
@@ -44,7 +45,7 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Ruban Horizon : manœuvres, arrivée | G | fonctionnelle | 2 | `HorizonStrip` (LOT 1) : échelle log 0–5 km, 3 prochaines manœuvres + arrivée ; virages par courbure : LOT 4 |
 | Ralentissements, bouchons, incidents dans le bandeau | G | bloquée | 3 | Dépend trafic |
 | Services (stations, aires) dans le bandeau | G | bloquée | 3 | Dépend POI |
-| Zones de vigilance dans le bandeau | G | bloquée | 3 | Dépend base de zones + cadre légal |
+| Zones de vigilance dans le bandeau | G | fonctionnelle | Radar | Zones de danger dans l'Horizon, la pastille et sur le tracé ; jamais de point d'équipement |
 
 ## 3. Recherche, lieux, favoris
 
@@ -115,7 +116,7 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 |---|---|---|---|---|
 | Multi-destinations (10), réorganisation | G | fonctionnelle | 4 | LOT 6 |
 | Optimisation de tournée | + | fonctionnelle | 4 | Valhalla `optimized_route`, repli local (LOT 6) |
-| Pauses planifiées, aires | G | non commencée | 4 | |
+| Pauses planifiées, aires | G | en cours | 4 | Rappel vocal après deux heures de conduite (option, Sécurité routière), puis toutes les 30 min ; aires : non commencé |
 | Heure d'arrivée souhaitée | G | non commencée | 4 | |
 
 ## 9. Stationnement et retour à pied

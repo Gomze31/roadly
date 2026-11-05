@@ -82,6 +82,12 @@ interface UserPreferencesRepository {
     /** Bip à l'entrée d'une zone de vigilance. */
     val vigilanceSound: Flow<Boolean>
     suspend fun setVigilanceSound(value: Boolean)
+    /** Annonce vocale des baisses de limitation (« Limitation 70. »). */
+    val limitDropVoice: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setLimitDropVoice(value: Boolean) = Unit
+    /** Rappel de pause après deux heures de conduite. */
+    val breakReminder: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setBreakReminder(value: Boolean) = Unit
     /** Limitation abaissée par temps de pluie (R413-2) quand une limitation est connue. */
     val rainLowersLimit: Flow<Boolean>
     suspend fun setRainLowersLimit(value: Boolean)
@@ -131,6 +137,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kSpeedSound = booleanPreferencesKey("speed.alert.sound")
     private val kVigilance = booleanPreferencesKey("vigilance.enabled")
     private val kVigilanceSound = booleanPreferencesKey("vigilance.sound")
+    private val kLimitDropVoice = booleanPreferencesKey("coach.limit.drop.voice")
+    private val kBreakReminder = booleanPreferencesKey("coach.break.reminder")
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
     private val kMap3d = booleanPreferencesKey("map.3d")
     private val kMapDetail = stringPreferencesKey("map.detail")
@@ -177,6 +185,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setVigilanceEnabled(value: Boolean) { store.edit { it[kVigilance] = value } }
     override val vigilanceSound: Flow<Boolean> = store.data.map { it[kVigilanceSound] ?: GuidanceDefaults.VIGILANCE_SOUND }
     override suspend fun setVigilanceSound(value: Boolean) { store.edit { it[kVigilanceSound] = value } }
+    override val limitDropVoice: Flow<Boolean> = store.data.map { it[kLimitDropVoice] ?: true }
+    override suspend fun setLimitDropVoice(value: Boolean) { store.edit { it[kLimitDropVoice] = value } }
+    override val breakReminder: Flow<Boolean> = store.data.map { it[kBreakReminder] ?: true }
+    override suspend fun setBreakReminder(value: Boolean) { store.edit { it[kBreakReminder] = value } }
     override val rainLowersLimit: Flow<Boolean> = store.data.map { it[kRainLimit] ?: GuidanceDefaults.RAIN_LOWERS_LIMIT }
     override suspend fun setRainLowersLimit(value: Boolean) { store.edit { it[kRainLimit] = value } }
     override val map3dEnabled: Flow<Boolean> = store.data.map { it[kMap3d] ?: GuidanceDefaults.MAP_3D }

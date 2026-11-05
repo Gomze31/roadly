@@ -38,7 +38,16 @@ data class RadarSettings(
      * téléphone, jusqu'à « Tout réafficher ». Plafonnées à [MAX_HIDDEN] (les plus anciennes sortent).
      */
     val hiddenZones: Set<String> = emptySet(),
+    /**
+     * Équipements signalés par des conducteurs (MapAtlas) absents de la liste officielle : désactivés par défaut, alerte visuelle
+     * seulement (confiance 45). La corroboration et le sens indicatif des équipements officiels restent toujours actifs.
+     */
+    val communityZones: Boolean = false,
 ) {
+    /** Un équipement de la base est-il retenu par ces réglages (zone masquée, source communautaire non activée) ? */
+    fun accepts(radar: fr.roadly.core.radar.Radar): Boolean =
+        radar.id !in hiddenZones && (communityZones || radar.source != fr.roadly.core.radar.RadarSourceIds.MAPATLAS)
+
     val enabledKinds: Set<RadarKind> get() = families.flatMapTo(HashSet()) { it.kinds }
 
     companion object {
@@ -57,6 +66,7 @@ interface RadarSettingsRepository {
     /** Fausse alerte : la zone [key] n'est plus annoncée ni dessinée. */
     suspend fun hideZone(key: String)
     suspend fun clearHiddenZones()
+    suspend fun setCommunityZones(value: Boolean)
 }
 
 @Singleton
@@ -67,6 +77,7 @@ class DataStoreRadarSettingsRepository @Inject constructor(private val store: Da
     private val kDisabled = stringPreferencesKey("radar.families.disabled")
     /** Ordre d'ajout conservé (liste séparée par des virgules) pour retirer les plus anciennes au-delà du plafond. */
     private val kHidden = stringPreferencesKey("radar.hidden.zones")
+    private val kCommunity = booleanPreferencesKey("radar.community.zones")
 
     override val settings: Flow<RadarSettings> = store.data.map { p ->
         val disabled = p[kDisabled].orEmpty().split(',').mapNotNull { n -> RadarFamily.entries.firstOrNull { it.name == n } }.toSet()
@@ -76,6 +87,7 @@ class DataStoreRadarSettingsRepository @Inject constructor(private val store: Da
             announceExit = p[kExit] ?: false,
             families = RadarFamily.entries.toSet() - disabled,
             hiddenZones = HiddenZones.decode(p[kHidden]).toSet(),
+            communityZones = p[kCommunity] ?: false,
         )
     }
 
@@ -91,6 +103,7 @@ class DataStoreRadarSettingsRepository @Inject constructor(private val store: Da
     }
     override suspend fun hideZone(key: String) { store.edit { p -> p[kHidden] = HiddenZones.encode(HiddenZones.add(HiddenZones.decode(p[kHidden]), key)) } }
     override suspend fun clearHiddenZones() { store.edit { it.remove(kHidden) } }
+    override suspend fun setCommunityZones(value: Boolean) { store.edit { it[kCommunity] = value } }
 }
 
 /** Liste ordonnée des zones masquées, sans doublon, plafonnée à [RadarSettings.MAX_HIDDEN]. */
@@ -113,4 +126,5 @@ object DefaultRadarSettingsRepository : RadarSettingsRepository {
     override suspend fun setFamily(family: RadarFamily, enabled: Boolean) = Unit
     override suspend fun hideZone(key: String) = Unit
     override suspend fun clearHiddenZones() = Unit
+    override suspend fun setCommunityZones(value: Boolean) = Unit
 }

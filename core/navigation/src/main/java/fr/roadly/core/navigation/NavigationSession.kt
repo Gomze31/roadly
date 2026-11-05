@@ -388,6 +388,7 @@ class NavigationSession @Inject constructor(
             updateRouteProfile(progress)
             if (routeLimitKmh == null) refreshSpeedLimit()
             checkOverSpeed()
+            coachTick(now)
             updateZone(progress)
             // Un recalcul a pu aboutir pendant une suspension : ne jamais associer l'ancienne progression au nouveau tracé.
             if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = false))
@@ -680,6 +681,18 @@ class NavigationSession @Inject constructor(
                 providerLimitKmh = when (result) {
                     is Outcome.Success -> result.value
                     is Outcome.Failure -> null
+                }
+            }
+        }
+
+        /** Baisse de limitation et rappel de pause (TomTom, Coyote, Sécurité routière), selon les réglages. */
+        private val coach = DrivingCoach()
+
+        private suspend fun coachTick(now: Long) {
+            for (advice in coach.update(now, effectiveLimit().first, speedKmh)) {
+                when (advice) {
+                    is DrivingCoach.Advice.LimitDropped -> if (prefs.limitDropVoice.first()) say(SpokenPhrases.limitDrop(advice.kmh), routeId = route.id)
+                    DrivingCoach.Advice.TakeABreak -> if (prefs.breakReminder.first()) say(SpokenPhrases.TAKE_A_BREAK, routeId = route.id, priority = SpeechPriority.LOW)
                 }
             }
         }

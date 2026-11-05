@@ -107,6 +107,11 @@ class SettingsViewModel @Inject constructor(
 
     /** Niveau de détail de la carte en guidage (Normal / Réduit). */
     val mapDetail: StateFlow<MapDetail> = prefs.mapDetail.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.MAP_DETAIL)
+    /** Aides de conduite : annonce des baisses de limitation, rappel de pause (deux heures). */
+    val coach: StateFlow<Pair<Boolean, Boolean>> = kotlinx.coroutines.flow.combine(prefs.limitDropVoice, prefs.breakReminder) { a, b -> a to b }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true to true)
+    fun setLimitDropVoice(value: Boolean) { viewModelScope.launch { prefs.setLimitDropVoice(value) } }
+    fun setBreakReminder(value: Boolean) { viewModelScope.launch { prefs.setBreakReminder(value) } }
     /** E2 : réglages du groupe « Navigation », appliqués immédiatement au guidage en cours (flux `Eagerly` du guidage). */
     val navigation: StateFlow<NavigationSettings> = combine(
         prefs.defaultCameraMode, prefs.zoomOffset, prefs.pitchPreset, prefs.autoRotate,

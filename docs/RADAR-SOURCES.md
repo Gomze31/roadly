@@ -32,7 +32,22 @@ Objectif : alimenter Radar Intelligence avec des données **légalement réutili
 | Licence | Licence Ouverte 2.0 |
 | Intégration | **Oui, en enrichissement** : un équipement de la liste 2025 reprend sens, route, commune, département, longueur de tronçon et vitesse PL d'un équipement **compatible à moins de 50 m**. Jamais l'existence, la position ou la vitesse. Mesure réelle : 2 223 équipements enrichis, 674 avec un sens exploitable (cardinal ou double sens) |
 
-### 1.3 Valhalla / OpenStreetMap (déjà utilisé par Roadly)
+### 1.3 MapAtlas Camera Index — **corroboration, sens indicatif, équipements en plus (option)**
+
+| | |
+|---|---|
+| Producteur | MapAtlas (signalements de conducteurs de l'application MapMetrics, dédoublonnés par coordonnées) |
+| URL | https://mapatlas.eu/tools/speed-camera-map ; fichier France : `https://mapatlas.eu/data/camera-index/FR.geojson` |
+| Données | Point, `class` (spot, signal = feu rouge, corridor = tronçon, adaptive), `limitKph`, `facingDeg`, `approach` (N, NE… ou « both ») |
+| Volume | 3 853 points en France (instantané du 21/05/2024, vérifié le 2026-11-05) |
+| Licence | CC BY 4.0, attribution « MapAtlas, https://mapatlas.eu » ; la page indique « no signup, no API key and no request limit » |
+| Limites | Instantané de 2024, sans date par équipement ni statut officiel ; radars mobiles quasi absents ; 725 points à « 140 km/h » (valeur inexistante en France, ignorée) |
+| Mesures (2026-11-05) | 3 072 points à moins de 100 m d'un équipement officiel (médiane 11 m) ; lettre `approach` conforme au jeu 2018 dans 37 cas sur 42 ; `facingDeg` conforme dans ≈ 55 % des cas ; « both » contredit par 2018 dans 30 % des cas |
+| Intégration | **Oui** : équipement officiel confirmé à ≤ 50 m (confiance + 5) ; lettre de sens = **sens indicatif** seulement (avance une alerte si le cap concorde, n'écarte jamais un équipement) ; points à plus de 100 m de tout équipement officiel = équipements « hors liste officielle », désactivés par défaut, alerte visuelle seulement. `facingDeg` et « both » ne sont pas utilisés. Mesure réelle : 2 633 confirmés, 364 sens indicatifs, 781 en plus, 369 ignorés |
+
+Recherche du 2026-11-05 (Reddit, forums OSM, Privacy Guides) : aucune autre source à licence explicite n'a été trouvée. Le site lufop.net (licence ODbL d'après un moteur de recherche) a refusé la lecture (HTTP 403) : non intégré tant que ses conditions n'ont pas été lues. VatioBoard (OSM) ne publie ni jeu téléchargeable ni licence.
+
+### 1.4 Valhalla / OpenStreetMap (déjà utilisé par Roadly)
 
 `trace_attributes` donne la limitation OSM et le nom de la route sous le véhicule (profil de route S1, map matching de la conduite libre). Radar Intelligence s'en sert pour **écarter un équipement dont le numéro de route ne correspond pas** à la route suivie (route parallèle, bretelle). Licence ODbL (données OSM), service FOSSGIS en fair-use.
 
@@ -46,7 +61,8 @@ Objectif : alimenter Radar Intelligence avec des données **légalement réutili
 | Radars pédagogiques (Toulouse, Bordeaux, Clermont…) | Afficheurs de vitesse | Pas des contrôles : risque de confusion |
 | Open-GATSO-POI (GitHub 1e1) | Export POI européen quotidien | Code MIT, mais données en partie issues de lufop.net : licence des données incertaine |
 | lufop.net | Base communautaire de zones | Conditions de réutilisation non vérifiées : exclu par prudence |
-| JamesSimpson/speedcamera, MapMetrics camera index | Bases communautaires | Pas de licence publiée pour les données |
+| JamesSimpson/speedcamera | Base communautaire | Pas de licence publiée pour les données |
+| lufop.net | Base communautaire (ODbL d'après un moteur de recherche) | Page refusée (HTTP 403) le 2026-11-05 : conditions non lues |
 | SCDB, POIbase, Coyote, TomTom, Waze | Bases complètes, mobiles comprises | Commerciales ou propriétaires (non évaluées plus avant) |
 
 ## 3. Cadre légal appliqué

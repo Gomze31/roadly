@@ -105,6 +105,12 @@ internal object SpokenPhrases {
 
     const val DANGER_ZONE_END = "Fin de zone de danger."
 
+    /** Baisse de limitation confirmée (DrivingCoach). */
+    fun limitDrop(kmh: Int): String = "Limitation $kmh."
+
+    /** Deux heures de conduite : recommandation de la Sécurité routière. */
+    const val TAKE_A_BREAK = "Vous roulez depuis deux heures. Pensez à faire une pause."
+
     /** 1.0 : premier portique de péage en flux libre de la course (dit une seule fois). */
     fun freeFlowToll(countryCode: String?): String =
         if (countryCode == "FR") "Péage en flux libre. Pensez à le payer en ligne sous 72 heures."

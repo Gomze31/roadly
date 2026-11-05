@@ -41,9 +41,11 @@ enum class RadarKind(val code: String?, val controlsSpeed: Boolean) {
 /**
  * Sens contrôlé. [bearingDeg] = cap de circulation contrôlé (0 = vers le nord) quand il est déductible ; [bothWays] = double sens.
  * [label] = texte source (« Nord vers Sud », « PARIS vers LYON ») conservé tel quel.
+ * [hint] = sens indicatif d'une source communautaire (MapAtlas, juste dans ≈ 88 % des cas mesurés) : il peut avancer une alerte
+ * quand le cap concorde, jamais écarter un équipement (pas de radar manqué si l'indication est fausse).
  */
-data class ControlledDirection(val bearingDeg: Double?, val bothWays: Boolean, val label: String?) {
-    val isKnownOneWay: Boolean get() = !bothWays && bearingDeg != null
+data class ControlledDirection(val bearingDeg: Double?, val bothWays: Boolean, val label: String?, val hint: Boolean = false) {
+    val isKnownOneWay: Boolean get() = !bothWays && bearingDeg != null && !hint
 }
 
 enum class RadarStatus { ACTIVE, REMOVED }
@@ -83,4 +85,7 @@ object RadarSourceIds {
     const val FIXED_FR = "dsr-radars-fixes"
     const val AUTOMATIQUES_2018 = "radars-automatiques-2018"
     const val ATTRIBUTION_FR = "Ministère de l'Intérieur – Délégation à la sécurité routière, data.gouv.fr, Licence Ouverte 2.0"
+    /** MapAtlas Camera Index (signalements de conducteurs, CC BY 4.0). */
+    const val MAPATLAS = "mapatlas-camera-index"
+    const val ATTRIBUTION_MAPATLAS = "MapAtlas, https://mapatlas.eu (CC BY 4.0)"
 }

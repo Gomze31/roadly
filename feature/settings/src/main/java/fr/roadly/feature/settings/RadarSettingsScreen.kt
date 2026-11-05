@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -100,6 +101,7 @@ class RadarSettingsViewModel @Inject constructor(
     fun setExit(v: Boolean) { viewModelScope.launch { radar.setAnnounceExit(v) } }
     fun setFamily(f: RadarFamily, v: Boolean) { viewModelScope.launch { radar.setFamily(f, v) } }
     fun showHiddenZones() { viewModelScope.launch { radar.clearHiddenZones() } }
+    fun setCommunityZones(v: Boolean) { viewModelScope.launch { radar.setCommunityZones(v) } }
 
     /** Synchronisation manuelle (téléchargement forcé) ; le résultat détaillé arrive dans le journal. */
     fun syncNow() {
@@ -153,6 +155,14 @@ fun RadarSettingsScreen(onBack: () -> Unit, vm: RadarSettingsViewModel = hiltVie
                 rows.forEachIndexed { i, (family, label, icon) ->
                     ToggleRow(stringResource(label), checked = family in s.settings.families, onCheckedChange = { vm.setFamily(family, it) }, icon = icon, enabled = s.enabled, divider = i < rows.lastIndex)
                 }
+            }
+            // Signalements de conducteurs (MapAtlas, CC BY 4.0) : équipements absents de la liste officielle, visuels seulement.
+            SettingsGroup(stringResource(R.string.radar_group_community), footer = stringResource(R.string.radar_community_footer)) {
+                val detail = s.lastApplied?.message?.takeIf { it.startsWith("MapAtlas") } ?: stringResource(R.string.radar_community_subtitle)
+                ToggleRow(
+                    stringResource(R.string.radar_community), checked = s.settings.communityZones, onCheckedChange = vm::setCommunityZones,
+                    icon = Icons.Default.Groups, enabled = s.enabled, subtitle = detail, divider = false,
+                )
             }
             // Fausses alertes signalées depuis la pastille (téléphone) ou l'alerte Android Auto.
             SettingsGroup(stringResource(R.string.radar_group_hidden), footer = stringResource(R.string.radar_hidden_footer)) {
