@@ -19,6 +19,7 @@ import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Speed
@@ -52,13 +53,20 @@ internal class CarHomeScreen(
     private var guiding = false
     private var permission = deps.location.permissionState.value
     private var lastFix: LocationFix? = deps.location.lastKnown
+    /** Localisation du téléphone coupée (réglages rapides) : aucune position n'arrivera, on le dit dans la liste. */
+    private var locationOff = !CarLocationSwitch.isOn(carContext)
 
     init {
         lifecycleScope.launch(Dispatchers.Main) {
             combine(
                 deps.favorites.observeHome(), deps.favorites.observeWork(), deps.favorites.observeAll(), deps.recents.observe(),
             ) { home, work, all, recents -> CarPlaces(home, work, all, recents) }
-                .collect { places = it; invalidate() }
+                .collect { places = it; centerWithoutFix(); invalidate() }
+        }
+        lifecycleScope.launch(Dispatchers.Main) {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                CarLocationSwitch.changes(carContext).collect { on -> if (locationOff == on) { locationOff = !on; invalidate() } }
+            }
         }
         lifecycleScope.launch(Dispatchers.Main) {
             deps.navigation.state.map { it is NavigationState.Guiding }.distinctUntilChanged().collect { guiding = it; invalidate() }
@@ -71,7 +79,7 @@ internal class CarHomeScreen(
                 // Accueil visible : plus de tracé, carte à plat qui suit le véhicule.
                 renderer.clearRoutes()
                 renderer.setHud(CarHudModel.EMPTY)
-                lastFix?.let { showFix(it) }
+                lastFix?.let { showFix(it) } ?: centerWithoutFix()
                 deps.location.fixes.collect { showFix(it) }
             }
         }
@@ -81,6 +89,13 @@ internal class CarHomeScreen(
         lastFix = fix
         renderer.setUser(fix)
         renderer.follow(fix.point, fix.bearingDeg?.toDouble(), FollowProfile.BROWSE)
+    }
+
+    /** Pas encore de position : carte sur le domicile (sinon le travail) plutôt que sur le planisphère ; aucun repère de véhicule. */
+    private fun centerWithoutFix() {
+        if (lastFix != null) return
+        val p = places ?: return
+        (p.home ?: p.work)?.let { renderer.follow(it.point, null, FollowProfile.BROWSE) }
     }
 
     override fun onGetTemplate(): Template {
@@ -103,6 +118,10 @@ internal class CarHomeScreen(
     }
 
     private fun rows(p: CarPlaces): List<Row> = buildList {
+        if (locationOff) {
+            add(Row.Builder().setTitle(carContext.getString(R.string.car_location_off_title)).addText(carContext.getString(R.string.car_location_off_text))
+                .setImage(CarIcons.of(Icons.Default.LocationOff, tint = CarColor.RED)).build())
+        }
         if (guiding) {
             add(row(Icons.Default.Navigation, deps.guidance.destinationName ?: carContext.getString(R.string.car_destination), null) {
                 screenManager.push(CarGuidanceScreen(carContext, deps, renderer, carContext.getCarService(androidx.car.app.navigation.NavigationManager::class.java)))

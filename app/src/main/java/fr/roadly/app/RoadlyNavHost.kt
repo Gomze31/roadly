@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -38,6 +40,7 @@ import fr.roadly.feature.settings.RadarSettingsRoute
 import fr.roadly.feature.settings.radarSettingsScreen
 import fr.roadly.feature.settings.PremiumRoute
 import fr.roadly.feature.settings.SettingsRoute
+import fr.roadly.feature.settings.SettingsSection
 import fr.roadly.feature.settings.assistanceScreen
 import fr.roadly.feature.settings.premiumScreen
 import fr.roadly.feature.settings.settingsScreen
@@ -68,7 +71,7 @@ fun RoadlyNavHost(
         homeScreen(
             isDark = isDark,
             onSearch = { nav.navigate(SearchRoute()) },
-            onSettings = { nav.navigate(SettingsRoute) },
+            onSettings = { nav.navigate(SettingsRoute()) },
             onNavigateToRoute = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) },
             onRequestLocationPermission = onRequestLocationPermission,
             onOpenAppSettings = onOpenAppSettings,
@@ -99,7 +102,7 @@ fun RoadlyNavHost(
         routeScreen(
             isDark = isDark,
             onBack = { nav.popBackStack() },
-            onOpenSettings = { nav.navigate(SettingsRoute) },
+            onOpenSettings = { nav.navigate(SettingsRoute(section = SettingsSection.NAVIGATION.name)) },
             onStartNavigation = { begin ->
                 // API 33+ : POST_NOTIFICATIONS demandée avant de démarrer le service (spec §2) ; refus = notification masquée seulement.
                 withNotificationPermission {
@@ -126,13 +129,14 @@ fun RoadlyNavHost(
         )
     }
     // Mise à jour disponible (release GitHub) : proposée au lancement ; le suivi détaillé est dans Réglages › Mises à jour.
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { launch.onForeground() }
     val update by launch.updatePrompt.collectAsStateWithLifecycle()
     update?.let { u ->
         AlertDialog(
             onDismissRequest = launch::dismiss,
             title = { Text("Roadly ${u.manifest.versionName} disponible") },
             text = { Text((u.notes.takeIf { it.isNotBlank() }?.take(600) ?: "Nouvelle version publiée sur GitHub.") + "\n\nLe téléchargement se poursuit dans Réglages › Mises à jour ; Android demande ensuite de confirmer l'installation.") },
-            confirmButton = { TextButton(onClick = { launch.installUpdate(u); nav.navigate(SettingsRoute) }) { Text("Mettre à jour") } },
+            confirmButton = { TextButton(onClick = { launch.installUpdate(u); nav.navigate(SettingsRoute(section = SettingsSection.UPDATES.name)) }) { Text("Mettre à jour") } },
             dismissButton = { TextButton(onClick = { launch.later(u) }) { Text("Ignorer cette version") } },
         )
     }
@@ -167,7 +171,7 @@ fun RoadlyNavHost(
             when (r) {
                 is NavRequest.OpenSearch -> nav.navigate(SearchRoute(category = r.category))
                 NavRequest.OpenGuidance -> nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
-                NavRequest.OpenSettings -> nav.navigate(SettingsRoute) { launchSingleTop = true }
+                NavRequest.OpenSettings -> nav.navigate(SettingsRoute()) { launchSingleTop = true }
             }
         }
     }

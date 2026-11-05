@@ -3,6 +3,39 @@
     <string name="settings_title">Réglages</string>
     <string name="settings_back">Retour</string>
 
+    <!-- Accueil des réglages : thèmes et rubriques -->
+    <string name="settings_home_driving">Conduite</string>
+    <string name="settings_home_app">Application</string>
+    <string name="settings_home_account">Compte et données</string>
+    <string name="settings_section_vehicle">Véhicule et profil</string>
+    <string name="settings_section_vehicle_sub">Véhicule, trottinette, profil, trajets</string>
+    <string name="settings_section_navigation">Navigation et itinéraires</string>
+    <string name="settings_section_navigation_sub">Carte, vue 3D des carrefours, péages, autoroutes</string>
+    <string name="settings_section_alerts">Alertes et radars</string>
+    <string name="settings_section_alerts_sub">Tolérance de vitesse, radars, zones, pauses</string>
+    <string name="settings_section_voice">Voix et assistant</string>
+    <string name="settings_section_voice_sub">Annonces vocales, volume, Roadly AI</string>
+    <string name="settings_section_display">Affichage</string>
+    <string name="settings_section_display_sub">Thème clair ou sombre, teinte du cockpit</string>
+    <string name="settings_section_android_auto">Android Auto</string>
+    <string name="settings_section_android_auto_sub">Afficher Roadly sur l\'écran de la voiture</string>
+    <string name="settings_section_updates">Mises à jour</string>
+    <string name="settings_section_updates_sub">Nouvelles versions publiées sur GitHub</string>
+    <string name="settings_section_plus">Roadly+ et assistance</string>
+    <string name="settings_section_plus_sub">Fonctions incluses, signaler un bug</string>
+    <string name="settings_section_data">Données et confidentialité</string>
+    <string name="settings_section_data_sub">Historique, favoris, vie privée</string>
+    <string name="settings_section_advanced">Avancé</string>
+    <string name="settings_section_advanced_sub">Communauté, fournisseurs de cartes et d\'itinéraires</string>
+    <string name="settings_section_about">À propos</string>
+    <string name="settings_section_about_sub">Version, licences, sources des données</string>
+    <string name="settings_updates_version">Version %1$s</string>
+    <string name="settings_updates_uptodate">Version %1$s · à jour</string>
+    <string name="settings_updates_available">Version %1$s disponible</string>
+    <string name="settings_updates_downloading">Téléchargement de la version %1$s…</string>
+    <string name="settings_updates_ready">Version %1$s · installation en attente</string>
+    <string name="settings_updates_failed">Version %1$s · dernière vérification en échec</string>
+
     <string name="settings_group_driving">Conduite</string>
     <string name="settings_group_appearance">Apparence</string>
     <string name="settings_group_routes">Itinéraires</string>

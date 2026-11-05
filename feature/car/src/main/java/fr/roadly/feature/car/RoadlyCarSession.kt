@@ -50,9 +50,19 @@ internal class RoadlyCarSession(private val deps: CarDependencies) : Session() {
         })
         dark.value = carContext.isDarkMode
         lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) = deps.location.setCarDisplayActive(true)
-            override fun onStop(owner: LifecycleOwner) = deps.location.setCarDisplayActive(false)
+            // Téléphone verrouillé ou sur une autre application : sans service de premier plan `location`, Android suspend la
+            // position et la carte de la voiture reste figée (constaté sur le HONOR, demande « inactive »).
+            override fun onStart(owner: LifecycleOwner) {
+                deps.carScreen.set(true)
+                deps.location.setCarDisplayActive(true)
+                deps.foregroundService.start()
+            }
+            override fun onStop(owner: LifecycleOwner) {
+                deps.carScreen.set(false)
+                deps.location.setCarDisplayActive(false)
+            }
             override fun onDestroy(owner: LifecycleOwner) {
+                deps.carScreen.set(false)
                 deps.location.setCarDisplayActive(false)
                 if (navigationStarted) navigationManager.navigationEnded()
                 navigationStarted = false

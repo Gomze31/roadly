@@ -3,6 +3,7 @@ package fr.roadly.feature.settings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -36,7 +37,10 @@ import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GraphicEq
@@ -66,6 +70,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +93,7 @@ import fr.roadly.core.data.community.CommunityConfig
 import fr.roadly.core.data.config.ProviderConfig
 import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.ThemeMode
+import fr.roadly.core.data.update.UpdateState
 import fr.roadly.core.designsystem.component.GlassButton
 import fr.roadly.core.designsystem.component.GlassButtonStyle
 import fr.roadly.core.designsystem.component.GlassChip
@@ -117,54 +124,154 @@ import kotlin.math.roundToInt
 /** Retrait du contenu placé sous une ligne avec tuile d'icône (aligné sur le texte de la ligne). */
 private val RowContentInset = 64.dp
 
+/**
+ * Rubriques des réglages. L'accueil les regroupe par thème (conduite, application, compte et données) ; chacune ouvre sa page.
+ * [name] sert de clé de lien direct (`SettingsRoute(section = "UPDATES")`).
+ */
+enum class SettingsSection(val title: Int, val subtitle: Int, val icon: ImageVector) {
+    VEHICLE(R.string.settings_section_vehicle, R.string.settings_section_vehicle_sub, Icons.Default.DirectionsCar),
+    NAVIGATION(R.string.settings_section_navigation, R.string.settings_section_navigation_sub, Icons.Default.Route),
+    ALERTS(R.string.settings_section_alerts, R.string.settings_section_alerts_sub, Icons.Default.Speed),
+    VOICE(R.string.settings_section_voice, R.string.settings_section_voice_sub, Icons.Default.RecordVoiceOver),
+    DISPLAY(R.string.settings_section_display, R.string.settings_section_display_sub, Icons.Default.Palette),
+    ANDROID_AUTO(R.string.settings_section_android_auto, R.string.settings_section_android_auto_sub, Icons.Default.Dashboard),
+    UPDATES(R.string.settings_section_updates, R.string.settings_section_updates_sub, Icons.Default.SystemUpdate),
+    PLUS(R.string.settings_section_plus, R.string.settings_section_plus_sub, Icons.Default.Star),
+    DATA(R.string.settings_section_data, R.string.settings_section_data_sub, Icons.Default.Shield),
+    ADVANCED(R.string.settings_section_advanced, R.string.settings_section_advanced_sub, Icons.Default.Dns),
+    ABOUT(R.string.settings_section_about, R.string.settings_section_about_sub, Icons.Default.Info);
+
+    companion object {
+        /** Thèmes de l'accueil, dans l'ordre d'affichage. */
+        val groups: List<Pair<Int, List<SettingsSection>>> = listOf(
+            R.string.settings_home_driving to listOf(VEHICLE, NAVIGATION, ALERTS, VOICE),
+            R.string.settings_home_app to listOf(DISPLAY, ANDROID_AUTO, UPDATES),
+            R.string.settings_home_account to listOf(PLUS, DATA, ADVANCED, ABOUT),
+        )
+
+        fun fromKey(key: String?): SettingsSection? = key?.let { k -> entries.firstOrNull { it.name == k } }
+    }
+}
+
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, onOpenPremium: () -> Unit = {}, onOpenAssistance: () -> Unit = {}, onOpenRadar: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel(), scooterVm: ScooterSettingsViewModel = hiltViewModel(), updatesVm: UpdatesViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, initialSection: String? = null, onOpenTrips: () -> Unit = {}, onOpenProfile: () -> Unit = {}, onOpenPremium: () -> Unit = {}, onOpenAssistance: () -> Unit = {}, onOpenRadar: () -> Unit = {}, vm: SettingsViewModel = hiltViewModel(), scooterVm: ScooterSettingsViewModel = hiltViewModel(), updatesVm: UpdatesViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
-    val providerError by vm.providerError.collectAsStateWithLifecycle()
-    val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
-    val community by vm.community.collectAsStateWithLifecycle()
-    val tint by vm.tint.collectAsStateWithLifecycle()
+    var sectionKey by rememberSaveable { mutableStateOf(SettingsSection.fromKey(initialSection)?.name) }
+    val section = SettingsSection.fromKey(sectionKey)
+    BackHandler(enabled = section != null) { sectionKey = null }
 
     RoadlyScreen {
-        RoadlyTopBar(title = stringResource(R.string.settings_title), onBack = onBack, backDescription = stringResource(R.string.settings_back))
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.s)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
+        RoadlyTopBar(
+            title = stringResource(section?.title ?: R.string.settings_title),
+            onBack = { if (section != null) sectionKey = null else onBack() },
+            backDescription = stringResource(R.string.settings_back),
+        )
+        // Une position de défilement par page : revenir à l'accueil ne garde pas celle d'une rubrique.
+        key(section) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(horizontal = RoadlySpacing.m, vertical = RoadlySpacing.s)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                when (section) {
+                    null -> SettingsHome(state, updatesVm, onOpen = { sectionKey = it.name })
+                    else -> SettingsSectionContent(section, state, vm, scooterVm, updatesVm, onOpenTrips, onOpenProfile, onOpenPremium, onOpenAssistance, onOpenRadar)
+                }
+                Spacer(Modifier.height(RoadlySpacing.s))
+            }
+        }
+    }
+}
+
+/** Accueil : rubriques groupées par thème, avec un résumé de l'état quand il est utile (véhicule, mises à jour). */
+@Composable
+private fun SettingsHome(state: SettingsUiState, updatesVm: UpdatesViewModel, onOpen: (SettingsSection) -> Unit) {
+    val updates by updatesVm.ui.collectAsStateWithLifecycle()
+    SettingsSection.groups.forEach { (groupTitle, sections) ->
+        SettingsGroup(stringResource(groupTitle)) {
+            sections.forEachIndexed { i, s ->
+                val subtitle = when (s) {
+                    SettingsSection.VEHICLE -> state.vehicle?.summary() ?: stringResource(s.subtitle)
+                    SettingsSection.UPDATES -> updatesSummary(updates)
+                    else -> stringResource(s.subtitle)
+                }
+                ListRow(stringResource(s.title), subtitle = subtitle, icon = s.icon, onClick = { onOpen(s) }, divider = i < sections.lastIndex)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionContent(
+    section: SettingsSection, state: SettingsUiState, vm: SettingsViewModel, scooterVm: ScooterSettingsViewModel, updatesVm: UpdatesViewModel,
+    onOpenTrips: () -> Unit, onOpenProfile: () -> Unit, onOpenPremium: () -> Unit, onOpenAssistance: () -> Unit, onOpenRadar: () -> Unit,
+) {
+    when (section) {
+        SettingsSection.VEHICLE -> {
             DrivingGroup(state, vm)
             ScooterSettingsGroup(scooterVm)
             SettingsGroup(stringResource(R.string.settings_group_trips)) {
                 ListRow(stringResource(R.string.settings_profile), subtitle = stringResource(R.string.settings_profile_subtitle), icon = Icons.Default.Person, onClick = onOpenProfile)
                 ListRow(stringResource(R.string.settings_trips), subtitle = stringResource(R.string.settings_trips_subtitle), icon = Icons.Default.History, onClick = onOpenTrips, divider = false)
             }
-            SettingsGroup(stringResource(R.string.settings_group_plus)) {
-                ListRow(stringResource(R.string.settings_premium), subtitle = stringResource(R.string.settings_premium_subtitle), icon = Icons.Default.Star, onClick = onOpenPremium)
-                ListRow(stringResource(R.string.settings_assistance), subtitle = stringResource(R.string.settings_assistance_subtitle), icon = Icons.Default.SupportAgent, onClick = onOpenAssistance, divider = false)
-            }
+        }
+        SettingsSection.NAVIGATION -> {
             val navigation by vm.navigation.collectAsStateWithLifecycle()
             NavigationGroup(navigation, vm)
-            AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
-            TintGroup(tint, onSelect = vm::setTint)
-            VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
-            AssistantGroup()
-            SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
+            RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
+        }
+        SettingsSection.ALERTS -> {
+            val vigilanceRefresh by vm.vigilanceRefresh.collectAsStateWithLifecycle()
             val coach by vm.coach.collectAsStateWithLifecycle()
+            SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
             AlertsGroup(
                 state.alerts, vigilanceRefresh, onRain = vm::setRainLowersLimit, onOpenRadar = onOpenRadar,
                 limitDropVoice = coach.first, onLimitDropVoice = vm::setLimitDropVoice, breakReminder = coach.second, onBreakReminder = vm::setBreakReminder,
             )
-            RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
+        }
+        SettingsSection.VOICE -> {
+            VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
+            AssistantGroup()
+        }
+        SettingsSection.DISPLAY -> {
+            val tint by vm.tint.collectAsStateWithLifecycle()
+            AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
+            TintGroup(tint, onSelect = vm::setTint)
+        }
+        SettingsSection.ANDROID_AUTO -> AndroidAutoGroup()
+        SettingsSection.UPDATES -> UpdatesGroup(updatesVm)
+        SettingsSection.PLUS -> SettingsGroup(stringResource(R.string.settings_group_plus)) {
+            ListRow(stringResource(R.string.settings_premium), subtitle = stringResource(R.string.settings_premium_subtitle), icon = Icons.Default.Star, onClick = onOpenPremium)
+            ListRow(stringResource(R.string.settings_assistance), subtitle = stringResource(R.string.settings_assistance_subtitle), icon = Icons.Default.SupportAgent, onClick = onOpenAssistance, divider = false)
+        }
+        SettingsSection.DATA -> {
             DataGroup(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
             PrivacyGroup()
+        }
+        SettingsSection.ADVANCED -> {
+            val community by vm.community.collectAsStateWithLifecycle()
+            val providerError by vm.providerError.collectAsStateWithLifecycle()
             CommunityGroup(community, onSave = vm::saveCommunity, onClear = vm::clearCommunity)
             ProvidersGroup(state.providers, providerError, onSave = vm::saveProviders, onReset = vm::resetProviders)
-            AndroidAutoGroup()
-            UpdatesGroup(updatesVm)
-            AboutGroup()
-            Spacer(Modifier.height(RoadlySpacing.s))
         }
+        SettingsSection.ABOUT -> AboutGroup()
+    }
+}
+
+/** « 0.1.178 · à jour », « 0.1.179 disponible »… : l'état des mises à jour visible dès l'accueil des réglages. */
+@Composable
+private fun updatesSummary(ui: UpdatesUi): String {
+    val v = ui.current.name
+    return when (val st = ui.state) {
+        is UpdateState.Available -> stringResource(R.string.settings_updates_available, st.update.manifest.versionName)
+        is UpdateState.Downloading -> stringResource(R.string.settings_updates_downloading, st.update.manifest.versionName)
+        is UpdateState.ReadyToInstall -> stringResource(R.string.settings_updates_ready, st.update.manifest.versionName)
+        is UpdateState.NeedsPermission -> stringResource(R.string.settings_updates_ready, st.update.manifest.versionName)
+        is UpdateState.Installing -> stringResource(R.string.settings_updates_ready, st.update.manifest.versionName)
+        is UpdateState.UpToDate -> stringResource(R.string.settings_updates_uptodate, v)
+        is UpdateState.Failed -> stringResource(R.string.settings_updates_failed, v)
+        else -> stringResource(R.string.settings_updates_version, v)
     }
 }
 

@@ -1,6 +1,6 @@
 # Mises à jour depuis GitHub
 
-Roadly vérifie les **releases GitHub** du dépôt `Gomze31/roadly`, télécharge l'APK de la dernière version, vérifie son empreinte SHA-256 puis lance l'installation Android. Réglages › **Mises à jour** ; vérification automatique au lancement (au plus toutes les 12 h, désactivable).
+Roadly vérifie les **releases GitHub** du dépôt `Gomze31/roadly`, télécharge l'APK de la dernière version, vérifie son empreinte SHA-256 puis lance l'installation Android. Réglages › **Mises à jour** ; vérification automatique à chaque ouverture ou retour dans l'application (au plus toutes les 30 min, jamais pendant un téléchargement ; désactivable).
 
 ## Fonctionnement
 
@@ -69,7 +69,7 @@ Dans Roadly : Réglages › Mises à jour › toucher la ligne de version › co
 
 ## Publier une version
 
-**Automatique :** chaque push sur `main` (hors changements limités à la documentation) publie la release `v0.1.<nombre de commits>`. Le téléphone la propose ensuite dans Réglages › Mises à jour (ou au lancement, au plus toutes les 12 h).
+**Automatique :** chaque push sur `main` (hors changements limités à la documentation) publie la release `v0.1.<nombre de commits>`. Le téléphone la propose ensuite dans Réglages › Mises à jour (ou à l'ouverture de Roadly, au plus toutes les 30 min).
 
 **Version nommée :**
 

@@ -29,13 +29,14 @@ class LaunchViewModel @Inject constructor(
     suspend fun work(): Place? = favorites.observeWork().first()
 
     private val _prompt = MutableStateFlow<AvailableUpdate?>(null)
-    /** Nouvelle version à proposer (vérification automatique au plus toutes les 12 h, version ignorée exclue). */
+    /** Nouvelle version à proposer (vérification automatique au plus toutes les 30 min, version ignorée exclue). */
     val updatePrompt: StateFlow<AvailableUpdate?> = _prompt
 
-    init {
+    /** Appelé à chaque passage au premier plan (lancement, retour dans l'appli). */
+    fun onForeground() {
         viewModelScope.launch {
             updates.checkIfDue()
-            _prompt.value = updates.promptable()
+            updates.promptable()?.let { _prompt.value = it }
         }
     }
 

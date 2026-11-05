@@ -52,11 +52,17 @@ internal object AndroidAutoProbe {
         return AndroidAutoFacts(carService, autoVersion, installer, version)
     }
 
-    /** Android Auto n'a pas d'icône sur les téléphones récents : son écran, sinon sa fiche dans les réglages Android. */
+    /**
+     * Android Auto n'a pas d'icône sur les téléphones récents. Ses propres réglages (où se trouvent « Version » et le menu
+     * développeur) s'ouvrent par `APPLICATION_PREFERENCES` (vérifié sur le HONOR Magic 8 Pro, Android Auto 17.9) ; sinon son
+     * écran de lancement, sinon sa fiche dans les réglages Android.
+     */
     fun open(context: Context) {
-        val launch = context.packageManager.getLaunchIntentForPackage(AndroidAutoReadiness.ANDROID_AUTO_PACKAGE)
-        val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${AndroidAutoReadiness.ANDROID_AUTO_PACKAGE}"))
-        for (intent in listOfNotNull(launch, details, Intent(Settings.ACTION_SETTINGS))) {
+        val pkg = AndroidAutoReadiness.ANDROID_AUTO_PACKAGE
+        val prefs = Intent(Intent.ACTION_APPLICATION_PREFERENCES).setPackage(pkg)
+        val launch = context.packageManager.getLaunchIntentForPackage(pkg)
+        val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
+        for (intent in listOfNotNull(prefs, launch, details, Intent(Settings.ACTION_SETTINGS))) {
             try { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return } catch (e: ActivityNotFoundException) { continue } catch (e: SecurityException) { continue }
         }
     }

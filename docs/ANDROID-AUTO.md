@@ -73,6 +73,19 @@ Roadly ne peut pas lire le réglage « Sources inconnues » d'Android Auto : il 
 
 Constat du 2026-11-05 : les releases 0.1.174 à 0.1.177 (avec Android Auto) sont publiées et signées, mais GitHub indique 0 téléchargement de leurs APK ; la version installée sur le téléphone est donc probablement antérieure. Réglages › Mises à jour donne la version installée.
 
+## 3 ter. Passe sur le HONOR Magic 8 Pro (2026-11-05, DHU 2.1)
+
+Installée : 0.1.178 (par la mise à jour intégrée), Android Auto 17.9, mode développeur et « Sources inconnues » actifs. Roadly **apparaît** dans le lanceur et s'ouvre (accueil, carte, liste).
+
+| Constat | Cause | Correction |
+|---|---|---|
+| Carte figée sur le planisphère, bouton de recentrage sans effet | Téléphone en arrière-plan : la demande de position de Roadly est « inactive » (pas de service de premier plan hors guidage) ; de plus la localisation du téléphone était coupée | `CarScreenPresence` : la session voiture démarre `NavigationService` (type `location`) dès `onStart` et le garde tant que l'écran voiture est affiché (notification « Roadly sur Android Auto »). Démarrage accepté par Android : processus `BTOP` (lié par l'hôte), capacité position accordée. Vérifié : la carte suit la position, téléphone sur l'écran d'accueil |
+| Aucune explication quand la localisation est coupée | — | Ligne « Localisation du téléphone désactivée » en tête de l'accueil voiture (`CarLocationSwitch`, mise à jour à chaud) ; carte centrée sur le domicile (sinon le travail) tant qu'aucune position n'arrive |
+| « Ouvrir Android Auto » ouvrait la fiche Infos de l'appli | Android Auto n'a pas d'activité de lancement | Intent `APPLICATION_PREFERENCES` sur le paquet d'Android Auto : ouvre ses réglages (vérifié) |
+| DHU 2.0 : « Waiting for phone », lien coupé après TLS | DHU 2.0 (2022) trop ancien pour Android Auto 17.9 | DHU 2.1 : `sdkmanager --channel=3 "extras;google;auto"` |
+
+Pour la DHU : Android Auto › ⋮ › « Démarrer serveur unité princ. », `adb forward tcp:5277 tcp:5277`, puis `desktop-head-unit.exe`. À la première connexion, Android Auto demande sur le téléphone d'accepter la « voiture ».
+
 ## 4. Vérifié / non vérifié
 
 | Élément | Statut |
@@ -80,10 +93,10 @@ Constat du 2026-11-05 : les releases 0.1.174 à 0.1.177 (avec Android Auto) sont
 | Compilation, fusion du manifeste, APK | Fait |
 | Lint `feature:car` | 0 erreur. 4 avertissements : ressource privée `hosts_allowlist_sample` (usage documenté par Google), service exporté (obligatoire pour l'hôte), allocation dans `onDraw`, extensions KTX |
 | Tests JVM | Correspondance des manœuvres (circulation à droite, ronds-points), distances, indications (zone traversée avant la suivante, tolérance, GPS perdu), intentions `geo:`, marges de caméra |
-| Affichage réel sur la DHU ou en voiture | **Non vérifié** |
+| Affichage réel sur la DHU | Fait (accueil, carte, suivi de position) ; recherche, itinéraire, guidage et conduite libre **non parcourus** ; en voiture : **non vérifié** |
 | Sens du défilement (`onScroll`) et zoom au pincement | Convention `GestureDetector` supposée, **à vérifier sur la DHU** |
-| Rendu MapLibre dans `Presentation` (SurfaceView) | **À vérifier** ; repli possible : `textureMode(true)` dans `SurfaceMapHost` |
-| Démarrage du service de premier plan depuis la voiture, téléphone verrouillé | **À vérifier** ; un refus du système n'arrête pas le guidage (journalisé) |
+| Rendu MapLibre dans `Presentation` (SurfaceView) | Fait : la carte s'affiche. À revoir : nombreuses icônes « P » de parking dès le zoom 14 et petits points blancs (style commun) |
+| Démarrage du service de premier plan depuis la voiture | Fait, téléphone déverrouillé sur l'écran d'accueil ; téléphone verrouillé : **à vérifier** |
 
 ## 5. Limites et suite
 

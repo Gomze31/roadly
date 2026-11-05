@@ -7,6 +7,8 @@
     <string name="nav_notif_text">%1$s · arrivée %2$s</string>
     <string name="nav_notif_stop">Arrêter</string>
     <string name="free_notif_title">Conduite libre</string>
+    <string name="car_notif_title">Roadly sur Android Auto</string>
+    <string name="car_notif_text">Position active pour la carte de la voiture</string>
     <string name="free_notif_limit">Limitation %1$d km/h</string>
     <string name="free_notif_limit_unknown">Limitation inconnue</string>
     <string name="free_notif_zone">Zone de vigilance · %1$s</string>

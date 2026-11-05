@@ -96,6 +96,9 @@ class AppUpdateControllerTest {
         val c = controller(FakeSource(), installer = installer)
         c.downloadAndInstall((c.check() as UpdateState.Available).update)
         assertTrue(c.state.value is UpdateState.NeedsPermission)
+        // Retour dans l'appli (vérification automatique due) : l'APK téléchargé n'est pas oublié.
+        c.checkIfDue()
+        assertTrue(c.state.value is UpdateState.NeedsPermission)
         installer.allowed = true
         c.install()
         assertEquals(1, installer.installed.size)
@@ -119,6 +122,11 @@ class AppUpdateControllerTest {
         settings.autoCheck.value = false; settings.lastCheckAtMs.value = 0
         c.checkIfDue()
         assertEquals(1, source.tokens.size)
+        // Plus de 30 min après : nouvelle vérification (plusieurs releases par jour).
+        settings.autoCheck.value = true
+        settings.lastCheckAtMs.value = 1_000_000_000L - AppUpdateController.AUTO_CHECK_INTERVAL_MS - 1
+        c.checkIfDue()
+        assertEquals(2, source.tokens.size)
     }
 
     @Test fun skippedVersionIsNotPromptedAgain() = runTest {

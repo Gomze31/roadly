@@ -44,6 +44,9 @@ internal object NavigationNotifications {
         return ctx.getString(R.string.free_notif_title) to text
     }
 
+    /** Écran Android Auto affiché, sans guidage ni conduite libre : la position reste active pour la carte de la voiture. */
+    fun carContent(ctx: Context): Pair<String, String> = ctx.getString(R.string.car_notif_title) to ctx.getString(R.string.car_notif_text)
+
     fun build(ctx: Context, content: Pair<String, String>): Notification {
         val open = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply {
             action = NavigationService.ACTION_OPEN_NAVIGATION

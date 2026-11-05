@@ -13,7 +13,9 @@ import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.geocoding.GeocodingProvider
 import fr.roadly.core.location.LocationRepository
+import fr.roadly.core.navigation.CarScreenPresence
 import fr.roadly.core.navigation.FreeDriveSession
+import fr.roadly.core.navigation.NavigationServiceController
 import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.navigation.NavigationClock
 import fr.roadly.core.navigation.NavigationSession
@@ -41,6 +43,8 @@ class CarDependencies @Inject constructor(
     val clock: NavigationClock,
     val dangerZones: VigilanceZoneProvider,
     val radarSettings: RadarSettingsRepository,
+    val carScreen: CarScreenPresence,
+    val foregroundService: NavigationServiceController,
 )
 
 /** Point d'entrée Android Auto (catégorie navigation). */

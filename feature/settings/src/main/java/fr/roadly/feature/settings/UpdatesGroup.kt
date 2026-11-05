@@ -83,7 +83,7 @@ internal fun UpdatesGroup(vm: UpdatesViewModel) {
             }
             GlassButton("Vérifier maintenant", onClick = vm::check, style = GlassButtonStyle.Secondary, enabled = st !is UpdateState.Checking && st !is UpdateState.Downloading)
         }
-        ToggleRow("Vérifier au lancement", checked = ui.autoCheck, onCheckedChange = vm::setAutoCheck, subtitle = "Au plus toutes les 12 h", divider = false)
+        ToggleRow("Vérifier au lancement", checked = ui.autoCheck, onCheckedChange = vm::setAutoCheck, subtitle = "À l'ouverture de Roadly, au plus toutes les 30 min", divider = false)
         ExpandableContent(editing) {
             SettingsField("Dépôt GitHub (propriétaire/dépôt)", repo, { repo = it }, KeyboardType.Uri)
             SettingsField(if (ui.hasToken) "Nouveau jeton GitHub (laisser vide pour garder l'actuel)" else "Jeton GitHub (dépôt privé)", token, { token = it }, KeyboardType.Password)

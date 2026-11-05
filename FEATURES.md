@@ -213,6 +213,6 @@ Détail, sources et limites : `docs/SCOOTER.md`. « Code livré » = compilé et
 
 | Fonction | Statut | Notes |
 |---|---|---|
-| Vérification des releases GitHub (au lancement ≤ 1/12 h, ou manuelle) | en cours | Dépôt privé : jeton fine-grained lecture seule, chiffré (Keystore) ; testé JVM |
+| Vérification des releases GitHub (à l'ouverture ≤ 1/30 min, ou manuelle) | en cours | Dépôt privé : jeton fine-grained lecture seule, chiffré (Keystore) ; testé JVM |
 | Téléchargement, contrôle SHA-256, installation PackageInstaller | en cours | Confirmation Android ; sans confirmation possible ensuite (Android 12+) ; non vérifié sur appareil |
 | Publication automatique (tag `v*` → APK signé + `update.json`) | en cours | Workflow non encore exécuté ; secrets de signature à créer (`docs/UPDATES.md`) |

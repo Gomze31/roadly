@@ -78,16 +78,25 @@ class AppUpdateController(
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     companion object {
-        const val AUTO_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
+        /** Chaque push sur main publie une release : plusieurs par jour. 30 min évite de solliciter GitHub à chaque retour dans l'appli. */
+        const val AUTO_CHECK_INTERVAL_MS = 30 * 60 * 1000L
     }
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
     private val mutex = Mutex()
 
-    /** Vérification automatique au lancement : si activée et la dernière date de plus de 12 h. */
+    /**
+     * Vérification automatique à chaque retour au premier plan : si activée, si la dernière date de plus de 30 min, et jamais
+     * pendant un téléchargement ou une installation (l'état en cours serait écrasé).
+     */
     suspend fun checkIfDue() {
         if (!settings.autoCheck.first()) return
+        when (_state.value) {
+            is UpdateState.Checking, is UpdateState.Downloading, is UpdateState.ReadyToInstall,
+            is UpdateState.NeedsPermission, is UpdateState.Installing -> return
+            else -> Unit
+        }
         val last = settings.lastCheckAtMs.first()
         if (last != null && nowMs() - last < AUTO_CHECK_INTERVAL_MS) return
         check()
