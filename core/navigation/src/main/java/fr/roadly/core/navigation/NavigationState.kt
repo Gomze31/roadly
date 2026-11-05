@@ -49,6 +49,8 @@ sealed interface NavigationState {
         val radarActive: fr.roadly.core.radar.ZoneStatus? = null,
         /** Radar Intelligence : prochaine zone de danger devant (≤ 3 km), [ZoneStatus.distanceM] = distance avant son début. */
         val radarNext: fr.roadly.core.radar.ZoneStatus? = null,
+        /** Vue 3D de carrefour : manœuvre retenue et étape d'anticipation ; null = aucune (ou réglage désactivé). */
+        val junction: fr.roadly.core.model.junction.JunctionGuidance? = null,
     ) : NavigationState
 
     data class Arrived(val route: Route, val freeFlowToll: FreeFlowTollTrip? = null) : NavigationState

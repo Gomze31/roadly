@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -129,6 +130,11 @@ import fr.roadly.core.model.RouteProgress
 import java.util.Locale
 import kotlin.math.ceil
 import kotlinx.coroutines.delay
+import fr.roadly.core.map.junction.JunctionDetail
+import fr.roadly.core.map.junction.rememberJunctionScene
+import fr.roadly.core.model.junction.JunctionGuidance
+import fr.roadly.core.model.junction.JunctionKind
+import fr.roadly.core.model.junction.JunctionPhase
 
 @Composable
 fun NavigationScreen(
@@ -166,6 +172,8 @@ private fun NavigationContent(
     val map = rememberMapController()
     var bannerExpanded by rememberSaveable { mutableStateOf(true) }
     var showReport by rememberSaveable { mutableStateOf(false) }
+    // OpenGL ES 3 indisponible sur l'appareil : la vue 3D de carrefour est retirée pour la session (le guidage 2D reste complet).
+    var junctionUnsupported by remember { mutableStateOf(false) }
     KeepScreenOn()
     // Retour système = « Arrêter » (pas d'entrée « Reprendre » sur l'accueil en Phase 2).
     BackHandler { vm.stop() }
@@ -235,6 +243,15 @@ private fun NavigationContent(
         val showThen by vm.showNextManeuverPreview.collectAsStateWithLifecycle()
         // E2 : la ligne « puis … » suit le réglage, pour les deux overlays (un seul point, `BannerStack` inchangé).
         val full = state.copy(communityAhead = reportsAhead).withNextManeuverPreview(showThen)
+        // Vue 3D de carrefour : scène préparée dès l'étape PREPARE, panneau montré à partir de REVEAL (sous le bandeau en portrait).
+        val junctionPalette = rememberJunctionPalette(isDark)
+        val junctionDetail = if (powerSave.value) JunctionDetail.REDUCED else JunctionDetail.FULL
+        val junction = state.junction?.takeUnless { junctionUnsupported }
+        val junctionScene = rememberJunctionScene(route, junction, map, junctionPalette, junctionDetail)
+        val junctionFps = if (powerSave.value) MapRendering.MAX_FPS_POWER_SAVE else MapRendering.MAX_FPS
+        val junctionSlot: (@Composable (Modifier) -> Unit)? = if (junction != null && junctionScene != null && junctionPanelVisible(junction, junctionScene)) {
+            { m -> JunctionPanel(junctionScene, junction, state.junctionUi, junctionFps, m, onUnsupported = { junctionUnsupported = true }) }
+        } else null
         if (state.styleUrl.isNotEmpty()) {
             RoadlyMap(
                 styleUrl = state.styleUrl, controller = map, modifier = Modifier.fillMaxSize(), onUserGesture = vm::onUserGesture,
@@ -243,9 +260,9 @@ private fun NavigationContent(
             )
         }
         if (landscape) {
-            LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel)
+            LandscapeOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel, junctionSlot)
         } else {
-            PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel)
+            PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel, junctionSlot)
         }
         ReportResultPillNav(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp))
     }
@@ -274,9 +291,11 @@ internal fun PortraitOverlay(
     vm: NavigationViewModel,
     assistantButton: @Composable () -> Unit,
     assistantPanel: @Composable () -> Unit,
+    junction: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val c = LocalRoadlyColors.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        val junctionHeight = maxHeight * JUNCTION_PORTRAIT_FRACTION
         // Passe appareil : bas de la pile du haut (bandeau, panneau de direction, voies, « puis », bouton « replier ») → marge haute de la caméra.
         Column(
             Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(RoadlySpacing.screenEdge).onGloballyPositioned { coords ->
@@ -286,7 +305,10 @@ internal fun PortraitOverlay(
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                    BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
+                    BannerStack(
+                        state, bannerExpanded, onOpenPreview = vm::openManeuverPreview,
+                        junction = junction?.let { slot -> { slot(Modifier.fillMaxWidth().height(junctionHeight)) } },
+                    )
                     if (state.rerouting) ReroutingPill()
                     ScooterExtras(state, vm)
                 }
@@ -377,8 +399,15 @@ internal fun LandscapeOverlay(
     vm: NavigationViewModel,
     assistantButton: @Composable () -> Unit,
     assistantPanel: @Composable () -> Unit,
+    junction: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        // Vue 3D de carrefour : en haut, entre la colonne gauche et la colonne d'actions (la voiture reste en bas à droite).
+        junction?.invoke(
+            Modifier.align(Alignment.TopStart)
+                .padding(start = maxWidth * 0.46f, end = RoadlySpacing.touchTargetDriving + RoadlySpacing.screenEdge * 2, top = RoadlySpacing.screenEdge)
+                .fillMaxWidth().height(maxHeight * JUNCTION_LANDSCAPE_FRACTION),
+        )
         // Colonne gauche : bandeau en haut, Horizon + barre d'information calés en bas (pas de défilement : tout doit rester visible en conduite).
         BoxWithConstraints(Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(0.46f).padding(RoadlySpacing.screenEdge)) {
             // Passe appareil : panneau déplié qui ne tient pas sous la pile du bandeau → replié (vérifié une fois les tailles stabilisées).
@@ -697,6 +726,7 @@ private data class MapTick(
     val zoomOffset: Int,
     val pitchPreset: PitchPreset,
     val buildings3d: Boolean,
+    val junctionWide: Boolean = false,
 )
 
 /**
@@ -727,7 +757,7 @@ private fun GuidanceMapEffects(
             ui.value.let { s ->
                 MapTick(
                     s.route, s.progress, s.speedKmh, s.approach != null, s.following, mode.value, powerSave.value, isLandscape.value, bottomPanel.value, topPanel.value,
-                    zoomOffset.value, pitchPreset.value, buildings3d.value,
+                    zoomOffset.value, pitchPreset.value, buildings3d.value, junctionWide(s.junction),
                 )
             }
         }
@@ -750,7 +780,7 @@ private fun GuidanceMapEffects(
                         distanceToManeuverM = progress.distanceToNextManeuverM, maneuverType = next.type, approaching = t.approaching,
                         mode = t.mode, powerSave = t.powerSave, landscape = t.landscape, nowMs = SystemClock.elapsedRealtime(),
                         bottomPanelFraction = t.bottomPanel, topPanelFraction = t.topPanel,
-                        zoomOffset = t.zoomOffset, pitchPreset = t.pitchPreset, buildings3d = t.buildings3d,
+                        zoomOffset = t.zoomOffset, pitchPreset = t.pitchPreset, buildings3d = t.buildings3d, junctionWide = t.junctionWide,
                     ),
                 )
                 map.applyGuidanceCamera(frame.point, frame.camera, frame.durationMs, frame.eased)
@@ -833,3 +863,15 @@ private val BANNER_TOGGLE_SIZE = 44.dp
 
 /** Paysage : délai sans changement de taille avant de vérifier que le panneau déplié tient (fin des animations du panneau et de l'Horizon). */
 private const val PANEL_SETTLE_MS = 400L
+
+/** Part de la hauteur (portrait) occupée par la vue 3D de carrefour sous le bandeau. */
+internal const val JUNCTION_PORTRAIT_FRACTION = 0.34f
+/** Paysage : part de la hauteur de la vue 3D, en haut entre les deux colonnes. */
+internal const val JUNCTION_LANDSCAPE_FRACTION = 0.62f
+
+/**
+ * Carte plus large pendant la préparation et l'affichage d'un échangeur, d'une bifurcation ou d'un carrefour complexe, jusqu'à la
+ * manœuvre ; retour progressif ensuite (paliers de zoom de la caméra).
+ */
+internal fun junctionWide(j: JunctionGuidance?): Boolean =
+    j != null && j.phase < JunctionPhase.MANEUVER && (j.kind == JunctionKind.INTERCHANGE || j.kind == JunctionKind.MOTORWAY_FORK || j.complexity >= 2)

@@ -31,12 +31,21 @@ import fr.roadly.core.model.ManeuverType
  * Un seul appel par overlay garde la surface de fusion minimale.
  */
 @Composable
-internal fun BannerStack(state: NavigationUiState, expanded: Boolean, onOpenPreview: () -> Unit, modifier: Modifier = Modifier) {
+internal fun BannerStack(
+    state: NavigationUiState,
+    expanded: Boolean,
+    onOpenPreview: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Vue 3D de carrefour visible : elle remplace le panneau de direction et les voies (dessinés dans la scène). */
+    junction: (@Composable () -> Unit)? = null,
+) {
     val banner = state.banner ?: return
-    val sign = bannerSign(state)
+    val sign = if (junction != null) null else bannerSign(state)
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
         ManeuverBanner(banner, Modifier.fillMaxWidth(), expanded = expanded, onClick = onOpenPreview, roundabout = state.roundabout, signShownBelow = sign != null)
-        if (sign != null) {
+        if (junction != null) {
+            junction()
+        } else if (sign != null) {
             ExitSignPanel(banner.type, sign.exitNumber, sign.toward, sign.branch, if (state.showLanes) state.lanes else emptyList(), banner.distanceText, isNext = true, Modifier.fillMaxWidth())
         } else if (state.showLanes) {
             LaneGuidanceView(state.lanes, emphasized = state.approach != null)

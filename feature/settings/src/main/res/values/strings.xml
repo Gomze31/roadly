@@ -26,6 +26,8 @@
     <string name="settings_theme_auto">Auto (jour/nuit solaire)</string>
     <string name="settings_map_3d">Bâtiments 3D</string>
     <string name="settings_map_3d_subtitle">Bâtiments en relief en vue 3D. Jamais en économie d\'énergie.</string>
+    <string name="settings_junction_3d">Vue 3D des carrefours</string>
+    <string name="settings_junction_3d_subtitle">Sorties, bifurcations et ronds-points en perspective à l\'approche, avec voies, panneaux et trajectoire.</string>
     <string name="settings_map_detail">Niveau de détail de la carte</string>
     <string name="settings_map_detail_subtitle">Pendant le guidage. Réduit : sans points d\'intérêt ni noms des petites rues. Réduit automatiquement au-delà de 90 km/h.</string>
     <string name="settings_map_detail_normal">Normal</string>

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -55,6 +56,11 @@ internal fun NavigationGroup(s: NavigationSettings, vm: SettingsViewModel) {
         ToggleRow(
             stringResource(R.string.settings_map_3d), checked = s.buildings3d, onCheckedChange = vm::setMap3d,
             subtitle = stringResource(R.string.settings_map_3d_subtitle), icon = Icons.Default.LocationCity,
+        )
+        val junction3d = vm.junction3d.collectAsStateWithLifecycle()
+        ToggleRow(
+            stringResource(R.string.settings_junction_3d), checked = junction3d.value, onCheckedChange = vm::setJunction3d,
+            subtitle = stringResource(R.string.settings_junction_3d_subtitle), icon = Icons.Default.ViewInAr,
         )
         ToggleRow(
             stringResource(R.string.settings_nav_then), checked = s.showNextManeuverPreview, onCheckedChange = vm::setShowNextManeuverPreview,

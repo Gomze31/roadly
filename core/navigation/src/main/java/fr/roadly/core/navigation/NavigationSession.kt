@@ -61,6 +61,15 @@ import fr.roadly.core.scooter.guidance.AnnouncementStage
 import fr.roadly.core.scooter.guidance.ScooterNavigationCoordinator
 import fr.roadly.core.scooter.guidance.ScooterNavigationUiState
 import fr.roadly.core.scooter.range.ScooterRangeEstimator
+import fr.roadly.core.model.ManeuverType
+import fr.roadly.core.model.junction.JunctionGuidance
+import fr.roadly.core.model.junction.JunctionPhase
+import fr.roadly.core.model.junction.JunctionTopology
+import fr.roadly.core.navigation.junction.JunctionAnticipation
+import fr.roadly.core.navigation.junction.JunctionInput
+import fr.roadly.core.navigation.junction.JunctionTopologyProvider
+import fr.roadly.core.navigation.junction.JunctionWindow
+import fr.roadly.core.navigation.junction.NoJunctionTopologyProvider
 
 /**
  * Session de guidage unique de l'application (spec §2, §4). Logique pure Kotlin testée sur JVM ;
@@ -89,6 +98,8 @@ class NavigationSession @Inject constructor(
     private val driveMemory: DriveMemoryRepository = NoDriveMemoryRepository,
     /** Radar Intelligence : voix, préavis, sortie de zone. */
     private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
+    /** Vue 3D de carrefour : topologie réelle (`trace_attributes`) de chaque carrefour retenu, demandée pendant sa préparation. */
+    private val junctionTopology: JunctionTopologyProvider = NoJunctionTopologyProvider,
 ) {
     private val _state = MutableStateFlow<NavigationState>(NavigationState.Idle)
     val state: StateFlow<NavigationState> = _state.asStateFlow()
@@ -324,6 +335,12 @@ class NavigationSession @Inject constructor(
         /** B4 : ronds-points du tracé courant, calculés une fois par tracé. */
         private var roundabouts: Map<Int, RoundaboutInfo> = RoundaboutResolver.resolveAll(route)
         /** B5 : dernier indice de manœuvre vu et instant de son changement (passage d'une manœuvre). */
+        /** Vue 3D de carrefour : anticipation, topologies chargées (par indice de manœuvre) et essais de chargement. */
+        private val junctions = JunctionAnticipation()
+        private val topologies = HashMap<Int, JunctionTopology>()
+        private val topologyAttempts = HashMap<Int, Pair<Int, Long>>()
+        private var junction: JunctionGuidance? = null
+        private var junctionEnabled = true
         private var lastNextIndex: Int? = null
         private var indexChangedAtMs: Long? = null
         private var vigilanceOn = GuidanceDefaults.VIGILANCE_ENABLED
@@ -357,6 +374,7 @@ class NavigationSession @Inject constructor(
                     .collect { speech.setMuted(it, VoiceChannel.GUIDANCE) }
             }
             launch { prefs.rainLowersLimit.collect { rainLowersLimit = it } }
+            launch { prefs.junction3dEnabled.collect { junctionEnabled = it } }
             launch { prefs.vigilanceEnabled.collect { vigilanceOn = it; loadHazards() } }
             launch { rainWatch() }
             launch { loadAttributes(route) }
@@ -390,6 +408,7 @@ class NavigationSession @Inject constructor(
             checkOverSpeed()
             coachTick(now)
             updateZone(progress)
+            updateJunction(progress, now, gpsLost = false)
             // Un recalcul a pu aboutir pendant une suspension : ne jamais associer l'ancienne progression au nouveau tracé.
             if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = false))
         }
@@ -442,6 +461,36 @@ class NavigationSession @Inject constructor(
         }
 
         private fun zoneKey(h: RouteHazard) = h.key ?: "zone@${h.startAlongM.toLong()}"
+
+        /**
+         * Vue 3D de carrefour : étape d'anticipation de la prochaine manœuvre retenue et chargement de sa topologie pendant la
+         * préparation (au plus [TOPOLOGY_MAX_ATTEMPTS] essais espacés de [TOPOLOGY_RETRY_MS]). Hors itinéraire, en recalcul ou
+         * GPS perdu, aucune vue n'est publiée.
+         */
+        private fun updateJunction(progress: RouteProgress, now: Long, gpsLost: Boolean) {
+            if (!junctionEnabled || route.scooterGoal != null || progress.routeId != route.id) { junction = null; return }
+            val r = route
+            val g = junctions.update(
+                JunctionInput(
+                    route = r, progress = progress, speedKmh = speedKmh, nowMs = now, gpsLost = gpsLost,
+                    rerouting = rerouting, offRoute = tracker.isOffRoute, topology = { topologies[it] },
+                ),
+            )
+            junction = g
+            if (g == null || g.topology != null || g.phase == JunctionPhase.RECOVER) return
+            val idx = g.maneuverIndex
+            val (attempts, lastAt) = topologyAttempts[idx] ?: (0 to 0L)
+            if (attempts >= TOPOLOGY_MAX_ATTEMPTS || (attempts > 0 && now - lastAt < TOPOLOGY_RETRY_MS)) return
+            topologyAttempts[idx] = (attempts + 1) to now
+            val start = junctions.alongOf(r, idx)
+            val end = if (r.maneuvers.getOrNull(idx + 1)?.type == ManeuverType.ROUNDABOUT_EXIT) junctions.alongOf(r, idx + 1) else start
+            val window = JunctionWindow.around(junctions.geometryFor(r), start, end)
+            runScope.launch {
+                val result = try { junctionTopology.topology(r, idx, window) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                val t = (result as? Outcome.Success)?.value ?: return@launch
+                if (r.id == route.id && t.routeId == r.id) topologies[idx] = t
+            }
+        }
 
         /** 1.0 : profil du tracé [r] (une requête) ; ignoré s'il arrive après un recalcul vers un autre tracé. */
         private suspend fun loadAttributes(r: Route) {
@@ -630,6 +679,7 @@ class NavigationSession @Inject constructor(
                     route = fresh
                     tracker = freshTracker
                     roundabouts = RoundaboutResolver.resolveAll(fresh)
+                    junctions.reset(); topologies.clear(); topologyAttempts.clear(); junction = null
                     announced.clear()
                     announced += 0 to Tier.NOW
                     lastNextIndex = null; indexChangedAtMs = null
@@ -662,6 +712,7 @@ class NavigationSession @Inject constructor(
                 announce(progress)
                 updateRouteProfile(progress)
                 updateZone(progress)
+                updateJunction(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS)
                 // Un recalcul a pu aboutir pendant la suspension de l'annonce : on abandonne la progression périmée.
                 if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
             }
@@ -747,6 +798,7 @@ class NavigationSession @Inject constructor(
                 roundabout = RoundaboutResolver.current(roundabouts, next),
                 nextSpeedLimit = nextLimit,
                 freeFlowToll = tollTrip,
+                junction = junction,
             )
         }
     }
@@ -764,6 +816,8 @@ class NavigationSession @Inject constructor(
 
     private companion object {
         const val LIMIT_HORIZON_S = 20.0
+        const val TOPOLOGY_MAX_ATTEMPTS = 3
+        const val TOPOLOGY_RETRY_MS = 5_000L
         const val LIMIT_HORIZON_MIN_M = 250.0
         const val LIMIT_HORIZON_MAX_M = 1_500.0
         /** Zones observées : de 500 m derrière (sortie) à 6 km devant (préavis et affichage). */

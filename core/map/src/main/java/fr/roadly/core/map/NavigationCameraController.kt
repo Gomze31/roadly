@@ -29,6 +29,8 @@ data class NavigationCameraInput(
     val pitchPreset: PitchPreset = PitchPreset.STANDARD,
     /** E2 « Bâtiments 3D » : sans bâtiments, pas d'inclinaison « ville dense ». */
     val buildings3d: Boolean = true,
+    /** Vue 3D de carrefour : vue large de la carte pour un échangeur ou une bifurcation (voir [GuidanceCameraInput.junctionWide]). */
+    val junctionWide: Boolean = false,
 )
 
 /** Commande caméra : cible, caméra, durée (0 = déplacement immédiat) et courbe ([eased] = accélération / décélération MapLibre, sinon linéaire). */
@@ -58,7 +60,7 @@ class NavigationCameraController {
                 speedKmh = input.speedKmh, bearingDeg = bearing?.toFloat(), distanceToManeuverM = input.distanceToManeuverM,
                 maneuverType = input.maneuverType, threeD = threeD, powerSave = input.powerSave, landscape = input.landscape,
                 approaching = input.approaching, buildingsVisible = threeD && !input.powerSave && input.buildings3d,
-                zoomOffset = input.zoomOffset, pitchPreset = input.pitchPreset,
+                zoomOffset = input.zoomOffset, pitchPreset = input.pitchPreset, junctionWide = input.junctionWide,
             ),
             previous,
         )

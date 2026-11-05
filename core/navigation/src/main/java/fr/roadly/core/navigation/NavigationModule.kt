@@ -21,5 +21,7 @@ abstract class NavigationModule {
     /** 1.0 : limitations et portiques du tracé, une requête `trace_attributes` par tracé (y compris sur l'instance publique). */
     @Binds abstract fun routeAttributes(impl: ValhallaRouteAttributesProvider): RouteAttributesProvider
     /** 1.0 : route sous la position en conduite libre (map matching espacé, voir `RoadQueryPolicy`). */
+    /** Vue 3D de carrefour : une petite requête `trace_attributes` par carrefour retenu. */
+    @Binds abstract fun junctionTopology(impl: fr.roadly.core.navigation.junction.ValhallaJunctionTopologyProvider): fr.roadly.core.navigation.junction.JunctionTopologyProvider
     @Binds abstract fun roadSnapshots(impl: ValhallaRoadSnapshotProvider): RoadSnapshotProvider
 }

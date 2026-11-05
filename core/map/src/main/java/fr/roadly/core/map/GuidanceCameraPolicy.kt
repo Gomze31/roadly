@@ -28,6 +28,11 @@ data class GuidanceCameraInput(
     val zoomOffset: Int = 0,
     /** E2 : inclinaison de croisière choisie. */
     val pitchPreset: PitchPreset = PitchPreset.STANDARD,
+    /**
+     * Vue 3D de carrefour : échangeur, bifurcation ou carrefour complexe en préparation ou affiché (avant la manœuvre) → carte plus
+     * large ([JUNCTION_WIDE_ZOOM_DELTA]) au lieu du zoom serré d'approche : la vue 3D montre le détail, la carte le contexte.
+     */
+    val junctionWide: Boolean = false,
 )
 
 /**
@@ -53,6 +58,8 @@ object GuidanceCameraPolicy {
     const val EXIT_APPROACH_M = 400.0
     const val EXIT_APPROACH_MIN_KMH = 70.0
     const val TURN_APPROACH_M = 150.0
+    /** Écart de zoom (vers l'arrière) de la vue large d'échangeur, par rapport au zoom de croisière. */
+    const val JUNCTION_WIDE_ZOOM_DELTA = 0.6
 
     val PADDING_PORTRAIT = CameraPadding(0f, 0.45f, 0f, 0.12f)
     val PADDING_LANDSCAPE = CameraPadding(0.40f, 0.25f, 0f, 0f)
@@ -87,8 +94,13 @@ object GuidanceCameraPolicy {
             else -> input.pitchPreset.degrees
         }
         // E2 : +1 ne resserre pas l'approche — ZOOM_APPROACH garde la flèche entière sous la pile du bandeau (3c02729).
-        val target = if (approaching) ZOOM_APPROACH + minOf(input.zoomOffset, 0) else zoomForSpeed(input.speedKmh) + input.zoomOffset
-        val zoom = if (approaching || previous == null) target else previous.zoom + (target - previous.zoom).coerceIn(-MAX_ZOOM_STEP, MAX_ZOOM_STEP)
+        val target = when {
+            input.junctionWide -> zoomForSpeed(input.speedKmh) - JUNCTION_WIDE_ZOOM_DELTA + minOf(input.zoomOffset, 0)
+            approaching -> ZOOM_APPROACH + minOf(input.zoomOffset, 0)
+            else -> zoomForSpeed(input.speedKmh) + input.zoomOffset
+        }
+        // Vue large : on s'y rend et on en revient par paliers (pas de saut de zoom à l'échangeur).
+        val zoom = if ((approaching && !input.junctionWide) || previous == null) target else previous.zoom + (target - previous.zoom).coerceIn(-MAX_ZOOM_STEP, MAX_ZOOM_STEP)
         return GuidanceCamera(zoom, pitch, bearing, if (input.landscape) PADDING_LANDSCAPE else PADDING_PORTRAIT)
     }
 

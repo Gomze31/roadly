@@ -121,7 +121,30 @@ data class NavigationUiState(
     val freeFlowToll: FreeFlowTollUi? = null,
     /** Radar Intelligence : zone de danger en cours, sinon la prochaine (≤ 3 km) ; null = aucune. */
     val radar: RadarUi? = null,
+    /** Vue 3D de carrefour publiée par le guidage (étape, géométrie, topologie) ; null = aucune. */
+    val junction: fr.roadly.core.model.junction.JunctionGuidance? = null,
+    /** Textes de la vue 3D (titre et distance), sur la même base que le bandeau ; null hors vue visible. */
+    val junctionUi: JunctionUi? = null,
 )
+
+/** Titre de la vue 3D (« SORTIE 31b », « 2e SORTIE », « BIFURCATION ») et distance au point de manœuvre. */
+data class JunctionUi(val title: String?, val distanceText: String, val targetExit: Int?)
+
+/** Titre factuel de la vue 3D : seul ce que disent les données (numéro de sortie signalé, rang de sortie du rond-point). */
+internal fun junctionUi(j: fr.roadly.core.model.junction.JunctionGuidance?, m: Maneuver): JunctionUi? {
+    if (j == null || !j.phase.visible) return null
+    val distance = if (j.distanceM >= 0) Formatters.maneuverDistance(j.distanceM) else ""
+    val exit = j.roundabout?.targetExit
+    val title = when (j.kind) {
+        fr.roadly.core.model.junction.JunctionKind.ROUNDABOUT -> exit?.let { if (it == 1) "1re SORTIE" else "${it}e SORTIE" }
+        fr.roadly.core.model.junction.JunctionKind.MOTORWAY_FORK -> m.exitNumber?.let { "SORTIE $it" } ?: "BIFURCATION"
+        fr.roadly.core.model.junction.JunctionKind.INTERCHANGE -> m.exitNumber?.let { "SORTIE $it" } ?: "ÉCHANGEUR"
+        fr.roadly.core.model.junction.JunctionKind.MOTORWAY_EXIT -> m.exitNumber?.let { "SORTIE $it" } ?: "SORTIE"
+        fr.roadly.core.model.junction.JunctionKind.MERGE -> "INSERTION"
+        fr.roadly.core.model.junction.JunctionKind.COMPLEX_TURN -> null
+    }
+    return JunctionUi(title, distance, exit)
+}
 
 /** [distance] = reste de la zone si [inside], sinon distance avant son début. */
 data class RadarUi(val inside: Boolean, val distance: String, val limitKmh: Int?, val confidence: Int)
@@ -218,6 +241,8 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 nextLimit = s.nextSpeedLimit?.let { NextLimitUi(it.kmh, Formatters.maneuverDistance(it.distanceM)) },
                 freeFlowToll = freeFlowTollUi(s.freeFlowToll, zone),
                 radar = radarUi(s.radarActive, s.radarNext),
+                junction = s.junction,
+                junctionUi = junctionUi(s.junction, ms[s.junction?.maneuverIndex?.coerceIn(0, ms.lastIndex) ?: next]),
             )
         }
     }

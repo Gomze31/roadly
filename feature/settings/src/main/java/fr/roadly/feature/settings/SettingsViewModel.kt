@@ -120,6 +120,10 @@ class SettingsViewModel @Inject constructor(
         NavigationSettings(v[0] as CameraMode3D, v[1] as Int, v[2] as PitchPreset, v[3] as Boolean, v[4] as MapDetail, v[5] as Boolean, v[6] as Boolean, v[7] as PowerSaveMode)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NavigationSettings())
 
+    /** Vue 3D des carrefours (sorties, bifurcations, ronds-points), appliquée au guidage en cours. */
+    val junction3d: StateFlow<Boolean> = prefs.junction3dEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuidanceDefaults.JUNCTION_3D)
+    fun setJunction3d(value: Boolean) { viewModelScope.launch { prefs.setJunction3dEnabled(value) } }
+
     fun setDefaultCameraMode(value: CameraMode3D) { viewModelScope.launch { prefs.setDefaultCameraMode(value) } }
     fun setZoomOffset(value: Int) {
         if (value !in GuidanceDefaults.ALLOWED_ZOOM_OFFSETS) return

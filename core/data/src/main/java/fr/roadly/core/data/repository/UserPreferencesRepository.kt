@@ -34,6 +34,8 @@ object GuidanceDefaults {
     const val RAIN_LOWERS_LIMIT = false
     /** E2 « Bâtiments 3D » (clé `map.3d`, ex-« Carte 3D en guidage ») : bâtiments extrudés en vue 3D. */
     const val MAP_3D = true
+    /** Vue 3D des carrefours activée par défaut. */
+    const val JUNCTION_3D = true
     /** Niveau de détail de la carte en guidage. */
     val MAP_DETAIL = MapDetail.NORMAL
     /** E2 : vue au départ du guidage ; sans choix enregistré, elle suit [MAP_3D] (migration). */
@@ -94,6 +96,9 @@ interface UserPreferencesRepository {
     /** E2 « Bâtiments 3D » (ex-« Carte 3D en guidage ») : bâtiments extrudés en vue 3D. */
     val map3dEnabled: Flow<Boolean>
     suspend fun setMap3dEnabled(value: Boolean)
+    /** Vue 3D des carrefours (sorties, bifurcations, ronds-points) pendant le guidage. */
+    val junction3dEnabled: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(GuidanceDefaults.JUNCTION_3D)
+    suspend fun setJunction3dEnabled(value: Boolean) = Unit
     /** C2 : niveau de détail de la carte en guidage (REDUCED : sans points d'intérêt ni noms des petites rues). */
     val mapDetail: Flow<MapDetail>
     suspend fun setMapDetail(value: MapDetail)
@@ -141,6 +146,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kBreakReminder = booleanPreferencesKey("coach.break.reminder")
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
     private val kMap3d = booleanPreferencesKey("map.3d")
+    private val kJunction3d = booleanPreferencesKey("map.junction3d")
     private val kMapDetail = stringPreferencesKey("map.detail")
     private val kTint = stringPreferencesKey("cockpit.tint")
     private val kCameraDefault = stringPreferencesKey("map.camera.default")
@@ -193,6 +199,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setRainLowersLimit(value: Boolean) { store.edit { it[kRainLimit] = value } }
     override val map3dEnabled: Flow<Boolean> = store.data.map { it[kMap3d] ?: GuidanceDefaults.MAP_3D }
     override suspend fun setMap3dEnabled(value: Boolean) { store.edit { it[kMap3d] = value } }
+    override val junction3dEnabled: Flow<Boolean> = store.data.map { it[kJunction3d] ?: GuidanceDefaults.JUNCTION_3D }
+    override suspend fun setJunction3dEnabled(value: Boolean) { store.edit { it[kJunction3d] = value } }
     override val mapDetail: Flow<MapDetail> = store.data.map { p -> p[kMapDetail]?.let { runCatching { MapDetail.valueOf(it) }.getOrNull() } ?: GuidanceDefaults.MAP_DETAIL }
     override suspend fun setMapDetail(value: MapDetail) { store.edit { it[kMapDetail] = value.name } }
     override val defaultCameraMode: Flow<CameraMode3D> = store.data.map { p ->

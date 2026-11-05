@@ -527,6 +527,15 @@ class MapController(internal val context: Context) {
     }
 
     /** Caméra courante, ou le dernier instantané pris au détachement ; null si aucune carte n'a jamais existé. */
+    /**
+     * Vue 3D de carrefour : routes et bâtiments des tuiles déjà chargées dans [radiusM] autour de [center] (hors ligne compris).
+     * Contexte vide tant que le style n'est pas prêt. Thread principal uniquement.
+     */
+    fun junctionContext(center: GeoPoint, radiusM: Double): fr.roadly.core.model.junction.JunctionMapContext {
+        val style = map?.style?.takeIf { styleReady && it.isFullyLoaded } ?: return fr.roadly.core.model.junction.JunctionMapContext.empty(center)
+        return fr.roadly.core.map.junction.JunctionTileQuery.query(style, center, radiusM)
+    }
+
     fun cameraPosition(): CameraSnapshot? = liveCamera() ?: lastSnapshot
 
     /** Restaure [snapshot] ; l'inclinaison n'est reprise que si [keepTilt] (écran de guidage) — l'accueil reste à plat. */
