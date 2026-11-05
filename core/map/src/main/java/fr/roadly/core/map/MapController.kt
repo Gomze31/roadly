@@ -33,6 +33,7 @@ import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.literal
 import org.maplibre.android.style.expressions.Expression.match
 import org.maplibre.android.style.expressions.Expression.stop
+import org.maplibre.android.style.expressions.Expression.toColor
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
@@ -89,6 +90,7 @@ class MapController(internal val context: Context) {
     private var arrowColorBody = "#FFFFFF"
     private var arrowColorCasing = "#8B5CF6"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
+    private var lastDanger: String = DangerZoneFeatures.EMPTY
     private var buildings3d = false
     private var buildingsColor = "#2A2236"
 
@@ -193,6 +195,7 @@ class MapController(internal val context: Context) {
         style.addImage(MapIds.IMG_REPORT, drawableToBitmap(R.drawable.ic_report))
         style.addImage(MapIds.IMG_ARROW_HEAD, drawableToBitmap(R.drawable.ic_arrow_head))
         style.addSource(GeoJsonSource(MapIds.SRC_ARROW))
+        style.addSource(GeoJsonSource(MapIds.SRC_DANGER))
         style.addSource(GeoJsonSource(MapIds.SRC_REPORTS))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
@@ -225,6 +228,14 @@ class MapController(internal val context: Context) {
         style.addLayer(LineLayer(MapIds.LYR_SCOOTER_CAUTION, MapIds.SRC_SCOOTER).withProperties(
             lineColor(RouteDisplayGroup.CAUTION.colorHex), lineWidth(3.5f), lineDasharray(arrayOf(1.2f, 1.2f)), lineCap(Property.LINE_CAP_BUTT),
         ).withFilter(eq(get("caution"), literal(true))))
+        // Zones de danger sur le tracé : ambre devant, rouge pour celle que l'on traverse (jamais de point d'équipement).
+        style.addLayer(LineLayer(MapIds.LYR_DANGER_CASING, MapIds.SRC_DANGER).withProperties(
+            lineColor(DangerZoneFeatures.CASING), lineWidth(11f), lineOpacity(0.85f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
+        ))
+        style.addLayer(LineLayer(MapIds.LYR_DANGER, MapIds.SRC_DANGER).withProperties(
+            lineColor(toColor(match(get("state"), literal(DangerZoneFeatures.AHEAD_COLOR), stop("inside", DangerZoneFeatures.INSIDE_COLOR)))),
+            lineWidth(6.5f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
+        ))
         // Tronçon déjà parcouru, dessiné par-dessus le tracé actif (spec §5 : « tracé parcouru atténué »).
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED, MapIds.SRC_TRAVERSED).withProperties(
             lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
@@ -294,6 +305,7 @@ class MapController(internal val context: Context) {
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_MARKERS)?.setGeoJson(PointFeatureBuilder.markers(lastMarkers))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(lastReports))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_DANGER)?.setGeoJson(lastDanger)
         applyRouteColors(style)
         applyArrowColors(style)
         applyBuildings(style)
@@ -417,6 +429,13 @@ class MapController(internal val context: Context) {
     }
 
     fun clearManeuverArrow() = setManeuverArrow(ManeuverArrowBuilder.EMPTY)
+
+    /** Zones de danger peintes sur le tracé (GeoJSON de [DangerZoneFeatures.build]) ; [DangerZoneFeatures.EMPTY] pour les effacer. */
+    fun setDangerZones(geoJson: String) {
+        if (geoJson == lastDanger) return
+        lastDanger = geoJson
+        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_DANGER)?.setGeoJson(geoJson)
+    }
 
     /** Couleurs CSS de la flèche : trait et liseré propres, contrastés quel que soit le thème du fond de carte. */
     fun setArrowColor(body: String, casing: String) {

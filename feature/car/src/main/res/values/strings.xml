@@ -21,6 +21,11 @@
     <string name="car_route_line">%1$s · %2$s</string>
     <string name="car_route_arrival">Arrivée %1$s</string>
     <string name="car_route_toll">Péage</string>
+    <plurals name="car_danger_zones">
+        <item quantity="one">%d zone de danger</item>
+        <item quantity="many">%d zones de danger</item>
+        <item quantity="other">%d zones de danger</item>
+    </plurals>
     <string name="car_route_start">Démarrer</string>
     <string name="car_retry">Réessayer</string>
     <string name="car_close">Fermer</string>
@@ -43,4 +48,6 @@
     <string name="car_zone_remaining">encore %1$s</string>
     <string name="car_zone_low_confidence">fiabilité faible</string>
     <string name="car_kmh">km/h</string>
+    <string name="car_zone_false_alarm">Fausse alerte</string>
+    <string name="car_ok">OK</string>
 </resources>

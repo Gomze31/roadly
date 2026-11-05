@@ -24,6 +24,9 @@ import fr.roadly.core.model.TravelMode
 import fr.roadly.core.model.motorVehicle
 import fr.roadly.core.navigation.ScooterGuidanceConfig
 import fr.roadly.core.navigation.ScooterServices
+import fr.roadly.core.navigation.VigilanceZoneProvider
+import kotlinx.coroutines.flow.collectLatest
+import kotlin.coroutines.cancellation.CancellationException
 import fr.roadly.core.routing.ScooterRouteOptionsUseCase
 import fr.roadly.core.scooter.assistant.ScooterAssistantContext
 import fr.roadly.core.scooter.guidance.CategoryAhead
@@ -58,6 +61,8 @@ class RouteViewModel @Inject constructor(
     private val routing: RoutingProvider,
     /** Services du mode trottinette ; null (tests existants) = seuls les modes voiture / moto existent. */
     private val scooter: ScooterServices? = null,
+    /** Zones de danger le long de chaque variante ; null (tests existants) = pas de décompte. */
+    private val dangerZoneProvider: VigilanceZoneProvider? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -160,10 +165,37 @@ class RouteViewModel @Inject constructor(
         }
     }
 
+    /** Radar Intelligence : zones de danger de chaque variante (même calcul que le guidage : sens, route, réglages, zones masquées). */
+    private val dangerZoneCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    init {
+        val provider = dangerZoneProvider
+        if (provider != null) viewModelScope.launch {
+            computed.collectLatest { s ->
+                dangerZoneCounts.value = emptyMap()
+                if (s !is RouteUiState.Content || s.scooter != null) return@collectLatest
+                val counts = HashMap<String, Int>()
+                for (o in s.options) {
+                    try {
+                        counts[o.route.id] = provider.zonesAlong(o.route).size
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Base locale illisible : pas de décompte pour cette variante, rien d'inventé.
+                    }
+                    dangerZoneCounts.value = counts.toMap()
+                }
+            }
+        }
+    }
+
     val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }, travelMode, assistantReply) { st, mode, reply -> st.copy(travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply) }
+    }, travelMode, assistantReply, dangerZoneCounts) { st, mode, reply, zones ->
+        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones) ?: st.phase
+        st.copy(phase = phase, travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())
 
     // ── Mode trottinette ──

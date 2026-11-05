@@ -20,6 +20,11 @@
     <string name="route_toll_no">Sans péage</string>
     <string name="route_toll_short">péage</string>
     <string name="route_same_as_fastest">Identique au plus rapide</string>
+    <plurals name="route_danger_zones">
+        <item quantity="one">%d zone de danger</item>
+        <item quantity="many">%d zones de danger</item>
+        <item quantity="other">%d zones de danger</item>
+    </plurals>
     <string name="route_depart_now">Départ maintenant</string>
     <string name="route_depart_at">Départ à %1$s</string>
     <string name="route_arrive_at">Arriver à %1$s · partir à %2$s</string>

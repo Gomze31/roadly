@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -301,7 +302,10 @@ private fun ChoicePanel(
                     selected = o.route.id == s.activeId,
                     onClick = { onSelect(o.route.id) },
                     tag = if (o.route.hasToll) ({ Text(stringResource(R.string.route_toll_short), style = MaterialTheme.typography.labelSmall, color = c.textTertiary) }) else null,
-                    note = if (o.sameAsFastest) stringResource(R.string.route_same_as_fastest) else null,
+                    note = listOfNotNull(
+                        if (o.sameAsFastest) stringResource(R.string.route_same_as_fastest) else null,
+                        s.dangerZones[o.route.id]?.let { n -> pluralStringResource(R.plurals.route_danger_zones, n, n) },
+                    ).joinToString(" · ").ifEmpty { null },
                 )
             }
             Spacer(Modifier.height(RoadlySpacing.xs))

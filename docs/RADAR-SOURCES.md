@@ -51,7 +51,7 @@ Objectif : alimenter Radar Intelligence avec des données **légalement réutili
 
 ## 3. Cadre légal appliqué
 
-- **France** : le décret n° 2012-3 (art. R413-15 du Code de la route) interdit les dispositifs signalant l'emplacement des contrôles. Les applications signalent des **zones de danger**. Roadly affiche « Zone de danger », sans type, sans icône de radar, sans position ; la zone commence avant le point (300 m en ville, 2 km sur route, 4 km sur voie rapide) et finit 300 m après. Les longueurs reprennent la pratique déjà retenue par Roadly ; une source de presse cite 2 km en agglomération et 4 km hors agglomération : **à confirmer sur Légifrance** avant diffusion.
+- **France** : le décret n° 2012-3 (art. R413-15 du Code de la route) interdit les dispositifs signalant l'emplacement des contrôles. Les applications signalent des **zones de danger**. Roadly affiche « Zone de danger », sans type, sans icône de radar, sans position ; la zone commence avant le point (300 m en ville, 2 km sur route, 4 km sur voie rapide, ± 15 % selon l'équipement) et finit 150 à 450 m après, selon l'équipement : ni le début, ni la fin, ni « encore 300 m » ne donnent la position du radar. Les longueurs reprennent la pratique déjà retenue par Roadly ; une source de presse cite 2 km en agglomération et 4 km hors agglomération : **à confirmer sur Légifrance** avant diffusion.
 - **Allemagne** : usage interdit en conduite (§ 23 StVO, y compris par un passager selon l'OLG Karlsruhe) → aucune alerte (`RadarDisplayMode.DISABLED`).
 - **Suisse** : interdiction des avertisseurs → aucune alerte.
 - Belgique, Espagne, Italie : non vérifié ; sans donnée hors de France, la question ne se pose pas encore.

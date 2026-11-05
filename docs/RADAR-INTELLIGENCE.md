@@ -60,6 +60,7 @@ Aucun champ n'est inventé : la VMA « NA » reste nulle, un sens « PARIS vers 
 Projection de chaque équipement sur le tracé, puis rejet si :
 - statut retiré, confiance < 40, catégorie désactivée ;
 - **écart latéral** > 18 m + précision du point (plafonnée à 42 m) ;
+- **zone masquée** par l'utilisateur (fausse alerte signalée) ;
 - **sens contrôlé connu** à plus de 60° du cap du segment (chaussée opposée, même dans un terre-plein étroit) ;
 - **numéro de route** connu des deux côtés et différent (route parallèle, bretelle).
 Les zones qui se chevauchent sont fusionnées (limitation la plus basse, confiance la plus haute) : une seule alerte.
@@ -123,7 +124,19 @@ Les faux positifs restants concernent tous le même piège : la chaussée oppos�
 | Radars mobiles, voitures radar, contrôles de voies réservées | Non : aucune source légale |
 | Téléchargement par pays / région | Non : seule la France a une source exploitable ; l'architecture (pays dans le modèle, réglementation par pays) le permet |
 
-## 10. Roadmap
+## 10. Radar Intelligence 2 (2026-11-05, même jour)
+
+| Élément | Détail | Vérifié |
+|---|---|---|
+| Position non déductible | Longueur avant le point × 0,85–1,15 et traîne de 150 à 450 m, tirées de l'identifiant (FNV-1a) : même zone à chaque passage et sur tout téléphone, mais la fin de zone (ou « encore 300 m ») ne donne plus l'emplacement. Mesure sur les 3 309 équipements : traîne de 150 à 449 m, tiers de la plage à 1 131 / 1 071 / 1 107 équipements | JVM (`RadarZonePlacementTest`) ; taux de faux positifs et négatifs inchangés |
+| Zones peintes sur le tracé | Calque MapLibre `roadly-danger` : étendue de chaque zone sur 30 km devant, ambre, rouge pour celle traversée ; téléphone et Android Auto | JVM (`DangerZoneFeaturesTest`) ; **non vu sur appareil** |
+| Zones par itinéraire | Nombre de zones de danger sur chaque variante (écran d'itinéraires, aperçu Android Auto), même calcul que le guidage | Compilé ; **non vu sur appareil** |
+| Fausses alertes | Toucher la pastille → « Masquer la zone » ; Android Auto : alerte de l'hôte (8 s) avec « Fausse alerte ». Effet immédiat (pastille, carte, voix), réversible dans Réglages, 500 zones au plus, stocké sur le téléphone seulement | JVM (`HiddenZonesTest`) ; **non vu sur appareil** |
+| Alerte Android Auto | Une alerte de l'hôte par zone et par passage (préavis ou entrée), distance, limitation, fiabilité | Compilé ; **non vu sur DHU** |
+
+Écarté : la vitesse moyenne sur les tronçons. Elle désignerait un contrôle de vitesse moyenne et son étendue, et son statut au regard de l'article R413-15 n'a pas pu être vérifié.
+
+## 11. Roadmap
 
 - **P0** : passe sur le HONOR (guidage réel, conduite libre, écran éteint) ; exécuter `RadarMigrationTest` ; vérifier les longueurs de zone sur Légifrance.
 - **P1** : affiner le sens des « PARIS vers LYON » (géocodage des deux villes → cap) ; enrichissement OSM par extraction hebdomadaire hors application (Geofabrik, ODbL) ; tronçons ETVM : point d'entrée et de sortie.

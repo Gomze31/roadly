@@ -90,4 +90,7 @@
     <string name="alt_note">Calculé depuis votre position actuelle, sans trafic. Choisir un itinéraire relance le guidage dessus.</string>
     <string name="alt_keep">Garder l\'itinéraire actuel</string>
     <string name="alt_add_stop">Ajouter un arrêt</string>
+    <string name="nav_zone_false_alarm">Fausse alerte ?</string>
+    <string name="nav_zone_false_alarm_text">Cette zone ne sera plus annoncée ni affichée sur ce téléphone. Vous pourrez la réafficher dans Réglages › Radars et zones de danger.</string>
+    <string name="nav_zone_hide">Masquer la zone</string>
 </resources>

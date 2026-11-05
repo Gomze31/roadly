@@ -353,6 +353,7 @@ class FreeDriveSession @Inject constructor(
             radarEngine.config = radarEngine.config.copy(prewarnM = settings.prewarnM.toDouble())
             val sample = DriveSample(fix.point, headingFilter.heading, headingFilter.curvaturePerM, fix.speedMps, fix.accuracyM, current.roadName)
             val observations = FreeRadarMatcher.match(radarIndex, sample, radarEngine.openKeys, enabled = settings.enabledKinds, lookAheadM = settings.prewarnM.toDouble()).observations
+                .filter { it.key !in settings.hiddenZones }
             val out = radarEngine.update(now, observations, current.speedKmh, prefs.speedAlertToleranceKmh.first())
             current = current.copy(
                 zone = out.active?.let { FreeDriveZone(it.key, it.speedLimitKmh, it.distanceM, it.confidence) },

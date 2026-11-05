@@ -31,6 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
+import fr.roadly.core.data.repository.RadarSettingsRepository
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,7 +86,11 @@ class FreeDriveViewModel @Inject constructor(
     private val session: FreeDriveSession,
     config: ProviderConfigRepository,
     prefs: UserPreferencesRepository,
+    private val radarSettings: RadarSettingsRepository,
 ) : ViewModel() {
+    /** Fausse alerte signalée : la zone n'est plus annoncée ni affichée. */
+    fun hideZone(key: String) { viewModelScope.launch { radarSettings.hideZone(key) } }
+
     private val isDark = MutableStateFlow(true)
     val state: StateFlow<FreeDriveState> = session.state
     val styleUrl: StateFlow<String> = combine(config.config, isDark) { c, dark -> if (dark) c.mapStyleDarkUrl else c.mapStyleLightUrl }
@@ -158,15 +166,18 @@ private fun FreeDriveContent(isDark: Boolean, onExit: () -> Unit, vm: FreeDriveV
             // Radar Intelligence : zone en cours (reste à parcourir) ou prochaine zone, avec la fiabilité des données.
             val zone = active?.zone
             val next = active?.nextZone
+            var zoneToHide by remember { mutableStateOf<String?>(null) }
+            val pillClick = Modifier.clip(RoadlyShapes.Chip).clickable(onClickLabel = stringResource(R.string.nav_zone_false_alarm)) { zoneToHide = zone?.id ?: next?.key }
             AnimatedVisibility(zone != null || next != null) {
                 if (zone != null) DangerZonePill(
                     stringResource(R.string.nav_zone_active), stringResource(R.string.nav_danger_remaining, Formatters.distance(zone.distanceM)),
-                    zone.limitKmh, zone.confidence, inside = true,
+                    zone.limitKmh, zone.confidence, inside = true, modifier = pillClick,
                 ) else if (next != null) DangerZonePill(
                     stringResource(R.string.nav_zone_active), stringResource(R.string.nav_danger_in, Formatters.distance(next.distanceM)),
-                    next.speedLimitKmh, next.confidence, inside = false,
+                    next.speedLimitKmh, next.confidence, inside = false, modifier = pillClick,
                 )
             }
+            zoneToHide?.let { key -> HideZoneDialog(onConfirm = { vm.hideZone(key); zoneToHide = null }, onDismiss = { zoneToHide = null }) }
             AnimatedVisibility(active?.gpsLost == true) {
                 GlassPanel(contentPadding = 10.dp, shape = RoadlyShapes.Chip) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

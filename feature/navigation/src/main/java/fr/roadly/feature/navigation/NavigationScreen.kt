@@ -60,6 +60,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.findRootCoordinates
@@ -77,6 +79,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.roadly.core.common.AppError
 import fr.roadly.core.designsystem.component.DangerZonePill
+import fr.roadly.core.map.DangerZoneFeatures
 import fr.roadly.core.designsystem.component.GlassButton
 import fr.roadly.core.designsystem.component.GlassButtonStyle
 import fr.roadly.core.designsystem.component.GlassPanel
@@ -193,6 +196,11 @@ private fun NavigationContent(
     LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
         if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
     }
+    // Radar Intelligence : zones de danger peintes sur le tracé ; recalculées seulement à l'entrée, à la sortie ou au recalcul.
+    LaunchedEffect(route?.id, state.dangerZones) {
+        map.setDangerZones(if (route == null) DangerZoneFeatures.EMPTY else DangerZoneFeatures.build(route.geometry, state.dangerZones))
+    }
+    DisposableEffect(map) { onDispose { map.setDangerZones(DangerZoneFeatures.EMPTY) } }
     val mapDetail by vm.mapDetail.collectAsStateWithLifecycle()
     LaunchedEffect(mapDetail) { map.applyDetail(mapDetail) }
     // Retour depuis la recherche : la dernière caméra du guidage revient avec son inclinaison, sans attendre la prochaine position.
@@ -246,6 +254,8 @@ private fun NavigationContent(
     val reports by vm.reports.collectAsStateWithLifecycle()
     LaunchedEffect(reports) { map.setReports(reports) }
     if (showReport) ReportSheet(onDismiss = { showReport = false }, enabled = communityEnabled, onSelect = vm::report)
+    val zoneToHide by vm.zoneToHide.collectAsStateWithLifecycle()
+    if (zoneToHide != null) HideZoneDialog(onConfirm = vm::confirmHideZone, onDismiss = vm::cancelHideZone)
     val pois by vm.pois.collectAsStateWithLifecycle()
     if (pois != PoisUi.Hidden) ScooterPoiSheet(pois, onSelect = vm::navigateToPoi, onDismiss = vm::dismissPois)
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
@@ -328,7 +338,7 @@ internal fun PortraitOverlay(
             // Pastilles d'état au-dessus du compteur, jamais à côté : la rangée 2D/3D + Nord de la colonne d'actions est à sa hauteur.
             Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
                 if (state.gpsLost) GpsLostPill()
-                StatusPills(state)
+                StatusPills(state, onZoneClick = vm::askHideZone)
                 SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
             }
             BottomBlock(state, vm, onChangeDestination)
@@ -423,7 +433,7 @@ internal fun LandscapeOverlay(
             horizontalAlignment = Alignment.End,
         ) {
             if (state.gpsLost) GpsLostPill()
-            StatusPills(state)
+            StatusPills(state, onZoneClick = vm::askHideZone)
             Row(verticalAlignment = Alignment.Bottom) {
                 CameraModeButtons(vm)
                 Spacer(Modifier.width(RoadlySpacing.s))
@@ -519,7 +529,7 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
 
 /** Zone de danger (Radar Intelligence), prochaine limitation, péage en flux libre et pluie, au-dessus du compteur. */
 @Composable
-private fun StatusPills(state: NavigationUiState) {
+private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}) {
     val c = LocalRoadlyColors.current
     // Radar Intelligence : zone de danger en cours (reste à parcourir) ou prochaine (compte à rebours), fiabilité des données.
     state.radar?.let { r ->
@@ -527,6 +537,7 @@ private fun StatusPills(state: NavigationUiState) {
             stringResource(R.string.nav_zone_active),
             stringResource(if (r.inside) R.string.nav_danger_remaining else R.string.nav_danger_in, r.distance),
             r.limitKmh, r.confidence, r.inside,
+            modifier = Modifier.clip(RoadlyShapes.Chip).clickable(onClickLabel = stringResource(R.string.nav_zone_false_alarm), onClick = onZoneClick),
         )
     }
     // 1.0 : limitation à venir sur le tracé (profil OSM via Valhalla), jamais devinée.

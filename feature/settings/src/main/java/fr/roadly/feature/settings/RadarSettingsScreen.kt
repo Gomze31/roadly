@@ -29,6 +29,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -97,6 +99,7 @@ class RadarSettingsViewModel @Inject constructor(
     fun setPrewarn(m: Int) { viewModelScope.launch { radar.setPrewarnM(m) } }
     fun setExit(v: Boolean) { viewModelScope.launch { radar.setAnnounceExit(v) } }
     fun setFamily(f: RadarFamily, v: Boolean) { viewModelScope.launch { radar.setFamily(f, v) } }
+    fun showHiddenZones() { viewModelScope.launch { radar.clearHiddenZones() } }
 
     /** Synchronisation manuelle (téléchargement forcé) ; le résultat détaillé arrive dans le journal. */
     fun syncNow() {
@@ -150,6 +153,16 @@ fun RadarSettingsScreen(onBack: () -> Unit, vm: RadarSettingsViewModel = hiltVie
                 rows.forEachIndexed { i, (family, label, icon) ->
                     ToggleRow(stringResource(label), checked = family in s.settings.families, onCheckedChange = { vm.setFamily(family, it) }, icon = icon, enabled = s.enabled, divider = i < rows.lastIndex)
                 }
+            }
+            // Fausses alertes signalées depuis la pastille (téléphone) ou l'alerte Android Auto.
+            SettingsGroup(stringResource(R.string.radar_group_hidden), footer = stringResource(R.string.radar_hidden_footer)) {
+                val hidden = s.settings.hiddenZones.size
+                ListRow(
+                    pluralStringResource(R.plurals.radar_hidden_count, hidden, hidden),
+                    subtitle = if (hidden > 0) stringResource(R.string.radar_hidden_reset) else null,
+                    icon = Icons.Default.VisibilityOff, iconStyle = IconTileStyle.Neutral,
+                    onClick = if (hidden > 0) vm::showHiddenZones else null, chevron = false, divider = false,
+                )
             }
             SettingsGroup(stringResource(R.string.radar_group_base), footer = stringResource(R.string.radar_sources_footer, RadarSourceIds.ATTRIBUTION_FR)) {
                 val applied = s.lastApplied

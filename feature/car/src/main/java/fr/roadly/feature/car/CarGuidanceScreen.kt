@@ -23,6 +23,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import fr.roadly.core.designsystem.component.userMessage
+import fr.roadly.core.map.DangerZoneSpans
 import fr.roadly.core.map.ManeuverArrowBuilder
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.navigation.NavigationState
@@ -49,6 +50,7 @@ internal class CarGuidanceScreen(
     private var shownArrowIndex = -1
     /** Contenu du gabarit au dernier rafraîchissement : l'hôte n'est sollicité que si l'affichage change. */
     private var shownKey: Any? = null
+    private val alerts = CarZoneAlerts(carContext, deps, lifecycleScope)
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -74,7 +76,10 @@ internal class CarGuidanceScreen(
         this.toleranceKmh = toleranceKmh
         if (s is NavigationState.Guiding) {
             val hud = CarHudModel.from(s, toleranceKmh)
-            if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) drawMap(s, hud)
+            if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                drawMap(s, hud)
+                alerts.onZone(s.radarActive?.key ?: s.radarNext?.key, hud.zone)
+            }
             updateTrip(s)
         }
         val key = displayKey(s, m)
@@ -93,6 +98,7 @@ internal class CarGuidanceScreen(
         }
         val p = g.progress
         renderer.setTraversed(p.segmentIndex, p.snapped)
+        renderer.setDangerZones(DangerZoneSpans.from(g.hazards, p.distanceAlongM, g.radarActive?.key))
         val next = p.nextManeuverIndex
         if (next != shownArrowIndex) {
             shownArrowIndex = next

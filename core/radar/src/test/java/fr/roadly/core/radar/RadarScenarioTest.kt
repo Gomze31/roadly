@@ -95,8 +95,9 @@ class RadarScenarioTest {
     @Test fun `clean GPS on a divided motorway - only our carriageway alerts`() {
         val run = driveFree(highway, 600, eastbound(), road = "A7")
         assertEquals(listOf("our-side", "our-side-unknown-dir"), run.entered)
-        // Zone de 4 km à 130 : annoncée dès son début (≈ 4 km avant le point), pas au dernier moment.
-        assertTrue("distance à l'entrée : ${run.enterDistanceToRadar}", run.enterDistanceToRadar.getValue("our-side") > 3_900.0)
+        // Zone de 4 km ± 15 % à 130 : annoncée dès son début, pas au dernier moment.
+        val lead = RadarRegulation.leadM(highway.first { it.id == "our-side" })
+        assertTrue("distance à l'entrée : ${run.enterDistanceToRadar}", run.enterDistanceToRadar.getValue("our-side") > lead - 100.0)
     }
 
     private fun noisyHighway(pos: Double, heading: Double, runs: Int = 50): Score {
@@ -245,9 +246,10 @@ class RadarScenarioTest {
         assertEquals(RejectReason.OFFSET, res.rejected["opposite-unknown-dir"])
         assertEquals(RejectReason.OFFSET, res.rejected["ramp"])
         val zone = res.zones.first()
-        // Point à ≈ 7 000 m le long du tracé (distances du tracé à 0,2 % près), zone de 4 km avant et 300 m après.
-        assertEquals(4_300.0, zone.endAlongM - zone.startAlongM, 1.0)
-        assertEquals(3_000.0, zone.startAlongM, 15.0)
+        // Point à ≈ 7 000 m le long du tracé (distances du tracé à 0,2 % près), zone de 4 km ± 15 % avant, 150–450 m après.
+        val r = highway.first { it.id == "our-side" }
+        assertEquals(RadarRegulation.leadM(r) + RadarRegulation.afterM(r), zone.endAlongM - zone.startAlongM, 1.0)
+        assertEquals(7_000.0 - RadarRegulation.leadM(r), zone.startAlongM, 15.0)
     }
 
     @Test fun `route matcher - a parallel road radar within the corridor is rejected by road number`() {

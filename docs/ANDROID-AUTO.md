@@ -16,7 +16,10 @@ Rédigé le 2026-11-05. Module `feature:car`, bibliothèque Car App `androidx.ca
 Sur la carte, dans la zone que l'hôte laisse libre :
 
 - en bas à gauche, la limitation (panneau rond) et la vitesse, en rouge au-delà de la tolérance réglée ;
-- en haut, la pastille « Zone de danger · dans 800 m » puis « encore 1,2 km », avec la limitation de la zone et « fiabilité faible » sous 60 de confiance.
+- en haut, la pastille « Zone de danger · dans 800 m » puis « encore 1,2 km », avec la limitation de la zone et « fiabilité faible » sous 60 de confiance ;
+- sur le tracé, l'étendue des zones de danger : ambre devant, rouge pour celle traversée.
+
+Chaque nouvelle zone déclenche une alerte de l'hôte pendant 8 s, avec « Fausse alerte » (masque la zone) et « OK ». L'aperçu des itinéraires indique le nombre de zones de danger de chaque variante.
 
 Jamais de type ni de position d'équipement (R413-15, voir `docs/RADAR-SOURCES.md`).
 

@@ -91,7 +91,10 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 |---|---|---|---|---|
 | Zones de vigilance (France, jamais un point exact) | G | fonctionnelle | Radar | Radar Intelligence (`docs/RADAR-INTELLIGENCE.md`) : liste officielle DSR 2025 (3 309 équipements) enrichie du jeu 2018 (sens, route), synchro incrémentale, zones de danger 300 m–4 km filtrées par sens, écart latéral et numéro de route ; testé JVM et en simulation, non vu sur appareil |
 | Alertes visuelles / vocales / sonores anticipées | G/+ | fonctionnelle | Radar | Machine à états : préavis réglable, entrée, fin de zone (option), une annonce par passage, voix seulement si confiance ≥ 60 ; pastille avec compte à rebours et fiabilité |
-| Limitation de la zone | + | bloquée | 3 | |
+| Limitation de la zone | + | fonctionnelle | Radar | VMA de la liste officielle quand elle est publiée (« NA » = rien d'affiché) |
+| Zones de danger sur la carte | — | fonctionnelle | Radar 2 | Étendue de chaque zone peinte sur le tracé (ambre devant, rouge traversée), téléphone et Android Auto ; jamais de point d'équipement |
+| Zones de danger par itinéraire | — | fonctionnelle | Radar 2 | « 3 zones de danger » sur chaque variante (téléphone et Android Auto), même calcul que le guidage |
+| Fausses alertes | — | fonctionnelle | Radar 2 | Toucher la pastille (ou « Fausse alerte » dans l'alerte Android Auto) masque la zone sur ce téléphone ; Réglages › Radars : nombre de zones masquées, tout réafficher |
 | Alerte sans itinéraire | + | fonctionnelle | 1.0 | « Conduite libre » : zones devant soi (axe du cap), limitation par map matching espacé (public : ≥ 20 s et 250 m), service de premier plan ; testé JVM, non vérifié sur appareil |
 | Désactivation par pays (Suisse) | — | en cours | Radar | `RadarRegulation` : France = zone de danger seule, Suisse et Allemagne = aucune alerte ; sans géofence de pays (les données ne couvrent que la France) |
 

@@ -24,14 +24,22 @@ object RadarRegulation {
         else -> RadarDisplayMode.DETAILED
     }
 
-    /** Traîne après le point : la zone ne finit jamais au radar (position non déductible). */
-    const val TAIL_M = 300.0
+    /**
+     * Traîne après le point, entre [TAIL_MIN_M] et [TAIL_MAX_M] selon l'équipement : la zone ne finit jamais à une distance fixe
+     * du radar. Avec une traîne fixe, « encore 300 m » ou la fin de zone tracée sur la carte donneraient sa position exacte.
+     */
+    const val TAIL_MIN_M = 150.0
+    const val TAIL_MAX_M = 450.0
+
+    /** Longueur avant le point : la longueur de référence multipliée par un facteur stable entre ces bornes. */
+    const val LEAD_MIN_FACTOR = 0.85
+    const val LEAD_MAX_FACTOR = 1.15
 
     /**
-     * Longueur de zone avant le point, calée sur la pratique des zones de danger : 300 m en ville, 2 km sur route, 4 km sur
+     * Longueur de référence avant le point, calée sur la pratique des zones de danger : 300 m en ville, 2 km sur route, 4 km sur
      * voie rapide. Feu rouge, passage à niveau et radar urbain : 300 m (milieu urbain ou carrefour, sans vitesse publiée).
      */
-    fun leadM(radar: Radar): Double = when {
+    fun baseLeadM(radar: Radar): Double = when {
         radar.kind == RadarKind.RED_LIGHT || radar.kind == RadarKind.LEVEL_CROSSING || radar.kind == RadarKind.URBAN -> 300.0
         radar.speedLimitKmh == null -> 2_000.0
         radar.speedLimitKmh >= 110 -> 4_000.0
@@ -39,8 +47,33 @@ object RadarRegulation {
         else -> 300.0
     }
 
+    /** Début de zone avant le point : [baseLeadM] × facteur propre à l'équipement (même zone à chaque passage, sur tout téléphone). */
+    fun leadM(radar: Radar): Double = baseLeadM(radar) * (LEAD_MIN_FACTOR + (LEAD_MAX_FACTOR - LEAD_MIN_FACTOR) * stableFraction(radar.id, SALT_LEAD))
+
+    fun tailM(radar: Radar): Double = TAIL_MIN_M + (TAIL_MAX_M - TAIL_MIN_M) * stableFraction(radar.id, SALT_TAIL)
+
     /** Longueur contrôlée après le point (tronçon de vitesse moyenne), puis la traîne. */
-    fun afterM(radar: Radar): Double = (radar.sectionLengthM ?: 0.0) + TAIL_M
+    fun afterM(radar: Radar): Double = (radar.sectionLengthM ?: 0.0) + tailM(radar)
+
+    /** Fraction dans [0, 1[ tirée de [id] (FNV-1a 32 bits) : déterministe, indépendante de la plateforme et du lancement. */
+    fun stableFraction(id: String, salt: Int): Double {
+        var h = FNV_OFFSET xor salt
+        for (c in id) {
+            h = h xor c.code
+            h *= FNV_PRIME
+        }
+        // Brassage final : des identifiants voisins (« 01234 », « 01235 ») donnent des fractions éloignées.
+        h = h xor (h ushr 16)
+        h *= MIX
+        h = h xor (h ushr 13)
+        return (h.toLong() and 0xFFFFFFFFL).toDouble() / 4_294_967_296.0
+    }
+
+    private const val FNV_OFFSET = -0x7ee3623b // 0x811C9DC5
+    private const val FNV_PRIME = 0x01000193
+    private const val MIX = -0x7a143595 // 0x85EBCA6B
+    private const val SALT_LEAD = 0x1EAD
+    private const val SALT_TAIL = 0x7A11
 }
 
 /** Normalisation des numéros de route : « RN 12 » / « N12 » → « N12 », « A 7 » → « A7 ». Null si ce n'est pas un numéro. */

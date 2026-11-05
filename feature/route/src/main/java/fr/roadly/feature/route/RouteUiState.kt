@@ -31,6 +31,8 @@ sealed interface RouteUiState {
         val optimizing: Boolean = false,
         /** Mode trottinette : profil, préférences et batterie utilisés pour ce calcul ; null en voiture / moto. */
         val scooter: ScooterRouteUi? = null,
+        /** Radar Intelligence : nombre de zones de danger par itinéraire (identifiant de tracé) ; absent = pas encore calculé. */
+        val dangerZones: Map<String, Int> = emptyMap(),
     ) : RouteUiState
 }
 

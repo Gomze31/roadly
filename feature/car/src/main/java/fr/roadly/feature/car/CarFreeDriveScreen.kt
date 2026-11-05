@@ -28,6 +28,7 @@ internal class CarFreeDriveScreen(
     private var state: FreeDriveState = deps.freeDrive.state.value
     private var toleranceKmh = 0
     private var shownKey: Any? = null
+    private val alerts = CarZoneAlerts(carContext, deps, lifecycleScope)
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -52,7 +53,9 @@ internal class CarFreeDriveScreen(
     }
 
     private fun drawMap(s: FreeDriveState.Active) {
-        renderer.setHud(CarHudModel.from(s, toleranceKmh))
+        val hud = CarHudModel.from(s, toleranceKmh)
+        renderer.setHud(hud)
+        alerts.onZone(s.zone?.id ?: s.nextZone?.key, hud.zone)
         val fix = s.lastFix ?: return
         renderer.setUser(fix)
         renderer.follow(fix.point, fix.bearingDeg?.toDouble(), FollowProfile.FREE_DRIVE)

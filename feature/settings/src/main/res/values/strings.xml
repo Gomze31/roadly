@@ -262,4 +262,12 @@
     <string name="radar_status_failed">Échec le %1$s, base conservée</string>
     <string name="radar_sources_footer">Sources : %1$s. Sens, route et longueur des tronçons : « Radars automatiques » (2018), appariés à moins de 50 m. Vérification hebdomadaire, liste publiée chaque année.</string>
     <string name="radar_offline_note">Les alertes sont calculées sur le téléphone, sans réseau. La base n\'est téléchargée que lorsqu\'une nouvelle liste est publiée.</string>
+    <string name="radar_group_hidden">Fausses alertes</string>
+    <string name="radar_hidden_footer">Touchez la pastille « Zone de danger » (ou « Fausse alerte » sur Android Auto) pour masquer une zone qui n\'existe plus. Le masquage reste sur ce téléphone.</string>
+    <plurals name="radar_hidden_count">
+        <item quantity="one">%d zone masquée</item>
+        <item quantity="many">%d zones masquées</item>
+        <item quantity="other">%d zones masquées</item>
+    </plurals>
+    <string name="radar_hidden_reset">Toucher pour tout réafficher</string>
 </resources>

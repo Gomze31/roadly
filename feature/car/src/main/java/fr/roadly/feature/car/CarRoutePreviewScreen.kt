@@ -32,6 +32,8 @@ internal class CarRoutePreviewScreen(
 ) : Screen(carContext) {
     private var options: List<RouteOption>? = null
     private var error: AppError? = null
+    /** Zones de danger par variante (même calcul que le guidage). */
+    private var zones: Map<String, Int> = emptyMap()
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -60,6 +62,20 @@ internal class CarRoutePreviewScreen(
             }
             showOnMap()
             invalidate()
+            val counted = HashMap<String, Int>()
+            for (o in options.orEmpty()) {
+                try {
+                    counted[o.route.id] = deps.dangerZones.zonesAlong(o.route).size
+                } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Base locale illisible : pas de décompte.
+                }
+            }
+            if (counted.isNotEmpty()) {
+                zones = counted
+                invalidate()
+            }
         }
     }
 
@@ -89,6 +105,7 @@ internal class CarRoutePreviewScreen(
                 val second = listOfNotNull(
                     carContext.getString(R.string.car_route_arrival, Formatters.clockTime(o.arrivalEpochMs)),
                     carContext.getString(R.string.car_route_toll).takeIf { r.hasToll },
+                    zones[r.id]?.let { n -> carContext.resources.getQuantityString(R.plurals.car_danger_zones, n, n) },
                 ).joinToString(" · ")
                 items.addItem(
                     Row.Builder()

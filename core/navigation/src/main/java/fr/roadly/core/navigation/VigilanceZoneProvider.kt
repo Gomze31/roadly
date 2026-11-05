@@ -78,9 +78,11 @@ class RepositoryVigilanceZoneProvider @Inject constructor(
     override suspend fun zonesAlong(route: Route): List<RouteHazard> {
         val box = BoundingBox.of(route.geometry) ?: return emptyList()
         val m = VigilanceZones.BOX_MARGIN_DEG
-        val candidates = repository.radarsIn(BoundingBox(box.south - m, box.west - m, box.north + m, box.east + m))
+        val s = settings.settings.first()
+        // Fausses alertes signalées par l'utilisateur : écartées avant le rapprochement (pas de fusion avec une zone voisine).
+        val candidates = repository.radarsIn(BoundingBox(box.south - m, box.west - m, box.north + m, box.east + m)).filter { it.id !in s.hiddenZones }
         if (candidates.isEmpty()) return emptyList()
-        val enabled = settings.settings.first().enabledKinds
+        val enabled = s.enabledKinds
         val line = Polyline(route.geometry)
         val names = RouteRoadNames.of(route, line)
         return RouteRadarMatcher.match(line, candidates, enabled = enabled, roadRefsAt = names::at).zones.map { z ->

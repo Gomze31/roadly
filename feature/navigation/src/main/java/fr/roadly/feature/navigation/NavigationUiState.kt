@@ -86,6 +86,8 @@ data class NavigationUiState(
     /** Virages et zones devant soi (≤ 5 km), triés par distance. */
     val hazards: List<HazardUi> = emptyList(),
     val activeZone: RouteHazard? = null,
+    /** Radar Intelligence : zones de danger peintes sur le tracé (≤ 30 km devant, celle traversée en rouge). */
+    val dangerZones: List<fr.roadly.core.map.DangerZoneSpan> = emptyList(),
     /** Signalements communautaires devant soi (projetés sur le tracé), fournis par le ViewModel. */
     val communityAhead: List<ReportAheadUi> = emptyList(),
     val raining: Boolean? = null,
@@ -200,6 +202,7 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 upcoming = upcoming,
                 hazards = hazardsAhead(s.hazards, p.distanceAlongM),
                 activeZone = s.activeZone,
+                dangerZones = fr.roadly.core.map.DangerZoneSpans.from(s.hazards, p.distanceAlongM, s.radarActive?.key),
                 raining = s.raining,
                 limitLoweredByRain = s.limitLoweredByRain,
                 etaClock = Formatters.clockTime(s.etaEpochMs, zone),

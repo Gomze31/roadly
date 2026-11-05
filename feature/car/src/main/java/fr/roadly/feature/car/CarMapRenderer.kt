@@ -7,6 +7,8 @@ import android.widget.FrameLayout
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
+import fr.roadly.core.map.DangerZoneFeatures
+import fr.roadly.core.map.DangerZoneSpan
 import fr.roadly.core.map.ManeuverArrowBuilder
 import fr.roadly.core.map.SurfaceArea
 import fr.roadly.core.map.SurfaceMapHost
@@ -39,6 +41,9 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
     private var activeRouteId: String? = null
     private var traversed: Pair<Int, GeoPoint?>? = null
     private var arrow: String = ManeuverArrowBuilder.EMPTY
+    private var dangerSpans: List<DangerZoneSpan> = emptyList()
+    private var danger: String = DangerZoneFeatures.EMPTY
+    private var dangerRouteId: String? = null
     private var user: LocationFix? = null
     private var hudModel = CarHudModel.EMPTY
 
@@ -75,7 +80,18 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         host?.controller?.setManeuverArrow(geoJson)
     }
 
+    /** Zones de danger peintes sur le tracé actif (même rendu que le téléphone). */
+    fun setDangerZones(spans: List<DangerZoneSpan>) {
+        val geometry = routes.firstOrNull { it.id == activeRouteId }?.geometry
+        if (spans == dangerSpans && activeRouteId == dangerRouteId) return
+        dangerSpans = spans
+        dangerRouteId = activeRouteId
+        danger = if (geometry == null) DangerZoneFeatures.EMPTY else DangerZoneFeatures.build(geometry, spans)
+        host?.controller?.setDangerZones(danger)
+    }
+
     fun clearRoutes() {
+        setDangerZones(emptyList())
         setRoutes(emptyList(), null)
         setManeuverArrow(ManeuverArrowBuilder.EMPTY)
         overview = null
@@ -141,6 +157,7 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         h.controller.setRoutes(routes, activeRouteId)
         setTraversed(traversed?.first, traversed?.second)
         h.controller.setManeuverArrow(arrow)
+        h.controller.setDangerZones(danger)
         h.controller.setUserLocation(user, 0)
         applyCamera(durationMs = 0)
     }

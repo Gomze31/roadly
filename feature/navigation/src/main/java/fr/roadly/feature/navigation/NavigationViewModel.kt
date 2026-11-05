@@ -23,6 +23,8 @@ import fr.roadly.core.model.Place
 import fr.roadly.core.model.ReportKind
 import fr.roadly.core.navigation.GuidanceActions
 import fr.roadly.core.navigation.NavigationSession
+import fr.roadly.core.data.repository.DefaultRadarSettingsRepository
+import fr.roadly.core.data.repository.RadarSettingsRepository
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.routing.RouteAlternativesUseCase
 import fr.roadly.core.routing.RouteOption
@@ -70,7 +72,26 @@ class NavigationViewModel @Inject constructor(
     private val community: CommunityRepository,
     /** Services du mode trottinette ; null (tests existants) = guidage voiture / moto inchangé. */
     private val scooter: ScooterServices? = null,
+    /** Fausses alertes (zones masquées) ; défaut immuable pour les tests existants. */
+    private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
 ) : ViewModel() {
+    /** Zone de danger dont l'utilisateur veut signaler une fausse alerte (confirmation affichée) ; null = aucune. */
+    private val _zoneToHide = MutableStateFlow<String?>(null)
+    val zoneToHide: StateFlow<String?> = _zoneToHide
+
+    /** Appui sur la pastille : zone traversée, sinon la prochaine. */
+    fun askHideZone() {
+        val g = session.state.value as? NavigationState.Guiding ?: return
+        _zoneToHide.value = g.radarActive?.key ?: g.radarNext?.key
+    }
+
+    fun confirmHideZone() {
+        val key = _zoneToHide.value ?: return
+        _zoneToHide.value = null
+        viewModelScope.launch { radarSettings.hideZone(key) }
+    }
+
+    fun cancelHideZone() { _zoneToHide.value = null }
     val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     /** Signalements autour de la position projetée (toutes les 60 s), affichés sur la carte. */
     val reports: StateFlow<List<CommunityReport>> = community.pollNearby({ (session.state.value as? NavigationState.Guiding)?.progress?.snapped }).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

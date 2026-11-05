@@ -411,6 +411,10 @@ class NavigationSession @Inject constructor(
             if (progress.routeId != route.id) return
             val settings = radarSettings.settings.first()
             radarEngine.config = radarEngine.config.copy(prewarnM = settings.prewarnM.toDouble())
+            // Zone signalée comme fausse alerte pendant le trajet : retirée du tracé tout de suite (pastille, carte, voix).
+            if (settings.hiddenZones.isNotEmpty() && hazards.any { it.kind == HazardKind.VIGILANCE_ZONE && it.key in settings.hiddenZones }) {
+                hazards = hazards.filterNot { it.kind == HazardKind.VIGILANCE_ZONE && it.key in settings.hiddenZones }
+            }
             val along = progress.distanceAlongM
             val onRoute = !tracker.isOffRoute
             val observations = if (!onRoute) emptyList() else hazards.asSequence()

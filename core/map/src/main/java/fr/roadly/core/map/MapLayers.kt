@@ -38,6 +38,10 @@ internal object MapIds {
     const val IMG_PIN = "roadly-img-pin"
     const val IMG_REPORT = "roadly-img-report"
     const val SRC_ARROW = "roadly-arrow"
+    /** Zones de danger peintes sur le tracé (Radar Intelligence). */
+    const val SRC_DANGER = "roadly-danger"
+    const val LYR_DANGER_CASING = "roadly-danger-casing"
+    const val LYR_DANGER = "roadly-danger-line"
     const val LYR_ARROW_CASING = "roadly-arrow-casing"
     const val LYR_ARROW = "roadly-arrow-line"
     const val LYR_ARROW_HEAD = "roadly-arrow-head"
