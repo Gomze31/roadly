@@ -69,10 +69,10 @@ class NavigationSessionHazardsTest {
         assertEquals(1, guiding(s).hazards.count { it.kind == HazardKind.VIGILANCE_ZONE })
         location.emit(fixAt(250.0)); runCurrent()
         assertEquals(zone, guiding(s).activeZone)
-        assertTrue(speech.spoken.contains("Zone de vigilance, limitation à 90."))
+        assertTrue(speech.spoken.contains("Zone de danger, limitation à 90."))
         assertEquals(1, speech.beeps)
         location.emit(fixAt(300.0)); runCurrent()
-        assertEquals(1, speech.spoken.count { it.startsWith("Zone de vigilance") })
+        assertEquals(1, speech.spoken.count { it.startsWith("Zone de danger") })
         location.emit(fixAt(450.0)); runCurrent()
         assertNull(guiding(s).activeZone)
     }

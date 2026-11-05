@@ -77,15 +77,16 @@
     <string name="settings_tint_subtitle">Couleur du tracé, des boutons et des sélections</string>
     <string name="settings_tint_footer">Violet, océan, menthe, corail, ambre. Appliquée immédiatement à toute l\'application, y compris le guidage.</string>
     <string name="settings_group_alerts">Alertes</string>
-    <string name="settings_vigilance">Zones de vigilance</string>
+    <string name="settings_vigilance">Radars et zones de danger</string>
+    <string name="settings_vigilance_off">Désactivé</string>
     <string name="settings_vigilance_subtitle">Annoncées à l\'entrée de la zone, affichées dans Horizon. Jamais un emplacement exact.</string>
     <string name="settings_vigilance_sound">Bip à l\'entrée d\'une zone</string>
     <string name="settings_vigilance_refresh">Mettre à jour les zones</string>
     <string name="settings_vigilance_loading">Téléchargement…</string>
     <string name="settings_vigilance_failed">Échec du téléchargement, réessayez.</string>
     <string name="settings_vigilance_empty">Aucune zone chargée : touchez pour télécharger.</string>
-    <string name="settings_vigilance_count">%1$d zones · téléchargé le %2$s</string>
-    <string name="settings_vigilance_footer">Source : « Radars automatiques », Sécurité routière, data.gouv.fr (Licence Ouverte 2.0), millésime octobre 2018. France uniquement ; aucune donnée en Suisse. Les zones font de 300 m à 4 km selon la limitation.</string>
+    <string name="settings_vigilance_count">%1$d équipements · base du %2$s</string>
+    <string name="settings_vigilance_footer">Zones de danger calculées sur le téléphone à partir de la liste officielle des radars fixes (Ministère de l\'Intérieur). France uniquement.</string>
     <string name="settings_rain_limit">Limitation abaissée par pluie</string>
     <string name="settings_rain_limit_subtitle">130 → 110, 110 → 100, 90 → 80 quand Open-Meteo signale de la pluie et qu\'une limitation est connue.</string>
 
@@ -224,4 +225,41 @@
     <string name="settings_assistant_cap">Plafond quotidien d\'écoute</string>
     <string name="settings_assistant_cap_minutes">%1$d min</string>
     <string name="settings_assistant_usage">Aujourd\'hui : %1$d / %2$d min d\'écoute · ≈ %3$d tokens</string>
+
+    <!-- Radar Intelligence -->
+    <string name="radar_title">Radars et zones de danger</string>
+    <string name="radar_group_alerts">Alertes</string>
+    <string name="radar_enabled">Alertes de zones de danger</string>
+    <string name="radar_enabled_subtitle">Avec ou sans itinéraire, écran éteint compris</string>
+    <string name="radar_voice">Annonce vocale</string>
+    <string name="radar_voice_subtitle">Seulement si les données sont assez fiables ; sinon alerte visuelle</string>
+    <string name="radar_sound">Bip à l\'entrée de zone</string>
+    <string name="radar_exit">Annoncer la fin de zone</string>
+    <string name="radar_legal_footer">En France, la loi interdit de signaler l\'emplacement des contrôles (art. R413-15 du Code de la route) : Roadly annonce une zone de danger de 300 m à 4 km, sans type ni position de l\'équipement. Aucune alerte en Suisse ni en Allemagne.</string>
+    <string name="radar_group_prewarn">Préavis avant la zone</string>
+    <string name="radar_prewarn_footer">Annonce supplémentaire avant l\'entrée. Sans itinéraire, un équipement dont le sens n\'est pas publié n\'est confirmé qu\'à 300 m : son préavis peut ne pas avoir lieu.</string>
+    <string name="radar_group_kinds">Équipements pris en compte</string>
+    <string name="radar_kinds_footer">Le type n\'est jamais affiché en conduite : il ne sert qu\'à choisir la longueur de la zone et à filtrer.</string>
+    <string name="radar_kind_speed">Contrôles de vitesse</string>
+    <string name="radar_kind_section">Vitesse moyenne (tronçons)</string>
+    <string name="radar_kind_red_light">Feux rouges</string>
+    <string name="radar_kind_level_crossing">Passages à niveau</string>
+    <string name="radar_group_base">Base locale</string>
+    <string name="radar_count">%1$d équipements actifs</string>
+    <string name="radar_source_version">Liste officielle du %1$s</string>
+    <string name="radar_legacy_base">Ancienne base (2018) : synchronisez</string>
+    <string name="radar_quality">Qualité des données</string>
+    <string name="radar_quality_detail">%1$d %% précis à 10 m · %2$d %% sens connu · %3$d %% enrichis</string>
+    <string name="radar_changes">Dernière mise à jour</string>
+    <string name="radar_changes_detail">%1$d nouveaux · %2$d retirés · %3$d déplacés · %4$d limitations modifiées</string>
+    <string name="radar_sync">Synchroniser maintenant</string>
+    <string name="radar_sync_loading">Synchronisation…</string>
+    <string name="radar_sync_failed">Échec : la base actuelle est conservée.</string>
+    <string name="radar_sync_never">Jamais synchronisée</string>
+    <string name="radar_status_applied">Mise à jour appliquée le %1$s</string>
+    <string name="radar_status_unchanged">Vérifiée le %1$s : source inchangée</string>
+    <string name="radar_status_rejected">Version rejetée le %1$s, base conservée</string>
+    <string name="radar_status_failed">Échec le %1$s, base conservée</string>
+    <string name="radar_sources_footer">Sources : %1$s. Sens, route et longueur des tronçons : « Radars automatiques » (2018), appariés à moins de 50 m. Vérification hebdomadaire, liste publiée chaque année.</string>
+    <string name="radar_offline_note">Les alertes sont calculées sur le téléphone, sans réseau. La base n\'est téléchargée que lorsqu\'une nouvelle liste est publiée.</string>
 </resources>

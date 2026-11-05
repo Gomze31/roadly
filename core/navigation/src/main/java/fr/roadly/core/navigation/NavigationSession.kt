@@ -4,7 +4,19 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.di.ApplicationScope
+import fr.roadly.core.data.repository.DriveMemoryRepository
 import fr.roadly.core.data.repository.GuidanceDefaults
+import fr.roadly.core.data.repository.NoDriveMemoryRepository
+import fr.roadly.core.data.repository.ParkedVehicle
+import fr.roadly.core.data.repository.DefaultRadarSettingsRepository
+import fr.roadly.core.data.repository.RadarSettingsRepository
+import fr.roadly.core.radar.RadarAlertConfig
+import fr.roadly.core.radar.RadarAlertEngine
+import fr.roadly.core.radar.RadarAlertEvent
+import fr.roadly.core.radar.RadarQuality
+import fr.roadly.core.radar.ZoneObservation
+import fr.roadly.core.radar.ZoneStatus
+import fr.roadly.core.data.repository.TollReminder
 import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.location.LocationPermissionState
@@ -71,6 +83,12 @@ class NavigationSession @Inject constructor(
     @param:ApplicationScope private val scope: CoroutineScope,
     /** Analyse des voies après un recalcul en mode trottinette ; sans elle, le guidage reste générique. */
     private val scooterAnalyzer: ScooterRouteAnalyzer = NoScooterRouteAnalyzer,
+    /** 1.0 : profil du tracé (limitations, portiques de péage en flux libre), une requête par tracé. */
+    private val routeAttributes: RouteAttributesProvider = NoRouteAttributesProvider,
+    /** 1.0 : rappels de péage en flux libre et position du véhicule à l'arrivée. */
+    private val driveMemory: DriveMemoryRepository = NoDriveMemoryRepository,
+    /** Radar Intelligence : voix, préavis, sortie de zone. */
+    private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
 ) {
     private val _state = MutableStateFlow<NavigationState>(NavigationState.Idle)
     val state: StateFlow<NavigationState> = _state.asStateFlow()
@@ -117,6 +135,22 @@ class NavigationSession @Inject constructor(
     private var lastScooter: ScooterGuidanceConfig? = null
     /** Course en cours (lue et modifiée uniquement sur [confined]). */
     private var current: Run? = null
+    /**
+     * 1.0 : portiques de péage en flux libre franchis depuis le départ. Conservé quand un départ remplace une course en cours
+     * (alternative, étape ajoutée) ; enregistré comme rappel à l'arrivée ou à l'arrêt.
+     */
+    @Volatile private var tollTrip: FreeFlowTollTrip? = null
+
+    /** Enregistre le rappel de péage de la course (s'il y en a un) et l'oublie ; une erreur de stockage n'a aucun effet sur le guidage. */
+    private fun persistTollReminder() {
+        val t = tollTrip ?: return
+        tollTrip = null
+        scope.launch {
+            try {
+                driveMemory.addTollReminder(TollReminder(t.firstPassedAtEpochMs, t.firstPassedAtEpochMs, t.roads, t.countryCode, t.gantries))
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { /* rappel perdu, guidage intact */ }
+        }
+    }
 
     /**
      * Démarre (ou remplace) la course sur [option] ; les [preferences] sont réutilisées lors des recalculs.
@@ -132,6 +166,8 @@ class NavigationSession @Inject constructor(
         scooter: ScooterGuidanceConfig? = null,
         destinationName: String? = null,
     ) {
+        // Un départ qui ne prolonge pas une course en cours repart sans portique franchi (le précédent rappel a déjà été enregistré).
+        if (_state.value !is NavigationState.Guiding) persistTollReminder()
         cancelRun(null)
         val previousDestination = lastOption?.route?.geometry?.lastOrNull()
         val sameDestination = previousDestination != null &&
@@ -187,6 +223,7 @@ class NavigationSession @Inject constructor(
         cancelRun(NavigationState.Idle)
         speech.release()
         persistLastGuidance(null)
+        persistTollReminder()
         if (wasGuiding) scope.launch { tripRecorder.end(arrived = false, nowMs = clock.nowMs()) }
     }
 
@@ -257,7 +294,16 @@ class NavigationSession @Inject constructor(
         private var speedKmh: Double? = null
         /** Vitesse GPS brute du dernier fix : c'est elle qu'affiche le badge (le lissage ne sert qu'à la politique d'annonce). */
         private var rawSpeedKmh: Double? = null
-        private var speedLimitKmh: Int? = null
+        /** Limitation du fournisseur fix par fix (Valhalla auto-hébergé uniquement) : repli quand le profil du tracé ne la connaît pas. */
+        private var providerLimitKmh: Int? = null
+        /** 1.0 : limitation lue dans le profil du tracé à la position courante ; null hors itinéraire ou inconnue. */
+        private var routeLimitKmh: Int? = null
+        private val speedLimitKmh: Int? get() = routeLimitKmh ?: providerLimitKmh
+        /** 1.0 : profil du tracé courant (null tant qu'il n'est pas chargé, ou indisponible). */
+        private var attributes: RouteAttributes? = null
+        private var nextLimit: SpeedLimitChange? = null
+        /** Abscisse au-delà de laquelle les portiques du tracé courant n'ont pas encore été comptés. */
+        private var gantryCursorM = 0.0
         val startedAtMs = clock.nowMs()
         private var lastFixAtMs = startedAtMs
         private var lastAdvanceAtMs = lastFixAtMs
@@ -271,7 +317,10 @@ class NavigationSession @Inject constructor(
         /** Virages + zones de vigilance du tracé courant (recalculés après un recalcul d'itinéraire). */
         private var hazards: List<RouteHazard> = emptyList()
         private var activeZone: RouteHazard? = null
-        private val zonesAnnounced = mutableSetOf<Double>()
+        /** Radar Intelligence : une machine à états par course (une zone n'est annoncée qu'une fois par passage). */
+        private val radarEngine = RadarAlertEngine(RadarAlertConfig(confirmTicks = 1))
+        private var radarActive: ZoneStatus? = null
+        private var radarNext: ZoneStatus? = null
         /** B4 : ronds-points du tracé courant, calculés une fois par tracé. */
         private var roundabouts: Map<Int, RoundaboutInfo> = RoundaboutResolver.resolveAll(route)
         /** B5 : dernier indice de manœuvre vu et instant de son changement (passage d'une manœuvre). */
@@ -310,6 +359,7 @@ class NavigationSession @Inject constructor(
             launch { prefs.rainLowersLimit.collect { rainLowersLimit = it } }
             launch { prefs.vigilanceEnabled.collect { vigilanceOn = it; loadHazards() } }
             launch { rainWatch() }
+            launch { loadAttributes(route) }
             val depart = route.maneuvers.first()
             announced += 0 to Tier.NOW
             say(depart.verbalPre ?: depart.instruction)
@@ -335,7 +385,8 @@ class NavigationSession @Inject constructor(
             if (!tracker.isOffRoute) rerouteAnnounced = false
             if (tracker.isOffRoute && !afterLongGap) maybeReroute(fix, now)
             announce(progress)
-            refreshSpeedLimit()
+            updateRouteProfile(progress)
+            if (routeLimitKmh == null) refreshSpeedLimit()
             checkOverSpeed()
             updateZone(progress)
             // Un recalcul a pu aboutir pendant une suspension : ne jamais associer l'ancienne progression au nouveau tracé.
@@ -352,15 +403,80 @@ class NavigationSession @Inject constructor(
             if (r.id == route.id) hazards = (curves + zones).sortedBy { it.startAlongM }
         }
 
-        /** Entrée dans une zone de vigilance : annonce (une fois par zone) et bip optionnel ; sortie : badge retiré. */
+        /**
+         * Radar Intelligence : zones de danger du tracé passées à la machine à états (préavis, entrée, sortie, une seule annonce
+         * par passage, voix seulement au-delà du seuil de confiance). Hors itinéraire, aucune zone n'est observée.
+         */
         private suspend fun updateZone(progress: RouteProgress) {
             if (progress.routeId != route.id) return
-            val zone = hazards.firstOrNull { it.kind == HazardKind.VIGILANCE_ZONE && it.contains(progress.distanceAlongM) }
-            activeZone = zone
-            if (zone != null && zonesAnnounced.add(zone.startAlongM)) {
-                say(SpokenPhrases.vigilanceZone(zone.speedLimitKmh), routeId = progress.routeId, priority = SpeechPriority.LOW)
-                if (prefs.vigilanceSound.first() && !_muted.value && prefs.voiceEnabled.first()) speech.beep()
+            val settings = radarSettings.settings.first()
+            radarEngine.config = radarEngine.config.copy(prewarnM = settings.prewarnM.toDouble())
+            val along = progress.distanceAlongM
+            val onRoute = !tracker.isOffRoute
+            val observations = if (!onRoute) emptyList() else hazards.asSequence()
+                .filter { it.kind == HazardKind.VIGILANCE_ZONE && it.endAlongM - along > -RADAR_BEHIND_M && it.startAlongM - along < RADAR_AHEAD_M }
+                .map { ZoneObservation(zoneKey(it), it.startAlongM - along, it.endAlongM - along, it.speedLimitKmh, it.confidence ?: RadarQuality.MIN_VOICE) }
+                .toList()
+            val out = radarEngine.update(clock.nowMs(), observations, speedKmh, prefs.speedAlertToleranceKmh.first())
+            activeZone = out.active?.let { a -> hazards.firstOrNull { it.kind == HazardKind.VIGILANCE_ZONE && zoneKey(it) == a.key } }
+            radarActive = out.active
+            radarNext = out.next
+            for (e in out.events) {
+                val voice = e.voice && settings.voice
+                when (e) {
+                    is RadarAlertEvent.PreWarning -> if (voice) say(SpokenPhrases.dangerZoneAhead(e.distanceM), routeId = progress.routeId, priority = SpeechPriority.LOW)
+                    is RadarAlertEvent.Entered -> {
+                        if (voice) say(SpokenPhrases.vigilanceZone(e.speedLimitKmh), routeId = progress.routeId, priority = SpeechPriority.LOW)
+                        if (prefs.vigilanceSound.first() && !_muted.value && prefs.voiceEnabled.first()) speech.beep()
+                    }
+                    is RadarAlertEvent.Exited -> if (voice && settings.announceExit) say(SpokenPhrases.DANGER_ZONE_END, routeId = progress.routeId, priority = SpeechPriority.LOW)
+                    // Le dépassement est déjà signalé par le bip général (checkOverSpeed) : pas de second son.
+                    is RadarAlertEvent.OverSpeed -> Unit
+                }
             }
+        }
+
+        private fun zoneKey(h: RouteHazard) = h.key ?: "zone@${h.startAlongM.toLong()}"
+
+        /** 1.0 : profil du tracé [r] (une requête) ; ignoré s'il arrive après un recalcul vers un autre tracé. */
+        private suspend fun loadAttributes(r: Route) {
+            val result = try {
+                routeAttributes.attributes(r)
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+            val a = (result as? Outcome.Success)?.value ?: return
+            if (r.id != route.id || a.routeId != r.id) return
+            attributes = a
+            // Un tracé recalculé commence à la position du recalcul : aucun de ses portiques n'est derrière nous.
+            gantryCursorM = 0.0
+        }
+
+        /** Horizon d'affichage de la prochaine limitation : 20 s de trajet, entre 250 m et 1,5 km. */
+        private fun limitHorizonM(): Double = ((speedKmh ?: 0.0) / 3.6 * LIMIT_HORIZON_S).coerceIn(LIMIT_HORIZON_MIN_M, LIMIT_HORIZON_MAX_M)
+
+        /**
+         * 1.0 : limitation courante et prochaine limitation lues dans le profil du tracé, et portiques franchis. Hors itinéraire,
+         * la position projetée ne dit rien de la route réellement suivie : rien n'est lu dans le profil.
+         */
+        private suspend fun updateRouteProfile(progress: RouteProgress) {
+            val a = attributes
+            val onRoute = !tracker.isOffRoute && progress.offRouteM <= GuidanceConstants.OFF_ROUTE_SOFT_M
+            if (a == null || a.routeId != route.id || progress.routeId != route.id || !onRoute) {
+                routeLimitKmh = null
+                nextLimit = null
+                return
+            }
+            routeLimitKmh = a.limitAt(progress.distanceAlongM)
+            nextLimit = a.nextChange(progress.distanceAlongM, limitHorizonM())
+            val passed = a.tollGantries.filter { it.alongM > gantryCursorM && it.alongM <= progress.distanceAlongM }
+            gantryCursorM = maxOf(gantryCursorM, progress.distanceAlongM)
+            for (g in passed) passGantry(g, progress.routeId)
+        }
+
+        private suspend fun passGantry(g: TollGantry, routeId: String) {
+            val previous = tollTrip
+            val base = previous ?: FreeFlowTollTrip(0, emptyList(), g.countryCode, clock.nowMs())
+            tollTrip = base.copy(gantries = base.gantries + 1, roads = (base.roads + listOfNotNull(g.roadName)).distinct())
+            if (previous == null) say(SpokenPhrases.freeFlowToll(g.countryCode), routeId = routeId, priority = SpeechPriority.LOW)
         }
 
         /** Pluie : au plus une requête toutes les 10 min, sur la dernière position connue ; échec = inconnue. */
@@ -449,8 +565,14 @@ class NavigationSession @Inject constructor(
                 val m = route.maneuvers[last]
                 say(m.verbalPre ?: m.instruction, priority = SpeechPriority.URGENT)
             }
-            publish(NavigationState.Arrived(route))
+            val tolls = tollTrip
+            publish(NavigationState.Arrived(route, tolls))
             tripRecorder.end(arrived = true, nowMs = clock.nowMs())
+            if (gen == generation) {
+                persistTollReminder()
+                // Véhicule motorisé : sa position à l'arrivée est mémorisée (« Mon véhicule » sur l'accueil).
+                if (scooter == null) rememberParking(recent.lastOrNull()?.point ?: destination)
+            }
             val current = synchronized(stateLock) {
                 // Course encore courante seulement : un nouveau départ survenu entre-temps a mémorisé sa propre course.
                 (gen == generation).also { if (it) { location.setGuidanceActive(false); persistLastGuidance(null) } }
@@ -509,8 +631,11 @@ class NavigationSession @Inject constructor(
                     freshTracker.update(fix)
                     rerouteAnnounced = false
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
-                    hazards = emptyList(); activeZone = null; zonesAnnounced.clear()
+                    // Nouvelles abscisses : les zones déjà annoncées gardent leur clé (équipement), donc pas de seconde annonce.
+                    hazards = emptyList(); activeZone = null; radarActive = null; radarNext = null
+                    attributes = null; routeLimitKmh = null; nextLimit = null
                     refreshScooterAfterReroute(fresh)
+                    runScope.launch { loadAttributes(fresh) }
                     loadHazards()
                 }
                 // Échec : on continue sur l'ancien tracé ; un nouveau recalcul sera tenté après 10 s.
@@ -530,6 +655,7 @@ class NavigationSession @Inject constructor(
                 val progress = tracker.extrapolate(mps * (now - lastAdvanceAtMs) / 1000.0, silentMs)
                 lastAdvanceAtMs = now
                 announce(progress)
+                updateRouteProfile(progress)
                 updateZone(progress)
                 // Un recalcul a pu aboutir pendant la suspension de l'annonce : on abandonne la progression périmée.
                 if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
@@ -547,7 +673,7 @@ class NavigationSession @Inject constructor(
                 } catch (e: Exception) {
                     Outcome.Failure(AppError.Unknown(e.message))
                 }
-                speedLimitKmh = when (result) {
+                providerLimitKmh = when (result) {
                     is Outcome.Success -> result.value
                     is Outcome.Failure -> null
                 }
@@ -591,6 +717,8 @@ class NavigationSession @Inject constructor(
                 speedLimitKmh = limit,
                 hazards = hazards,
                 activeZone = activeZone,
+                radarActive = radarActive,
+                radarNext = radarNext,
                 raining = raining,
                 limitLoweredByRain = lowered,
                 upcoming = ms.subList(min(next + 1, ms.size), min(next + 1 + GuidanceConstants.UPCOMING_COUNT, ms.size)),
@@ -600,8 +728,30 @@ class NavigationSession @Inject constructor(
                 rerouting = rerouting,
                 scooter = scooterUi,
                 roundabout = RoundaboutResolver.current(roundabouts, next),
+                nextSpeedLimit = nextLimit,
+                freeFlowToll = tollTrip,
             )
         }
+    }
+
+    /** Mémorise la position du véhicule à l'arrivée ; une erreur de stockage est sans effet sur le guidage. */
+    private fun rememberParking(point: GeoPoint) {
+        val label = lastDestinationName
+        val at = clock.nowMs()
+        scope.launch {
+            try {
+                driveMemory.setParkedVehicle(ParkedVehicle(point, at, label))
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { /* position non mémorisée */ }
+        }
+    }
+
+    private companion object {
+        const val LIMIT_HORIZON_S = 20.0
+        const val LIMIT_HORIZON_MIN_M = 250.0
+        const val LIMIT_HORIZON_MAX_M = 1_500.0
+        /** Zones observées : de 500 m derrière (sortie) à 6 km devant (préavis et affichage). */
+        const val RADAR_BEHIND_M = 500.0
+        const val RADAR_AHEAD_M = 6_000.0
     }
 }
 

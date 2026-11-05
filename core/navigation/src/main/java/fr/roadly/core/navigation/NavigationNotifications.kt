@@ -37,6 +37,13 @@ internal object NavigationNotifications {
         return m.instruction to text
     }
 
+    /** Conduite libre : limitation (connue ou non) et zone de vigilance ; la vitesse n'y figure pas (pas de mise à jour à chaque seconde). */
+    fun freeDriveContent(ctx: Context, state: FreeDriveState.Active): Pair<String, String> {
+        val limit = state.speedLimitKmh?.let { ctx.getString(R.string.free_notif_limit, it) } ?: ctx.getString(R.string.free_notif_limit_unknown)
+        val text = if (state.zone != null) ctx.getString(R.string.free_notif_zone, limit) else limit
+        return ctx.getString(R.string.free_notif_title) to text
+    }
+
     fun build(ctx: Context, content: Pair<String, String>): Notification {
         val open = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply {
             action = NavigationService.ACTION_OPEN_NAVIGATION

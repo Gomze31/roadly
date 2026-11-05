@@ -56,9 +56,33 @@ interface VehicleProfileDao {
 
 @Dao
 interface VigilanceZoneDao {
-    @Query("SELECT * FROM vigilance_zones WHERE lat BETWEEN :south AND :north AND lon BETWEEN :west AND :east")
+    /** Équipements actifs (les retirés restent en base pour l'historique, jamais alertés). */
+    @Query("SELECT * FROM vigilance_zones WHERE lat BETWEEN :south AND :north AND lon BETWEEN :west AND :east AND (status IS NULL OR status = 'ACTIVE')")
     suspend fun inBox(south: Double, west: Double, north: Double, east: Double): List<VigilanceZoneEntity>
-    @Query("SELECT COUNT(*) FROM vigilance_zones") fun observeCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM vigilance_zones WHERE status IS NULL OR status = 'ACTIVE'") fun observeCount(): Flow<Int>
+    /** Lignes issues d'une synchronisation (source renseignée), y compris retirées. */
+    @Query("SELECT * FROM vigilance_zones WHERE source IS NOT NULL") suspend fun synced(): List<VigilanceZoneEntity>
+    @Query("DELETE FROM vigilance_zones WHERE source IS NULL") suspend fun deleteLegacy()
+    @Query("UPDATE vigilance_zones SET status = 'REMOVED', updatedAt = :at WHERE id IN (:ids)") suspend fun markRemoved(ids: List<String>, at: Long)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertVersion(v: RadarVersionEntity)
+    @Query("SELECT * FROM radar_versions ORDER BY fetchedAt DESC LIMIT :limit") fun observeVersions(limit: Int): Flow<List<RadarVersionEntity>>
+    @Query("SELECT * FROM radar_versions WHERE status IN ('APPLIED', 'UNCHANGED') ORDER BY fetchedAt DESC LIMIT 1") suspend fun lastSuccess(): RadarVersionEntity?
+    @Query("SELECT * FROM radar_versions WHERE status = 'APPLIED' ORDER BY fetchedAt DESC LIMIT 1") suspend fun lastApplied(): RadarVersionEntity?
+    @Query("DELETE FROM radar_versions WHERE id NOT IN (SELECT id FROM radar_versions ORDER BY fetchedAt DESC LIMIT :keep)") suspend fun pruneVersions(keep: Int)
+
+    /** Nouvelle version : lignes héritées supprimées, équipements écrits, disparus marqués retirés, journal mis à jour — atomique. */
+    @Transaction
+    suspend fun applyVersion(rows: List<VigilanceZoneEntity>, removedIds: List<String>, at: Long, version: RadarVersionEntity) {
+        deleteLegacy()
+        rows.chunked(500).forEach { insertAll(it) }
+        removedIds.chunked(500).forEach { markRemoved(it, at) }
+        insertVersion(version)
+        pruneVersions(30)
+    }
+
+    /** Journal seul (synchronisation inchangée, rejetée ou en échec). */
+    @Transaction
+    suspend fun logVersion(version: RadarVersionEntity) { insertVersion(version); pruneVersions(30) }
     @Query("SELECT MAX(updatedAt) FROM vigilance_zones") fun observeUpdatedAt(): Flow<Long?>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(rows: List<VigilanceZoneEntity>)
     @Query("DELETE FROM vigilance_zones") suspend fun clear()

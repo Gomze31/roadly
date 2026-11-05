@@ -20,7 +20,9 @@ import androidx.navigation.compose.rememberNavController
 import fr.roadly.core.navigation.NavRequest
 import fr.roadly.feature.home.HomeRoute
 import fr.roadly.feature.home.homeScreen
+import fr.roadly.feature.navigation.FreeDriveRoute
 import fr.roadly.feature.navigation.NavigationRoute
+import fr.roadly.feature.navigation.freeDriveScreen
 import fr.roadly.feature.navigation.navigationScreen
 import fr.roadly.core.model.Place
 import fr.roadly.feature.route.PICKED_STOP_KEY
@@ -32,6 +34,8 @@ import fr.roadly.feature.route.routeScreen
 import fr.roadly.feature.search.SearchRoute
 import fr.roadly.feature.search.searchScreen
 import fr.roadly.feature.settings.AssistanceRoute
+import fr.roadly.feature.settings.RadarSettingsRoute
+import fr.roadly.feature.settings.radarSettingsScreen
 import fr.roadly.feature.settings.PremiumRoute
 import fr.roadly.feature.settings.SettingsRoute
 import fr.roadly.feature.settings.assistanceScreen
@@ -73,6 +77,8 @@ fun RoadlyNavHost(
             onOpenProfile = { nav.navigate(ProfileRoute) },
             assistantButton = { AssistantMicButton() },
             assistantPanel = { AssistantOverlay(Modifier.fillMaxWidth()) },
+            // API 33+ : notification du service demandée comme pour le guidage ; un refus masque seulement la notification.
+            onFreeDrive = { withNotificationPermission { nav.navigate(FreeDriveRoute) { launchSingleTop = true } } },
         )
         searchScreen(
             onBack = { nav.popBackStack() },
@@ -102,12 +108,14 @@ fun RoadlyNavHost(
             },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
         )
-        settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) }, onOpenProfile = { nav.navigate(ProfileRoute) }, onOpenPremium = { nav.navigate(PremiumRoute) }, onOpenAssistance = { nav.navigate(AssistanceRoute) })
+        settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) }, onOpenProfile = { nav.navigate(ProfileRoute) }, onOpenPremium = { nav.navigate(PremiumRoute) }, onOpenAssistance = { nav.navigate(AssistanceRoute) }, onOpenRadar = { nav.navigate(RadarSettingsRoute) })
+        radarSettingsScreen(onBack = { nav.popBackStack() })
         premiumScreen(onBack = { nav.popBackStack() })
         assistanceScreen(onBack = { nav.popBackStack() })
         tripsScreen(onBack = { nav.popBackStack() }, onOpenTrip = { id -> nav.navigate(ReplayRoute(id)) })
         profileScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) })
         replayScreen(isDark = isDark, onBack = { nav.popBackStack() }, onNavigateTo = { p -> nav.navigate(RouteRoute(p.point.lat, p.point.lon, p.name)) { popUpTo(HomeRoute) } })
+        freeDriveScreen(isDark = isDark, onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) })
         navigationScreen(
             isDark = isDark,
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
@@ -131,7 +139,9 @@ fun RoadlyNavHost(
     // Après NavHost : le graphe est posé avant de traiter une ouverture demandée par la notification.
     LaunchedEffect(openNavigationRequested) {
         if (openNavigationRequested) {
-            nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
+            // Notification de la conduite libre : même action, écran de conduite libre.
+            if (launch.freeDriveActive()) nav.navigate(FreeDriveRoute) { popUpTo(HomeRoute); launchSingleTop = true }
+            else nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
             onOpenNavigationHandled()
         }
     }

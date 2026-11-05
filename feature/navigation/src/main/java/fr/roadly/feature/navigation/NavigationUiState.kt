@@ -113,7 +113,28 @@ data class NavigationUiState(
     val sign: ExitSignUi? = null,
     /** D4 : voies montrées sous le bandeau (dans les [LANES_FROM_M] derniers mètres ou à l'approche, jamais sans données). */
     val showLanes: Boolean = false,
+    /** 1.0 : prochaine limitation différente sur le tracé (« 50 dans 300 m ») ; null = aucune connue à l'horizon. */
+    val nextLimit: NextLimitUi? = null,
+    /** 1.0 : portiques de péage en flux libre franchis (guidage et arrivée) ; null = aucun. */
+    val freeFlowToll: FreeFlowTollUi? = null,
+    /** Radar Intelligence : zone de danger en cours, sinon la prochaine (≤ 3 km) ; null = aucune. */
+    val radar: RadarUi? = null,
 )
+
+/** [distance] = reste de la zone si [inside], sinon distance avant son début. */
+data class RadarUi(val inside: Boolean, val distance: String, val limitKmh: Int?, val confidence: Int)
+
+internal fun radarUi(active: fr.roadly.core.radar.ZoneStatus?, next: fr.roadly.core.radar.ZoneStatus?): RadarUi? =
+    (active ?: next)?.let { RadarUi(it.inside, Formatters.distance(it.distanceM), it.speedLimitKmh, it.confidence) }
+
+data class NextLimitUi(val kmh: Int, val distance: String)
+
+/** [due] = échéance lisible (« ven. 14:32 »), null hors de France. */
+data class FreeFlowTollUi(val gantries: Int, val roads: String?, val due: String?)
+
+internal fun freeFlowTollUi(t: fr.roadly.core.navigation.FreeFlowTollTrip?, zone: ZoneId): FreeFlowTollUi? = t?.let {
+    FreeFlowTollUi(it.gantries, it.roads.takeIf { r -> r.isNotEmpty() }?.joinToString(" · "), it.dueAtEpochMs?.let { d -> Formatters.dayTime(d, zone) })
+}
 
 /** « 6 » / « min » sous l'heure ; « 1 h 12 » / « restant » au-delà d'une heure. */
 internal fun splitDuration(seconds: Double): SplitValue {
@@ -153,7 +174,7 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
     return when (s) {
         NavigationState.Idle -> base.copy(phase = NavigationPhase.IDLE)
         is NavigationState.Failed -> base.copy(phase = NavigationPhase.FAILED, error = s.error)
-        is NavigationState.Arrived -> base.copy(phase = NavigationPhase.ARRIVED, route = s.route)
+        is NavigationState.Arrived -> base.copy(phase = NavigationPhase.ARRIVED, route = s.route, freeFlowToll = freeFlowTollUi(s.freeFlowToll, zone))
         is NavigationState.Guiding -> {
             val p = s.progress
             val ms = s.route.maneuvers
@@ -191,6 +212,9 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 gpsLost = s.gpsLost,
                 rerouting = s.rerouting,
                 scooter = s.scooter,
+                nextLimit = s.nextSpeedLimit?.let { NextLimitUi(it.kmh, Formatters.maneuverDistance(it.distanceM)) },
+                freeFlowToll = freeFlowTollUi(s.freeFlowToll, zone),
+                radar = radarUi(s.radarActive, s.radarNext),
             )
         }
     }

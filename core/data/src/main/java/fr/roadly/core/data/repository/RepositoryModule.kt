@@ -39,4 +39,6 @@ abstract class RepositoryModule {
     @Binds abstract fun scooterProfiles(impl: RoomScooterProfileRepository): ScooterProfileRepository
     @Binds abstract fun billing(impl: NoBillingProvider): BillingProvider
     @Binds abstract fun entitlements(impl: DefaultEntitlementsRepository): EntitlementsRepository
+    @Binds abstract fun driveMemory(impl: DataStoreDriveMemoryRepository): DriveMemoryRepository
+    @Binds abstract fun radarSettings(impl: DataStoreRadarSettingsRepository): RadarSettingsRepository
 }

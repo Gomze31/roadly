@@ -1,5 +1,7 @@
 package fr.roadly.app
 
+import fr.roadly.core.navigation.FreeDriveSession
+import fr.roadly.core.navigation.FreeDriveState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +20,11 @@ import javax.inject.Inject
 class LaunchViewModel @Inject constructor(
     private val favorites: FavoritesRepository,
     private val updates: AppUpdateController,
+    private val freeDrive: FreeDriveSession,
 ) : ViewModel() {
+    /** 1.0 : la notification du service ouvre la conduite libre quand c'est elle qui tourne. */
+    fun freeDriveActive(): Boolean = freeDrive.state.value is FreeDriveState.Active
+
     suspend fun home(): Place? = favorites.observeHome().first()
     suspend fun work(): Place? = favorites.observeWork().first()
 

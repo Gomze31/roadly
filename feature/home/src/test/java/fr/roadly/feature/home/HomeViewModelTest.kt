@@ -117,7 +117,7 @@ class HomeViewModelTest {
     }
 
     private fun TestScope.vm(session: NavigationSession = session()) =
-        HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents(), session, NoopCommunity, prefs, RouteAlternativesUseCase(routing), vehicles)
+        HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents(), session, NoopCommunity, prefs, RouteAlternativesUseCase(routing), vehicles, fr.roadly.core.data.testing.FakeDriveMemoryRepository())
 
     @Test fun `collecting state switches location to MAP mode and exposes speed in km per h`() = runTest {
         val vm = vm()

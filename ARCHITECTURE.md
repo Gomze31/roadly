@@ -9,7 +9,9 @@
 - Aucune donnée inventée : ce qui n'a pas de source s'affiche « — » ou « Bientôt ».
 - Les `feature:*` ne dépendent que de `core:*`. `core:model` et `core:common` sont des modules JVM purs.
 
-## 2. Modules (16)
+## 2. Modules (20 : `app`, 12 `core:*` dont `core:assistant` et `core:radar`, 7 `feature:*` dont `feature:assistant`)
+
+`core:radar` (JVM pur) : modèle radar, parseurs des jeux officiels, fusion, moteur géospatial et machine à états des alertes — voir `docs/RADAR-INTELLIGENCE.md`.
 
 ```
 app                 Application Hilt, MainActivity, NavHost typé, résolution du thème, permission localisation
@@ -43,6 +45,12 @@ core:scooter        mode trottinette (JVM pur) : profil de routage, réglementat
 - **Permission** : `MainActivity` (launcher) → `LocationRepository.refreshPermission / markDeniedForever` (DENIED_FOREVER persisté) → `PermissionEvents.changed` → `HomeViewModel`.
 - **Guidage** : « Démarrer » → (API 33+ POST_NOTIFICATIONS) → `NavigationSession.start` → `LocationRepository.setGuidanceActive(true)` (1 Hz) + `NavigationService` (premier plan `location`) → pour chaque fix : `SpeedSmoother` → `RouteTracker.update` → `AnnouncementPolicy` → `SpeechService` ; hors itinéraire → `RoutingProvider.route` (≤ 1/10 s) ; > 3 s sans fix → extrapolation ; `StateFlow<NavigationState>` → `NavigationViewModel` / notification. Arrivée ou « Arrêter » → GPS relâché, service arrêté.
 
+## 3 ter. Roadly 1.0 (2026-11-05, `docs/ROADLY-1.0.md`)
+
+- **Profil de route** : `NavigationSession` → `RouteAttributesProvider` (`ValhallaRouteAttributesProvider`, une requête `trace_attributes` `edge_walk` par tracé, cache des 6 derniers) → `RouteAttributes` (tronçons de limitation, portiques `toll_gantry`, en abscisses du tracé). À chaque position : limitation courante, prochaine limitation, portiques franchis. Repli sur `SpeedLimitProvider` (fix par fix, auto-hébergé) quand le profil ne sait pas.
+- **Mémoire de conduite** : `DriveMemoryRepository` (`core:data`, DataStore JSON) — rappels de péage en flux libre (écrits à l'arrivée ou à l'arrêt) et véhicule garé (écrit à l'arrivée voiture / moto) ; lus par l'accueil.
+- **Conduite libre** : `FreeDriveSession` (`core:navigation`, exclusive du guidage) → `RoadSnapshotProvider` (`map_snap` espacé selon `RoadQueryPolicy`), zones `VigilanceRepository` autour de la position, `TripRecorder` ; `NavigationService` reste au premier plan tant que le guidage **ou** la conduite libre est actif. Écran `FreeDriveScreen` (`feature:navigation`), bouton compteur de l'accueil.
+
 ## 3 bis. Mode trottinette (LOT 13)
 
 - **Itinéraires** : `RouteViewModel` → `ScooterRouteOptionsUseCase` (3 variantes Valhalla `bicycle` + `elevation_interval`) → `ValhallaScooterRouteAnalyzer` (`/trace_attributes` edge_walk + Overpass) → `ScooterRouteAnalysisBuilder` (classification, réglementation, confort) → contournement éventuel des portions interdites (`exclude_polygons`) → `ScooterRangeEstimator` → badges.
@@ -51,7 +59,7 @@ core:scooter        mode trottinette (JVM pur) : profil de routage, réglementat
 
 ## 4. Données locales
 
-Room `roadly.db` (v5) : `favorite_places` (dont domicile/travail), `recent_searches` (50), `vehicle_profile` (1 ligne), `saved_routes` (Phase 4), `vigilance_zones`, `trips` (+ mode, dénivelé, énergie, batterie), `scooter_profiles`. DataStore : thème, URLs fournisseurs, drapeaux permission, réglages de guidage (voix, volume, son et tolérance de dépassement, préférences d'itinéraire). `allowBackup=false`.
+Room `roadly.db` (v6) : `favorite_places` (dont domicile/travail), `recent_searches` (50), `vehicle_profile` (1 ligne), `saved_routes` (Phase 4), `vigilance_zones`, `trips` (+ mode, dénivelé, énergie, batterie), `scooter_profiles`. DataStore : thème, URLs fournisseurs, drapeaux permission, réglages de guidage (voix, volume, son et tolérance de dépassement, préférences d'itinéraire). `allowBackup=false`.
 
 ## 5. Erreurs
 

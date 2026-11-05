@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.Toll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -68,12 +69,14 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.roadly.core.common.AppError
+import fr.roadly.core.designsystem.component.DangerZonePill
 import fr.roadly.core.designsystem.component.GlassButton
 import fr.roadly.core.designsystem.component.GlassButtonStyle
 import fr.roadly.core.designsystem.component.GlassPanel
@@ -469,7 +472,7 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
             if (vm.scooterMode) {
                 val trip by vm.lastTrip.collectAsStateWithLifecycle()
                 ScooterRecapPanel(trip, onArrivalBattery = vm::setArrivalBattery, onFinish = vm::stop)
-            } else ArrivedPanel(onFinish = vm::stop)
+            } else ArrivedPanel(state.freeFlowToll, onFinish = vm::stop)
         }
         NavigationPhase.FAILED -> Box(measured) { FailedPanel(state.error, onRetry = vm::retry, onStop = vm::stop) }
         NavigationPhase.LOADING, NavigationPhase.IDLE -> GlassPanel(measured) { LoadingRow(stringResource(R.string.nav_loading)) }
@@ -514,18 +517,35 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
     return (maneuvers + hazards + community).sortedBy { it.distanceM }
 }
 
-/** Badge « Zone de vigilance » (avec sa limitation si connue) et badge pluie, à côté du compteur. */
+/** Zone de danger (Radar Intelligence), prochaine limitation, péage en flux libre et pluie, au-dessus du compteur. */
 @Composable
 private fun StatusPills(state: NavigationUiState) {
     val c = LocalRoadlyColors.current
-    val zone = state.activeZone
-    if (zone != null) {
+    // Radar Intelligence : zone de danger en cours (reste à parcourir) ou prochaine (compte à rebours), fiabilité des données.
+    state.radar?.let { r ->
+        DangerZonePill(
+            stringResource(R.string.nav_zone_active),
+            stringResource(if (r.inside) R.string.nav_danger_remaining else R.string.nav_danger_in, r.distance),
+            r.limitKmh, r.confidence, r.inside,
+        )
+    }
+    // 1.0 : limitation à venir sur le tracé (profil OSM via Valhalla), jamais devinée.
+    state.nextLimit?.let { next ->
         GlassPanel(contentPadding = 8.dp, shape = RoadlyShapes.Chip) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconTile(Icons.Default.Shield, style = IconTileStyle.Warning, size = 28.dp)
+                SpeedLimitSign(next.kmh, size = 30.dp)
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.nav_zone_active), style = MaterialTheme.typography.labelLarge, color = c.warning)
-                zone.speedLimitKmh?.let { Spacer(Modifier.width(8.dp)); SpeedLimitSign(it, size = 30.dp) }
+                Text(stringResource(R.string.nav_next_limit, next.distance), style = MaterialTheme.typography.labelLarge, color = c.textPrimary)
+            }
+        }
+    }
+    // 1.0 : portique de péage en flux libre franchi : rappel discret, détaillé à l'arrivée.
+    state.freeFlowToll?.let { toll ->
+        GlassPanel(contentPadding = 8.dp, shape = RoadlyShapes.Chip) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(Icons.Default.Toll, style = IconTileStyle.Warning, size = 28.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.nav_free_flow_passed), style = MaterialTheme.typography.labelLarge, color = c.warning)
             }
         }
     }
@@ -566,7 +586,7 @@ private fun GpsLostPill() {
 }
 
 @Composable
-private fun ArrivedPanel(onFinish: () -> Unit) {
+private fun ArrivedPanel(toll: FreeFlowTollUi?, onFinish: () -> Unit) {
     val c = LocalRoadlyColors.current
     GlassPanel(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
@@ -576,6 +596,22 @@ private fun ArrivedPanel(onFinish: () -> Unit) {
                 Column {
                     Text(stringResource(R.string.nav_arrived_title), style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
                     Text(stringResource(R.string.nav_arrived_body), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
+                }
+            }
+            if (toll != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(Icons.Default.Toll, style = IconTileStyle.Warning, size = 36.dp)
+                    Spacer(Modifier.width(RoadlySpacing.sm))
+                    Column {
+                        Text(
+                            pluralStringResource(R.plurals.nav_free_flow_count, toll.gantries, toll.gantries) + (toll.roads?.let { " · $it" } ?: ""),
+                            style = MaterialTheme.typography.titleSmall, color = c.warning,
+                        )
+                        Text(
+                            toll.due?.let { stringResource(R.string.nav_free_flow_due, it) } ?: stringResource(R.string.nav_free_flow_check),
+                            style = MaterialTheme.typography.bodySmall, color = c.textSecondary,
+                        )
+                    }
                 }
             }
             GlassButton(stringResource(R.string.nav_finish), onClick = onFinish, style = GlassButtonStyle.Brand, modifier = Modifier.fillMaxWidth())
@@ -600,7 +636,7 @@ private fun FailedPanel(error: AppError?, onRetry: () -> Unit, onStop: () -> Uni
 
 /** `FLAG_KEEP_SCREEN_ON` tant que l'écran de guidage est affiché (spec §2, mode conduite). */
 @Composable
-private fun KeepScreenOn() {
+internal fun KeepScreenOn() {
     val context = LocalContext.current
     DisposableEffect(context) {
         val window = context.findActivity()?.window

@@ -9,7 +9,10 @@ import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.pollNearby
 import fr.roadly.core.data.connectivity.ConnectivityObserver
+import fr.roadly.core.data.repository.DriveMemoryRepository
 import fr.roadly.core.data.repository.FavoritesRepository
+import fr.roadly.core.data.repository.ParkedVehicle
+import fr.roadly.core.data.repository.TollReminder
 import fr.roadly.core.data.repository.LastGuidance
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
@@ -50,6 +53,9 @@ import javax.inject.Inject
 /** Distance minimale (en mètres) parcourue avant de relancer un géocodage inverse. */
 private const val REVERSE_MIN_DISTANCE_M = 50.0
 
+/** Identifiant du point « Mon véhicule » dans la fiche de l'accueil. */
+internal const val PARKED_PLACE_ID = "parked-vehicle"
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val location: LocationRepository,
@@ -63,7 +69,34 @@ class HomeViewModel @Inject constructor(
     private val prefs: UserPreferencesRepository,
     private val alternatives: RouteAlternativesUseCase,
     private val vehicles: VehicleProfileRepository,
+    private val driveMemory: DriveMemoryRepository,
 ) : ViewModel() {
+
+    /** 1.0 : péages en flux libre franchis et pas encore marqués « payé », du plus récent au plus ancien. */
+    val tollReminders: StateFlow<List<TollReminder>> = driveMemory.tollReminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 1.0 : position du véhicule (mémorisée à l'arrivée d'un guidage motorisé, ou « Je suis garé ici »). */
+    val parkedVehicle: StateFlow<ParkedVehicle?> = driveMemory.parkedVehicle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun dismissTollReminder(id: Long) { viewModelScope.launch { driveMemory.dismissTollReminder(id) } }
+
+    /** Mémorise la position actuelle comme place de stationnement ; sans position connue, rien. */
+    fun parkHere() {
+        val fix = location.lastKnown ?: return
+        viewModelScope.launch { driveMemory.setParkedVehicle(ParkedVehicle(fix.point, System.currentTimeMillis(), null)) }
+    }
+
+    fun forgetParkedVehicle() {
+        if (picked.value?.id == PARKED_PLACE_ID) picked.value = null
+        viewModelScope.launch { driveMemory.setParkedVehicle(null) }
+    }
+
+    /** Montre le véhicule sur la carte (marqueur et fiche) ; la caméra passe en mode libre pour ne pas revenir sur la position. */
+    fun showParkedVehicle(name: String, near: String?) {
+        val v = parkedVehicle.value ?: return
+        onUserGesture()
+        picked.value = Place(PARKED_PLACE_ID, name, near, v.point, PlaceKind.COORDINATES, "local")
+    }
 
     /** Service communautaire configuré (Réglages → Communauté) : feuille « Signaler » active, signalements sur la carte. */
     val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

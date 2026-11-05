@@ -8,6 +8,12 @@ import fr.roadly.core.model.RouteHazard
 import fr.roadly.core.model.RouteProgress
 import fr.roadly.core.scooter.guidance.ScooterNavigationUiState
 
+/** Portiques de péage en flux libre franchis pendant une course ; [firstPassedAtEpochMs] fixe l'échéance de paiement. */
+data class FreeFlowTollTrip(val gantries: Int, val roads: List<String>, val countryCode: String?, val firstPassedAtEpochMs: Long) {
+    /** France : 72 h pour payer après le passage ; ailleurs aucune échéance n'est affichée. */
+    val dueAtEpochMs: Long? get() = if (countryCode == "FR") firstPassedAtEpochMs + fr.roadly.core.data.repository.TollReminder.FR_PAYMENT_DELAY_MS else null
+}
+
 /** État publié par `NavigationSession` (spec §4 ; dans core:navigation car il porte un AppError). */
 sealed interface NavigationState {
     data object Idle : NavigationState
@@ -35,8 +41,16 @@ sealed interface NavigationState {
         val scooter: ScooterNavigationUiState? = null,
         /** B4 : rond-point de la prochaine manœuvre, ou dans lequel on se trouve ; null sinon. */
         val roundabout: RoundaboutInfo? = null,
+        /** 1.0 : prochaine limitation différente sur le tracé (profil `trace_attributes`) ; null = aucune connue à l'horizon. */
+        val nextSpeedLimit: SpeedLimitChange? = null,
+        /** 1.0 : portiques de péage en flux libre franchis pendant la course ; null = aucun. */
+        val freeFlowToll: FreeFlowTollTrip? = null,
+        /** Radar Intelligence : zone de danger dans laquelle on se trouve ([ZoneStatus.distanceM] = reste à parcourir). */
+        val radarActive: fr.roadly.core.radar.ZoneStatus? = null,
+        /** Radar Intelligence : prochaine zone de danger devant (≤ 3 km), [ZoneStatus.distanceM] = distance avant son début. */
+        val radarNext: fr.roadly.core.radar.ZoneStatus? = null,
     ) : NavigationState
 
-    data class Arrived(val route: Route) : NavigationState
+    data class Arrived(val route: Route, val freeFlowToll: FreeFlowTollTrip? = null) : NavigationState
     data class Failed(val error: AppError) : NavigationState
 }

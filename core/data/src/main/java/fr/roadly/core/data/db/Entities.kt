@@ -52,17 +52,58 @@ data class SavedRouteEntity(
     val createdAt: Long,
 )
 
-/** Zone de vigilance (France) : point source du jeu officiel ; la zone (jamais le point) est reconstituée au guidage. */
+/**
+ * Équipement de contrôle (France) : point source du jeu officiel ; la zone de danger (jamais le point) est reconstituée au
+ * guidage. Colonnes v6 (Radar Intelligence) : nulles pour les lignes héritées du jeu 2018 tant qu'aucune synchronisation n'a eu lieu.
+ */
 @Entity(tableName = "vigilance_zones")
 data class VigilanceZoneEntity(
     @PrimaryKey val id: String,
     val lat: Double,
     val lon: Double,
+    /** Sens publié (texte source). */
     val direction: String?,
+    /** Libellé source (2018) ; voir [kind] pour la catégorie normalisée. */
     val type: String?,
     val road: String?,
     val limitKmh: Int?,
     val updatedAt: Long,
+    val kind: String? = null,
+    val bearingDeg: Double? = null,
+    val bothWays: Boolean? = null,
+    val sectionLengthM: Double? = null,
+    val heavyLimitKmh: Int? = null,
+    val commune: String? = null,
+    val department: String? = null,
+    val country: String? = null,
+    val source: String? = null,
+    val sourceVersion: String? = null,
+    val enrichedFrom: String? = null,
+    val commissionedAt: String? = null,
+    val verifiedAt: Long? = null,
+    val precisionM: Double? = null,
+    val confidence: Int? = null,
+    val status: String? = null,
+)
+
+/** Une synchronisation de la base radar (appliquée, inchangée, rejetée ou en échec) : historique et état affichés. */
+@Entity(tableName = "radar_versions")
+data class RadarVersionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val fetchedAt: Long,
+    val status: String,
+    val sourceUrl: String?,
+    val sourceModified: String?,
+    val total: Int,
+    val added: Int,
+    val removed: Int,
+    val moved: Int,
+    val limitChanged: Int,
+    val enriched: Int,
+    val withDirection: Int,
+    val highPrecision: Int,
+    val rejected: Int,
+    val message: String?,
 )
 
 /** Trajet guidé terminé (historique, Replay) ; coût estimé d'après le profil véhicule au moment du trajet, null sans profil. */

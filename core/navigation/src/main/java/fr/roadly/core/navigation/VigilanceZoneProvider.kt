@@ -1,7 +1,11 @@
 package fr.roadly.core.navigation
 
 import fr.roadly.core.data.db.VigilanceZoneEntity
+import fr.roadly.core.data.repository.RadarSettingsRepository
 import fr.roadly.core.data.vigilance.VigilanceRepository
+import fr.roadly.core.radar.Polyline
+import fr.roadly.core.radar.RouteRadarMatcher
+import kotlinx.coroutines.flow.first
 import fr.roadly.core.model.BoundingBox
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.HazardKind
@@ -63,11 +67,41 @@ object VigilanceZones {
     }
 }
 
-class RepositoryVigilanceZoneProvider @Inject constructor(private val repository: VigilanceRepository) : VigilanceZoneProvider {
+/**
+ * Radar Intelligence le long d'un itinéraire : équipements de la base locale projetés sur le tracé, filtrés par écart latéral,
+ * sens contrôlé, numéro de route (noms des manœuvres), confiance et catégories autorisées ; zones de danger fusionnées.
+ */
+class RepositoryVigilanceZoneProvider @Inject constructor(
+    private val repository: VigilanceRepository,
+    private val settings: RadarSettingsRepository,
+) : VigilanceZoneProvider {
     override suspend fun zonesAlong(route: Route): List<RouteHazard> {
         val box = BoundingBox.of(route.geometry) ?: return emptyList()
         val m = VigilanceZones.BOX_MARGIN_DEG
-        val records = repository.zonesIn(BoundingBox(box.south - m, box.west - m, box.north + m, box.east + m))
-        return VigilanceZones.build(route, records)
+        val candidates = repository.radarsIn(BoundingBox(box.south - m, box.west - m, box.north + m, box.east + m))
+        if (candidates.isEmpty()) return emptyList()
+        val enabled = settings.settings.first().enabledKinds
+        val line = Polyline(route.geometry)
+        val names = RouteRoadNames.of(route, line)
+        return RouteRadarMatcher.match(line, candidates, enabled = enabled, roadRefsAt = names::at).zones.map { z ->
+            RouteHazard(HazardKind.VIGILANCE_ZONE, z.startAlongM, z.endAlongM, speedLimitKmh = z.speedLimitKmh, key = z.key, confidence = z.confidence)
+        }
+    }
+}
+
+/** Noms de voie du tracé par abscisse, d'après les manœuvres (chaque manœuvre nomme la voie qu'elle emprunte). */
+class RouteRoadNames private constructor(private val starts: DoubleArray, private val names: List<List<String>>) {
+    fun at(alongM: Double): List<String> {
+        var i = starts.indexOfLast { it <= alongM }
+        if (i < 0) i = 0
+        return names.getOrElse(i) { emptyList() }
+    }
+
+    companion object {
+        fun of(route: Route, line: Polyline): RouteRoadNames {
+            val ms = route.maneuvers
+            val starts = DoubleArray(ms.size) { i -> line.cumulative.getOrElse(ms[i].beginShapeIndex.coerceIn(0, (line.cumulative.size - 1).coerceAtLeast(0))) { 0.0 } }
+            return RouteRoadNames(starts, ms.map { (it.streetNames + listOfNotNull(it.streetName)).distinct() })
+        }
     }
 }

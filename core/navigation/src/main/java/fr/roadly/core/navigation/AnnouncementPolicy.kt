@@ -98,7 +98,17 @@ internal object SpokenPhrases {
 
     /** Entrée en zone de vigilance : jamais de position exacte, seulement la zone et sa limitation si connue. */
     fun vigilanceZone(limitKmh: Int?): String =
-        if (limitKmh != null) "Zone de vigilance, limitation à $limitKmh." else "Zone de vigilance."
+        if (limitKmh != null) "Zone de danger, limitation à $limitKmh." else "Zone de danger."
+
+    /** Préavis (réglage) : la zone, jamais l'équipement. */
+    fun dangerZoneAhead(meters: Double): String = "Zone de danger dans ${distance(meters)}."
+
+    const val DANGER_ZONE_END = "Fin de zone de danger."
+
+    /** 1.0 : premier portique de péage en flux libre de la course (dit une seule fois). */
+    fun freeFlowToll(countryCode: String?): String =
+        if (countryCode == "FR") "Péage en flux libre. Pensez à le payer en ligne sous 72 heures."
+        else "Péage sans barrière. Vérifiez comment le payer."
 
     fun inDistance(meters: Double, instruction: String): String =
         "Dans ${distance(meters)}, ${instruction.replaceFirstChar { it.lowercase(Locale.FRANCE) }}"

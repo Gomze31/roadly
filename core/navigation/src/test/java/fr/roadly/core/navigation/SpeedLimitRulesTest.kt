@@ -13,7 +13,7 @@ class SpeedLimitRulesTest {
     }
 
     @Test fun `vigilance phrase names the zone and the limit when known`() {
-        assertEquals("Zone de vigilance, limitation à 90.", SpokenPhrases.vigilanceZone(90))
-        assertEquals("Zone de vigilance.", SpokenPhrases.vigilanceZone(null))
+        assertEquals("Zone de danger, limitation à 90.", SpokenPhrases.vigilanceZone(90))
+        assertEquals("Zone de danger.", SpokenPhrases.vigilanceZone(null))
     }
 }

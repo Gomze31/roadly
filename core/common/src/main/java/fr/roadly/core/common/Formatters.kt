@@ -40,4 +40,10 @@ object Formatters {
 
     fun clockTime(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
         clock.format(Instant.ofEpochMilli(epochMs).atZone(zone))
+
+    private val dayTime = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", fr)
+
+    /** « ven. 6 nov., 14:32 » : échéance lisible à quelques jours. */
+    fun dayTime(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+        dayTime.format(Instant.ofEpochMilli(epochMs).atZone(zone))
 }

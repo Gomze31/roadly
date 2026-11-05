@@ -6,8 +6,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [FavoritePlaceEntity::class, RecentSearchEntity::class, VehicleProfileEntity::class, SavedRouteEntity::class, VigilanceZoneEntity::class, TripEntity::class, ScooterProfileEntity::class],
-    version = 5,
+    entities = [FavoritePlaceEntity::class, RecentSearchEntity::class, VehicleProfileEntity::class, SavedRouteEntity::class, VigilanceZoneEntity::class, TripEntity::class, ScooterProfileEntity::class, RadarVersionEntity::class],
+    version = 6,
     exportSchema = false,
 )
 abstract class RoadlyDatabase : RoomDatabase() {
@@ -19,6 +19,23 @@ abstract class RoadlyDatabase : RoomDatabase() {
     abstract fun scooterProfileDao(): ScooterProfileDao
 
     companion object {
+        /** v5 → v6 : Radar Intelligence — catégorie, sens, provenance, précision, confiance, statut ; journal des synchronisations. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "kind TEXT", "bearingDeg REAL", "bothWays INTEGER", "sectionLengthM REAL", "heavyLimitKmh INTEGER", "commune TEXT", "department TEXT",
+                    "country TEXT", "source TEXT", "sourceVersion TEXT", "enrichedFrom TEXT", "commissionedAt TEXT", "verifiedAt INTEGER", "precisionM REAL",
+                    "confidence INTEGER", "status TEXT",
+                ).forEach { column -> db.execSQL("ALTER TABLE `vigilance_zones` ADD COLUMN $column") }
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `radar_versions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fetchedAt` INTEGER NOT NULL, `status` TEXT NOT NULL, " +
+                        "`sourceUrl` TEXT, `sourceModified` TEXT, `total` INTEGER NOT NULL, `added` INTEGER NOT NULL, `removed` INTEGER NOT NULL, `moved` INTEGER NOT NULL, " +
+                        "`limitChanged` INTEGER NOT NULL, `enriched` INTEGER NOT NULL, `withDirection` INTEGER NOT NULL, `highPrecision` INTEGER NOT NULL, " +
+                        "`rejected` INTEGER NOT NULL, `message` TEXT)",
+                )
+            }
+        }
+
         /** v1 → v2 : table des zones de vigilance (LOT 4) ; les favoris et récents sont conservés. */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {

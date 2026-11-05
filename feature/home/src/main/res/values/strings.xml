@@ -23,9 +23,27 @@
     <string name="home_resume_action">Reprendre</string>
     <string name="home_resume_routing">Calcul de l\'itinéraire…</string>
     <string name="home_resume_dismiss">Ignorer</string>
+    <string name="home_toll_title">Péage en flux libre</string>
+    <string name="home_toll_due">À payer en ligne avant %1$s</string>
+    <string name="home_toll_overdue">Délai dépassé depuis %1$s : vérifiez auprès de l\'exploitant</string>
+    <string name="home_toll_check">Péage sans barrière : vérifiez comment le payer</string>
+    <string name="home_toll_paid">C\'est payé</string>
+    <plurals name="home_toll_others">
+        <item quantity="one">+ %1$d autre passage à vérifier</item>
+        <item quantity="other">+ %1$d autres passages à vérifier</item>
+    </plurals>
+    <string name="home_parked_title">Mon véhicule</string>
+    <string name="home_parked_near">Près de %1$s</string>
+    <string name="home_parked_forget">Oublier cette position</string>
+    <string name="home_park_here">Je suis garé ici</string>
+    <string name="home_age_now">à l\'instant</string>
+    <string name="home_age_minutes">il y a %1$d min</string>
+    <string name="home_age_hours">il y a %1$d h</string>
+    <string name="home_age_days">il y a %1$d j</string>
     <string name="home_resume_failed">Itinéraire impossible pour l\'instant. Réessayez.</string>
     <string name="home_resume_waiting_position">En attente de la position…</string>
     <string name="home_report">Signaler</string>
+    <string name="home_free_drive">Conduite libre</string>
     <string name="report_sent">Signalement envoyé, merci !</string>
     <string name="report_rate_limited">Un signalement par minute au maximum.</string>
     <string name="report_failed">Signalement impossible pour le moment.</string>

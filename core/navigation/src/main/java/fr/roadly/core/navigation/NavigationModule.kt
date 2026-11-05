@@ -18,4 +18,8 @@ abstract class NavigationModule {
     @Binds abstract fun rain(impl: OpenMeteoRainProvider): RainProvider
     @Binds abstract fun tripRecorder(impl: RoomTripRecorder): TripRecorder
     @Binds abstract fun temperature(impl: OpenMeteoTemperatureProvider): TemperatureProvider
+    /** 1.0 : limitations et portiques du tracé, une requête `trace_attributes` par tracé (y compris sur l'instance publique). */
+    @Binds abstract fun routeAttributes(impl: ValhallaRouteAttributesProvider): RouteAttributesProvider
+    /** 1.0 : route sous la position en conduite libre (map matching espacé, voir `RoadQueryPolicy`). */
+    @Binds abstract fun roadSnapshots(impl: ValhallaRoadSnapshotProvider): RoadSnapshotProvider
 }

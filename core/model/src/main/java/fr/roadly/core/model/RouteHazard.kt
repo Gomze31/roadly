@@ -18,6 +18,10 @@ data class RouteHazard(
     val endAlongM: Double,
     val speedLimitKmh: Int? = null,
     val angleDeg: Double? = null,
+    /** Zone de danger : identifiant stable (équipement de référence) pour la machine à états des alertes. */
+    val key: String? = null,
+    /** Zone de danger : score de confiance 0–100 des données ; null = non évalué (traité comme fiable). */
+    val confidence: Int? = null,
 ) {
     fun contains(alongM: Double): Boolean = alongM in startAlongM..endAlongM
 }

@@ -2,7 +2,7 @@
 
 Référentiel : `docs/SILLAXE-ANALYSE.md` (fonctions vérifiées sur les pages publiques de Sillaxe) et `docs/BENCHMARK-SILLAXE.md` (sources de données et contraintes). Statuts : **non commencée** · **en cours** · **fonctionnelle** · **bloquée** (dépend d'une source externe non configurée). « Palier Sillaxe » = gratuit (G) ou Sillaxe+ (+) chez Sillaxe ; Roadly ne reproduit pas le modèle économique, l'information sert à prioriser.
 
-Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La matrice de parité complète avec Sillaxe est dans `SILLAXE_PARITY.md` (référence pour les lots suivants) ; le design system est décrit dans `docs/DESIGN-SYSTEM.md`.
+Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage en flux libre, véhicule garé — voir `docs/ROADLY-1.0.md`). Auparavant : 2026-10-31 (LOT 1 design system). La matrice de parité complète avec Sillaxe est dans `SILLAXE_PARITY.md` (référence pour les lots suivants) ; le design system est décrit dans `docs/DESIGN-SYSTEM.md`.
 
 État de la Phase 2 : code livré, 224 tests unitaires (JVM) et 3 tests instrumentés passent. Vérifié sur HONOR Magic 8 Pro (Android 17) **à l'arrêt** : démarrage du guidage, service de premier plan, notification et son action « Arrêter », voix et focus audio, écran maintenu allumé, refus de `POST_NOTIFICATIONS` sans plantage. **Non vérifié en conduite** : recalcul, paliers d'annonces, arrivée, « GPS perdu ».
 
@@ -19,9 +19,10 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Ronds-points avec sortie | G | fonctionnelle | 2 | Pastille « 2e sortie » ; numéro de sortie (`sign`) si présent |
 | Suivi d'itinéraire, détection de sortie, recalcul | G | fonctionnelle | 2 | RouteTracker (garde de cap) ; hors itinéraire 40 m × 5 fixes ou 100 m ; recalcul ≤ 1/10 s, délai 10 s |
 | Temps/distance restants, heure d'arrivée en guidage | G | fonctionnelle | 2 | Durées Valhalla restantes, manœuvre courante au prorata |
-| Limitation de vitesse de la route | G | bloquée | 2 | Implémentée (`trace_attributes`, ≤ 1/5 s) ; active seulement avec un Valhalla auto-hébergé ; « — » sur FOSSGIS |
-| Alerte sonore de dépassement (option) | G | bloquée | 2 | Implémentée (bip + badge rouge, tolérance 0/5/10 km/h) ; dépend de la limitation |
-| Limitation abaissée par pluie (option) | G | fonctionnelle | 2 | Open-Meteo (CC BY 4.0, sans clé) ; effet visible seulement si une limitation est connue (LOT 4) |# FEATURES.md — statut des fonctionnalités Roadly
+| Limitation de vitesse de la route | G | fonctionnelle | 1.0 | Profil du tracé : une requête `trace_attributes` (`edge_walk`) par tracé, y compris FOSSGIS ; « — » là où OSM n'a pas de `maxspeed` ; repli fix par fix sur un Valhalla auto-hébergé. Testé JVM, non vérifié en conduite |
+| Prochaine limitation (« 50 dans 300 m ») | G | fonctionnelle | 1.0 | Lue dans le profil, horizon 20 s de trajet (250 m–1,5 km) ; testé JVM |
+| Alerte sonore de dépassement (option) | G | fonctionnelle | 2 | Bip + badge rouge, tolérance 0/5/10 km/h ; active dès qu'une limitation est connue (profil 1.0) |
+| Limitation abaissée par pluie (option) | G | fonctionnelle | 2 | Open-Meteo (CC BY 4.0, sans clé) ; effet visible seulement si une limitation est connue (LOT 4) |
 | Changer de destination / ajouter un arrêt en guidage | G | fonctionnelle | 2 | Destination, itinéraire alternatif, ajout d'arrêt (LOT 6) |
 | Jusqu'à 10 arrêts réordonnables | G | fonctionnelle | 4 | Écran d'itinéraires (LOT 6) |
 | Départ planifié (heure de départ) | G | fonctionnelle | 1 | Décale seulement l'heure d'arrivée |
@@ -88,11 +89,11 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 
 | Fonction | Palier | Statut | Phase | Notes |
 |---|---|---|---|---|
-| Zones de vigilance (France, jamais un point exact) | G | fonctionnelle | 2 | Jeu officiel data.gouv.fr (2018) en cache Room, zones 300 m–4 km, annonce + bip (LOT 4) |
-| Alertes visuelles / vocales / sonores anticipées | G/+ | fonctionnelle | 2 | Badge, voix, bip à l'entrée de zone (LOT 4) |
+| Zones de vigilance (France, jamais un point exact) | G | fonctionnelle | Radar | Radar Intelligence (`docs/RADAR-INTELLIGENCE.md`) : liste officielle DSR 2025 (3 309 équipements) enrichie du jeu 2018 (sens, route), synchro incrémentale, zones de danger 300 m–4 km filtrées par sens, écart latéral et numéro de route ; testé JVM et en simulation, non vu sur appareil |
+| Alertes visuelles / vocales / sonores anticipées | G/+ | fonctionnelle | Radar | Machine à états : préavis réglable, entrée, fin de zone (option), une annonce par passage, voix seulement si confiance ≥ 60 ; pastille avec compte à rebours et fiabilité |
 | Limitation de la zone | + | bloquée | 3 | |
-| Alerte sans itinéraire | + | non commencée | 3 | Service premier plan |
-| Désactivation par pays (Suisse) | — | non commencée | 3 | Géofence pays |
+| Alerte sans itinéraire | + | fonctionnelle | 1.0 | « Conduite libre » : zones devant soi (axe du cap), limitation par map matching espacé (public : ≥ 20 s et 250 m), service de premier plan ; testé JVM, non vérifié sur appareil |
+| Désactivation par pays (Suisse) | — | en cours | Radar | `RadarRegulation` : France = zone de danger seule, Suisse et Allemagne = aucune alerte ; sans géofence de pays (les données ne couvrent que la France) |
 
 ## 7. Stations, bornes, parkings, aires, ponts, ralentisseurs
 
@@ -120,7 +121,7 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 |---|---|---|---|---|
 | Parking proche de la destination | G | bloquée | 3 | |
 | Chemin à pied jusqu'à la destination | G | non commencée | 4 | Valhalla `pedestrian` |
-| Retrouver son véhicule (position mémorisée) | G | non commencée | 4 | Local |
+| Retrouver son véhicule (position mémorisée) | G | fonctionnelle | 1.0 | Position à l'arrivée d'un guidage voiture / moto, ou « Je suis garé ici » ; ligne « Mon véhicule » sur l'accueil (DataStore) ; itinéraire piéton : non commencé |
 
 ## 10. Communauté
 
@@ -144,7 +145,7 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 |---|---|---|---|---|
 | Profils véhicule PL / taxi / dimensions | + | fonctionnelle | 4 | LOT 7 ; un seul profil enregistré |
 | Partage de trajet en direct | + | non commencée | 4 | Supabase + page web |
-| Rappel péage flux libre | + | non commencée | 4 | Géofences des portiques (données à constituer) |
+| Rappel péage flux libre | + | fonctionnelle | 1.0 | Portiques OSM `toll_gantry` du profil du tracé ; annonce au premier passage, rappel sur l'accueil (France : échéance 72 h) jusqu'à « C'est payé » ; aucun montant ; testé JVM |
 | Replay des trajets | + | fonctionnelle | 4 | LOT 9 |
 | Historique des dépenses | + | non commencée | 4 | |
 | Personnalisation (teintes, icône, silhouettes) | + | en cours | 5 | 5 teintes de cockpit (LOT 10) ; icône, silhouettes : non commencées |
@@ -174,7 +175,7 @@ Mise à jour : 2026-10-31 (LOT 1 design system, branche `feat/roadly-v1`). La ma
 | Fonction | Statut | Notes |
 |---|---|---|
 | APK debug installable | fonctionnelle | ~116 Mo (toutes ABI) ; App Bundle en Phase 5 ; installation sur appareil non refaite depuis la Phase 2 |
-| Tests unitaires | fonctionnelle | 291 tests (JVM) |
+| Tests unitaires | fonctionnelle | 728 tests (JVM), tous verts le 2026-11-05 |
 | Tests instrumentés | en cours | Non exécutés pour la Phase 2 : le HONOR Magic 8 Pro n'était plus visible par ADB (Task 12) |
 | Service de premier plan / notification | fonctionnelle | Type `location`, notification (manœuvre, distance, arrivée, Arrêter), arrêt à l'arrivée ; vérifié sur appareil (type location, notification LOW, Arrêter depuis la notification) |
 | Widget (domicile, travail, rechercher) | fonctionnelle | 4×1, jour / nuit (LOT 12) |

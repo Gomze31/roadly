@@ -19,7 +19,7 @@ private val Context.roadlyPrefs: DataStore<Preferences> by preferencesDataStore(
 object DatabaseModule {
     @Provides @Singleton
     fun db(@ApplicationContext ctx: Context): RoadlyDatabase =
-        Room.databaseBuilder(ctx, RoadlyDatabase::class.java, "roadly.db").addMigrations(RoadlyDatabase.MIGRATION_1_2, RoadlyDatabase.MIGRATION_2_3, RoadlyDatabase.MIGRATION_3_4, RoadlyDatabase.MIGRATION_4_5).build()
+        Room.databaseBuilder(ctx, RoadlyDatabase::class.java, "roadly.db").addMigrations(RoadlyDatabase.MIGRATION_1_2, RoadlyDatabase.MIGRATION_2_3, RoadlyDatabase.MIGRATION_3_4, RoadlyDatabase.MIGRATION_4_5, RoadlyDatabase.MIGRATION_5_6).build()
 
     @Provides fun favoriteDao(db: RoadlyDatabase) = db.favoriteDao()
     @Provides fun vigilanceDao(db: RoadlyDatabase) = db.vigilanceZoneDao()

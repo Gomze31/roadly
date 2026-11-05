@@ -28,9 +28,25 @@
     <string name="nav_horizon_curve">virage</string>
     <string name="nav_horizon_zone">zone de vigilance</string>
     <string name="nav_horizon_zone_limit">zone · %1$d</string>
-    <string name="nav_zone_active">Zone de vigilance</string>
+    <string name="nav_zone_active">Zone de danger</string>
+    <string name="nav_danger_in">dans %1$s</string>
+    <string name="nav_danger_remaining">encore %1$s</string>
     <string name="nav_rain">Pluie</string>
     <string name="nav_rain_lowered">Limitation abaissée (pluie)</string>
+    <string name="nav_next_limit">dans %1$s</string>
+    <string name="free_title">Conduite libre</string>
+    <string name="free_road_unknown">Route en cours d\'identification</string>
+    <string name="free_stat_duration">durée</string>
+    <string name="free_stat_distance">parcourus</string>
+    <string name="free_stat_limit">limitation</string>
+    <string name="free_sources">Limitations : OpenStreetMap (via Valhalla), « — » si inconnue. Zones de danger : radars fixes, Ministère de l\'Intérieur (data.gouv.fr).</string>
+    <string name="nav_free_flow_passed">Péage en flux libre franchi</string>
+    <plurals name="nav_free_flow_count">
+        <item quantity="one">%1$d portique de péage en flux libre</item>
+        <item quantity="other">%1$d portiques de péage en flux libre</item>
+    </plurals>
+    <string name="nav_free_flow_due">À payer en ligne avant %1$s. Rappel gardé sur l\'accueil.</string>
+    <string name="nav_free_flow_check">Péage sans barrière : vérifiez comment le payer. Rappel gardé sur l\'accueil.</string>
     <string name="nav_exit_number">SORTIE %1$s</string>
     <string name="nav_exit_toward">Direction %1$s</string>
     <string name="nav_roundabout_exit_first">1re sortie</string>

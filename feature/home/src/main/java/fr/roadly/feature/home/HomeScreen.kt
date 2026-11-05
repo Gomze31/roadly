@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -98,9 +100,14 @@ import fr.roadly.core.map.rememberMapController
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Place
 import java.util.Locale
+import fr.roadly.core.data.repository.ParkedVehicle
+import fr.roadly.core.data.repository.TollReminder
 
 /** Vue initiale (France entière) tant qu'aucune position n'est connue. */
 private val FRANCE_CENTER = GeoPoint(46.6, 2.4)
+
+/** Zoom de la carte quand on montre le véhicule garé. */
+private const val PARKED_ZOOM = 16.5
 
 @Composable
 fun HomeScreen(
@@ -115,17 +122,22 @@ fun HomeScreen(
     onOpenProfile: () -> Unit = {},
     assistantButton: @Composable () -> Unit = {},
     assistantPanel: @Composable () -> Unit = {},
+    onFreeDrive: () -> Unit = {},
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val isGuiding by vm.isGuiding.collectAsStateWithLifecycle()
     val resumeCard by vm.resumeCard.collectAsStateWithLifecycle()
+    val tollReminders by vm.tollReminders.collectAsStateWithLifecycle()
+    val parked by vm.parkedVehicle.collectAsStateWithLifecycle()
     // E3 : après « Reprendre », l'écran de guidage s'ouvre dès que la session guide (même chemin que « Reprendre le guidage »).
     var resumeRequested by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(resumeRequested, isGuiding) { if (resumeRequested && isGuiding) { resumeRequested = false; onResumeGuidance() } }
     LaunchedEffect(resumeCard?.phase) { if (resumeCard?.phase == ResumePhase.FAILED) resumeRequested = false }
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
+    val parkedName = stringResource(R.string.home_parked_title)
+    val parkedNear = stringResource(R.string.home_parked_near)
     var showReport by rememberSaveable { mutableStateOf(false) }
     var showPosition by rememberSaveable { mutableStateOf(false) }
 
@@ -171,6 +183,10 @@ fun HomeScreen(
         ) {
             assistantButton()
             RoundIconButton(Icons.Default.Warning, stringResource(R.string.home_report), onClick = { showReport = true }, style = RoundButtonStyle.Accent)
+            // 1.0 : conduite libre (compteur, limitation, zones de vigilance sans itinéraire) ; pas pendant un guidage.
+            if (!isGuiding && state.permission == LocationPermissionState.GRANTED) {
+                RoundIconButton(Icons.Default.Speed, stringResource(R.string.home_free_drive), onClick = onFreeDrive)
+            }
             AnimatedVisibility(state.isRotated, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                 CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
             }
@@ -226,6 +242,14 @@ fun HomeScreen(
                 LocationPermissionState.GRANTED -> BottomPanel(
                     state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance, onPosition = { showPosition = true }, onCategory = onSearchCategory,
                     resumeCard = resumeCard, onResumeLast = { resumeRequested = vm.resumeLastGuidance() }, onDismissResume = { resumeRequested = false; vm.dismissResume() },
+                    tollReminders = tollReminders, onTollPaid = vm::dismissTollReminder,
+                    parked = parked,
+                    onShowParked = {
+                        parked?.let { v ->
+                            vm.showParkedVehicle(parkedName, v.label?.let { parkedNear.format(it) })
+                            map.moveTo(v.point, PARKED_ZOOM)
+                        }
+                    },
                 )
                 else -> PermissionPanel(state.permission, onRequestLocationPermission, onOpenAppSettings)
             }
@@ -237,7 +261,7 @@ fun HomeScreen(
     LaunchedEffect(reports) { map.setReports(reports) }
     if (showReport) ReportSheet(onDismiss = { showReport = false }, enabled = communityEnabled, onSelect = vm::report)
     val fix = state.fix
-    if (showPosition && fix != null) PositionSheet(point = fix.point, address = state.address, onDismiss = { showPosition = false })
+    if (showPosition && fix != null) PositionSheet(point = fix.point, address = state.address, onDismiss = { showPosition = false }, onParkHere = { vm.parkHere(); showPosition = false })
 
     // Point choisi par appui long : fiche avec l'action d'itinéraire.
     state.pickedPlace?.let { p ->
@@ -252,7 +276,10 @@ fun HomeScreen(
                     }
                 }
                 Spacer(Modifier.height(RoadlySpacing.m))
-                GlassButton(
+                if (p.id == PARKED_PLACE_ID) {
+                    // Véhicule mémorisé : il est sur la carte ; seule action, l'oublier (pas d'itinéraire voiture vers sa propre voiture).
+                    GlassButton(stringResource(R.string.home_parked_forget), onClick = vm::forgetParkedVehicle, style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth())
+                } else GlassButton(
                     stringResource(R.string.home_picked_route),
                     onClick = { vm.onDismissPicked(); onNavigateToRoute(p) },
                     style = GlassButtonStyle.Brand,
@@ -276,6 +303,10 @@ private fun BottomPanel(
     resumeCard: ResumeCardUi? = null,
     onResumeLast: () -> Unit = {},
     onDismissResume: () -> Unit = {},
+    tollReminders: List<TollReminder> = emptyList(),
+    onTollPaid: (Long) -> Unit = {},
+    parked: ParkedVehicle? = null,
+    onShowParked: () -> Unit = {},
 ) {
     val c = LocalRoadlyColors.current
     GlassPanel(Modifier.fillMaxWidth(), contentPadding = 14.dp) {
@@ -288,6 +319,17 @@ private fun BottomPanel(
             if (!isGuiding && resumeCard != null) {
                 ResumeGuidanceCard(resumeCard, canResume = state.fix != null, onResume = onResumeLast, onDismiss = onDismissResume)
                 Spacer(Modifier.height(RoadlySpacing.sm))
+            }
+            // 1.0 : péage en flux libre franchi lors d'une course, à payer (le plus récent ; les autres sont comptés).
+            tollReminders.firstOrNull()?.let { t ->
+                val now = System.currentTimeMillis()
+                TollReminderCard(t, others = tollReminders.size - 1, overdue = t.dueAtEpochMs?.let { it < now } == true, onPaid = { onTollPaid(t.id) })
+                Spacer(Modifier.height(RoadlySpacing.sm))
+            }
+            // 1.0 : véhicule garé (position à l'arrivée du dernier guidage, ou « Je suis garé ici »).
+            if (!isGuiding && parked != null) {
+                ParkedVehicleRow(parked, state.fix?.point, System.currentTimeMillis(), onShow = onShowParked)
+                Spacer(Modifier.height(RoadlySpacing.xs))
             }
             // Toucher sa position : adresse copiable et partageable (feuille).
             Row(
@@ -403,7 +445,7 @@ private fun CompassButton(bearingDeg: Double, onClick: () -> Unit) {
 
 /** Position courante : adresse (si géocodée) et coordonnées, à copier ou partager. */
 @Composable
-private fun PositionSheet(point: GeoPoint, address: String?, onDismiss: () -> Unit) {
+private fun PositionSheet(point: GeoPoint, address: String?, onDismiss: () -> Unit, onParkHere: () -> Unit) {
     val c = LocalRoadlyColors.current
     val context = LocalContext.current
     val coords = String.format(Locale.ROOT, "%.5f, %.5f", point.lat, point.lon)
@@ -434,6 +476,11 @@ private fun PositionSheet(point: GeoPoint, address: String?, onDismiss: () -> Un
                     },
                 )
             }
+            Spacer(Modifier.height(RoadlySpacing.s))
+            GlassButton(
+                stringResource(R.string.home_park_here), icon = Icons.Default.DirectionsCar, style = GlassButtonStyle.Ghost, modifier = Modifier.fillMaxWidth(),
+                onClick = onParkHere,
+            )
         }
     }
 }
