@@ -160,6 +160,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenTrips: () -> Unit = {}, onOpenProfi
             PrivacyGroup()
             CommunityGroup(community, onSave = vm::saveCommunity, onClear = vm::clearCommunity)
             ProvidersGroup(state.providers, providerError, onSave = vm::saveProviders, onReset = vm::resetProviders)
+            AndroidAutoGroup()
             UpdatesGroup(updatesVm)
             AboutGroup()
             Spacer(Modifier.height(RoadlySpacing.s))

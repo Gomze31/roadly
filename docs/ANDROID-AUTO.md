@@ -59,6 +59,20 @@ Les builds débogables acceptent tout hôte. Les builds de version n'acceptent q
 
 **En voiture** : même réglage « Sources inconnues ». Sans lui, Android Auto masque les applications qui ne viennent pas du Play Store.
 
+## 3 bis. « Roadly n'apparaît pas dans Android Auto »
+
+Réglages › **Android Auto** (sur le téléphone) affiche le diagnostic :
+
+| Vérification | Comment Roadly la fait |
+|---|---|
+| La version installée contient Android Auto | Recherche du service `androidx.car.app.CarAppService` dans le paquet de Roadly (présent à partir de la release 0.1.174) |
+| L'application Android Auto est installée | Paquet `com.google.android.projection.gearhead` (déclaré dans `<queries>`) |
+| Installation hors Play Store | Paquet installateur ≠ `com.android.vending` → « Sources inconnues » obligatoire |
+
+Roadly ne peut pas lire le réglage « Sources inconnues » d'Android Auto : il affiche les 4 étapes (Version × 10, Paramètres pour les développeurs, Sources inconnues, reconnexion / Personnaliser le lanceur) et un bouton qui ouvre Android Auto (sinon sa fiche dans les réglages Android).
+
+Constat du 2026-11-05 : les releases 0.1.174 à 0.1.177 (avec Android Auto) sont publiées et signées, mais GitHub indique 0 téléchargement de leurs APK ; la version installée sur le téléphone est donc probablement antérieure. Réglages › Mises à jour donne la version installée.
+
 ## 4. Vérifié / non vérifié
 
 | Élément | Statut |
