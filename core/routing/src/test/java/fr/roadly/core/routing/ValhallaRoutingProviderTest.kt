@@ -85,6 +85,16 @@ class ValhallaRoutingProviderTest {
         assertEquals(2, body["locations"]!!.let { it as kotlinx.serialization.json.JsonArray }.size)
     }
 
+    @Test fun `a walking request uses pedestrian costing, even with a vehicle and toll preferences`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        val truck = fr.roadly.core.model.VehicleProfile(fr.roadly.core.model.VehicleType.TRUCK, fr.roadly.core.model.FuelType.DIESEL, 28.0, null)
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, vehicle = truck, preferences = RoutePreferences(avoidTolls = true), pedestrian = true))
+        val body = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals("pedestrian", body["costing"]!!.jsonPrimitive.content)
+        assertNull(body["costing_options"])
+        assertEquals("fr-FR", body["language"]!!.jsonPrimitive.content)
+    }
+
     @Test fun `a truck profile switches to truck costing with only the entered dimensions`() = runTest {
         server.enqueue(MockResponse().setBody(fixture()))
         val truck = fr.roadly.core.model.VehicleProfile(

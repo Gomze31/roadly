@@ -104,6 +104,17 @@ class RouteViewModelTest {
         }
     }
 
+    @Test fun `opened cold without position, the first fix becomes the origin`() = runTest {
+        vm().uiState.test {
+            advanceUntilIdle()
+            assertTrue(expectMostRecentItem().phase is RouteUiState.NoOrigin)
+            assertEquals(fr.roadly.core.location.LocationMode.MAP, location.mode)
+            location.emit(LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)); advanceUntilIdle()
+            val s = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals(GeoPoint(48.8, 2.3), s.origin)
+        }
+    }
+
     @Test fun `with position computes three options and selects fastest`() = runTest {
         location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
         vm().uiState.test {
@@ -112,6 +123,32 @@ class RouteViewModelTest {
             assertEquals(3, s.options.size)
             assertEquals(RouteCosting.FASTEST, s.options.first { it.route.id == s.activeId }.route.costing)
             assertTrue(s.options.all { it.cost == null })
+        }
+    }
+
+    @Test fun `each variant gets its identity card from its real profile, a failed one gets none`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val asked = mutableListOf<String>()
+        val attributes = object : fr.roadly.core.navigation.RouteAttributesProvider {
+            override suspend fun attributes(route: Route): Outcome<fr.roadly.core.navigation.RouteAttributes> {
+                asked += route.id
+                if (route.id == "SHORTEST") return Outcome.Failure(AppError.Network)
+                val limits = listOf(fr.roadly.core.navigation.SpeedLimitSpan(0.0, 5_000.0, 130))
+                val gantries = if (route.id == "FASTEST") listOf(fr.roadly.core.navigation.TollGantry(1_000.0, "A1", "fr")) else emptyList()
+                return Outcome.Success(fr.roadly.core.navigation.RouteAttributes(route.id, 10_000.0, limits, gantries))
+            }
+        }
+        val base = vm()
+        val v = RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing, routeAttributes = attributes)
+        assertTrue(base !== v)
+        v.uiState.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals("FASTEST", asked.first()) // variante active d'abord
+            assertEquals(50, s.identities.getValue("FASTEST").knownLimitPercent)
+            assertEquals(1, s.identities.getValue("FASTEST").tollGantries)
+            assertEquals(0, s.identities.getValue("NO_TOLL").tollGantries)
+            assertTrue("échec : pas de carte inventée", "SHORTEST" !in s.identities)
         }
     }
 

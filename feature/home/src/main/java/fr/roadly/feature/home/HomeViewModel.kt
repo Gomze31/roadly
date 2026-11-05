@@ -30,9 +30,16 @@ import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
 import fr.roadly.core.model.RouteCosting
+import fr.roadly.core.navigation.FreeDriveSession
+import fr.roadly.core.navigation.FreeDriveState
 import fr.roadly.core.navigation.NavigationSession
+import kotlinx.coroutines.flow.flowOf
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.routing.RouteAlternativesUseCase
+import fr.roadly.core.routing.RoutingProvider
+import fr.roadly.core.common.AppError
+import fr.roadly.core.model.Route
+import fr.roadly.core.model.RouteRequest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
@@ -70,7 +77,18 @@ class HomeViewModel @Inject constructor(
     private val alternatives: RouteAlternativesUseCase,
     private val vehicles: VehicleProfileRepository,
     private val driveMemory: DriveMemoryRepository,
+    /** Conduite libre (null dans les tests existants) : sa limitation alimente le badge de l'accueil quand elle tourne. */
+    private val freeDrive: FreeDriveSession? = null,
+    /** Routage (null dans les tests existants) : trajet à pied vers la voiture garée. */
+    private val routing: RoutingProvider? = null,
 ) : ViewModel() {
+
+    /**
+     * Limitation de la conduite libre en cours (lancée depuis Android Auto alors que le téléphone montre l'accueil, par exemple) ;
+     * null hors conduite libre ou limitation inconnue. Hors conduite libre, l'accueil n'a pas de source de limitation.
+     */
+    val freeDriveLimitKmh: StateFlow<Int?> = (freeDrive?.state?.map { (it as? FreeDriveState.Active)?.speedLimitKmh } ?: flowOf(null))
+        .distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** 1.0 : péages en flux libre franchis et pas encore marqués « payé », du plus récent au plus ancien. */
     val tollReminders: StateFlow<List<TollReminder>> = driveMemory.tollReminders.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -88,6 +106,7 @@ class HomeViewModel @Inject constructor(
 
     fun forgetParkedVehicle() {
         if (picked.value?.id == PARKED_PLACE_ID) picked.value = null
+        clearWalkToCar()
         viewModelScope.launch { driveMemory.setParkedVehicle(null) }
     }
 
@@ -258,5 +277,41 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onDismissPicked() { picked.value = null }
+    fun onDismissPicked() { picked.value = null; clearWalkToCar() }
+
+    // ── S4 : retour à pied vers la voiture garée ──
+    private val _walkToCar = MutableStateFlow<WalkToCar?>(null)
+    /** Trajet à pied vers la voiture (calcul, résultat ou échec) ; null = rien demandé. */
+    val walkToCar: StateFlow<WalkToCar?> = _walkToCar
+    private var walkJob: Job? = null
+
+    /** Calcule le trajet à pied (Valhalla `pedestrian`) de la position actuelle à la voiture garée ; sans position, rien. */
+    fun requestWalkToCar() {
+        val provider = routing ?: return
+        val from = location.lastKnown?.point ?: run { _walkToCar.value = WalkToCar.Failed(AppError.PermissionDenied); return }
+        val car = parkedVehicle.value ?: return
+        walkJob?.cancel()
+        if (from.distanceTo(car.point) < NEARBY_CAR_M) { _walkToCar.value = WalkToCar.Nearby; return }
+        _walkToCar.value = WalkToCar.Loading
+        walkJob = viewModelScope.launch {
+            _walkToCar.value = when (val r = provider.route(RouteRequest(from, car.point, costing = RouteCosting.FASTEST, pedestrian = true))) {
+                is Outcome.Success -> r.value.firstOrNull()?.let { WalkToCar.Ready(it) } ?: WalkToCar.Failed(AppError.NoResult)
+                is Outcome.Failure -> WalkToCar.Failed(r.error)
+            }
+        }
+    }
+
+    fun clearWalkToCar() { walkJob?.cancel(); _walkToCar.value = null }
+}
+
+/** En deçà, la voiture est « à côté » (précision GPS de quelques mètres) : aucun trajet n'est demandé. */
+internal const val NEARBY_CAR_M = 30.0
+
+/** Trajet à pied vers la voiture garée. */
+sealed interface WalkToCar {
+    data object Loading : WalkToCar
+    /** Moins de [NEARBY_CAR_M] de la voiture : pas de trajet à calculer. */
+    data object Nearby : WalkToCar
+    data class Ready(val route: Route) : WalkToCar
+    data class Failed(val error: AppError) : WalkToCar
 }

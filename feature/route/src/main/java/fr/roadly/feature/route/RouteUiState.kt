@@ -4,6 +4,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.RoutePreferences
+import fr.roadly.core.navigation.RouteIdentity
 import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.model.ScooterRoutePreferences
 import fr.roadly.core.model.TravelMode
@@ -33,6 +34,8 @@ sealed interface RouteUiState {
         val scooter: ScooterRouteUi? = null,
         /** Radar Intelligence : nombre de zones de danger par itinéraire (identifiant de tracé) ; absent = pas encore calculé. */
         val dangerZones: Map<String, Int> = emptyMap(),
+        /** S5 : carte d'identité par itinéraire (profil réel) ; absent = pas encore obtenue ou indisponible (hors ligne, échec). */
+        val identities: Map<String, RouteIdentity> = emptyMap(),
     ) : RouteUiState
 }
 

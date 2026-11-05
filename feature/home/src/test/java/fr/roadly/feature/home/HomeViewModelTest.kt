@@ -50,6 +50,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -118,6 +119,35 @@ class HomeViewModelTest {
 
     private fun TestScope.vm(session: NavigationSession = session()) =
         HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents(), session, NoopCommunity, prefs, RouteAlternativesUseCase(routing), vehicles, fr.roadly.core.data.testing.FakeDriveMemoryRepository())
+
+    @Test fun `walk to the parked car asks a pedestrian route from the current position`() = runTest {
+        val memory = fr.roadly.core.data.testing.FakeDriveMemoryRepository()
+        val vm = HomeViewModel(location, favorites, geocoder, connectivity, config, PermissionEvents(), session(), NoopCommunity, prefs, RouteAlternativesUseCase(routing), vehicles, memory, routing = routing)
+        backgroundScope.launch { vm.parkedVehicle.collect {} }
+        val car = GeoPoint(48.8600, 2.3600)
+        memory.setParkedVehicle(fr.roadly.core.data.repository.ParkedVehicle(car, 0L, null))
+        location.emit(fix(48.85, 2.35)); advanceUntilIdle()
+        val walk = Route("w", fr.roadly.core.model.RouteCosting.FASTEST, 1_400.0, 1_080.0, listOf(GeoPoint(48.85, 2.35), car), emptyList(), false, "fake")
+        routeResult = Outcome.Success(listOf(walk))
+        vm.requestWalkToCar(); advanceUntilIdle()
+        val req = requests.last()
+        assertTrue(req.pedestrian)
+        assertEquals(car, req.destination)
+        assertEquals(GeoPoint(48.85, 2.35), req.origin)
+        assertEquals(walk, (vm.walkToCar.value as WalkToCar.Ready).route)
+        // Fiche fermée ou position oubliée : plus de trajet affiché.
+        vm.onDismissPicked()
+        assertNull(vm.walkToCar.value)
+        routeResult = Outcome.Failure(AppError.Network)
+        vm.requestWalkToCar(); advanceUntilIdle()
+        assertTrue(vm.walkToCar.value is WalkToCar.Failed)
+        // Voiture à quelques mètres : aucun calcul demandé.
+        val before = requests.size
+        memory.setParkedVehicle(fr.roadly.core.data.repository.ParkedVehicle(GeoPoint(48.85005, 2.35), 0L, null)); advanceUntilIdle()
+        vm.requestWalkToCar(); advanceUntilIdle()
+        assertEquals(WalkToCar.Nearby, vm.walkToCar.value)
+        assertEquals(before, requests.size)
+    }
 
     @Test fun `collecting state switches location to MAP mode and exposes speed in km per h`() = runTest {
         val vm = vm()

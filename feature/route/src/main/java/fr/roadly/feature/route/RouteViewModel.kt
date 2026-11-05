@@ -8,6 +8,7 @@ import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
+import fr.roadly.core.location.LocationMode
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Place
@@ -25,6 +26,8 @@ import fr.roadly.core.model.motorVehicle
 import fr.roadly.core.navigation.ScooterGuidanceConfig
 import fr.roadly.core.navigation.ScooterServices
 import fr.roadly.core.navigation.VigilanceZoneProvider
+import fr.roadly.core.navigation.RouteAttributesProvider
+import fr.roadly.core.navigation.RouteIdentity
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.coroutines.cancellation.CancellationException
 import fr.roadly.core.routing.ScooterRouteOptionsUseCase
@@ -63,6 +66,8 @@ class RouteViewModel @Inject constructor(
     private val scooter: ScooterServices? = null,
     /** Zones de danger le long de chaque variante ; null (tests existants) = pas de décompte. */
     private val dangerZoneProvider: VigilanceZoneProvider? = null,
+    /** S5 : profil réel (limitations, portiques) de chaque variante ; null (tests existants) = pas de carte d'identité. */
+    private val routeAttributes: RouteAttributesProvider? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -104,6 +109,13 @@ class RouteViewModel @Inject constructor(
     private data class Params(val origin: GeoPoint?, val departAt: Long, val arriveAt: Long?, val vehicle: VehicleProfile?, val preferences: RoutePreferences, val stops: List<Place>)
 
     init {
+        // Ouverture à froid (lien geo:, raccourci, Android Auto) : aucune position encore connue. Constaté sur le HONOR : l'écran restait
+        // sur « Position inconnue ». On demande la position et on prend la première, sauf si un départ a été choisi entre-temps.
+        if (origin.value == null) viewModelScope.launch {
+            location.setMode(LocationMode.MAP)
+            val first = location.fixes.first()
+            if (origin.value == null) origin.value = first.point
+        }
         scooter?.let { sc -> viewModelScope.launch { sc.ensureProfile() } }
         viewModelScope.launch {
             val base = combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, stops, reload) { values ->
@@ -189,11 +201,35 @@ class RouteViewModel @Inject constructor(
         }
     }
 
+    /**
+     * S5 : carte d'identité de chaque variante (part à limitation connue, temps au-dessus de 90, portiques en flux libre). Une requête
+     * `trace_attributes` par variante, mise en cache par le fournisseur (le guidage réutilise celle de la variante choisie).
+     */
+    private val identities = MutableStateFlow<Map<String, RouteIdentity>>(emptyMap())
+
+    init {
+        val provider = routeAttributes
+        if (provider != null) viewModelScope.launch {
+            computed.collectLatest { s ->
+                identities.value = emptyMap()
+                if (s !is RouteUiState.Content || s.scooter != null) return@collectLatest
+                // Variante active d'abord : c'est celle que l'écran montre.
+                val ordered = s.options.sortedByDescending { it.route.id == activeId.value }
+                val found = HashMap<String, RouteIdentity>()
+                for (o in ordered) {
+                    val r = try { provider.attributes(o.route) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                    // Échec (réseau, tracé non reconnu) : pas de carte pour cette variante, rien d'inventé.
+                    if (r is Outcome.Success) { found[o.route.id] = RouteIdentity.from(r.value); identities.value = found.toMap() }
+                }
+            }
+        }
+    }
+
     val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }, travelMode, assistantReply, dangerZoneCounts) { st, mode, reply, zones ->
-        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones) ?: st.phase
+    }, travelMode, assistantReply, dangerZoneCounts, identities) { st, mode, reply, zones, ids ->
+        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones, identities = ids) ?: st.phase
         st.copy(phase = phase, travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())

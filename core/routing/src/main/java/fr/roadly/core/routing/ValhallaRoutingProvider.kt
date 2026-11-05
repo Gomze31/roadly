@@ -69,6 +69,13 @@ class ValhallaRoutingProvider @Inject constructor(
                     request.excludePolygons.forEach { ring -> add(JsonArray(ring.map { p -> JsonArray(listOf(JsonPrimitive(p.lon), JsonPrimitive(p.lat))) })) }
                 }
             }
+            if (request.pedestrian) {
+                // À pied : trottoirs, chemins et passages piétons ; ni péage ni autoroute n'ont de sens.
+                put("costing", PEDESTRIAN_COSTING)
+                put("units", "kilometers")
+                put("language", "fr-FR")
+                return@buildJsonObject
+            }
             val scooter = request.scooter
             if (scooter != null) {
                 // Trottinette : costing vélo paramétré (fr.roadly.core.scooter.routing.ScooterRoutingProfile) + profil d'altitude.
@@ -114,6 +121,8 @@ class ValhallaRoutingProvider @Inject constructor(
     companion object {
         /** Pas du profil d'altitude demandé pour les itinéraires trottinette (valeur recommandée par Valhalla). */
         const val ELEVATION_INTERVAL_M = 30
+        /** Costing Valhalla du trajet à pied (retour à la voiture garée). */
+        const val PEDESTRIAN_COSTING = "pedestrian"
     }
 
     /** Costing Valhalla selon le type de véhicule : poids lourd (gabarit, interdictions PL), moto, taxi (voies réservées si taguées), sinon auto. */

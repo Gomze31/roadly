@@ -38,4 +38,20 @@
     <string name="route_loading">Calcul des itinéraires…</string>
     <string name="route_time_confirm">Valider</string>
     <string name="route_time_now">Maintenant</string>
+    <!-- S5 : carte d'identité du trajet -->
+    <string name="route_identity_title">Identité du trajet</string>
+    <string name="route_identity_percent">%1$d %%</string>
+    <string name="route_identity_known_limit">limitation connue</string>
+    <string name="route_identity_minutes">%1$d min</string>
+    <string name="route_identity_fast_roads">à plus de %1$d</string>
+    <plurals name="route_identity_gantries">
+        <item quantity="one">péage flux libre</item>
+        <item quantity="many">péages flux libre</item>
+        <item quantity="other">péages flux libre</item>
+    </plurals>
+    <plurals name="route_identity_zones">
+        <item quantity="one">zone de danger</item>
+        <item quantity="many">zones de danger</item>
+        <item quantity="other">zones de danger</item>
+    </plurals>
 </resources>

@@ -65,7 +65,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -130,6 +132,8 @@ fun HomeScreen(
     val resumeCard by vm.resumeCard.collectAsStateWithLifecycle()
     val tollReminders by vm.tollReminders.collectAsStateWithLifecycle()
     val parked by vm.parkedVehicle.collectAsStateWithLifecycle()
+    val freeDriveLimit by vm.freeDriveLimitKmh.collectAsStateWithLifecycle()
+    val walk by vm.walkToCar.collectAsStateWithLifecycle()
     // E3 : après « Reprendre », l'écran de guidage s'ouvre dès que la session guide (même chemin que « Reprendre le guidage »).
     var resumeRequested by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(resumeRequested, isGuiding) { if (resumeRequested && isGuiding) { resumeRequested = false; onResumeGuidance() } }
@@ -157,6 +161,17 @@ fun HomeScreen(
     }
     LaunchedEffect(state.fix == null) { if (state.fix == null && vm.lastCamera == null) map.moveTo(FRANCE_CENTER, 5.2, animate = false) }
     LaunchedEffect(state.pickedPlace) { map.setMarkers(listOfNotNull(state.pickedPlace)) }
+    // S4 : trajet à pied vers la voiture garée, tracé et cadré au-dessus de la fiche (qui couvre le bas de l'écran).
+    val density = LocalDensity.current
+    val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.roundToPx() }
+    LaunchedEffect(walk) {
+        val route = (walk as? WalkToCar.Ready)?.route
+        map.setRoutes(listOfNotNull(route), route?.id)
+        if (route != null) {
+            val side = with(density) { 48.dp.roundToPx() }
+            map.fitBounds(route.geometry, side, with(density) { 120.dp.roundToPx() }, side, (screenHeightPx * 0.45f).toInt())
+        }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
@@ -222,8 +237,8 @@ fun HomeScreen(
             assistantPanel()
             Spacer(Modifier.height(RoadlySpacing.sm))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                // Pas de source de limitation de vitesse hors guidage : le badge affiche « — ».
-                SpeedBadge(speedKmh = state.speedKmh, limitKmh = null)
+                // Limitation connue seulement pendant une conduite libre (lancée depuis la voiture) ; sinon le badge affiche « — ».
+                SpeedBadge(speedKmh = state.speedKmh, limitKmh = freeDriveLimit)
                 Spacer(Modifier.weight(1f))
                 val recenterIcon = when (state.cameraMode) {
                     CameraMode.FREE -> Icons.Default.MyLocation
@@ -277,7 +292,9 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(RoadlySpacing.m))
                 if (p.id == PARKED_PLACE_ID) {
-                    // Véhicule mémorisé : il est sur la carte ; seule action, l'oublier (pas d'itinéraire voiture vers sa propre voiture).
+                    // Véhicule mémorisé : trajet à pied pour le rejoindre (pas d'itinéraire voiture vers sa propre voiture), ou l'oublier.
+                    WalkToCarBlock(walk, onRequest = vm::requestWalkToCar, onClear = vm::clearWalkToCar)
+                    Spacer(Modifier.height(RoadlySpacing.s))
                     GlassButton(stringResource(R.string.home_parked_forget), onClick = vm::forgetParkedVehicle, style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth())
                 } else GlassButton(
                     stringResource(R.string.home_picked_route),

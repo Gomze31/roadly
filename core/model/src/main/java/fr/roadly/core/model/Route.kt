@@ -107,4 +107,6 @@ data class RouteRequest(
     val scooter: ScooterRouteRequest? = null,
     /** Zones à éviter (`exclude_polygons` Valhalla), anneaux fermés ; vide = aucune. */
     val excludePolygons: List<List<GeoPoint>> = emptyList(),
+    /** Trajet à pied (costing Valhalla `pedestrian`) : retour vers la voiture garée ; prioritaire sur le véhicule et la trottinette. */
+    val pedestrian: Boolean = false,
 )

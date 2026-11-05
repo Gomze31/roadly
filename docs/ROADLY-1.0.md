@@ -70,11 +70,11 @@ Signalés par les notes de la session précédente, non revérifiés ici : deux 
 
 - **Fonctionnement** : à l'arrivée d'un guidage voiture / moto, la dernière position est mémorisée (« Mon véhicule · 350 m · il y a 2 h »). « Je suis garé ici » dans la fiche « Ma position ». Toucher la ligne montre le véhicule sur la carte ; « Oublier cette position ».
 - **Dépendances** : aucune. **Complexité** : faible.
-- **Suite (P1)** : itinéraire piéton (Valhalla `pedestrian`) et guidage à pied.
+- **Trajet à pied — livré le 2026-11-05** : fiche « Mon véhicule » › « Trajet à pied jusqu'à la voiture » (Valhalla `pedestrian`, `RouteRequest.pedestrian`), tracé cadré sur la carte de l'accueil avec durée et distance ; « Vous êtes à côté de votre voiture » sous 30 m. Pas de guidage pas à pas à pied (le guidage est conçu pour la conduite : radars, vue des carrefours, mémorisation du stationnement).
 
-### S5. Carte d'identité du trajet — P1
+### S5. Carte d'identité du trajet — **livré le 2026-11-05**
 
-Sur l'écran d'itinéraires, le profil S1 des variantes : part du trajet à limitation connue, temps passé au-dessus de 90, **péages en flux libre présents**, nombre de zones de vigilance. Faisable avec l'existant (une requête par variante, mise en cache par `ValhallaRouteAttributesProvider`). Complexité faible à moyenne.
+Sur l'écran d'itinéraires, sous la durée de la variante choisie : part du trajet à limitation connue, temps sur les routes limitées au-dessus de 90 (compté à la limitation, borne basse), **péages en flux libre** franchis, zones de danger. `RouteIdentity` (pur, testé) à partir du profil S1 ; une requête `trace_attributes` par variante, variante active d'abord, mise en cache par `ValhallaRouteAttributesProvider`. Sans profil (hors ligne, échec) : pas de carte, rien d'inventé. Vérifié sur le HONOR (Toulouse → Capitole : 89 %, 0 min, 0, 1).
 
 ### S6. Roadly AI proactif — P1
 
@@ -100,11 +100,12 @@ Carburant (déjà calculé sur le profil véhicule) + historique mensuel des dé
 ### P1 — évolutions majeures
 
 - Rappel de péage en flux libre (S2) — **fait**.
-- Mon véhicule (S4) — **fait** ; itinéraire piéton à ajouter.
-- Carte d'identité du trajet (S5).
+- Mon véhicule (S4) — **fait**, trajet à pied compris.
+- Carte d'identité du trajet (S5) — **fait**.
 - Annonce vocale optionnelle des baisses de limitation.
 - Roadly AI : outils sur le profil de route (S6).
-- Badge de limitation sur l'accueil quand la conduite libre est active (aujourd'hui : écran dédié).
+- Badge de limitation sur l'accueil quand la conduite libre est active — **fait** (cas utile : conduite libre lancée depuis Android Auto, téléphone sur l'accueil ; non vérifié à l'écran).
+- Écran d'itinéraires ouvert à froid (lien `geo:`, raccourci) : attend la première position au lieu de rester sur « Position inconnue » — **corrigé** (constaté sur le HONOR).
 
 ### P2 — premium / expérimental
 

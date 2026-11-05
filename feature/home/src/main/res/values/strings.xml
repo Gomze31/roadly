@@ -35,6 +35,12 @@
     <string name="home_parked_title">Mon véhicule</string>
     <string name="home_parked_near">Près de %1$s</string>
     <string name="home_parked_forget">Oublier cette position</string>
+    <string name="home_parked_walk">Trajet à pied jusqu\'à la voiture</string>
+    <string name="home_parked_walk_loading">Calcul du trajet à pied…</string>
+    <string name="home_parked_walk_result">%1$s à pied · %2$s</string>
+    <string name="home_parked_walk_hide">Masquer le trajet</string>
+    <string name="home_parked_walk_retry">Réessayer</string>
+    <string name="home_parked_walk_nearby">Vous êtes à côté de votre voiture</string>
     <string name="home_park_here">Je suis garé ici</string>
     <string name="home_age_now">à l\'instant</string>
     <string name="home_age_minutes">il y a %1$d min</string>

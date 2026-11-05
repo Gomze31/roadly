@@ -283,6 +283,10 @@ private fun ChoicePanel(
                 distance = Formatters.distance(active.route.distanceMeters), distanceLabel = stringResource(R.string.route_distance_label),
                 chips = { InfoChips(s, active, onPickTime, onOpenSettings) },
             )
+            s.identities[active.route.id]?.let { identity ->
+                Spacer(Modifier.height(RoadlySpacing.s))
+                RouteIdentityCard(identity, s.dangerZones[active.route.id])
+            }
             Spacer(Modifier.height(RoadlySpacing.s))
             // Options d'itinéraire : éviter péages / autoroutes / ferries, appliquées aux trois variantes et au recalcul.
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
