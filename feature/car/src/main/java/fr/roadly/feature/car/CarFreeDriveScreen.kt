@@ -74,13 +74,13 @@ internal class CarFreeDriveScreen(
         } else {
             ActionStrip.Builder().addAction(CarActions.text(carContext, R.string.car_close) { screenManager.pop() }).build()
         }
-        return NavigationTemplate.Builder()
+        val builder = NavigationTemplate.Builder()
             .setNavigationInfo(MessageInfo.Builder(title).apply { text?.let { setText(it) } }.build())
             .setActionStrip(actions)
-            .setMapActionStrip(CarActions.mapStrip(renderer))
-            .setPanModeListener { }
             .setBackgroundColor(CarColor.createCustom(CARD, CARD))
-            .build()
+        // Bandeau de carte : niveau 2 ; au niveau 1 la carte suit le véhicule, sans boutons.
+        if (carContext.capabilities().navigationMapStrip) builder.setMapActionStrip(CarActions.mapStrip(renderer)).setPanModeListener { }
+        return builder.build()
     }
 
     private companion object {

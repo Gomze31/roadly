@@ -8,10 +8,12 @@
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
-        <!-- Niveau 7 : MapWithContentTemplate (listes, recherche et aperçu d'itinéraire sur la carte). -->
+        <!-- Niveau 1 : tous les hôtes Android Auto. Un niveau plus haut masque Roadly du lanceur des voitures dont l'hôte négocie
+             moins. Les gabarits suivent le niveau négocié (CarTemplates) : MapWithContentTemplate à partir de 7, gabarits de
+             navigation historiques en dessous. -->
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
-            android:value="7" />
+            android:value="1" />
 
         <service
             android:name="fr.roadly.feature.car.RoadlyCarAppService"

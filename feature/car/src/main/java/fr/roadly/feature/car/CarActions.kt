@@ -4,11 +4,25 @@ import androidx.car.app.CarContext
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
+import androidx.car.app.model.Header
+import androidx.car.app.model.MessageTemplate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.ui.graphics.vector.ImageVector
+
+/** Capacités de l'hôte pour le niveau d'API voiture négocié (connu dès la création de la session). */
+internal fun CarContext.capabilities(): CarCapabilities = CarTemplates.level(carAppApiLevel)
+
+/** En-tête d'un `MessageTemplate` : `Header` à partir du niveau 7, titre + action d'en-tête en dessous. */
+internal fun MessageTemplate.Builder.withHeader(carContext: CarContext, title: String, action: Action): MessageTemplate.Builder =
+    if (carContext.capabilities().messageHeader) {
+        setHeader(Header.Builder().setTitle(title).setStartHeaderAction(action).build())
+    } else {
+        @Suppress("DEPRECATION")
+        setTitle(title).setHeaderAction(action)
+    }
 
 internal object CarActions {
     /** Action avec icône seule (bandeau de carte, bandeau d'actions). */

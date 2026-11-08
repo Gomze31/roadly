@@ -130,9 +130,9 @@ internal class CarGuidanceScreen(
 
     override fun onGetTemplate(): Template {
         val builder = NavigationTemplate.Builder()
-            .setMapActionStrip(CarActions.mapStrip(renderer))
-            .setPanModeListener { }
             .setBackgroundColor(CarColor.createCustom(CARD_DAY, CARD_NIGHT))
+        // Bandeau de carte (défilement, zoom, recentrage) : niveau 2 ; au niveau 1 la carte suit le véhicule, sans boutons.
+        if (carContext.capabilities().navigationMapStrip) builder.setMapActionStrip(CarActions.mapStrip(renderer)).setPanModeListener { }
         when (val s = state) {
             is NavigationState.Guiding -> {
                 val model = CarGuidanceMapper.map(s)

@@ -26,6 +26,8 @@ internal class CarZoneAlerts(
 
     fun onZone(key: String?, zone: CarZoneModel?) {
         if (key == null || zone == null) return
+        // Alertes de l'hôte : niveau 5. En dessous, la pastille sur la carte reste la seule indication.
+        if (!carContext.capabilities().alerts) return
         if (key == alertedKey) return
         alertedKey = key
         val id = nextId++

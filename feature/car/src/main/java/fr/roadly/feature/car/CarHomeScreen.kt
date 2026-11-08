@@ -16,6 +16,7 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.MapController
 import androidx.car.app.navigation.model.MapWithContentTemplate
+import androidx.car.app.navigation.model.PlaceListNavigationTemplate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -43,7 +44,10 @@ import kotlinx.coroutines.launch
 /** Lieux proposés à l'accueil de la voiture. */
 private data class CarPlaces(val home: Place?, val work: Place?, val favorites: List<Place>, val recents: List<Place>)
 
-/** Accueil : carte centrée sur le véhicule, recherche, domicile, travail, favoris, récents, conduite libre. */
+/**
+ * Accueil : carte centrée sur le véhicule, recherche, domicile, travail, favoris, récents, conduite libre.
+ * Niveau 7 et plus : `MapWithContentTemplate` + liste ; en dessous : `PlaceListNavigationTemplate` (même liste, même carte).
+ */
 internal class CarHomeScreen(
     carContext: CarContext,
     private val deps: CarDependencies,
@@ -100,6 +104,8 @@ internal class CarHomeScreen(
 
     override fun onGetTemplate(): Template {
         if (permission != LocationPermissionState.GRANTED) return permissionTemplate()
+        val caps = carContext.capabilities()
+        if (caps.tier == TemplateTier.NAVIGATION) return placeListTemplate(caps)
         val limit = carContext.getCarService(ConstraintManager::class.java).getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
         val list = ListTemplate.Builder().setHeader(Header.Builder().setTitle(carContext.getString(R.string.app_name_car)).setStartHeaderAction(Action.APP_ICON).build())
         val p = places
@@ -115,6 +121,34 @@ internal class CarHomeScreen(
             .setMapController(MapController.Builder().setMapActionStrip(CarActions.mapStrip(renderer)).setPanModeListener { }.build())
             .setActionStrip(ActionStrip.Builder().addAction(CarActions.icon(Icons.Default.Search) { openSearch() }).build())
             .build()
+    }
+
+    /** Hôtes de niveau 1 à 6 : liste de lieux de navigation ; bandeau de carte à partir du niveau 4, en-tête à partir du 5. */
+    private fun placeListTemplate(caps: CarCapabilities): Template {
+        val builder = PlaceListNavigationTemplate.Builder()
+        val title = carContext.getString(R.string.app_name_car)
+        if (caps.header) {
+            builder.setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.APP_ICON).build())
+        } else {
+            @Suppress("DEPRECATION")
+            builder.setTitle(title).setHeaderAction(Action.APP_ICON)
+        }
+        val p = places
+        if (p == null) {
+            builder.setLoading(true)
+        } else {
+            val limit = if (caps.contentLimit) {
+                carContext.getCarService(ConstraintManager::class.java).getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_PLACE_LIST)
+            } else {
+                CarTemplates.DEFAULT_LIST_LIMIT
+            }
+            val items = ItemList.Builder()
+            rows(p).take(limit.coerceAtLeast(1)).forEach(items::addItem)
+            builder.setItemList(items.build())
+        }
+        builder.setActionStrip(ActionStrip.Builder().addAction(CarActions.icon(Icons.Default.Search) { openSearch() }).build())
+        if (caps.listMapStrip) builder.setMapActionStrip(CarActions.mapStrip(renderer)).setPanModeListener { }
+        return builder.build()
     }
 
     private fun rows(p: CarPlaces): List<Row> = buildList {
@@ -157,7 +191,7 @@ internal class CarHomeScreen(
     }
 
     private fun permissionTemplate(): Template = MessageTemplate.Builder(carContext.getString(R.string.car_location_text))
-        .setHeader(Header.Builder().setTitle(carContext.getString(R.string.car_location_title)).setStartHeaderAction(Action.APP_ICON).build())
+        .withHeader(carContext, carContext.getString(R.string.car_location_title), Action.APP_ICON)
         .addAction(
             Action.Builder().setTitle(carContext.getString(R.string.car_location_allow)).setFlags(Action.FLAG_PRIMARY).setOnClickListener {
                 CarToast.makeText(carContext, R.string.car_location_on_phone, CarToast.LENGTH_LONG).show()

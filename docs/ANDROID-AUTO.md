@@ -1,8 +1,10 @@
 # Roadly sur Android Auto
 
-Rédigé le 2026-11-05. Module `feature:car`, bibliothèque Car App `androidx.car.app` 1.7.0 (dernière version stable ; 1.8 en rc, 1.9 en alpha), catégorie **navigation**, niveau d'API voiture minimal **7**.
+Rédigé le 2026-11-05. Module `feature:car`, bibliothèque Car App `androidx.car.app` 1.7.0 (dernière version stable ; 1.8 en rc, 1.9 en alpha), catégorie **navigation**, niveau d'API voiture minimal **1** (voir § 1 bis ; c'était 7 jusqu'au 2026-11-08).
 
 ## 1. Ce que fait l'écran de la voiture
+
+Gabarits pour un hôte de niveau 7 ou plus ; en dessous, voir § 1 bis.
 
 | Écran | Gabarit | Contenu |
 |---|---|---|
@@ -26,6 +28,33 @@ Jamais de type ni de position d'équipement (R413-15, voir `docs/RADAR-SOURCES.m
 **Une seule session** : la voiture pilote la même `NavigationSession`, la même `FreeDriveSession` et les mêmes lieux que le téléphone. Un guidage lancé sur l'un s'affiche sur l'autre, l'arrêt aussi. La voix reste celle du téléphone et sort sur les haut-parleurs de la voiture. L'hôte reçoit `navigationStarted` / `navigationEnded` et un `Trip` (combiné d'instruments). Sa demande d'arrêt (`onStopNavigation`, une autre application de navigation démarre) arrête le guidage ou la conduite libre.
 
 **« Navigue vers… »** (Assistant, autres applications) : `geo:lat,lon` ou `geo:0,0?q=lat,lon(nom)` démarre le guidage ; `geo:0,0?q=adresse` ouvre la recherche préremplie.
+
+## 1 bis. Niveau d'API voiture
+
+L'hôte Android Auto et Roadly négocient un niveau d'API voiture (`CarContext.carAppApiLevel`). Si `androidx.car.app.minCarApiLevel` (manifeste de `feature:car`) dépasse le niveau de l'hôte, Android Auto **masque Roadly sans message**, y compris dans « Personnaliser le lanceur ». Une application multimédia n'est pas concernée : elle ne passe pas par cette négociation. Roadly déclare donc **1** et choisit ses gabarits au niveau négocié (`CarTemplates.level`, testé en JVM).
+
+Niveaux requis (annotations `@RequiresCarApi` de `androidx.car.app:app:1.7.0`, lues avec `javap`) :
+
+| API | Niveau |
+|---|---|
+| `NavigationTemplate`, `PlaceListNavigationTemplate`, `RoutePreviewNavigationTemplate`, `SearchTemplate`, `MessageTemplate`, `ListTemplate`, `NavigationManager`, `Trip`, `SurfaceCallback` (surface, zone visible) | 1 |
+| `NavigationTemplate.setMapActionStrip` / `setPanModeListener`, `ConstraintManager` (limite de lignes), `SurfaceCallback.onScroll` / `onScale` | 2 |
+| `PlaceListNavigationTemplate` / `RoutePreviewNavigationTemplate` : `setMapActionStrip` / `setPanModeListener` ; `Action.Builder.setFlags` | 4 |
+| `Header` (et `setHeader` des gabarits de navigation), `MapController`, `MapTemplate`, `AppManager.showAlert` (`Alert`) | 5 |
+| `MapWithContentTemplate`, `ListTemplate.setHeader`, `MessageTemplate.setHeader` | 7 |
+
+Ce que fait chaque écran selon le niveau (rien n'est simulé : ce qu'un niveau ne sait pas afficher est absent) :
+
+| Écran | Niveau ≥ 7 | Niveaux 1 à 6 |
+|---|---|---|
+| Accueil | inchangé (`MapWithContentTemplate` + liste) | `PlaceListNavigationTemplate` : même liste, même carte, Rechercher dans le bandeau d'actions ; bandeau de carte dès 4, `Header` dès 5 (sinon titre + icône de l'appli) ; 6 lignes au niveau 1 (pas de limite fournie par l'hôte) |
+| Itinéraires | inchangé (une ligne = départ) | `RoutePreviewNavigationTemplate` : une ligne = choisir la variante (surlignée sur la carte), bouton « Démarrer » ; bandeau de carte dès 4 |
+| Recherche | `SearchTemplate` | `SearchTemplate` (identique) |
+| Guidage, conduite libre | `NavigationTemplate` | `NavigationTemplate` ; bandeau de carte (défilement, zoom, recentrage) dès 2 ; au niveau 1 la carte suit le véhicule, sans boutons |
+| Position refusée, erreur d'itinéraire | `MessageTemplate` + `Header` | `MessageTemplate` + titre et action d'en-tête |
+| Alerte de zone de danger | `Alert` de l'hôte | dès 5 ; en dessous, seulement la pastille sur la carte |
+
+La carte (`SurfaceMapHost`, via `CarMapRenderer`) est la même à tous les niveaux : la surface est fournie par l'hôte pour tous les gabarits de navigation (déjà le cas du guidage sous `NavigationTemplate`).
 
 ## 2. Architecture
 
@@ -68,6 +97,7 @@ Réglages › **Android Auto** (sur le téléphone) affiche le diagnostic :
 | La version installée contient Android Auto | Recherche du service `androidx.car.app.CarAppService` dans le paquet de Roadly (présent à partir de la release 0.1.174) |
 | L'application Android Auto est installée | Paquet `com.google.android.projection.gearhead` (déclaré dans `<queries>`) |
 | Installation hors Play Store | Paquet installateur ≠ `com.android.vending` → « Sources inconnues » obligatoire |
+| Niveau d'API voiture | Non vérifiable depuis le téléphone. Jusqu'au 2026-11-08, Roadly exigeait le niveau 7 : un hôte qui négocie moins le masquait du lanceur sans message (cas d'une vraie voiture où Roadly manquait alors qu'il apparaissait sur la DHU 2.1). Les versions suivantes exigent le niveau 1 (§ 1 bis) |
 
 Roadly ne peut pas lire le réglage « Sources inconnues » d'Android Auto : il affiche les 4 étapes (Version × 10, Paramètres pour les développeurs, Sources inconnues, reconnexion / Personnaliser le lanceur) et un bouton qui ouvre Android Auto (sinon sa fiche dans les réglages Android).
 
