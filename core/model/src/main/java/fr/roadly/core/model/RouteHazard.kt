@@ -10,6 +10,8 @@ enum class HazardKind {
     TOLL_BOOTH,
     /** Feu tricolore (OSM `highway=traffic_signals`, via Valhalla) : point du tracé. */
     TRAFFIC_LIGHT,
+    /** Ralentisseur (dos-d'âne, plateau, coussin ; OSM `traffic_calming`) : point du tracé. */
+    SPEED_BUMP,
 }
 
 /**

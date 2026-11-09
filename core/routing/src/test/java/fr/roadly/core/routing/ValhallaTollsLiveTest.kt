@@ -36,7 +36,7 @@ class ValhallaTollsLiveTest {
         val carcassonne = GeoPoint(43.2130, 2.3491)
         val with = (useCase(toulouse, carcassonne, null, 0L) as Outcome.Success).value
         val without = (useCase(toulouse, carcassonne, null, 0L, RoutePreferences(avoidTolls = true)) as Outcome.Success).value
-        fun List<RouteOption>.describe() = joinToString { "${it.label}: ${(it.route.durationSeconds / 60).toInt()} min, péage=${it.route.hasToll}" }
+        fun List<RouteOption>.describe() = joinToString { "${it.label}: ${(it.route.durationSeconds / 60).toInt()} min, péage=${it.route.hasToll}" + ", conso ≈ ${(FuelSpeedModel.equivalentMeters(it.route) / it.route.distanceMeters * 100).toInt()} %" + (it.ecoSavingPct?.let { p -> ", ÉCONOME −$p %" } ?: "") }
         println("Péages autorisés  → ${with.describe()}")
         println("Sans péage choisi → ${without.describe()}")
         assertTrue(with.first().route.hasToll)

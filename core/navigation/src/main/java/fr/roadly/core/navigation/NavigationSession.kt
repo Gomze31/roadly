@@ -100,6 +100,8 @@ class NavigationSession @Inject constructor(
     private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
     /** Vue 3D de carrefour : topologie réelle (`trace_attributes`) de chaque carrefour retenu, demandée pendant sa préparation. */
     private val junctionTopology: JunctionTopologyProvider = NoJunctionTopologyProvider,
+    /** Ralentisseurs OSM du tracé (une requête Overpass par tracé, après son profil). */
+    private val speedBumps: SpeedBumpProvider = NoSpeedBumpProvider,
 ) {
     private val _state = MutableStateFlow<NavigationState>(NavigationState.Idle)
     val state: StateFlow<NavigationState> = _state.asStateFlow()
@@ -321,6 +323,8 @@ class NavigationSession @Inject constructor(
         /** Manœuvres du tracé courant situées à un feu ([TrafficLightCues]) ; virages déjà annoncés (abscisse de début). */
         private var lightManeuvers: Set<Int> = emptySet()
         private val announcedCurves = HashSet<Double>()
+        private var bumpsAlong: List<Double> = emptyList()
+        private val announcedBumps = HashSet<Double>()
         val startedAtMs = clock.nowMs()
         private var lastFixAtMs = startedAtMs
         private var lastAdvanceAtMs = lastFixAtMs
@@ -510,8 +514,14 @@ class NavigationSession @Inject constructor(
             gantryCursorM = 0.0
             announcedBooths.clear()
             lightManeuvers = TrafficLightCues.indexes(r, a.trafficSignals)
-            profileHazards = a.tollBooths.map { RouteHazard(HazardKind.TOLL_BOOTH, it, it) } +
-                a.trafficSignals.map { RouteHazard(HazardKind.TRAFFIC_LIGHT, it, it) }
+            announcedBumps.clear()
+            bumpsAlong = emptyList()
+            rebuildProfileHazards(a)
+            if (scooter == null) runScope.launch {
+                val bumps = try { (speedBumps.bumps(r, a) as? Outcome.Success)?.value } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                if (bumps != null && r.id == route.id && attributes === a) { bumpsAlong = bumps; rebuildProfileHazards(a) }
+            }
+
         }
 
         /** Horizon d'affichage de la prochaine limitation : 20 s de trajet, entre 250 m et 1,5 km. */
@@ -535,6 +545,30 @@ class NavigationSession @Inject constructor(
             gantryCursorM = maxOf(gantryCursorM, progress.distanceAlongM)
             for (g in passed) passGantry(g, progress.routeId)
             announceTollBooth(a, progress)
+        }
+
+        private fun rebuildProfileHazards(a: RouteAttributes) {
+            profileHazards = a.tollBooths.map { RouteHazard(HazardKind.TOLL_BOOTH, it, it) } +
+                a.trafficSignals.map { RouteHazard(HazardKind.TRAFFIC_LIGHT, it, it) } +
+                bumpsAlong.map { RouteHazard(HazardKind.SPEED_BUMP, it, it) }
+        }
+
+        /**
+         * Ralentisseur annoncé une fois, ~5 s avant (60–150 m), au-dessus de [BUMP_MIN_SPEED_KMH] ; une série (ralentisseurs à
+         * moins de [BUMP_SERIES_M] les uns des autres) n'est annoncée qu'au premier.
+         */
+        private suspend fun announceBump(progress: RouteProgress) {
+            val speed = speedKmh ?: return
+            if (speed < BUMP_MIN_SPEED_KMH || bumpsAlong.isEmpty() || tracker.isOffRoute) return
+            val lead = (speed / 3.6 * BUMP_LEAD_S).coerceIn(BUMP_LEAD_MIN_M, BUMP_LEAD_MAX_M)
+            val bump = bumpsAlong.firstOrNull { it - progress.distanceAlongM in BUMP_MIN_AHEAD_M..lead } ?: return
+            if (!announcedBumps.add(bump)) return
+            // Toute la série devant est considérée comme annoncée.
+            var last = bump
+            for (b in bumpsAlong) if (b > last && b - last <= BUMP_SERIES_M) { announcedBumps += b; last = b }
+            val series = last > bump
+            if (!prefs.roadHazardVoice.first()) return
+            say(SpokenPhrases.speedBump(series), routeId = progress.routeId, priority = SpeechPriority.LOW)
         }
 
         /** Gare de péage à barrières : une annonce entre 1,2 km et 300 m avant (temps de préparer le paiement). */
@@ -601,7 +635,7 @@ class NavigationSession @Inject constructor(
                 announced += a.maneuverIndex to a.tier
                 say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
             }
-            if (c != null) scooterTick(c, progress) else announceCurve(progress)
+            if (c != null) scooterTick(c, progress) else { announceCurve(progress); announceBump(progress) }
         }
 
         /**
@@ -617,6 +651,7 @@ class NavigationSession @Inject constructor(
                     h.startAlongM - progress.distanceAlongM in CURVE_MIN_AHEAD_M..lead
             } ?: return
             if (!announcedCurves.add(curve.startAlongM)) return
+            if (!prefs.roadHazardVoice.first()) return
             say(SpokenPhrases.sharpCurve(curve.rightHand!!), routeId = progress.routeId, priority = SpeechPriority.LOW)
         }
 
@@ -732,7 +767,7 @@ class NavigationSession @Inject constructor(
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
                     // Nouvelles abscisses : les zones déjà annoncées gardent leur clé (équipement), donc pas de seconde annonce.
                     hazards = emptyList(); activeZone = null; radarActive = null; radarNext = null
-                    attributes = null; routeLimitKmh = null; nextLimit = null; profileHazards = emptyList(); lightManeuvers = emptySet(); announcedCurves.clear()
+                    attributes = null; routeLimitKmh = null; nextLimit = null; profileHazards = emptyList(); lightManeuvers = emptySet(); announcedCurves.clear(); bumpsAlong = emptyList()
                     refreshScooterAfterReroute(fresh)
                     runScope.launch { loadAttributes(fresh) }
                     loadHazards()
@@ -870,6 +905,12 @@ class NavigationSession @Inject constructor(
         const val CURVE_LEAD_MIN_M = 120.0
         const val CURVE_LEAD_MAX_M = 350.0
         const val CURVE_MIN_AHEAD_M = 40.0
+        const val BUMP_MIN_SPEED_KMH = 30.0
+        const val BUMP_LEAD_S = 5.0
+        const val BUMP_LEAD_MIN_M = 60.0
+        const val BUMP_LEAD_MAX_M = 150.0
+        const val BUMP_MIN_AHEAD_M = 20.0
+        const val BUMP_SERIES_M = 250.0
         const val TOPOLOGY_MAX_ATTEMPTS = 3
         const val TOPOLOGY_RETRY_MS = 5_000L
         const val LIMIT_HORIZON_MIN_M = 250.0

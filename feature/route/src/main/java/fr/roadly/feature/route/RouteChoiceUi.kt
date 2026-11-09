@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -199,6 +200,14 @@ internal fun RouteChoicePanel(
                             Icons.Default.Warning, c.accent, onClick = { onTraffic(hits) },
                         )
                     }
+                    // Le plus économe (consommation estimée selon la vitesse des tronçons).
+                    active.ecoSavingPct?.let { pct ->
+                        StatusPill(
+                            active.ecoSavedLitres?.takeIf { it >= 0.1 }?.let { stringResource(R.string.route_eco_litres, String.format(java.util.Locale.FRANCE, "%.1f", it)) }
+                                ?: stringResource(R.string.route_eco_pct, pct),
+                            Icons.Default.Savings, c.success,
+                        )
+                    }
                     // Route fermée (Bison Futé) contournée automatiquement : dit pourquoi le tracé peut sembler plus long.
                     if (active.route.avoidedClosures > 0) {
                         StatusPill(
@@ -309,11 +318,13 @@ private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int
         val maxIcons = if (fr.roadly.core.designsystem.theme.isCompactSpace()) 2 else 4
         var shown = 0
         fun room(): Boolean = (shown < maxIcons).also { if (it) shown++ }
+        val showEco = o.ecoSavingPct != null && room()
         val showIncidents = incidents > 0 && room()
         val showZfe = zfe != null && zfe != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION && room()
         val showToll = o.route.hasToll && room()
         val showZones = dangerZones > 0 && room()
         Text(Formatters.distance(o.route.distanceMeters), style = StatValue.copy(fontSize = 17.sp * LocalUiScale.current, fontWeight = FontWeight.ExtraBold), color = c.textPrimary)
+        if (showEco) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Savings, contentDescription = stringResource(R.string.route_eco_short), tint = c.success, modifier = Modifier.size(20.dp)) }
         if (showToll) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Euro, contentDescription = stringResource(R.string.route_toll_yes), tint = c.accent, modifier = Modifier.size(20.dp)) }
         if (showIncidents) {
             Spacer(Modifier.width(8.dp))

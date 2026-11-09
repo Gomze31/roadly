@@ -49,6 +49,9 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     override suspend fun setVigilanceSound(value: Boolean) { vigilanceBeep.value = value }
     override val rainLowersLimit: Flow<Boolean> = rainLimit
     override suspend fun setRainLowersLimit(value: Boolean) { rainLimit.value = value }
+    val roadHazards = MutableStateFlow(true)
+    override val roadHazardVoice: kotlinx.coroutines.flow.Flow<Boolean> = roadHazards
+    override suspend fun setRoadHazardVoice(value: Boolean) { roadHazards.value = value }
     val map3d = MutableStateFlow(GuidanceDefaults.MAP_3D)
     override val map3dEnabled: Flow<Boolean> = map3d
     override suspend fun setMap3dEnabled(value: Boolean) { map3d.value = value }

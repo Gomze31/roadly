@@ -112,6 +112,9 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true to true)
     fun setLimitDropVoice(value: Boolean) { viewModelScope.launch { prefs.setLimitDropVoice(value) } }
     fun setBreakReminder(value: Boolean) { viewModelScope.launch { prefs.setBreakReminder(value) } }
+    /** Annonce des ralentisseurs et des virages serrés. */
+    val roadHazardVoice: StateFlow<Boolean> = prefs.roadHazardVoice.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setRoadHazardVoice(value: Boolean) { viewModelScope.launch { prefs.setRoadHazardVoice(value) } }
     /** Zones à faibles émissions (frontière sur la carte, alerte selon la vignette Crit'Air). */
     val zfeEnabled: StateFlow<Boolean> = prefs.zfeEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setZfeEnabled(value: Boolean) { viewModelScope.launch { prefs.setZfeEnabled(value) } }

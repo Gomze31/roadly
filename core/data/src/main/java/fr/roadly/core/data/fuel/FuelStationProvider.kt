@@ -79,6 +79,7 @@ class OpenDataFuelStationProvider @Inject constructor(private val api: ApiClient
             prices = prices,
             open24h = str("horaires_automate_24_24")?.equals("Oui", ignoreCase = true) == true,
             services = services,
+            onMotorway = str("pop") == "A",
         )
     }
 
@@ -87,7 +88,7 @@ class OpenDataFuelStationProvider @Inject constructor(private val api: ApiClient
     companion object {
         /** Colonnes du flux → carburants Roadly (GPLc = GPL). */
         val FUEL_FIELDS = listOf("gazole" to FuelType.DIESEL, "sp95" to FuelType.SP95, "sp98" to FuelType.SP98, "e10" to FuelType.E10, "e85" to FuelType.E85, "gplc" to FuelType.LPG)
-        private val SELECT = "id,adresse,ville,cp,geom,horaires_automate_24_24,services_service," + FUEL_FIELDS.joinToString(",") { "${it.first}_prix,${it.first}_maj" }
+        private val SELECT = "id,adresse,ville,cp,geom,pop,horaires_automate_24_24,services_service," + FUEL_FIELDS.joinToString(",") { "${it.first}_prix,${it.first}_maj" }
 
         fun parseDate(iso: String): Long? = runCatching { OffsetDateTime.parse(iso).toInstant().toEpochMilli() }.getOrNull()
 

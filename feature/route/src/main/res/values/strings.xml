@@ -45,6 +45,9 @@
     <string name="route_identity_known_limit">limitation connue</string>
     <string name="route_identity_minutes">%1$d min</string>
     <string name="route_identity_fast_roads">à plus de %1$d</string>
+    <string name="route_eco_pct">Le plus économe · −%1$d %% de carburant</string>
+    <string name="route_eco_litres">Le plus économe · −%1$s L</string>
+    <string name="route_eco_short">Le plus économe</string>
     <plurals name="route_closures_avoided">
         <item quantity="one">Route fermée évitée</item>
         <item quantity="many">%d routes fermées évitées</item>

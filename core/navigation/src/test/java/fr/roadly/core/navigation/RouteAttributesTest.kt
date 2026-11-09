@@ -126,3 +126,37 @@ class TrafficLightCuesTest {
         org.junit.Assert.assertEquals("Au feu, tournez à droite dans Rue d'Essai.", TrafficLightCues.phrase("Tournez à droite dans Rue d'Essai."))
     }
 }
+
+class SpeedBumpQueryTest {
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    @Test fun `only slow ways are kept for the overpass query, in order and once`() {
+        val a = RouteAttributesBuilder.build("r", 400.0, listOf(
+            RouteEdge(100.0, 30, null, emptyList(), "FR", wayId = 11), RouteEdge(100.0, 130, null, emptyList(), "FR", wayId = 22),
+            RouteEdge(100.0, null, null, emptyList(), "FR", wayId = 11), RouteEdge(100.0, 50, null, emptyList(), "FR", wayId = 33),
+        ))!!
+        org.junit.Assert.assertEquals(listOf(11L, 33L), a.slowWayIds)
+        val q = SpeedBumpQuery.query(a.slowWayIds)
+        assertTrue(q.contains("way(id:11,33)") && q.contains("node(w)[traffic_calming~"))
+    }
+
+    @Test fun `parse reads way ids from trace attributes`() {
+        val edges = ValhallaRouteAttributes.parse(json, """{"edges":[{"length":0.1,"way_id":123456789}]}""")!!
+        org.junit.Assert.assertEquals(123456789L, edges.single().wayId)
+    }
+
+    @Test fun `bumps near the route are projected, merged per crossing, others dropped`() {
+        val r = fr.roadly.core.navigation.testing.TestRoutes.straight()
+        val g = RouteGeometry(r.geometry)
+        val onRoute = g.pointAt(300.0)
+        val sameBumpOtherLane = fr.roadly.core.model.GeoPoint(onRoute.lat + 0.00006, onRoute.lon) // ~7 m au nord
+        val farStreet = fr.roadly.core.model.GeoPoint(onRoute.lat + 0.001, onRoute.lon)          // ~110 m
+        val second = g.pointAt(700.0)
+        val along = SpeedBumpQuery.along(r.geometry, listOf(second, sameBumpOtherLane, onRoute, farStreet))
+        org.junit.Assert.assertEquals(2, along.size)
+        org.junit.Assert.assertEquals(300.0, along[0], 2.0)
+        org.junit.Assert.assertEquals(700.0, along[1], 2.0)
+        val nodes = SpeedBumpQuery.parse(json, """{"elements":[{"type":"node","id":1,"lat":43.6,"lon":1.44},{"type":"way","id":2}]}""")!!
+        org.junit.Assert.assertEquals(1, nodes.size)
+    }
+}

@@ -30,6 +30,7 @@
     <string name="nav_horizon_toll">péage</string>
     <string name="nav_horizon_light">feu</string>
     <string name="nav_at_light">au feu</string>
+    <string name="nav_horizon_bump">ralentisseur</string>
     <string name="nav_horizon_zone_limit">zone · %1$d</string>
     <string name="nav_zone_active">Zone de danger</string>
     <string name="nav_danger_in">dans %1$s</string>

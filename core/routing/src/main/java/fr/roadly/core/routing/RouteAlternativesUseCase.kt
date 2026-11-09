@@ -22,6 +22,10 @@ data class RouteOption(
     val sameAsFastest: Boolean,
     /** Mode trottinette : analyse des voies, autonomie et classement ; null pour un itinéraire motorisé. */
     val scooter: ScooterOptionInfo? = null,
+    /** Variante la plus économe (≠ la plus rapide) : économie de carburant estimée (%) par rapport à la plus rapide ; null sinon. */
+    val ecoSavingPct: Int? = null,
+    /** Litres économisés par rapport à la plus rapide, si le profil véhicule donne la consommation. */
+    val ecoSavedLitres: Double? = null,
 )
 
 /**
@@ -54,13 +58,26 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
             return Outcome.Failure(firstError)
         }
         val fastest = routes.firstOrNull { it.costing == RouteCosting.FASTEST }
+        // Le plus économe : consommation estimée selon la vitesse des tronçons ; signalé s'il économise ≥ 5 % sur le plus rapide.
+        val fuel = vehicle?.fuel
+        val use = routes.associate { it.costing to FuelSpeedModel.equivalentMeters(it, fuel) }
+        val eco = routes.filter { it.costing != RouteCosting.FASTEST }.minByOrNull { use.getValue(it.costing) }
+        val ecoPct = if (fastest == null || eco == null) null else {
+            val f = use.getValue(fastest.costing); val e = use.getValue(eco.costing)
+            if (f <= 0.0 || e > f * (1 - ECO_MIN_SAVING)) null else ((f - e) / f * 100).toInt()
+        }
+        val ecoLitres = if (ecoPct == null || vehicle == null || vehicle.consumptionPer100 <= 0.0) null
+            else (use.getValue(fastest!!.costing) - use.getValue(eco!!.costing)) / 100_000.0 * vehicle.consumptionPer100
         return Outcome.Success(routes.map { r ->
+            val isEco = ecoPct != null && r.costing == eco?.costing
             RouteOption(
                 route = r,
                 label = r.costing.label(),
                 arrivalEpochMs = departAtEpochMs + (r.durationSeconds * 1000).toLong(),
-                cost = vehicle?.let { FuelCostCalculator.estimate(r.distanceMeters, it) },
+                cost = vehicle?.let { FuelCostCalculator.estimate(r, it) },
                 sameAsFastest = fastest != null && r.costing != RouteCosting.FASTEST && r.geometry == fastest.geometry,
+                ecoSavingPct = if (isEco) ecoPct else null,
+                ecoSavedLitres = if (isEco) ecoLitres else null,
             )
         })
     }
@@ -74,6 +91,8 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         } catch (e: Exception) {
             Outcome.Failure(AppError.Unknown(e.message))
         }
+
+    private companion object { const val ECO_MIN_SAVING = 0.05 }
 
     private fun RouteCosting.label() = when (this) {
         RouteCosting.FASTEST -> "Le plus rapide"

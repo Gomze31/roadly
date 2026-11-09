@@ -24,4 +24,6 @@ abstract class NavigationModule {
     /** Vue 3D de carrefour : une petite requête `trace_attributes` par carrefour retenu. */
     @Binds abstract fun junctionTopology(impl: fr.roadly.core.navigation.junction.ValhallaJunctionTopologyProvider): fr.roadly.core.navigation.junction.JunctionTopologyProvider
     @Binds abstract fun roadSnapshots(impl: ValhallaRoadSnapshotProvider): RoadSnapshotProvider
+    /** Ralentisseurs OSM des voies lentes du tracé, une requête Overpass par tracé. */
+    @Binds abstract fun speedBumps(impl: OverpassSpeedBumpProvider): SpeedBumpProvider
 }

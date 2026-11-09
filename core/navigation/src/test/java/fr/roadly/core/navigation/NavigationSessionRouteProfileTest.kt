@@ -56,7 +56,7 @@ class NavigationSessionRouteProfileTest {
         listOf(TollGantry(700.0, "A 79", "FR")),
     )
 
-    private fun TestScope.session(attrs: RouteAttributes? = profile): NavigationSession {
+    private fun TestScope.session(attrs: RouteAttributes? = profile, bumps: List<Double> = emptyList()): NavigationSession {
         val d = StandardTestDispatcher(testScheduler)
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
@@ -69,6 +69,9 @@ class NavigationSessionRouteProfileTest {
             location, routing, providerLimits, speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime },
             NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope,
             NoScooterRouteAnalyzer, provider, memory,
+            speedBumps = object : SpeedBumpProvider {
+                override suspend fun bumps(route: Route, attributes: RouteAttributes) = Outcome.Success(bumps)
+            },
         )
     }
 
@@ -199,6 +202,29 @@ class NavigationSessionRouteProfileTest {
         assertEquals(true, guiding(s).hazards.first { it.kind == fr.roadly.core.model.HazardKind.CURVE }.rightHand)
         for (a in listOf(300.0, 400.0, 480.0, 540.0)) { location.emit(LocationFix(t.pointAt(a), 90f, 8f, 5f, 0L)); runCurrent() }
         assertEquals(0, speech.spoken.count { it.startsWith("Attention, virage") })
+    }
+
+    @Test fun `speed bumps are shown and announced once per series, only above 30 km per h, and can be muted`() = runTest {
+        val s = session(profile.copy(tollGantries = emptyList()), bumps = listOf(600.0, 700.0, 1_200.0))
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(100.0, mps = 12f)); runCurrent()
+        assertEquals(3, guiding(s).hazards.count { it.kind == fr.roadly.core.model.HazardKind.SPEED_BUMP })
+        location.emit(fixAt(555.0, mps = 12f)); runCurrent()
+        assertEquals(speech.spoken.joinToString(" | "), 1, speech.spoken.count { it == "Attention, ralentisseurs." })
+        location.emit(fixAt(650.0, mps = 12f)); runCurrent()
+        assertEquals(1, speech.spoken.count { it.startsWith("Attention, ralentisseur") })
+        // 1 200 m, seul : abordé au pas (5 km/h, vitesse lissée sur plusieurs positions), rien n'est dit.
+        for (a in listOf(1_000.0, 1_040.0, 1_080.0, 1_110.0, 1_130.0, 1_150.0)) { location.emit(fixAt(a, mps = 1.5f)); runCurrent() }
+        assertEquals(1, speech.spoken.count { it.startsWith("Attention, ralentisseur") })
+    }
+
+    @Test fun `road hazard voice off silences bumps`() = runTest {
+        prefs.setRoadHazardVoice(false)
+        val s = session(profile.copy(tollGantries = emptyList()), bumps = listOf(600.0))
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(100.0, mps = 12f)); runCurrent()
+        location.emit(fixAt(555.0, mps = 12f)); runCurrent()
+        assertEquals(0, speech.spoken.count { it.startsWith("Attention, ralentisseur") })
     }
 
     @Test fun `stopping after a gantry still records the reminder, but parks nothing`() = runTest {

@@ -52,7 +52,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - **Horizon** : la route à venir en un coup d'œil (manœuvres, virages serrés, zones de vigilance, signalements).
 - Limitation de vitesse de la route (OpenStreetMap) et alerte de dépassement, annonce des baisses de limitation, limitation abaissée par temps de pluie.
 - **Repères « au feu »** : « Au feu, tournez à droite… » quand le carrefour a des feux (OpenStreetMap), avec un badge sur le bandeau.
-- **Virages serrés annoncés** hors agglomération (« Attention, virage serré à gauche »).
+- **Virages serrés et ralentisseurs annoncés** (« Attention, virage serré à gauche », « Attention, ralentisseurs »), d'après OpenStreetMap ; désactivables dans les réglages.
 - **Péage annoncé** à l'approche (« Péage dans 1 kilomètre, préparez votre moyen de paiement »), feux tricolores dans l'Horizon.
 - Recalcul immédiat hors itinéraire, extrapolation dans les tunnels, carte 3D avec bâtiments.
 - **Incidents officiels Bison Futé** sur votre trajet (accident, bouchon et sa longueur, véhicule en panne, route fermée, travaux), dans le sens où vous roulez : pastille « Incident détecté », Horizon, carte, Android Auto. Les **routes fermées sont contournées automatiquement**, au calcul comme au recalcul.
@@ -60,6 +60,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - Envoyez votre heure d'arrivée en un geste.
 
 ### 🛣️ Itinéraires
+- **Le plus économe** : consommation estimée selon la vitesse de chaque tronçon, badge et litres économisés quand une variante consomme au moins 5 % de moins que la plus rapide.
 - Jusqu'à trois variantes distinctes (rapide, court, sans péage) avec l'**écart de durée**, l'heure d'arrivée et la distance ; les tracés identiques sont fusionnés.
 - Éviter **péages, autoroutes, tunnels, ferries, chemins non revêtus** sur toutes les variantes, choisis **dès la recherche** pour ce trajet seulement ou mémorisés ; les options actives restent affichées sur le choix d'itinéraire.
 - Bouton **« Y aller »** sur chaque résultat de recherche, recherche vocale.

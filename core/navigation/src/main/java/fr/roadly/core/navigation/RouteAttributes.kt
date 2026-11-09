@@ -48,6 +48,8 @@ data class RouteAttributes(
     val tollBooths: List<Double> = emptyList(),
     /** Feux tricolores (abscisses ; ceux d'un même carrefour sont fusionnés). */
     val trafficSignals: List<Double> = emptyList(),
+    /** Voies OSM parcourues (dans l'ordre, sans doublon) dont la limitation est inconnue ou ≤ 70 km/h : là où sont les ralentisseurs. */
+    val slowWayIds: List<Long> = emptyList(),
 ) {
     /** Part du tracé (0..1) dont la limitation est connue. */
     val coverage: Double get() = if (totalM <= 0.0) 0.0 else (speedLimits.sumOf { it.endAlongM - it.startAlongM } / totalM).coerceIn(0.0, 1.0)
@@ -93,6 +95,7 @@ data class RouteEdge(
     val names: List<String>,
     val countryCode: String?,
     val endTrafficSignal: Boolean = false,
+    val wayId: Long? = null,
 )
 
 object RouteAttributesBuilder {
@@ -104,6 +107,8 @@ object RouteAttributesBuilder {
     const val TOLL_PLAZA_MERGE_M = 400.0
     /** Feux d'un même carrefour (un par branche) : fusionnés en deçà de cet écart. */
     const val SIGNAL_MERGE_M = 40.0
+    /** Au-delà (voies rapides, autoroutes), pas de ralentisseur : ces voies ne sont pas interrogées. */
+    const val SLOW_WAY_MAX_KMH = 70
 
     private fun MutableList<Double>.addMerged(at: Double, mergeM: Double) { if (isEmpty() || at - last() > mergeM) add(at) }
 
@@ -117,6 +122,7 @@ object RouteAttributesBuilder {
         val gantries = ArrayList<TollGantry>()
         val booths = ArrayList<Double>()
         val signals = ArrayList<Double>()
+        val slowWays = LinkedHashSet<Long>()
         var at = 0.0
         for (e in edges) {
             val start = at * scale
@@ -132,8 +138,9 @@ object RouteAttributesBuilder {
             if (e.endNodeType == "toll_gantry") gantries += TollGantry(end, e.names.firstOrNull(), e.countryCode)
             if (e.endNodeType == "toll_booth") booths.addMerged(end, TOLL_PLAZA_MERGE_M)
             if (e.endTrafficSignal) signals.addMerged(end, SIGNAL_MERGE_M)
+            if (e.wayId != null && (e.speedLimitKmh == null || e.speedLimitKmh <= SLOW_WAY_MAX_KMH)) slowWays += e.wayId
         }
-        return RouteAttributes(routeId, geometryTotalM, spans, gantries, booths, signals)
+        return RouteAttributes(routeId, geometryTotalM, spans, gantries, booths, signals, slowWays.toList())
     }
 }
 
@@ -142,7 +149,7 @@ object ValhallaRouteAttributes {
     val ATTRIBUTES = listOf(
         "edge.length", "edge.speed_limit", "edge.names", "edge.end_node", "node.type", "node.admin_index", "admin.country_code",
         // Feu au bout de l'arête dans le sens parcouru (le plus fréquent en ville) ; feu sur le nœud du carrefour (plus rare).
-        "edge.traffic_signal", "node.traffic_signal",
+        "edge.traffic_signal", "node.traffic_signal", "edge.way_id",
     )
 
     fun request(encodedPolyline6: String, costing: String = "auto"): JsonObject = buildJsonObject {
@@ -172,7 +179,8 @@ object ValhallaRouteAttributes {
             val names = (o["names"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
             val signal = (o["traffic_signal"] as? JsonPrimitive)?.takeIf { !it.isString }?.content == "true" ||
                 (node?.get("traffic_signal") as? JsonPrimitive)?.takeIf { !it.isString }?.content == "true"
-            RouteEdge(km * 1000.0, limit, type, names, country, signal)
+            val way = (o["way_id"] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toLongOrNull()
+            RouteEdge(km * 1000.0, limit, type, names, country, signal, way)
         }
     }.getOrNull()
 }

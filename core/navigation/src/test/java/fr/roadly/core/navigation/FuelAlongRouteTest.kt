@@ -46,8 +46,21 @@ class FuelAlongRouteTest {
         assertEquals(3, fake.asked.size)
     }
 
+    @Test fun `a motorway station on the left serves the other carriageway and is left out`() = runTest {
+        // Tracé vers l'est : le nord est à gauche, le sud à droite.
+        val at = geo.pointAt(20_000.0)
+        val north = station("nord", GeoPoint(at.lat + 0.0007, at.lon), 1.70).copy(onMotorway = true)
+        val south = station("sud", GeoPoint(at.lat - 0.0007, at.lon), 1.75).copy(onMotorway = true)
+        val town = station("ville", GeoPoint(at.lat + 0.005, at.lon), 1.72)
+        val out = (FuelAlongRoute(Fake(listOf(north, south, town))).ahead(route, 0.0, FuelType.DIESEL) as Outcome.Success).value
+        assertEquals(listOf("ville", "sud"), out.map { it.station.id })
+    }
+
     @Test fun `a provider failure everywhere is reported, a partial one is not`() = runTest {
-        assertTrue(FuelAlongRoute(Fake(emptyList(), fail = true)).ahead(route, 0.0, FuelType.DIESEL) is Outcome.Failure)
+        val failing = Fake(emptyList(), fail = true)
+        assertTrue(FuelAlongRoute(failing).ahead(route, 0.0, FuelType.DIESEL) is Outcome.Failure)
+        // Chaque cercle est retenté une fois.
+        assertEquals(2 * 3, failing.asked.size)
         val empty = FuelAlongRoute(Fake(emptyList())).ahead(route, 0.0, FuelType.DIESEL)
         assertEquals(emptyList<StationAhead>(), (empty as Outcome.Success).value)
     }
