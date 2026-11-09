@@ -52,6 +52,9 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val roadHazards = MutableStateFlow(true)
     override val roadHazardVoice: kotlinx.coroutines.flow.Flow<Boolean> = roadHazards
     override suspend fun setRoadHazardVoice(value: Boolean) { roadHazards.value = value }
+    val aerial = MutableStateFlow(false)
+    override val mapAerial: kotlinx.coroutines.flow.Flow<Boolean> = aerial
+    override suspend fun setMapAerial(value: Boolean) { aerial.value = value }
     val map3d = MutableStateFlow(GuidanceDefaults.MAP_3D)
     override val map3dEnabled: Flow<Boolean> = map3d
     override suspend fun setMap3dEnabled(value: Boolean) { map3d.value = value }

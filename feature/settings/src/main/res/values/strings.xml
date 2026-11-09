@@ -76,6 +76,8 @@
     <string name="settings_theme_light">Clair</string>
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_theme_auto">Auto (jour/nuit solaire)</string>
+    <string name="settings_map_aerial">Photos aériennes (IGN)</string>
+    <string name="settings_map_aerial_subtitle">Vue réaliste : photos aériennes de l\'IGN sous les routes et le tracé, assombries la nuit. France uniquement ; ailleurs, le plan reste affiché. Consomme plus de données.</string>
     <string name="settings_map_3d">Bâtiments 3D</string>
     <string name="settings_map_3d_subtitle">Bâtiments en relief en vue 3D. Jamais en économie d\'énergie.</string>
     <string name="settings_junction_3d">Vue 3D des carrefours</string>

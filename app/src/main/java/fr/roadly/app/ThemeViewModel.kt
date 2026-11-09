@@ -40,6 +40,9 @@ class ThemeViewModel @Inject constructor(prefs: UserPreferencesRepository) : Vie
     /** Teinte du cockpit choisie dans Réglages → Personnalisation. */
     val tint: StateFlow<CockpitTint> = prefs.cockpitTint.map { name -> CockpitTint.entries.firstOrNull { it.name == name } ?: CockpitTint.MAGENTA }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CockpitTint.MAGENTA)
 
+    /** Fond de carte en photos aériennes IGN (Réglages, bouton de l'accueil). */
+    val mapAerial: StateFlow<Boolean> = prefs.mapAerial.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     /** Horloge à la minute pour réévaluer le mode solaire. */
     val nowTick: StateFlow<Long> = flow { while (true) { emit(System.currentTimeMillis()); delay(60_000) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), System.currentTimeMillis())

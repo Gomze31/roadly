@@ -99,6 +99,8 @@ fun RoadlyMap(
     }
 
     LaunchedEffect(styleUrl) { controller.setStyle(styleUrl) }
+    val aerial = LocalMapAerial.current
+    LaunchedEffect(aerial) { controller.setAerial(aerial.enabled, aerial.night) }
 
     AndroidView(
         modifier = modifier,

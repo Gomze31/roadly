@@ -83,4 +83,6 @@
     <string name="home_avoid_tunnels">Tunnels</string>
     <string name="home_avoid_ferries">Ferries</string>
     <string name="home_avoid_unpaved">Chemins non revêtus</string>
+    <string name="home_map_aerial">Photos aériennes</string>
+    <string name="home_map_plan">Plan</string>
 </resources>

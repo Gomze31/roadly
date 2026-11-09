@@ -80,7 +80,8 @@ class MainActivity : ComponentActivity() {
             // Interface sombre en permanence (panneaux violets sur carte claire, comme la référence) ; la carte, elle, suit jour / nuit.
             // Seul le choix explicite « Clair » rend l'interface claire.
             val pip by inPip.collectAsStateWithLifecycle()
-            CompositionLocalProvider(LocalPictureInPicture provides pip) {
+            val aerial by themeVm.mapAerial.collectAsStateWithLifecycle()
+            CompositionLocalProvider(LocalPictureInPicture provides pip, fr.roadly.core.map.LocalMapAerial provides fr.roadly.core.map.MapAerialMode(aerial, isDark)) {
             RoadlyTheme(darkTheme = isDark || mode != fr.roadly.core.data.repository.ThemeMode.LIGHT, tint = tint) {
                 RoadlyNavHost(
                     isDark = isDark,

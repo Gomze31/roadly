@@ -87,6 +87,9 @@ class HomeViewModel @Inject constructor(
     /** Carte « Départ » (null dans les tests existants : départ immédiat, carte inactive). */
     private val departurePlanner: DeparturePlanner? = null,
 ) : ViewModel() {
+    /** Fond de carte en photos aériennes IGN : bascule rapide depuis l'accueil (même réglage que dans Réglages › Navigation). */
+    val mapAerial: StateFlow<Boolean> = prefs.mapAerial.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun toggleMapAerial() { viewModelScope.launch { prefs.setMapAerial(!prefs.mapAerial.first()) } }
 
     /** Départ planifié sur la carte « Départ » ; null = partir maintenant. */
     val departurePlan: StateFlow<DeparturePlan?> = departurePlanner?.plan ?: MutableStateFlow(null)

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Satellite
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
@@ -74,6 +75,7 @@ class HomeScreenshots {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         RoundIconButton(Icons.Default.LocalGasStation, "", {}, iconTint = c.accent)
                         CompassButton(35.0, {})
+                        RoundIconButton(Icons.Default.Satellite, "", {}, iconTint = c.success)
                     }
                     Spacer(Modifier.weight(1f))
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.End) {

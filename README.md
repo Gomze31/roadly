@@ -55,6 +55,11 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - **Virages serrés et ralentisseurs annoncés** (« Attention, virage serré à gauche », « Attention, ralentisseurs »), d'après OpenStreetMap ; désactivables dans les réglages.
 - **Péage annoncé** à l'approche (« Péage dans 1 kilomètre, préparez votre moyen de paiement »), feux tricolores dans l'Horizon.
 - Recalcul immédiat hors itinéraire, extrapolation dans les tunnels, carte 3D avec bâtiments.
+- **Vue photos aériennes (IGN)** : la carte réaliste, avec les vraies photos de l'IGN sous les routes et le tracé, assombries la nuit ; un bouton sur l'accueil, sans clé ni compte.
+
+<img src="docs/images/aerial-view.jpg" alt="Plan, photos aériennes de jour et de nuit à Toulouse" width="100%">
+<sub>Plan, photos aériennes de jour, puis de nuit (Toulouse, rendu MapLibre). Photos aériennes © IGN – Géoplateforme (Licence Ouverte), données © contributeurs OpenStreetMap.</sub>
+
 - **Incidents officiels Bison Futé** sur votre trajet (accident, bouchon et sa longueur, véhicule en panne, route fermée, travaux), dans le sens où vous roulez : pastille « Incident détecté », Horizon, carte, Android Auto. Les **routes fermées sont contournées automatiquement**, au calcul comme au recalcul.
 - **Image dans l'image** : quittez l'app, la prochaine manœuvre reste visible dans une petite fenêtre.
 - Envoyez votre heure d'arrivée en un geste.
@@ -161,6 +166,7 @@ Roadly existe grâce aux données ouvertes et aux projets libres :
 - Incidents de circulation : [Bison Futé](https://www.bison-fute.gouv.fr) (DATEX II, données publiques).
 - [Base nationale consolidée des ZFE](https://transport.data.gouv.fr/datasets/base-nationale-consolidee-des-zones-a-faibles-emissions), [prix des carburants](https://data.economie.gouv.fr), liste des équipements de contrôle routier : données publiques sous Licence Ouverte.
 - Météo : [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
+- Photos aériennes : [IGN – Géoplateforme](https://geoservices.ign.fr) (orthophotographies, Licence Ouverte 2.0).
 - Polices [Nunito](https://github.com/googlefonts/nunito) et [Inter](https://rsms.me/inter/) (SIL Open Font License 1.1).
 
 Les serveurs publics de Valhalla et Photon sont offerts en *fair-use* : pour une diffusion à grande échelle, auto-hébergez-les (voir [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md)).
