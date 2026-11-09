@@ -24,9 +24,15 @@ data class RouteOption(
     val scooter: ScooterOptionInfo? = null,
 )
 
-/** Calcule en parallèle les trois variantes (rapide, court, sans péage) et signale celles qui reprennent le tracé du plus rapide. */
+/**
+ * Calcule en parallèle les variantes (rapide, court, sans péage) et ne garde que des tracés distincts : une variante qui reprend
+ * le tracé d'une précédente est retirée. « Sans péage » n'est pas calculée quand les péages sont déjà évités (elle doublerait
+ * « Le plus rapide »).
+ */
 class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingProvider) {
-    private val order = listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST, RouteCosting.NO_TOLL)
+    private fun order(preferences: RoutePreferences) =
+        if (preferences.avoidTolls) listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST)
+        else listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST, RouteCosting.NO_TOLL)
 
     suspend operator fun invoke(
         origin: GeoPoint,
@@ -37,11 +43,12 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         waypoints: List<GeoPoint> = emptyList(),
     ): Outcome<List<RouteOption>> {
         val results = coroutineScope {
-            order.map { c ->
+            order(preferences).map { c ->
                 async { c to safely { routing.route(RouteRequest(origin, destination, waypoints = waypoints, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) } }
             }.map { it.await() }
         }
         val routes = results.mapNotNull { (c, r) -> (r as? Outcome.Success)?.value?.firstOrNull()?.copy(costing = c) }
+            .distinctBy { it.geometry }
         if (routes.isEmpty()) {
             val firstError = results.firstNotNullOfOrNull { (_, r) -> (r as? Outcome.Failure)?.error } ?: AppError.NoResult
             return Outcome.Failure(firstError)

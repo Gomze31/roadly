@@ -72,7 +72,7 @@ class RouteViewModelTest {
         override val id = "fake"
         override suspend fun route(request: RouteRequest) = Outcome.Success(listOf(
             Route(
-                request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, request.destination),
+                request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, GeoPoint(request.origin.lat, request.origin.lon + 0.001 * (request.costing.ordinal + 1)), request.destination),
                 listOf(
                     Maneuver(ManeuverType.DEPART, "Conduisez.", null, 10_000.0, 600.0, 0, null),
                     Maneuver(ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 1, null),
@@ -332,7 +332,8 @@ class RouteViewModelTest {
             prefs.setRoutePreferences(RoutePreferences(avoidHighways = true, avoidTolls = true))
             advanceUntilIdle()
             expectMostRecentItem()
-            assertEquals(6, seen.size)
+            // Péages évités : « Sans péage » n'est plus calculée (elle doublerait le plus rapide).
+            assertEquals(5, seen.size)
             assertTrue(seen.drop(3).all { it.preferences.avoidTolls })
         }
     }
@@ -344,7 +345,7 @@ class RouteViewModelTest {
         routing = object : RoutingProvider {
             override val id = "fake"
             override suspend fun route(request: RouteRequest) = Outcome.Success(listOf(
-                Route(request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin) + request.waypoints + request.destination,
+                Route(request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, GeoPoint(request.origin.lat, request.origin.lon + 0.001 * (request.costing.ordinal + 1))) + request.waypoints + request.destination,
                     listOf(Maneuver(ManeuverType.DEPART, "", null, 10_000.0, 600.0, 0, null), Maneuver(ManeuverType.ARRIVE, "", null, 0.0, 0.0, 1, null)), false, "fake"),
             )).also { seen += request.waypoints }
         }

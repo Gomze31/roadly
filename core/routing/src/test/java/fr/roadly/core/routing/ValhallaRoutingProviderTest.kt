@@ -284,6 +284,37 @@ class ValhallaRoutingProviderTest {
         assertNull(auto["use_tolls"])
     }
 
+    @Test fun `shortest without tolls uses the strict exclude_tolls flag, ignored by valhalla otherwise`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.SHORTEST, preferences = RoutePreferences(avoidTolls = true, avoidHighways = true)))
+        val auto = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertEquals("true", auto["shortest"]!!.jsonPrimitive.content)
+        assertEquals("true", auto["exclude_tolls"]!!.jsonPrimitive.content)
+        assertEquals("true", auto["exclude_highways"]!!.jsonPrimitive.content)
+        assertNull(auto["exclude_ferries"])
+    }
+
+    @Test fun `shortest without tolls and no strict path falls back to distance weighting with the use flags`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error_code":442,"error":"No path could be found for input","status_code":400}"""))
+        server.enqueue(MockResponse().setBody(fixture()))
+        val out = provider.route(RouteRequest(origin, dest, costing = RouteCosting.SHORTEST, preferences = RoutePreferences(avoidTolls = true)))
+        assertTrue(out is Outcome.Success)
+        server.takeRequest()
+        val second = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertNull(second["exclude_tolls"])
+        assertNull(second["shortest"])
+        assertEquals("1.0", second["use_distance"]!!.jsonPrimitive.content)
+        assertEquals("0", second["use_tolls"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `fastest without tolls keeps the soft use_tolls flag only`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, preferences = RoutePreferences(avoidTolls = true)))
+        val auto = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertEquals("0", auto["use_tolls"]!!.jsonPrimitive.content)
+        assertNull(auto["exclude_tolls"])
+    }
+
     @Test fun `bearings, end index, post instruction, street names and side come from the fixture`() = runTest {
         server.enqueue(MockResponse().setBody(fixture()))
         val r = (provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST)) as Outcome.Success).value.single()

@@ -102,7 +102,7 @@ class NavigationViewModelTest {
         val okRouting = object : RoutingProvider {
             override val id = "ok"
             val origins = mutableListOf<fr.roadly.core.model.GeoPoint>()
-            override suspend fun route(request: RouteRequest): Outcome<List<Route>> { origins += request.origin; return Outcome.Success(listOf(route.copy(id = "alt-" + request.costing.name))) }
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> { origins += request.origin; return Outcome.Success(listOf(route.copy(id = "alt-" + request.costing.name, geometry = route.geometry + GeoPoint(0.001 * (request.costing.ordinal + 1), 0.0)))) }
         }
         val s = session()
         val vm = NavigationViewModel(s, prefs, config, okRouting)

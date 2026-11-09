@@ -57,8 +57,8 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - Envoyez votre heure d'arrivée en un geste.
 
 ### 🛣️ Itinéraires
-- Trois variantes comparées (rapide, court, sans péage) avec l'**écart de durée**, l'heure d'arrivée et la distance.
-- Éviter **péages, autoroutes, tunnels, ferries, chemins non revêtus**, choisis **dès la recherche** pour ce trajet seulement ou mémorisés ; les options actives restent affichées sur le choix d'itinéraire.
+- Jusqu'à trois variantes distinctes (rapide, court, sans péage) avec l'**écart de durée**, l'heure d'arrivée et la distance ; les tracés identiques sont fusionnés.
+- Éviter **péages, autoroutes, tunnels, ferries, chemins non revêtus** sur toutes les variantes, choisis **dès la recherche** pour ce trajet seulement ou mémorisés ; les options actives restent affichées sur le choix d'itinéraire.
 - Bouton **« Y aller »** sur chaque résultat de recherche, recherche vocale.
 - **Partir à** / **arriver à** une heure donnée, inversion départ ↔ arrivée.
 - Jusqu'à **10 arrêts**, réordonnables, avec optimisation de l'ordre (mode tournée).

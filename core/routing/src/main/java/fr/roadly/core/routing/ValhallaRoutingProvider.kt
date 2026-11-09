@@ -42,15 +42,18 @@ class ValhallaRoutingProvider @Inject constructor(
     override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
         val motor = request.scooter == null && !request.pedestrian
         val p = request.preferences
-        val first = routeOnce(request, excludeTunnels = p.avoidTunnels && motor, excludeUnpaved = p.avoidUnpaved && motor)
-        // Tunnels et chemins non revêtus sont des exclusions strictes : sans chemin possible, on relance sans elles (passage inévitable).
-        if (first is Outcome.Failure && first.error == AppError.NoResult && motor && (p.avoidTunnels || p.avoidUnpaved)) {
-            return routeOnce(request, excludeTunnels = false, excludeUnpaved = false)
-        }
+        // « Le plus court » (shortest) ne tient compte que de la distance : Valhalla y ignore use_tolls / use_highways / use_ferry.
+        // Constaté sur FOSSGIS (Toulouse → Carcassonne) : le plus court passait encore par l'A61 « sans péage » choisi.
+        // On y passe donc les exclusions strictes correspondantes.
+        val shortestAvoids = motor && request.costing == RouteCosting.SHORTEST && (p.avoidTolls || p.avoidHighways || p.avoidFerries)
+        val strict = motor && (p.avoidTunnels || p.avoidUnpaved || shortestAvoids)
+        val first = routeOnce(request, strict = strict)
+        // Exclusions strictes : sans chemin possible, on relance sans elles (passage inévitable, île, tunnel obligatoire…).
+        if (first is Outcome.Failure && first.error == AppError.NoResult && strict) return routeOnce(request, strict = false)
         return first
     }
 
-    private suspend fun routeOnce(request: RouteRequest, excludeTunnels: Boolean, excludeUnpaved: Boolean = false): Outcome<List<Route>> {
+    private suspend fun routeOnce(request: RouteRequest, strict: Boolean): Outcome<List<Route>> {
         // Lecture de la configuration (DataStore) : une IOException/CorruptionException ne doit jamais s'échapper.
         val base = try {
             config.config.first().valhallaBaseUrl
@@ -102,13 +105,22 @@ class ValhallaRoutingProvider @Inject constructor(
             putJsonObject("costing_options") {
                 putJsonObject(costingName) {
                     val prefs = request.preferences
-                    if (request.costing == RouteCosting.SHORTEST) put("shortest", true)
-                    // 0 = éviter autant que possible (sémantique Valhalla) ; appliqué aux 3 variantes et au recalcul.
+                    val shortest = request.costing == RouteCosting.SHORTEST
+                    val avoidsSoft = prefs.avoidTolls || prefs.avoidHighways || prefs.avoidFerries
+                    // Plus court sans exclusion possible : on garde les pénalités use_* (que shortest ignorerait) en favorisant la distance.
+                    if (shortest && (strict || !avoidsSoft)) put("shortest", true)
+                    else if (shortest) put("use_distance", 1.0)
+                    // 0 = éviter autant que possible (sémantique Valhalla) ; appliqué aux variantes et au recalcul.
                     if (request.costing == RouteCosting.NO_TOLL || prefs.avoidTolls) put("use_tolls", 0)
                     if (prefs.avoidHighways) put("use_highways", 0)
                     if (prefs.avoidFerries) put("use_ferry", 0)
-                    if (excludeTunnels) put("exclude_tunnels", true)
-                    if (excludeUnpaved) put("exclude_unpaved", true)
+                    if (strict) {
+                        if (prefs.avoidTunnels) put("exclude_tunnels", true)
+                        if (prefs.avoidUnpaved) put("exclude_unpaved", true)
+                        if (shortest && prefs.avoidTolls) put("exclude_tolls", true)
+                        if (shortest && prefs.avoidHighways) put("exclude_highways", true)
+                        if (shortest && prefs.avoidFerries) put("exclude_ferries", true)
+                    }
                     // Gabarit : seulement en costing poids lourd, et seulement les valeurs saisies (Valhalla garde ses défauts sinon).
                     val d = request.vehicle?.dimensions
                     if (costingName == "truck" && d != null) {
