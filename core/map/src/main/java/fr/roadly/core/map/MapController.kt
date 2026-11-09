@@ -84,11 +84,12 @@ class MapController(internal val context: Context) {
     private var lastScooter: String = ScooterRouteFeatures.EMPTY
     private var lastTraversedTail: String = TraversedFeatureBuilder.EMPTY
     private val traversed = TraversedLine()
-    private var routeColorActive = "#B794FF"
-    private var routeColorInactive = "#5A5470"
-    private var routeColorCasing = "#0E0B14"
+    // Valeurs par défaut = palette de l'app (Android Auto n'appelle pas setRouteColors).
+    private var routeColorActive = "#D08CFF"
+    private var routeColorInactive = "#6A5A78"
+    private var routeColorCasing = "#140A1A"
     private var arrowColorBody = "#FFFFFF"
-    private var arrowColorCasing = "#8B5CF6"
+    private var arrowColorCasing = "#F03CDC"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
     private var lastDanger: String = DangerZoneFeatures.EMPTY
     private var buildings3d = false
