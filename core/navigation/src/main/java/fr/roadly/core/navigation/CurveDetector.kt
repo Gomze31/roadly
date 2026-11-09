@@ -50,7 +50,8 @@ object CurveDetector {
                     if (last != null && start - last.endAlongM <= MERGE_M) {
                         found[found.lastIndex] = last.copy(endAlongM = end, angleDeg = maxOf(last.angleDeg ?: 0.0, abs(best.second)))
                     } else {
-                        found += RouteHazard(HazardKind.CURVE, start, end, angleDeg = abs(best.second))
+                        // Caps croissants = sens horaire = virage à droite.
+                        found += RouteHazard(HazardKind.CURVE, start, end, angleDeg = abs(best.second), rightHand = best.second > 0)
                     }
                 }
                 i = best.first

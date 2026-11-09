@@ -18,11 +18,14 @@ class RouteAttributesTest {
 
     @Test fun `parse reads traffic signals on end nodes`() {
         // Forme réelle FOSSGIS (Toulouse → Carcassonne, 2026-11-09) : traffic_signal booléen sur chaque nœud.
+        // Toulouse, Capitole → Purpan : 12 feux en edge.traffic_signal (bout d'arête, sens parcouru), 2 en node.traffic_signal.
         val body = """{"edges":[{"length":0.1,"end_node":{"type":"street_intersection","traffic_signal":true}},
-            {"length":0.2,"end_node":{"type":"toll_booth","traffic_signal":false}}]}"""
+            {"length":0.2,"end_node":{"type":"toll_booth","traffic_signal":false}},
+            {"length":0.3,"traffic_signal":true,"end_node":{"type":"street_intersection","traffic_signal":false}}]}"""
         val edges = ValhallaRouteAttributes.parse(json, body)!!
         assertTrue(edges[0].endTrafficSignal)
         assertEquals(false, edges[1].endTrafficSignal)
+        assertTrue(edges[2].endTrafficSignal)
         assertEquals("toll_booth", edges[1].endNodeType)
     }
 
@@ -68,7 +71,7 @@ class RouteAttributesTest {
         val r = ValhallaRouteAttributes.request("abc")
         assertEquals("edge_walk", r["shape_match"]!!.jsonPrimitive.content)
         val attrs = r["filters"]!!.let { (it as kotlinx.serialization.json.JsonObject)["attributes"]!!.jsonArray.map { a -> a.jsonPrimitive.content } }
-        assertTrue(attrs.containsAll(listOf("edge.speed_limit", "node.type", "edge.length", "node.traffic_signal")))
+        assertTrue(attrs.containsAll(listOf("edge.speed_limit", "node.type", "edge.length", "node.traffic_signal", "edge.traffic_signal")))
     }
 
     @Test fun `consecutive equal limits merge and short unknown edges are absorbed`() {
@@ -108,5 +111,18 @@ class RouteAttributesTest {
         val same = RouteAttributesBuilder.build("r", 1_000.0, listOf(edge(400.0, 50), edge(200.0, null), edge(400.0, 50)))!!
         assertNull("même limitation après une portion inconnue : pas un changement", same.nextChange(300.0, 1_000.0))
         assertNotNull(same.nextChange(450.0, 1_000.0)) // depuis l'inconnu, la limitation à venir est annoncée
+    }
+}
+
+class TrafficLightCuesTest {
+    @Test fun `only turns whose point has a light just before or at it are cued`() {
+        val r = fr.roadly.core.navigation.testing.TestRoutes.straight()
+        val turnAt = RouteGeometry(r.geometry).cumulative[r.maneuvers[1].beginShapeIndex]
+        org.junit.Assert.assertEquals(setOf(1), TrafficLightCues.indexes(r, listOf(turnAt - 30.0)))
+        org.junit.Assert.assertEquals(setOf(1), TrafficLightCues.indexes(r, listOf(turnAt + 5.0)))
+        org.junit.Assert.assertEquals(emptySet<Int>(), TrafficLightCues.indexes(r, listOf(turnAt - 80.0)))
+        // Le départ et l'arrivée ne sont jamais « au feu ».
+        org.junit.Assert.assertEquals(emptySet<Int>(), TrafficLightCues.indexes(r, listOf(0.0, RouteGeometry(r.geometry).totalM)))
+        org.junit.Assert.assertEquals("Au feu, tournez à droite dans Rue d'Essai.", TrafficLightCues.phrase("Tournez à droite dans Rue d'Essai."))
     }
 }

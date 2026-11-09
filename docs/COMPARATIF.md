@@ -14,6 +14,8 @@ Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (foncti
 | Recalcul selon le trafic | ✅ | ✅ | ? | ❌ | 🟡 **routes fermées (Bison Futé) contournées automatiquement**, au choix et au recalcul ; pas de déviation sur bouchon |
 | Radars, zones de danger | ✅ | ? | ✅ | ❌ | ✅ zones de vigilance issues de la liste officielle, sans point exact (règle française) |
 | Limitation de vitesse, alerte | ✅ | ? | ✅ | ? | ✅ OpenStreetMap, baisse annoncée, abaissée par la pluie |
+| Directions par repère (« au feu ») | ❌ | ✅ (2026, États-Unis) | ❌ | ❌ | ✅ feux OpenStreetMap au point de manœuvre : voix et badge du bandeau |
+| Alerte virage serré | ✅ (2026) | ❌ | ? | ❌ | ✅ voix au-dessus de 50 km/h, côté indiqué, Horizon |
 | Alerte péage, feux tricolores | ✅ (2026) | ? | ? | ❌ | ✅ « Péage dans 1 km » annoncé, gares et feux dans l'Horizon et sur la carte d'identité du trajet (OpenStreetMap) |
 | ZFE et Crit'Air | ? | ? | ? | ❌ | ✅ **base nationale**, verdict selon votre vignette, la date et les horaires |
 | Éviter péages, autoroutes, tunnels, ferries | ? | ✅ | ? | ✅ | ✅ les quatre, aussi à la voix |

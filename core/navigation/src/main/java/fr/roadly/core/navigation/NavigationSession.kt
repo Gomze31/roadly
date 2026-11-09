@@ -318,6 +318,9 @@ class NavigationSession @Inject constructor(
         /** Gares de péage et feux du profil (Horizon) ; gares déjà annoncées (abscisses). */
         private var profileHazards: List<RouteHazard> = emptyList()
         private val announcedBooths = HashSet<Double>()
+        /** Manœuvres du tracé courant situées à un feu ([TrafficLightCues]) ; virages déjà annoncés (abscisse de début). */
+        private var lightManeuvers: Set<Int> = emptySet()
+        private val announcedCurves = HashSet<Double>()
         val startedAtMs = clock.nowMs()
         private var lastFixAtMs = startedAtMs
         private var lastAdvanceAtMs = lastFixAtMs
@@ -506,6 +509,7 @@ class NavigationSession @Inject constructor(
             // Un tracé recalculé commence à la position du recalcul : aucun de ses portiques n'est derrière nous.
             gantryCursorM = 0.0
             announcedBooths.clear()
+            lightManeuvers = TrafficLightCues.indexes(r, a.trafficSignals)
             profileHazards = a.tollBooths.map { RouteHazard(HazardKind.TOLL_BOOTH, it, it) } +
                 a.trafficSignals.map { RouteHazard(HazardKind.TRAFFIC_LIGHT, it, it) }
         }
@@ -578,7 +582,17 @@ class NavigationSession @Inject constructor(
                 lastNextIndex = progress.nextManeuverIndex
             }
             val c = coordinator
+            val lights = lightManeuvers
             val override: ((Int, Tier, Double) -> String?)? = c?.let { co -> { i, tier, d -> co.maneuverText(i, tier.toStage(), d) } }
+                ?: if (lights.isEmpty() || attributes?.routeId != route.id) null else { i, tier, d ->
+                    // « Au feu, tournez à droite » : repère réel (feu OSM au point de manœuvre), sinon le texte Valhalla.
+                    if (i !in lights) null else route.maneuvers.getOrNull(i)?.let { m ->
+                        when (tier) {
+                            Tier.NOW -> TrafficLightCues.phrase(m.verbalPre ?: m.instruction)
+                            Tier.NEAR, Tier.FAR -> SpokenPhrases.inDistance(d, TrafficLightCues.phrase(m.verbalAlert ?: m.verbalPre ?: m.instruction))
+                        }
+                    }
+                }
             val a = AnnouncementPolicy.next(
                 progress, route.maneuvers, speedKmh, announced,
                 scooter = scooter != null, textOverride = override, sincePreviousManeuverMs = indexChangedAtMs?.let { now - it },
@@ -587,7 +601,23 @@ class NavigationSession @Inject constructor(
                 announced += a.maneuverIndex to a.tier
                 say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
             }
-            if (c != null) scooterTick(c, progress)
+            if (c != null) scooterTick(c, progress) else announceCurve(progress)
+        }
+
+        /**
+         * Virage serré (≥ [CURVE_MIN_ANGLE_DEG], hors carrefour) annoncé une fois, ~8 s avant, au-dessus de [CURVE_MIN_SPEED_KMH] :
+         * en ville, les virages se prennent lentement et l'annonce serait du bruit.
+         */
+        private suspend fun announceCurve(progress: RouteProgress) {
+            val speed = speedKmh ?: return
+            if (speed < CURVE_MIN_SPEED_KMH || tracker.isOffRoute) return
+            val lead = (speed / 3.6 * CURVE_LEAD_S).coerceIn(CURVE_LEAD_MIN_M, CURVE_LEAD_MAX_M)
+            val curve = hazards.firstOrNull { h ->
+                h.kind == HazardKind.CURVE && (h.angleDeg ?: 0.0) >= CURVE_MIN_ANGLE_DEG && h.rightHand != null &&
+                    h.startAlongM - progress.distanceAlongM in CURVE_MIN_AHEAD_M..lead
+            } ?: return
+            if (!announcedCurves.add(curve.startAlongM)) return
+            say(SpokenPhrases.sharpCurve(curve.rightHand!!), routeId = progress.routeId, priority = SpeechPriority.LOW)
         }
 
         /** Transitions de voie, avertissements anticipés et autonomie (trottinette). */
@@ -702,7 +732,7 @@ class NavigationSession @Inject constructor(
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
                     // Nouvelles abscisses : les zones déjà annoncées gardent leur clé (équipement), donc pas de seconde annonce.
                     hazards = emptyList(); activeZone = null; radarActive = null; radarNext = null
-                    attributes = null; routeLimitKmh = null; nextLimit = null; profileHazards = emptyList()
+                    attributes = null; routeLimitKmh = null; nextLimit = null; profileHazards = emptyList(); lightManeuvers = emptySet(); announcedCurves.clear()
                     refreshScooterAfterReroute(fresh)
                     runScope.launch { loadAttributes(fresh) }
                     loadHazards()
@@ -812,6 +842,7 @@ class NavigationSession @Inject constructor(
                 roundabout = RoundaboutResolver.current(roundabouts, next),
                 nextSpeedLimit = nextLimit,
                 freeFlowToll = tollTrip,
+                nextAtTrafficLight = progress.nextManeuverIndex in lightManeuvers && attributes?.routeId == route.id,
                 junction = junction,
             )
         }
@@ -833,6 +864,12 @@ class NavigationSession @Inject constructor(
         /** Gare de péage annoncée entre ces distances (m). */
         const val TOLL_BOOTH_ANNOUNCE_M = 1_200.0
         const val TOLL_BOOTH_MIN_M = 300.0
+        const val CURVE_MIN_ANGLE_DEG = 60.0
+        const val CURVE_MIN_SPEED_KMH = 50.0
+        const val CURVE_LEAD_S = 8.0
+        const val CURVE_LEAD_MIN_M = 120.0
+        const val CURVE_LEAD_MAX_M = 350.0
+        const val CURVE_MIN_AHEAD_M = 40.0
         const val TOPOLOGY_MAX_ATTEMPTS = 3
         const val TOPOLOGY_RETRY_MS = 5_000L
         const val LIMIT_HORIZON_MIN_M = 250.0

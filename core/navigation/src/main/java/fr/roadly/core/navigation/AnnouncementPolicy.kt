@@ -116,6 +116,9 @@ internal object SpokenPhrases {
         if (countryCode == "FR") "Péage en flux libre. Pensez à le payer en ligne sous 72 heures."
         else "Péage sans barrière. Vérifiez comment le payer."
 
+    /** Virage serré hors carrefour, détecté sur la géométrie (annoncé une fois, à vitesse de route). */
+    fun sharpCurve(rightHand: Boolean): String = "Attention, virage serré à ${if (rightHand) "droite" else "gauche"}."
+
     /** Gare de péage à barrières devant : rappel pour préparer le paiement (annoncé une fois par gare). */
     fun tollBooth(meters: Double): String = "Péage dans ${distance(meters)}. Préparez votre moyen de paiement."
 

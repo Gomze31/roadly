@@ -141,7 +141,8 @@ object RouteAttributesBuilder {
 object ValhallaRouteAttributes {
     val ATTRIBUTES = listOf(
         "edge.length", "edge.speed_limit", "edge.names", "edge.end_node", "node.type", "node.admin_index", "admin.country_code",
-        "node.traffic_signal",
+        // Feu au bout de l'arête dans le sens parcouru (le plus fréquent en ville) ; feu sur le nœud du carrefour (plus rare).
+        "edge.traffic_signal", "node.traffic_signal",
     )
 
     fun request(encodedPolyline6: String, costing: String = "auto"): JsonObject = buildJsonObject {
@@ -169,7 +170,8 @@ object ValhallaRouteAttributes {
             val type = (node?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
             val country = (node?.get("admin_index") as? JsonPrimitive)?.takeIf { !it.isString }?.intOrNull?.let { countries.getOrNull(it) }
             val names = (o["names"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
-            val signal = (node?.get("traffic_signal") as? JsonPrimitive)?.takeIf { !it.isString }?.content == "true"
+            val signal = (o["traffic_signal"] as? JsonPrimitive)?.takeIf { !it.isString }?.content == "true" ||
+                (node?.get("traffic_signal") as? JsonPrimitive)?.takeIf { !it.isString }?.content == "true"
             RouteEdge(km * 1000.0, limit, type, names, country, signal)
         }
     }.getOrNull()

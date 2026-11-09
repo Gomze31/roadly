@@ -51,6 +51,8 @@ sealed interface NavigationState {
         val radarNext: fr.roadly.core.radar.ZoneStatus? = null,
         /** Vue 3D de carrefour : manœuvre retenue et étape d'anticipation ; null = aucune (ou réglage désactivé). */
         val junction: fr.roadly.core.model.junction.JunctionGuidance? = null,
+        /** La prochaine manœuvre a lieu à un feu tricolore (profil OSM du tracé). */
+        val nextAtTrafficLight: Boolean = false,
     ) : NavigationState
 
     data class Arrived(val route: Route, val freeFlowToll: FreeFlowTollTrip? = null) : NavigationState

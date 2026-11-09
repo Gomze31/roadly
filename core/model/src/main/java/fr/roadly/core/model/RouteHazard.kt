@@ -26,6 +26,8 @@ data class RouteHazard(
     val key: String? = null,
     /** Zone de danger : score de confiance 0–100 des données ; null = non évalué (traité comme fiable). */
     val confidence: Int? = null,
+    /** Virage : true = vers la droite, false = vers la gauche ; null = sans objet. */
+    val rightHand: Boolean? = null,
 ) {
     fun contains(alongM: Double): Boolean = alongM in startAlongM..endAlongM
 }

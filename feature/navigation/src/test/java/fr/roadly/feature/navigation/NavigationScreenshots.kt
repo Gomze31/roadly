@@ -58,6 +58,12 @@ class NavigationScreenshots {
 
     @Test fun guidance() = shot("navigation_guidance") { guidanceContent() }
 
+    @Test fun bannerAtLight() = shot("navigation_banner_at_light") {
+        Column(Modifier.padding(12.dp).padding(top = 36.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            ManeuverBanner(BannerUi(ManeuverType.TURN_RIGHT, "120 m", "Tournez à droite dans Place du Pont Neuf.", "Place du Pont Neuf", null, null, atTrafficLight = true), Modifier.fillMaxWidth())
+        }
+    }
+
     @Composable
     private fun guidanceContent() {
         val banner = BannerUi(ManeuverType.ROUNDABOUT_ENTER, "600 m", "Au rond-point, prenez la 2e sortie.", "Rd-pt du Pr Jean-Jacques Laffont", null, 2)
