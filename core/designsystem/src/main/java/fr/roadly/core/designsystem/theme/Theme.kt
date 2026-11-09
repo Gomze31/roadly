@@ -15,11 +15,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 fun RoadlyTheme(
     darkTheme: Boolean,
     drivingMode: Boolean = false,
-    tint: CockpitTint = CockpitTint.VIOLET,
+    tint: CockpitTint = CockpitTint.MAGENTA,
     content: @Composable () -> Unit,
 ) {
     val base = if (darkTheme) RoadlyColors.Night else RoadlyColors.Day
-    val colors = if (tint == CockpitTint.VIOLET) base else base.withTint(tint)
+    val colors = if (tint == CockpitTint.MAGENTA) base else base.withTint(tint)
     val material: ColorScheme = if (darkTheme) {
         darkColorScheme(
             primary = colors.brand, onPrimary = colors.onBrand,

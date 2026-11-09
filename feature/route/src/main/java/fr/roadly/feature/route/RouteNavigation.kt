@@ -10,7 +10,19 @@ import fr.roadly.core.model.Place
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-@Serializable data class RouteRoute(val destLat: Double, val destLon: Double, val destName: String)
+/**
+ * [fromLat] / [fromLon] / [fromName] : point de départ choisi (bouton « inverser ») ; absents = position actuelle.
+ * [destIsMyPosition] : la destination est la position de l'utilisateur au moment de l'inversion (une nouvelle inversion repart de la position réelle).
+ */
+@Serializable data class RouteRoute(
+    val destLat: Double,
+    val destLon: Double,
+    val destName: String,
+    val fromLat: Double? = null,
+    val fromLon: Double? = null,
+    val fromName: String? = null,
+    val destIsMyPosition: Boolean = false,
+)
 
 /**
  * [onStartNavigation] reçoit `begin` (démarre la session, false si rien à guider) ; l'app y ajoute permission et navigation.
@@ -23,6 +35,8 @@ fun NavGraphBuilder.routeScreen(
     onOpenSettings: () -> Unit,
     onStartNavigation: (begin: () -> Boolean) -> Unit = { begin -> begin() },
     onAddStop: () -> Unit = {},
+    onSwap: (RouteRoute) -> Unit = {},
+    onSearchFuel: () -> Unit = {},
 ) {
     composable<RouteRoute> { entry ->
         val vm: RouteViewModel = hiltViewModel()
@@ -32,6 +46,6 @@ fun NavGraphBuilder.routeScreen(
             entry.savedStateHandle[PICKED_STOP_KEY] = null
             runCatching { Json.decodeFromString(Place.serializer(), raw) }.getOrNull()?.let { vm.addStop(it) }
         }
-        RouteScreen(isDark = isDark, onBack = onBack, onOpenSettings = onOpenSettings, onStartNavigation = onStartNavigation, onAddStop = onAddStop, vm = vm)
+        RouteScreen(isDark = isDark, onBack = onBack, onOpenSettings = onOpenSettings, onStartNavigation = onStartNavigation, onAddStop = onAddStop, onSwap = onSwap, onSearchFuel = onSearchFuel, vm = vm)
     }
 }

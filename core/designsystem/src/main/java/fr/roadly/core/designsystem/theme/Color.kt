@@ -61,12 +61,14 @@ data class RoadlyColorScheme(
     /** Teinte du cockpit (personnalisation) : remplace la couleur de marque et ses dérivés. */
     fun withTint(tint: CockpitTint): RoadlyColorScheme {
         val (b, bright) = if (isDark) tint.night else tint.day
-        return copy(brand = b, brandBright = bright, routeActive = bright)
+        // Texte clair sur les teintes autres que le magenta par défaut (le magenta de nuit porte un texte foncé).
+        return copy(brand = b, brandBright = bright, routeActive = bright, onBrand = if (tint == CockpitTint.MAGENTA) onBrand else Color.White)
     }
 }
 
 /** Teintes de cockpit proposées (L10 : personnalisation). La première est la teinte par défaut. */
 enum class CockpitTint(val night: Pair<Color, Color>, val day: Pair<Color, Color>) {
+    MAGENTA(Color(0xFFF03CDC) to Color(0xFFFF79EE), Color(0xFFD01FC0) to Color(0xFFF03CDC)),
     VIOLET(Color(0xFF8B5CF6) to Color(0xFFB794FF), Color(0xFF6D3FE0) to Color(0xFF8B5CF6)),
     OCEAN(Color(0xFF2F9BFF) to Color(0xFF6DC1FF), Color(0xFF1E6FD9) to Color(0xFF2F9BFF)),
     MINT(Color(0xFF22C58B) to Color(0xFF5EE3B0), Color(0xFF13A070) to Color(0xFF22C58B)),
@@ -76,24 +78,24 @@ enum class CockpitTint(val night: Pair<Color, Color>, val day: Pair<Color, Color
 
 object RoadlyColors {
     val Night = RoadlyColorScheme(
-        background = Color(0xFF0E0B14),
-        surface = Color(0xFF17121F),
-        surfaceElevated = Color(0xFF1F1829),
-        glass = Color(0xE6171221),
-        glassBorder = Color(0x1AFFFFFF),
-        glassHighlight = Color(0x0CFFFFFF),
-        textPrimary = Color(0xFFF4F1F8),
-        textSecondary = Color(0xFFA79FB5),
-        textTertiary = Color(0xFF6E6680),
-        brand = Color(0xFF8B5CF6),
-        brandBright = Color(0xFFB794FF),
-        onBrand = Color(0xFFFFFFFF),
+        background = Color(0xFF140A1A),
+        surface = Color(0xFF1C1024),
+        surfaceElevated = Color(0xFF2A1733),
+        glass = Color(0xF21E1027),
+        glassBorder = Color(0x3DB04FC0),
+        glassHighlight = Color(0x14FF7AF0),
+        textPrimary = Color(0xFFFAF5FC),
+        textSecondary = Color(0xFFB4A8BE),
+        textTertiary = Color(0xFF85778F),
+        brand = Color(0xFFF03CDC),
+        brandBright = Color(0xFFFF79EE),
+        onBrand = Color(0xFF1B0820),
         accent = Color(0xFFF5A524),
         onAccent = Color(0xFF1A1200),
-        routeActive = Color(0xFFB794FF),
-        routeInactive = Color(0xFF5A5470),
-        routeCasing = Color(0xFF0E0B14),
-        buildings3d = Color(0xFF2A2236),
+        routeActive = Color(0xFFD08CFF),
+        routeInactive = Color(0xFF6A5A78),
+        routeCasing = Color(0xFF140A1A),
+        buildings3d = Color(0xFF2E2238),
         danger = Color(0xFFFF4D6D),
         warning = Color(0xFFFFC43D),
         success = Color(0xFF34D399),
@@ -110,12 +112,12 @@ object RoadlyColors {
         textPrimary = Color(0xFF14101C),
         textSecondary = Color(0xFF5E5870),
         textTertiary = Color(0xFF938CA3),
-        brand = Color(0xFF6D3FE0),
-        brandBright = Color(0xFF8B5CF6),
+        brand = Color(0xFFD01FC0),
+        brandBright = Color(0xFFF03CDC),
         onBrand = Color(0xFFFFFFFF),
         accent = Color(0xFFE08A00),
         onAccent = Color(0xFFFFFFFF),
-        routeActive = Color(0xFF8B5CF6),
+        routeActive = Color(0xFFB45CF0),
         routeInactive = Color(0xFFB9B3C8),
         routeCasing = Color(0xFFFFFFFF),
         buildings3d = Color(0xFFD9D4E3),

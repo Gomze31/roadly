@@ -112,6 +112,14 @@ class MapController(internal val context: Context) {
 
     var onRouteClick: ((String) -> Unit)? = null
 
+    /** Incrémenté à chaque mouvement de caméra : les étiquettes Compose posées sur la carte se recalculent. */
+    private val _cameraTick = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val cameraTick: kotlinx.coroutines.flow.StateFlow<Int> = _cameraTick
+
+    /** Position à l'écran (px, dans la vue de la carte) d'un point ; null tant que la carte n'est pas attachée. */
+    fun toScreen(point: GeoPoint): android.graphics.PointF? =
+        map?.projection?.toScreenLocation(org.maplibre.android.geometry.LatLng(point.lat, point.lon))
+
     /** D5 : coin et marges (px) de l'icône d'attribution, appliqués à l'attache et à chaque changement. */
     private var attributionTop = false
     private var attributionEnd = false
@@ -141,6 +149,8 @@ class MapController(internal val context: Context) {
                 window.add(fps, SystemClock.elapsedRealtime())?.let { Log.d(FPS_TAG, String.format(Locale.ROOT, "carte %.1f i/s (moyenne 5 s)", it)) }
             }
         }
+        map.addOnCameraMoveListener { _cameraTick.value++ }
+        map.addOnCameraIdleListener { _cameraTick.value++ }
         map.addOnMapClickListener { latLng ->
             val m = this.map ?: return@addOnMapClickListener false
             val pt = m.projection.toScreenLocation(latLng)

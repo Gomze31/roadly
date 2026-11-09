@@ -84,7 +84,12 @@ class RouteViewModel @Inject constructor(
         requireNotNull(savedStateHandle.get<Double>("destLat")) { "destLat manquant" },
         requireNotNull(savedStateHandle.get<Double>("destLon")) { "destLon manquant" },
     )
-    private val origin = MutableStateFlow(location.lastKnown?.point)
+    /** Départ choisi par l'inversion ; null = position actuelle. */
+    private val fixedOrigin: GeoPoint? = savedStateHandle.get<Double>("fromLat")?.let { lat -> savedStateHandle.get<Double>("fromLon")?.let { lon -> GeoPoint(lat, lon) } }
+    /** Nom du départ affiché (« Partir de … ») ; null = « Ma position ». */
+    val originName: String? = if (fixedOrigin != null) savedStateHandle.get<String>("fromName") ?: "" else null
+    private val destIsMyPosition: Boolean = savedStateHandle.get<Boolean>("destIsMyPosition") ?: false
+    private val origin = MutableStateFlow(fixedOrigin ?: location.lastKnown?.point)
     private val plannedAtOpen = departurePlanner?.active(System.currentTimeMillis())
     private val departAt = MutableStateFlow(plannedAtOpen?.takeIf { !it.arrive }?.epochMs ?: System.currentTimeMillis())
     /** Heure d'arrivée souhaitée ; null = mode « Partir à ». */
@@ -119,7 +124,7 @@ class RouteViewModel @Inject constructor(
     init {
         // Ouverture à froid (lien geo:, raccourci, Android Auto) : aucune position encore connue. Constaté sur le HONOR : l'écran restait
         // sur « Position inconnue ». On demande la position et on prend la première, sauf si un départ a été choisi entre-temps.
-        if (origin.value == null) viewModelScope.launch {
+        if (origin.value == null && fixedOrigin == null) viewModelScope.launch {
             location.setMode(LocationMode.MAP)
             val first = location.fixes.first()
             if (origin.value == null) origin.value = first.point
@@ -286,6 +291,20 @@ class RouteViewModel @Inject constructor(
     /** Origine choisie par appui long sur la carte quand la position est inconnue. */
     fun setOrigin(point: GeoPoint) { origin.value = point }
     val destinationPoint: GeoPoint get() = destination
+
+    /**
+     * Inversion départ / arrivée : depuis « Ma position », on part de la destination pour revenir à la position actuelle ;
+     * une nouvelle inversion repart de la position réelle. Null tant que le départ est inconnu.
+     */
+    fun swapped(myPositionLabel: String): RouteRoute? {
+        val o = origin.value ?: return null
+        val fromLabel = originName
+        return if (destIsMyPosition) RouteRoute(o.lat, o.lon, fromLabel ?: destName)
+        else RouteRoute(
+            destLat = o.lat, destLon = o.lon, destName = fromLabel?.ifBlank { null } ?: myPositionLabel,
+            fromLat = destination.lat, fromLon = destination.lon, fromName = destName, destIsMyPosition = fromLabel == null,
+        )
+    }
 
     /** Favori correspondant à la destination (même point à [FAVORITE_MATCH_M] près, l'écran ne reçoit pas l'identifiant du lieu). */
     private val matchingFavorite: StateFlow<Place?> = (favorites?.observeAll() ?: flowOf(emptyList()))

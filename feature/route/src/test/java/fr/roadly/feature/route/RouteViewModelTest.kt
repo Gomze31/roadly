@@ -149,6 +149,31 @@ class RouteViewModelTest {
         }
     }
 
+    @Test fun `swapping goes from the destination back to my position, and swapping again restores the trip`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val first = vm()
+        advanceUntilIdle()
+        assertNull(first.originName)
+        val back = first.swapped("Ma position")!!
+        assertEquals(RouteRoute(48.8, 2.3, "Ma position", fromLat = 48.9, fromLon = 2.4, fromName = "Test", destIsMyPosition = true), back)
+
+        val handle2 = SavedStateHandle(mapOf("destLat" to back.destLat, "destLon" to back.destLon, "destName" to back.destName,
+            "fromLat" to back.fromLat, "fromLon" to back.fromLon, "fromName" to back.fromName, "destIsMyPosition" to back.destIsMyPosition))
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
+        val second = RouteViewModel(handle2, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing)
+        second.uiState.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals("le départ est la destination d'origine", GeoPoint(48.9, 2.4), s.origin)
+            assertEquals("Test", second.originName)
+        }
+        assertEquals(RouteRoute(48.9, 2.4, "Test"), second.swapped("Ma position"))
+    }
+
     @Test fun `the header star adds the destination to favorites, then removes it`() = runTest {
         location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
         val saved = kotlinx.coroutines.flow.MutableStateFlow<List<Place>>(emptyList())

@@ -51,7 +51,7 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subway
-import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.Umbrella
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -123,7 +123,6 @@ fun OnboardingScreen(
     val steps = remember { OnboardingFlow.steps(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) }
     var stepIndex by rememberSaveable { mutableIntStateOf(0) }
     val step = steps[stepIndex.coerceIn(steps.indices)]
-    val c = LocalRoadlyColors.current
 
     fun advance() {
         val next = OnboardingFlow.next(steps, step)
@@ -156,6 +155,83 @@ fun OnboardingScreen(
     var notificationsGranted by remember { mutableStateOf(notificationsGranted(context)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { notificationsGranted = notificationsGranted(context) }
 
+    val actions = remember(vm) {
+        OnboardingActions(
+            setRoute = vm::setRoute, setVoice = vm::setVoice, setVigilance = vm::setVigilance, setVigilanceSound = vm::setVigilanceSound,
+            setSpeedAlertSound = vm::setSpeedAlertSound, setLimitDropVoice = vm::setLimitDropVoice, setRainLowersLimit = vm::setRainLowersLimit,
+            setBreakReminder = vm::setBreakReminder,
+        )
+    }
+    OnboardingSheet(
+        steps = steps, step = step,
+        primaryLabel = primaryLabel(step, settings.permission, notificationsGranted),
+        onSkip = ::advance,
+        onPrimary = {
+            when (step) {
+                OnboardingStep.LOCATION -> when (settings.permission) {
+                    LocationPermissionState.GRANTED -> advance()
+                    LocationPermissionState.DENIED_FOREVER -> onOpenAppSettings()
+                    else -> { locationAsked = true; onRequestLocationPermission() }
+                }
+                OnboardingStep.NOTIFICATIONS ->
+                    if (notificationsGranted) advance()
+                    else withNotificationPermission { notificationsGranted = notificationsGranted(context); advance() }
+                OnboardingStep.VEHICLE -> {
+                    val t = vehicleType; val f = fuel
+                    when {
+                        consumption.isBlank() || t == null || f == null -> advance()
+                        vm.saveVehicle(t, f, consumption, critAir) -> advance()
+                        else -> consumptionError = true
+                    }
+                }
+                else -> advance()
+            }
+        },
+    ) { s ->
+        OnboardingStepContent(
+            s, settings, notificationsGranted, actions,
+            vehicle = VehicleDraft(vehicleType, fuel, consumption, critAir, consumptionError),
+            onVehicle = { d ->
+                if (d.consumption != consumption) consumptionError = false
+                vehicleType = d.type; fuel = d.fuel; consumption = d.consumption; critAir = d.critAir
+            },
+            onOpenProfile = { vm.finish(); onOpenProfile() },
+        )
+    }
+}
+
+/** Réglages modifiables depuis l'accueil (branchés sur le ViewModel ; factices dans les rendus de test). */
+internal class OnboardingActions(
+    val setRoute: (fr.roadly.core.model.RoutePreferences) -> Unit = {},
+    val setVoice: (Boolean) -> Unit = {},
+    val setVigilance: (Boolean) -> Unit = {},
+    val setVigilanceSound: (Boolean) -> Unit = {},
+    val setSpeedAlertSound: (Boolean) -> Unit = {},
+    val setLimitDropVoice: (Boolean) -> Unit = {},
+    val setRainLowersLimit: (Boolean) -> Unit = {},
+    val setBreakReminder: (Boolean) -> Unit = {},
+)
+
+/** Saisie du véhicule en cours. */
+internal data class VehicleDraft(
+    val type: VehicleType? = null,
+    val fuel: FuelType? = null,
+    val consumption: String = "",
+    val critAir: CritAir? = null,
+    val consumptionError: Boolean = false,
+)
+
+/** Feuille posée sur la carte : progression, contenu de l'étape, « Ignorer » / bouton principal. Sans état. */
+@Composable
+internal fun OnboardingSheet(
+    steps: List<OnboardingStep>,
+    step: OnboardingStep,
+    primaryLabel: Int,
+    onSkip: () -> Unit,
+    onPrimary: () -> Unit,
+    content: @Composable (OnboardingStep) -> Unit,
+) {
+    val c = LocalRoadlyColors.current
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f))
             // Absorbe les touchers : la carte en dessous ne réagit pas pendant l'accueil.
@@ -186,53 +262,41 @@ fun OnboardingScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(subtitleOf(s)), style = MaterialTheme.typography.bodyLarge, color = c.textSecondary)
                     Spacer(Modifier.height(22.dp))
-                    when (s) {
-                        OnboardingStep.WELCOME -> WelcomeContent()
-                        OnboardingStep.LOCATION -> LocationContent(settings.permission)
-                        OnboardingStep.NOTIFICATIONS -> NotificationsContent(notificationsGranted)
-                        OnboardingStep.VEHICLE -> VehicleContent(
-                            vehicleType, { vehicleType = it }, fuel, { fuel = it },
-                            consumption, { consumption = it; consumptionError = false }, consumptionError,
-                            critAir, { critAir = if (critAir == it) null else it },
-                        )
-                        OnboardingStep.ALERTS -> AlertsContent(settings, vm)
-                        OnboardingStep.ROUTE -> RouteContent(settings, vm)
-                        OnboardingStep.THANKS -> ThanksContent(onOpenProfile = { vm.finish(); onOpenProfile() })
-                    }
+                    content(s)
                     Spacer(Modifier.height(RoadlySpacing.l))
                 }
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
-                GlassButton(stringResource(R.string.onboarding_skip), onClick = ::advance, style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f))
-                val primary = primaryLabel(step, settings.permission, notificationsGranted)
-                GlassButton(
-                    stringResource(primary),
-                    style = GlassButtonStyle.Brand,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        when (step) {
-                            OnboardingStep.LOCATION -> when (settings.permission) {
-                                LocationPermissionState.GRANTED -> advance()
-                                LocationPermissionState.DENIED_FOREVER -> onOpenAppSettings()
-                                else -> { locationAsked = true; onRequestLocationPermission() }
-                            }
-                            OnboardingStep.NOTIFICATIONS ->
-                                if (notificationsGranted) advance()
-                                else withNotificationPermission { notificationsGranted = notificationsGranted(context); advance() }
-                            OnboardingStep.VEHICLE -> {
-                                val t = vehicleType; val f = fuel
-                                when {
-                                    consumption.isBlank() || t == null || f == null -> advance()
-                                    vm.saveVehicle(t, f, consumption, critAir) -> advance()
-                                    else -> consumptionError = true
-                                }
-                            }
-                            else -> advance()
-                        }
-                    },
-                )
+                GlassButton(stringResource(R.string.onboarding_skip), onClick = onSkip, style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f))
+                GlassButton(stringResource(primaryLabel), style = GlassButtonStyle.Brand, modifier = Modifier.weight(1f), onClick = onPrimary)
             }
         }
+    }
+}
+
+/** Contenu d'une étape. Sans état. */
+@Composable
+internal fun OnboardingStepContent(
+    s: OnboardingStep,
+    settings: OnboardingSettings,
+    notificationsGranted: Boolean,
+    actions: OnboardingActions,
+    vehicle: VehicleDraft,
+    onVehicle: (VehicleDraft) -> Unit,
+    onOpenProfile: () -> Unit,
+) {
+    when (s) {
+        OnboardingStep.WELCOME -> WelcomeContent()
+        OnboardingStep.LOCATION -> LocationContent(settings.permission)
+        OnboardingStep.NOTIFICATIONS -> NotificationsContent(notificationsGranted)
+        OnboardingStep.VEHICLE -> VehicleContent(
+            vehicle.type, { onVehicle(vehicle.copy(type = it)) }, vehicle.fuel, { onVehicle(vehicle.copy(fuel = it)) },
+            vehicle.consumption, { onVehicle(vehicle.copy(consumption = it)) }, vehicle.consumptionError,
+            vehicle.critAir, { onVehicle(vehicle.copy(critAir = if (vehicle.critAir == it) null else it)) },
+        )
+        OnboardingStep.ALERTS -> AlertsContent(settings, actions)
+        OnboardingStep.ROUTE -> RouteContent(settings, actions)
+        OnboardingStep.THANKS -> ThanksContent(onOpenProfile = onOpenProfile)
     }
 }
 
@@ -398,34 +462,34 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun AlertsContent(s: OnboardingSettings, vm: OnboardingViewModel) {
+private fun AlertsContent(s: OnboardingSettings, vm: OnboardingActions) {
     Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.l)) {
         SettingsGroup(stringResource(R.string.onboarding_alerts_group_voice)) {
-            ToggleRow(stringResource(R.string.onboarding_alerts_voice), checked = s.voice, onCheckedChange = vm::setVoice, icon = Icons.Default.RecordVoiceOver, subtitle = stringResource(R.string.onboarding_alerts_voice_sub))
-            ToggleRow(stringResource(R.string.onboarding_alerts_limit_drop), checked = s.limitDropVoice, onCheckedChange = vm::setLimitDropVoice, icon = Icons.Default.TrendingDown, subtitle = stringResource(R.string.onboarding_alerts_limit_drop_sub))
-            ToggleRow(stringResource(R.string.onboarding_alerts_break), checked = s.breakReminder, onCheckedChange = vm::setBreakReminder, icon = Icons.Default.Coffee, subtitle = stringResource(R.string.onboarding_alerts_break_sub), divider = false)
+            ToggleRow(stringResource(R.string.onboarding_alerts_voice), checked = s.voice, onCheckedChange = vm.setVoice, icon = Icons.Default.RecordVoiceOver, subtitle = stringResource(R.string.onboarding_alerts_voice_sub))
+            ToggleRow(stringResource(R.string.onboarding_alerts_limit_drop), checked = s.limitDropVoice, onCheckedChange = vm.setLimitDropVoice, icon = Icons.Default.TrendingDown, subtitle = stringResource(R.string.onboarding_alerts_limit_drop_sub))
+            ToggleRow(stringResource(R.string.onboarding_alerts_break), checked = s.breakReminder, onCheckedChange = vm.setBreakReminder, icon = Icons.Default.Coffee, subtitle = stringResource(R.string.onboarding_alerts_break_sub), divider = false)
         }
         SettingsGroup(stringResource(R.string.onboarding_alerts_group_alerts)) {
-            ToggleRow(stringResource(R.string.onboarding_alerts_vigilance), checked = s.vigilance, onCheckedChange = vm::setVigilance, icon = Icons.Default.Shield, iconStyle = IconTileStyle.Accent, subtitle = stringResource(R.string.onboarding_alerts_vigilance_sub))
-            ToggleRow(stringResource(R.string.onboarding_alerts_vigilance_sound), checked = s.vigilanceSound, onCheckedChange = vm::setVigilanceSound, icon = Icons.Default.VolumeUp, enabled = s.vigilance)
-            ToggleRow(stringResource(R.string.onboarding_alerts_speed_sound), checked = s.speedAlertSound, onCheckedChange = vm::setSpeedAlertSound, icon = Icons.Default.Speed, iconStyle = IconTileStyle.Danger, subtitle = stringResource(R.string.onboarding_alerts_speed_sound_sub), divider = false)
+            ToggleRow(stringResource(R.string.onboarding_alerts_vigilance), checked = s.vigilance, onCheckedChange = vm.setVigilance, icon = Icons.Default.Shield, iconStyle = IconTileStyle.Accent, subtitle = stringResource(R.string.onboarding_alerts_vigilance_sub))
+            ToggleRow(stringResource(R.string.onboarding_alerts_vigilance_sound), checked = s.vigilanceSound, onCheckedChange = vm.setVigilanceSound, icon = Icons.Default.VolumeUp, enabled = s.vigilance)
+            ToggleRow(stringResource(R.string.onboarding_alerts_speed_sound), checked = s.speedAlertSound, onCheckedChange = vm.setSpeedAlertSound, icon = Icons.Default.Speed, iconStyle = IconTileStyle.Danger, subtitle = stringResource(R.string.onboarding_alerts_speed_sound_sub), divider = false)
         }
     }
 }
 
 @Composable
-private fun RouteContent(s: OnboardingSettings, vm: OnboardingViewModel) {
+private fun RouteContent(s: OnboardingSettings, vm: OnboardingActions) {
     val r = s.route
     Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.l)) {
         SettingsGroup(stringResource(R.string.onboarding_route_group_avoid), footer = stringResource(R.string.onboarding_route_footer)) {
-            ToggleRow(stringResource(R.string.onboarding_route_tolls), checked = r.avoidTolls, onCheckedChange = { vm.setRoute(r.copy(avoidTolls = it)) }, icon = Icons.Default.Toll)
+            ToggleRow(stringResource(R.string.onboarding_route_tolls), checked = r.avoidTolls, onCheckedChange = { vm.setRoute(r.copy(avoidTolls = it)) }, icon = Icons.Default.Euro)
             ToggleRow(stringResource(R.string.onboarding_route_highways), checked = r.avoidHighways, onCheckedChange = { vm.setRoute(r.copy(avoidHighways = it)) }, icon = Icons.Default.AltRoute)
             ToggleRow(stringResource(R.string.onboarding_route_tunnels), checked = r.avoidTunnels, onCheckedChange = { vm.setRoute(r.copy(avoidTunnels = it)) }, icon = Icons.Default.Subway)
             ToggleRow(stringResource(R.string.onboarding_route_ferries), checked = r.avoidFerries, onCheckedChange = { vm.setRoute(r.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat, divider = false)
         }
         SettingsGroup(stringResource(R.string.onboarding_route_group_local)) {
             ToggleRow(
-                stringResource(R.string.onboarding_route_rain), checked = s.rainLowersLimit, onCheckedChange = vm::setRainLowersLimit,
+                stringResource(R.string.onboarding_route_rain), checked = s.rainLowersLimit, onCheckedChange = vm.setRainLowersLimit,
                 icon = Icons.Default.Umbrella, subtitle = stringResource(R.string.onboarding_route_rain_sub), divider = false,
             )
         }

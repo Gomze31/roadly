@@ -119,6 +119,9 @@ fun RoadlyNavHost(
                 }
             },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
+            // Inversion départ / arrivée : nouvel écran d'itinéraires à la place du courant.
+            onSwap = { r -> nav.navigate(r) { popUpTo<RouteRoute> { inclusive = true } } },
+            onSearchFuel = { nav.navigate(SearchRoute(category = fr.roadly.core.geocoding.PoiCategory.FUEL.name)) },
         )
         settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) }, onOpenProfile = { nav.navigate(ProfileRoute) }, onOpenPremium = { nav.navigate(PremiumRoute) }, onOpenAssistance = { nav.navigate(AssistanceRoute) }, onOpenRadar = { nav.navigate(RadarSettingsRoute) })
         radarSettingsScreen(onBack = { nav.popBackStack() })

@@ -64,7 +64,9 @@ class MainActivity : ComponentActivity() {
             val tint by themeVm.tint.collectAsStateWithLifecycle()
             val p = location.lastKnown?.point
             val isDark = ThemeResolver.isDark(mode, isSystemInDarkTheme(), p?.lat, p?.lon, now)
-            RoadlyTheme(darkTheme = isDark, tint = tint) {
+            // Interface sombre en permanence (panneaux violets sur carte claire, comme la référence) ; la carte, elle, suit jour / nuit.
+            // Seul le choix explicite « Clair » rend l'interface claire.
+            RoadlyTheme(darkTheme = isDark || mode != fr.roadly.core.data.repository.ThemeMode.LIGHT, tint = tint) {
                 RoadlyNavHost(
                     isDark = isDark,
                     onRequestLocationPermission = { permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },

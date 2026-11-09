@@ -11,7 +11,10 @@ android {
     defaultConfig { minSdk = 29 }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildFeatures { compose = true }
+    // Rendus d'écran sur la JVM (Robolectric, graphismes natifs) : ressources Android disponibles dans les tests.
+    testOptions { unitTests { isIncludeAndroidResources = true } }
 }
+
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     implementation(project(":core:designsystem"))
@@ -25,4 +28,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

@@ -1,5 +1,11 @@
 package fr.roadly.feature.home
 
+import androidx.compose.ui.unit.sp
+
+import fr.roadly.core.designsystem.theme.softShadow
+
+import fr.roadly.core.designsystem.theme.Display
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -16,7 +22,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Subway
-import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -232,9 +238,9 @@ fun HomeScreen(
             Row(Modifier.fillMaxWidth().padding(top = RoadlySpacing.xs), verticalAlignment = Alignment.Top) {
                 Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
                     AnimatedVisibility(!collapsed, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
-                        RoundIconButton(Icons.Default.LocalGasStation, stringResource(R.string.home_stations), onClick = { onSearchCategory(PoiCategory.FUEL) }, iconTint = c.accent)
+                        RoundIconButton(Icons.Default.LocalGasStation, stringResource(R.string.home_stations), onClick = { onSearchCategory(PoiCategory.FUEL) }, iconTint = c.accent, size = 56.dp)
                     }
-                    AnimatedVisibility(state.isRotated, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+                    AnimatedVisibility(!collapsed, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                         CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
                     }
                 }
@@ -243,13 +249,13 @@ fun HomeScreen(
                     val chevron by animateFloatAsState(if (collapsed) 180f else 0f, label = "chevron")
                     RoundIconButton(
                         Icons.Default.KeyboardArrowUp, stringResource(if (collapsed) R.string.home_expand else R.string.home_collapse),
-                        onClick = { collapsed = !collapsed }, iconModifier = Modifier.rotate(chevron),
+                        onClick = { collapsed = !collapsed }, iconModifier = Modifier.rotate(chevron), iconTint = c.brand, size = 56.dp,
                     )
                     AnimatedVisibility(!collapsed, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                         Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm), horizontalAlignment = Alignment.End) {
                             ParkingButton(onClick = { onSearchCategory(PoiCategory.PARKING) })
-                            RoundIconButton(Icons.Default.EmojiEvents, stringResource(R.string.home_ranking), onClick = onOpenProfile, iconTint = c.warning)
-                            RoundIconButton(Icons.Default.Settings, stringResource(R.string.home_settings), onClick = onSettings, iconTint = c.brandBright)
+                            RoundIconButton(Icons.Default.EmojiEvents, stringResource(R.string.home_ranking), onClick = onOpenProfile, iconTint = c.warning, size = 56.dp)
+                            RoundIconButton(Icons.Default.Settings, stringResource(R.string.home_settings), onClick = onSettings, iconTint = c.brand, size = 56.dp)
                             assistantButton()
                             // 1.0 : conduite libre (compteur, limitation, zones de vigilance sans itinéraire) ; pas pendant un guidage.
                             if (!isGuiding && state.permission == LocationPermissionState.GRANTED) {
@@ -354,7 +360,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun BottomPanel(
+internal fun BottomPanel(
     state: HomeUiState,
     isGuiding: Boolean,
     onNavigateToRoute: (Place) -> Unit,
@@ -485,15 +491,24 @@ private fun PermissionPanel(state: LocationPermissionState, onRequest: () -> Uni
 
 /** Boussole : l'aiguille tourne avec la carte ; un appui remet le nord en haut. */
 @Composable
-private fun CompassButton(bearingDeg: Double, onClick: () -> Unit) {
+internal fun CompassButton(bearingDeg: Double, onClick: () -> Unit) {
     val c = LocalRoadlyColors.current
     val angle by animateFloatAsState((-bearingDeg).toFloat(), label = "compass")
+    val description = stringResource(R.string.home_compass)
     Box(
-        Modifier.size(RoadlySpacing.touchTarget).clip(RoadlyShapes.Pill).background(c.glass).border(1.dp, c.glassBorder, RoadlyShapes.Pill)
-            .clickable(role = Role.Button, onClick = onClick),
+        Modifier.size(56.dp).softShadow(RoadlyShapes.Pill, Color.Black, 8.dp).clip(RoadlyShapes.Pill).background(c.surface).border(1.dp, c.glassBorder, RoadlyShapes.Pill)
+            .semantics { contentDescription = description }.clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Default.Navigation, contentDescription = stringResource(R.string.home_compass), tint = c.danger, modifier = Modifier.size(22.dp).rotate(angle))
+        // Cadran qui tourne avec la carte : N (couleur de marque), E, S, O.
+        Box(Modifier.fillMaxSize().rotate(angle).padding(3.dp)) {
+            val style = MaterialTheme.typography.labelLarge.copy(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 12.sp)
+            Text("N", style = style, color = c.brand, modifier = Modifier.align(Alignment.TopCenter).clearAndSetSemantics {})
+            Text("E", style = style, color = c.textPrimary, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 2.dp).clearAndSetSemantics {})
+            Text("S", style = style, color = c.textPrimary, modifier = Modifier.align(Alignment.BottomCenter).clearAndSetSemantics {})
+            Text("O", style = style, color = c.textPrimary, modifier = Modifier.align(Alignment.CenterStart).padding(start = 2.dp).clearAndSetSemantics {})
+        }
+        Icon(Icons.Default.Navigation, contentDescription = null, tint = c.brand, modifier = Modifier.size(20.dp).rotate(angle))
     }
 }
 
@@ -567,7 +582,7 @@ internal fun ReportResultPill(message: String?, modifier: Modifier = Modifier) {
 
 /** Barre de recherche de l'accueil : marque, champ (ouvre la recherche), dictée, flèche « aller ». */
 @Composable
-private fun HomeSearchPill(onSearch: () -> Unit, onVoice: () -> Unit) {
+internal fun HomeSearchPill(onSearch: () -> Unit, onVoice: () -> Unit) {
     val c = LocalRoadlyColors.current
     GlassPanel(Modifier.fillMaxWidth().height(64.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp, onClick = onSearch) {
         Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -592,7 +607,7 @@ private fun HomeSearchPill(onSearch: () -> Unit, onVoice: () -> Unit) {
 
 /** Carte « Départ » : partir maintenant, partir à… ou arriver à… ; l'heure est reprise par l'écran d'itinéraires. */
 @Composable
-private fun DepartureCard(plan: DeparturePlan?, onClick: () -> Unit) {
+internal fun DepartureCard(plan: DeparturePlan?, onClick: () -> Unit) {
     val c = LocalRoadlyColors.current
     val now = System.currentTimeMillis()
     val active = plan?.takeIf { it.epochMs > now }
@@ -622,11 +637,11 @@ private fun DepartureCard(plan: DeparturePlan?, onClick: () -> Unit) {
 
 /** Bouton « P » (parkings à proximité), pastille bleue des panneaux de stationnement. */
 @Composable
-private fun ParkingButton(onClick: () -> Unit) {
+internal fun ParkingButton(onClick: () -> Unit) {
     val blue = Color(0xFF2F6FDB)
     val label = stringResource(R.string.home_parkings)
     Box(
-        Modifier.semantics(mergeDescendants = true) { contentDescription = label }.size(RoadlySpacing.touchTarget).clip(RoadlyShapes.Pill)
+        Modifier.semantics(mergeDescendants = true) { contentDescription = label }.size(56.dp).clip(RoadlyShapes.Pill)
             .background(Brush.verticalGradient(listOf(Color(0xFF6FA2F5), blue)))
             .border(1.dp, Color.White.copy(alpha = 0.25f), RoadlyShapes.Pill)
             .clickable(role = Role.Button, onClick = onClick),
@@ -645,7 +660,7 @@ private fun RouteOptionsSheet(prefs: RoutePreferences, onChange: (RoutePreferenc
             Text(stringResource(R.string.home_route_options_title), style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
             Spacer(Modifier.height(RoadlySpacing.m))
             SettingsGroup(stringResource(R.string.home_route_options_avoid), footer = stringResource(R.string.home_route_options_footer)) {
-                ToggleRow(stringResource(R.string.home_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = { onChange(prefs.copy(avoidTolls = it)) }, icon = Icons.Default.Toll)
+                ToggleRow(stringResource(R.string.home_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = { onChange(prefs.copy(avoidTolls = it)) }, icon = Icons.Default.Euro)
                 ToggleRow(stringResource(R.string.home_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = { onChange(prefs.copy(avoidHighways = it)) }, icon = Icons.Default.AltRoute)
                 ToggleRow(stringResource(R.string.home_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = { onChange(prefs.copy(avoidTunnels = it)) }, icon = Icons.Default.Subway)
                 ToggleRow(stringResource(R.string.home_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = { onChange(prefs.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat, divider = false)

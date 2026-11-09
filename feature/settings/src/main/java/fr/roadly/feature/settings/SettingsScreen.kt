@@ -62,7 +62,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -599,7 +599,7 @@ private fun DriverAidGroup(
 @Composable
 private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit, onTunnels: (Boolean) -> Unit) {
     SettingsGroup(stringResource(R.string.settings_group_routes)) {
-        ToggleRow(stringResource(R.string.settings_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = onTolls, icon = Icons.Default.Toll)
+        ToggleRow(stringResource(R.string.settings_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = onTolls, icon = Icons.Default.Euro)
         ToggleRow(stringResource(R.string.settings_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = onHighways, icon = Icons.Default.Route)
         ToggleRow(stringResource(R.string.settings_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = onTunnels, icon = Icons.Default.Subway)
         ToggleRow(stringResource(R.string.settings_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = onFerries, icon = Icons.Default.DirectionsBoat, divider = false)
@@ -663,11 +663,11 @@ private fun TintGroup(current: String?, onSelect: (String?) -> Unit) {
         Row(Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
             CockpitTint.entries.forEach { t ->
                 val color = if (c.isDark) t.night.second else t.day.first
-                val selected = (current ?: CockpitTint.VIOLET.name) == t.name
+                val selected = (current ?: CockpitTint.MAGENTA.name) == t.name
                 Box(
                     Modifier.size(44.dp).clip(RoadlyShapes.Pill).background(color)
                         .border(if (selected) 3.dp else 0.dp, if (selected) c.textPrimary else androidx.compose.ui.graphics.Color.Transparent, RoadlyShapes.Pill)
-                        .clickable(role = Role.RadioButton) { onSelect(if (t == CockpitTint.VIOLET) null else t.name) },
+                        .clickable(role = Role.RadioButton) { onSelect(if (t == CockpitTint.MAGENTA) null else t.name) },
                     contentAlignment = Alignment.Center,
                 ) { if (selected) Icon(Icons.Default.Check, contentDescription = t.name, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp)) }
             }

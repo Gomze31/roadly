@@ -58,4 +58,11 @@
     <string name="route_favorite_add">Ajouter aux favoris</string>
     <string name="route_favorite_remove">Retirer des favoris</string>
     <string name="route_pick_time">Heure de départ ou d\'arrivée</string>
+    <string name="route_choice_title">Choix Roadly</string>
+    <string name="route_details">Détails du trajet</string>
+    <string name="route_choose">Choisir</string>
+    <string name="route_swap">Inverser le départ et l\'arrivée</string>
+    <string name="route_collapse">Replier le panneau</string>
+    <string name="route_expand">Afficher le panneau</string>
+    <string name="route_fuel">Stations-service</string>
 </resources>

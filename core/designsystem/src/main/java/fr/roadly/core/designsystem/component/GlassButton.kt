@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import fr.roadly.core.designsystem.theme.ButtonLabel
 import fr.roadly.core.designsystem.theme.LocalDrivingMode
 import fr.roadly.core.designsystem.theme.LocalRoadlyColors
 import fr.roadly.core.designsystem.theme.RoadlyShapes
@@ -59,7 +60,7 @@ fun GlassButton(
     val minHeight = if (LocalDrivingMode.current) RoadlySpacing.touchTargetDriving else RoadlySpacing.touchTarget
     val fg = when (style) {
         GlassButtonStyle.Primary -> c.onAccent
-        GlassButtonStyle.Brand -> c.onBrand
+        GlassButtonStyle.Brand -> c.onBrandAuto
         GlassButtonStyle.Secondary, GlassButtonStyle.Ghost -> c.textPrimary
         GlassButtonStyle.Danger -> c.danger
     }
@@ -67,7 +68,7 @@ fun GlassButton(
     val bgModifier = when (style) {
         GlassButtonStyle.Primary -> Modifier.softShadow(shape, c.accent, 8.dp).background(c.accent)
         GlassButtonStyle.Brand -> Modifier.softShadow(shape, c.brand, 10.dp).background(brandGradient())
-        GlassButtonStyle.Secondary -> Modifier.background(c.glass).border(1.dp, c.glassBorder, shape)
+        GlassButtonStyle.Secondary -> Modifier.background(c.surfaceElevated).border(1.dp, c.glassBorder, shape)
         GlassButtonStyle.Danger -> Modifier.background(c.dangerSoft)
         GlassButtonStyle.Ghost -> Modifier
     }
@@ -86,7 +87,7 @@ fun GlassButton(
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(RoadlySpacing.s))
         }
-        Text(text, style = MaterialTheme.typography.labelLarge, color = fg)
+        Text(text, style = ButtonLabel, color = fg, maxLines = 1)
         if (trailingIcon != null) {
             Spacer(Modifier.width(RoadlySpacing.s))
             Icon(trailingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
