@@ -18,6 +18,7 @@ Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (foncti
 | ZFE et Crit'Air | ? | ? | ? | ❌ | ✅ **base nationale**, verdict selon votre vignette, la date et les horaires |
 | Éviter péages, autoroutes, tunnels, ferries | ? | ✅ | ? | ✅ | ✅ les quatre, aussi à la voix |
 | Coût du trajet, prix des carburants | ? | ? | ? | ❌ | ✅ coût selon votre véhicule, **prix officiels** des stations |
+| Recherche le long du trajet | ? | ✅ | ? | ❌ | ✅ **stations les moins chères sur le trajet** (prix officiels), ajoutées comme arrêt |
 | Arrêts multiples, optimisation | 🟡 | 🟡 | ? | 🟡 | ✅ 10 arrêts, ordre optimisé |
 | Partir à / arriver à | ? | ✅ | ? | ❌ | ✅ |
 | Commandes vocales | ✅ | ✅ | ? | ❌ | ✅ **sur le téléphone, sans service d'IA** |

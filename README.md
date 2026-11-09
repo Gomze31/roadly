@@ -72,6 +72,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 
 ### ⛽ Autour de vous
 - **Stations-service avec les prix officiels** (flux de l'État, mis à jour en continu), tri par prix ou par distance.
+- **Les stations les moins chères sur votre trajet**, pendant le guidage : à moins de 1,5 km de la route sur les 80 prochains km, avec le détour ; un appui en fait un arrêt.
 - Bornes de recharge, parkings, aires de repos à proximité.
 - **Voiture garée** mémorisée à l'arrivée, avec le trajet à pied pour la retrouver.
 

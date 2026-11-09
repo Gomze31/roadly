@@ -121,6 +121,43 @@ class NavigationViewModelTest {
         }
     }
 
+    @Test fun `fuel along the route lists stations by price, an electric car gets an explanation, and a pick becomes a stop`() = runTest {
+        val near = tracker.pointAt(900.0)
+        val stationsSource = object : fr.roadly.core.data.fuel.FuelStationProvider {
+            override val id = "fake"
+            override suspend fun nearby(near: GeoPoint, radiusKm: Int, limit: Int) = Outcome.Success(listOf(
+                fr.roadly.core.model.FuelStation("s1", "Relais", null, near, listOf(fr.roadly.core.model.FuelPrice(fr.roadly.core.model.FuelType.DIESEL, 1.70, null)), false, emptyList()),
+            ))
+        }
+        val vehicles = object : fr.roadly.core.data.repository.VehicleProfileRepository {
+            val p = kotlinx.coroutines.flow.MutableStateFlow<fr.roadly.core.model.VehicleProfile?>(null)
+            override val profile = p
+            override suspend fun save(profile: fr.roadly.core.model.VehicleProfile) { p.value = profile }
+            override suspend fun clear() { p.value = null }
+        }
+        val s = session()
+        val vm = NavigationViewModel(
+            s, prefs, config, GuidanceActions(s, RouteAlternativesUseCase(routing), routing, location, prefs, fakeVehicle, NavigationClock { testScheduler.currentTime }), NoopCommunity,
+            fuelAlong = fr.roadly.core.navigation.FuelAlongRoute(stationsSource), vehicles = vehicles,
+        )
+        vm.uiState.test {
+            s.start(option, RoutePreferences()); runCurrent()
+            location.emit(fixAt(100.0)); runCurrent()
+            vm.loadFuelAhead(); runCurrent()
+            val content = vm.fuelAheadUi.value as FuelAheadUi.Content
+            assertEquals(listOf("s1"), content.stations.map { it.station.id })
+            assertEquals(fr.roadly.core.model.FuelType.DIESEL, content.fuel)
+            assertEquals(1.70, content.stations.single().priceEur!!, 1e-9)
+            vm.dismissFuelAhead()
+            vehicles.p.value = fr.roadly.core.model.VehicleProfile(fr.roadly.core.model.VehicleType.CITY, fr.roadly.core.model.FuelType.ELECTRIC, 15.0, null)
+            vm.loadFuelAhead(); runCurrent()
+            assertEquals(FuelAheadUi.Electric, vm.fuelAheadUi.value)
+            vm.addFuelStop(content.stations.single()); runCurrent()
+            assertEquals(FuelAheadUi.Hidden, vm.fuelAheadUi.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test fun `guiding state is formatted for the banner, the upcoming strip and the ETA`() = runTest {
         val s = session()
         val vm = NavigationViewModel(s, prefs, config)
