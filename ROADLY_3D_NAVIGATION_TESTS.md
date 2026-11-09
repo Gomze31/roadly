@@ -2,7 +2,7 @@
 
 Date : 2026-10-31. Référence : `ROADLY_3D_NAVIGATION_PLAN.md`. État actuel (étape F, `991795e`, 2026-11-01) : **521 tests JVM verts** sur 16 modules (0 échec, 0 ignoré), `assembleDebug` vert ; 14 instrumentés (dont 11 de `NavigationPremiumUiTest`, verts sur le HONOR le 2026-11-01 à `5d82e35`, non rejoués après l'étape E faute d'appareil) ; `:app:lintDebug` : 5 erreurs et 31 avertissements, tous dans des fichiers que la branche ne modifie pas ; aucune CI.
 
-Commandes : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test --offline -q` ; `.\gradlew.bat :app:assembleDebug --offline -q` ; instrumentés : `.\gradlew.bat connectedDebugAndroidTest --offline` (HONOR `AREE026226000174`).
+Commandes : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test --offline -q` ; `.\gradlew.bat :app:assembleDebug --offline -q` ; instrumentés : `.\gradlew.bat connectedDebugAndroidTest --offline` (HONOR Magic 8 Pro).
 
 ## Jeux de données
 - `TestRoutes.straight` (1 464 m, virage à droite) ; `TestRoutes.outAndBack` (demi-tour) — existants.
@@ -46,7 +46,7 @@ Commandes : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test 
 
 ## Performance (C3) — mesures
 
-Conditions : HONOR `AREE026226000174`, guidage stationnaire vers 43.6045,1.4440 (Capitole, 4,6 km, première manœuvre à 200 m), thème Auto (nuit → sombre), Carte 3D, luminosité automatique laissée telle quelle (non réglée à la main), économiseur coupé, téléphone sur câble USB, 2026-10-31 (23:06–23:26).
+Conditions : HONOR Magic 8 Pro, guidage stationnaire vers 43.6045,1.4440 (Capitole, 4,6 km, première manœuvre à 200 m), thème Auto (nuit → sombre), Carte 3D, luminosité automatique laissée telle quelle (non réglée à la main), économiseur coupé, téléphone sur câble USB, 2026-10-31 (23:06–23:26).
 
 | Mesure (commande) | Avant (`c4d05ef`) | Après (`5906c87`) |
 |---|---|---|

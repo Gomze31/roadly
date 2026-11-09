@@ -110,7 +110,7 @@ Tests JVM par module :
 - Portée : `lintAnalyzeDebug` tourne sur tous les modules, mais le rapport de `:app` ne cite que `app` et `gradle/libs.versions.toml`. Sans `checkDependencies`, les constats des modules `core` et `feature`, où vit le code de la branche, n'y figurent pas. Un lint par module (`:feature:navigation:lintDebug`, …) n'a pas été lancé.
 
 ### Instrumentés
-- `NavigationPremiumUiTest` : **11/11 verts sur le HONOR** (`AREE026226000174`) le 2026-11-01, à `5d82e35` puis rejoués à `4028943` et `3c02729` sans changement de sélecteur. Ils couvrent bandeau → aperçu, aperçu refermé au changement de manœuvre, rond-point (annonce numéro + rue), « vers … » déplié et replié, voies absentes ou présentes à 300 m, poignée → panneau déplié (56 dp, marge de la caméra), ligne ETA → trajet complet, Retour sur le panneau déplié, overlay paysage.
+- `NavigationPremiumUiTest` : **11/11 verts sur le HONOR** (`(numéro de série retiré)`) le 2026-11-01, à `5d82e35` puis rejoués à `4028943` et `3c02729` sans changement de sélecteur. Ils couvrent bandeau → aperçu, aperçu refermé au changement de manœuvre, rond-point (annonce numéro + rue), « vers … » déplié et replié, voies absentes ou présentes à 300 m, poignée → panneau déplié (56 dp, marge de la caméra), ligne ETA → trajet complet, Retour sur le panneau déplié, overlay paysage.
 - Total du projet : 14 instrumentés (+ `FavoriteDaoTest` ×2, `GlassSearchBarTest` ×1). L'étape E n'en ajoute aucun, et aucun n'a été rejoué depuis.
 
 ### Passes appareil par étape (HONOR Magic 8 Pro, toutes à l'arrêt)

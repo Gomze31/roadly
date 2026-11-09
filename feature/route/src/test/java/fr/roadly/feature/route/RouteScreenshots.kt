@@ -72,7 +72,7 @@ class RouteScreenshots {
 
     @Test fun choice() = shot("route_choice") {
         val s = RouteUiState.Content(
-            GeoPoint(43.6, 1.44), "6 Impasse Miguel Villabona", listOf(option("a", 17, 5.3, cost = 0.62), option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
+            GeoPoint(43.6, 1.44), "Capitole de Toulouse", listOf(option("a", 17, 5.3, cost = 0.62), option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
             activeId = "a", hasVehicleProfile = true, departAtEpochMs = System.currentTimeMillis(), dangerZones = mapOf("c" to 1),
             zfe = mapOf("a" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN)), "b" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.ALLOWED))),
         )
@@ -80,7 +80,7 @@ class RouteScreenshots {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.align(Alignment.TopCenter).padding(12.dp).padding(top = 36.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RouteTopBar("6 Impasse Miguel Villabona", favorite = false, {}, {}, {})
+                    RouteTopBar("Capitole de Toulouse", favorite = false, {}, {}, {})
                     RouteFromBar("Ma position", onSwap = {})
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {

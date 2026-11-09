@@ -130,7 +130,7 @@ JVM :
 - Parseur Valhalla : `exitToward` depuis la fixture.
 - Commande : `.\gradlew.bat testDebugUnitTest :core:model:test :core:common:test --offline -q`.
 
-Appareil (HONOR Magic 8 Pro, `AREE026226000174`) : `assembleDebug`, installation, trajet simulé ou réel avec une sortie ; captures portrait / paysage (`adb exec-out screencap`) ; `logcat -d | grep FATAL`.
+Appareil (HONOR Magic 8 Pro, `(numéro de série retiré)`) : `assembleDebug`, installation, trajet simulé ou réel avec une sortie ; captures portrait / paysage (`adb exec-out screencap`) ; `logcat -d | grep FATAL`.
 
 ## Suivi
 

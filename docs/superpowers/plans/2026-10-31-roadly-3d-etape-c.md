@@ -13,7 +13,7 @@
 - Le style Roadly est un asset JSON généré une fois par un script PowerShell déterministe, à partir des styles OpenFreeMap enregistrés dans le dépôt. Le script et l'asset sont commités, et un test JVM vérifie l'asset.
 - À l'écran, les mises à jour de la carte passent par un `snapshotFlow` unique, hors recomposition des overlays. Les nouveaux états du ViewModel sont des `StateFlow` séparées : `cameraMode`, `recenterInSeconds`, `mapDetail`. Le `combine` de `uiState` n'est pas touché.
 
-**Pile technique :** Kotlin 2.2.10, Jetpack Compose (BOM 2026.05.00), Hilt 2.58, MapLibre Android 11.13.5, styles et tuiles OpenFreeMap (schéma OpenMapTiles), DataStore Preferences 1.1.7, kotlinx.serialization (lecture du style dans les tests), JUnit 4.13.2, kotlinx-coroutines-test, Turbine, Windows PowerShell 5.1 (génération du style), adb (HONOR `AREE026226000174`).
+**Pile technique :** Kotlin 2.2.10, Jetpack Compose (BOM 2026.05.00), Hilt 2.58, MapLibre Android 11.13.5, styles et tuiles OpenFreeMap (schéma OpenMapTiles), DataStore Preferences 1.1.7, kotlinx.serialization (lecture du style dans les tests), JUnit 4.13.2, kotlinx-coroutines-test, Turbine, Windows PowerShell 5.1 (génération du style), adb (HONOR Magic 8 Pro).
 
 **Spécification :** `ROADLY_3D_NAVIGATION_PLAN.md`, § « Étape C — Carte 3D » (C1 à C3 et leurs critères d'acceptation). Lire aussi :
 - `ROADLY_3D_NAVIGATION_TESTS.md` : scénarios 15 et 19, ligne « Performance » des vérifications supplémentaires, journal ;
@@ -53,7 +53,7 @@
 **Interface et appareil**
 - Pas de `Color(0x…)` dans les écrans. Les couleurs CSS `#RRGGBB` du style JSON et de `MapController` ne sont pas des couleurs Compose et sont admises.
 - Les chaînes d'interface sont en français, dans `strings.xml`.
-- Appareil : HONOR `adb -s AREE026226000174`, identifiant d'application `fr.roadly` (debug, débogable). Le fichier DataStore est `files/datastore/roadly_prefs.preferences_pb`.
+- Appareil : HONOR `adb -s (numéro de série retiré)`, identifiant d'application `fr.roadly` (debug, débogable). Le fichier DataStore est `files/datastore/roadly_prefs.preferences_pb`.
 - Modifier `ROADLY_3D_NAVIGATION_TESTS.md` uniquement avec l'outil Edit, en gardant les accents.
 
 ---
@@ -2709,7 +2709,7 @@ $base = "C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-perf-base"
 git worktree add $base c4d05ef
 Copy-Item "C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\local.properties" $base
 & "$base\gradlew.bat" -p $base :app:assembleDebug --offline -q
-adb -s AREE026226000174 install -r "$base\app\build\outputs\apk\debug\app-debug.apk"
+adb -s (numéro de série retiré) install -r "$base\app\build\outputs\apk\debug\app-debug.apk"
 ```
 
 Conditions, à fixer par l'utilisateur et identiques avant et après :
@@ -2722,7 +2722,7 @@ Conditions, à fixer par l'utilisateur et identiques avant et après :
 Puis :
 
 ```powershell
-$d = 'AREE026226000174'
+$d = '(numéro de série retiré)'
 adb -s $d shell dumpsys gfxinfo fr.roadly reset
 Start-Sleep -Seconds 120
 adb -s $d shell dumpsys gfxinfo fr.roadly | Select-String "Total frames rendered|Janky frames|50th percentile|90th percentile|95th percentile|99th percentile"
@@ -2745,7 +2745,7 @@ Noter la ligne `UID u0a<n>` qui correspond à `userId=10<n>` (en mAh), et le « 
 - [ ] **Étape 3 : mesure du build courant (après).**
 
 ```powershell
-adb -s AREE026226000174 install -r app\build\outputs\apk\debug\app-debug.apk
+adb -s (numéro de série retiré) install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
 Avant toute mesure, ouvrir Réglages → Fournisseurs → Serveurs et toucher « Réinitialiser » : des URL https enregistrées plus tôt masqueraient le style embarqué (écart 11). Vérifier que les champs de style affichent `asset://styles/roadly-…json`.
@@ -2753,9 +2753,9 @@ Avant toute mesure, ouvrir Réglages → Fournisseurs → Serveurs et toucher «
 Refaire exactement l'étape 2 (gfxinfo 120 s, batterie 20 min), avec en plus le journal du rendu :
 
 ```powershell
-adb -s AREE026226000174 logcat -c
+adb -s (numéro de série retiré) logcat -c
 # … pendant les 120 s de gfxinfo …
-adb -s AREE026226000174 logcat -d -s RoadlyFps:D
+adb -s (numéro de série retiré) logcat -d -s RoadlyFps:D
 ```
 
 Noter la moyenne des valeurs « carte N i/s » affichées pendant les 120 s.
@@ -2783,7 +2783,7 @@ git worktree remove --force "C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GP
 Captures (thème sombre, guidage en cours) :
 
 ```powershell
-$d = 'AREE026226000174'
+$d = '(numéro de série retiré)'
 adb -s $d shell screencap -p /sdcard/Download/roadly-c-nuit-3d.png
 adb -s $d pull /sdcard/Download/roadly-c-nuit-3d.png docs\captures\etape-c\nuit-3d.png
 ```
@@ -2797,7 +2797,7 @@ Même procédure pour `nuit-2d.png` (après le bouton 2D), `nuit-nord.png` (nord
 1. **Style hors ligne.**
    - Lancer l'application une fois en ligne : les tuiles se mettent en cache.
    - Fermer l'application et activer le mode avion (action de l'utilisateur). Relancer : le style Roadly se charge depuis l'asset, et les zones en cache s'affichent avec la palette Roadly.
-   - `adb -s AREE026226000174 logcat -d | Select-String -Pattern "Failed to load style|style.*error" -CaseSensitive:$false` ne doit rien renvoyer.
+   - `adb -s (numéro de série retiré) logcat -d | Select-String -Pattern "Failed to load style|style.*error" -CaseSensitive:$false` ne doit rien renvoyer.
    - Désactiver le mode avion.
 2. **Hiérarchie lisible.** Autoroute plus large avec un liseré distinct, routes principales étagées, bretelles plus fines, tunnels en pointillé, ponts bordés d'un liseré plus sombre. Vérifier sur une zone connue de l'utilisateur ; les cas « tunnel / pont » réels relèvent des essais en roulant.
 3. **Points d'intérêt.** Au zoom 14 ou plus, près d'une station-service ou d'un parking : icône et nom visibles. Au zoom 16, autres points d'intérêt en texte.
@@ -2809,7 +2809,7 @@ Même procédure pour `nuit-2d.png` (après le bouton 2D), `nuit-nord.png` (nord
 1. **Mort du processus (scénario 14).** Démarrer un guidage, puis :
 
 ```powershell
-$d = 'AREE026226000174'
+$d = '(numéro de série retiré)'
 $appPid = (adb -s $d shell pidof fr.roadly).Trim()
 adb -s $d shell run-as fr.roadly kill -9 $appPid
 adb -s $d shell "run-as fr.roadly cat files/datastore/roadly_prefs.preferences_pb" | Select-String "guidance.last"
@@ -2865,7 +2865,7 @@ Nouveau :
 ```markdown
 ## Performance (C3) — mesures
 
-Conditions : HONOR `AREE026226000174`, guidage stationnaire vers <destination notée>, thème sombre, Carte 3D, luminosité manuelle, économiseur coupé, <date>.
+Conditions : HONOR Magic 8 Pro, guidage stationnaire vers <destination notée>, thème sombre, Carte 3D, luminosité manuelle, économiseur coupé, <date>.
 
 | Mesure (commande) | Avant (`c4d05ef`) | Après (`<empreinte>`) |
 |---|---|---|

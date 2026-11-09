@@ -1139,7 +1139,7 @@ PowerShell (arrière-plan) : `.\gradlew.bat testDebugUnitTest :core:model:test :
 - [ ] **Step 3 : installation et essai sur le HONOR**
 
 ```bash
-adb -s AREE026226000174 install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s (numéro de série retiré) install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Lancer un guidage (destination à > 2 km avec au moins un virage ; si le téléphone est immobile, utiliser une position simulée : Options développeur → application de position fictive, ou l'écran de recherche puis « Rouler » et observer la caméra au premier `progress`). Vérifier : carte inclinée orientée selon le cap, voiture dans le tiers bas (portrait) / bas-droite (paysage), bâtiments visibles en ville (zoom ≥ 15), flèche + panneau « SORTIE n » à moins de 150 m d'un virage, `LaneStrip` visible bandeau replié en approche, bouton Recentrer → retour en 3D, réglage « Carte 3D » désactivé → carte plate zoom 17, économiseur de batterie activé → bâtiments masqués.
@@ -1147,8 +1147,8 @@ Lancer un guidage (destination à > 2 km avec au moins un virage ; si le télép
 Captures :
 
 ```bash
-adb -s AREE026226000174 exec-out screencap -p > "C:/Users/FORZAP~1/AppData/Local/Temp/claude/C--Users-Forza-PC-Documents-Yannis-Projet-Yannis-GPS/2cf31ddc-48c6-40e0-a417-479338457359/scratchpad/nav3d-portrait.png"
-adb -s AREE026226000174 logcat -d | grep -i FATAL
+adb -s (numéro de série retiré) exec-out screencap -p > "C:/Users/FORZAP~1/AppData/Local/Temp/claude/C--Users-Forza-PC-Documents-Yannis-Projet-Yannis-GPS/2cf31ddc-48c6-40e0-a417-479338457359/scratchpad/nav3d-portrait.png"
+adb -s (numéro de série retiré) logcat -d | grep -i FATAL
 ```
 
 Aucune ligne FATAL attendue.

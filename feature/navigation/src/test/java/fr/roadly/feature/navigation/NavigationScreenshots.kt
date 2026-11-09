@@ -73,7 +73,7 @@ class NavigationScreenshots {
                         title = "Horizon", modifier = Modifier.weight(1f),
                     )
                 }
-                NavigationBottomPanel(state, expanded = false, destinationName = "6 Impasse Miguel Villabona", {}, {}, {}, {}, {}, {})
+                NavigationBottomPanel(state, expanded = false, destinationName = "Capitole de Toulouse", {}, {}, {}, {}, {}, {})
             }
         }
     }
