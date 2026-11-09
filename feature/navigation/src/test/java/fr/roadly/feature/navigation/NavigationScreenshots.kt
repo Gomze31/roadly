@@ -74,7 +74,10 @@ class NavigationScreenshots {
                     SpeedBadge(0.0, 50)
                     Spacer(Modifier.width(10.dp))
                     HorizonStrip(
-                        listOf(HorizonItem(HorizonKind.CLOSURE, 420.0, "dans 25 s", "fermeture"), HorizonItem(HorizonKind.MANEUVER, 600.0, "600 m", "rond-point")),
+                        listOf(
+                            HorizonItem(HorizonKind.TRAFFIC_LIGHT, 180.0, "180 m · feu", "feu"), HorizonItem(HorizonKind.CLOSURE, 420.0, "dans 25 s", "fermeture"),
+                            HorizonItem(HorizonKind.MANEUVER, 600.0, "600 m", "rond-point"), HorizonItem(HorizonKind.TOLL, 2_400.0, "2,4 km · péage", "péage"),
+                        ),
                         title = "Horizon", modifier = Modifier.weight(1f),
                     )
                 }

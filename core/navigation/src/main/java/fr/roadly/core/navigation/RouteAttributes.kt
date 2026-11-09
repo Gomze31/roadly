@@ -44,6 +44,10 @@ data class RouteAttributes(
     val totalM: Double,
     val speedLimits: List<SpeedLimitSpan>,
     val tollGantries: List<TollGantry>,
+    /** Gares de péage à barrières (abscisses, une par gare : les guichets voisins sont fusionnés). */
+    val tollBooths: List<Double> = emptyList(),
+    /** Feux tricolores (abscisses ; ceux d'un même carrefour sont fusionnés). */
+    val trafficSignals: List<Double> = emptyList(),
 ) {
     /** Part du tracé (0..1) dont la limitation est connue. */
     val coverage: Double get() = if (totalM <= 0.0) 0.0 else (speedLimits.sumOf { it.endAlongM - it.startAlongM } / totalM).coerceIn(0.0, 1.0)
@@ -82,13 +86,26 @@ data class RouteAttributes(
 }
 
 /** Arête Valhalla réduite à ce qu'utilise le profil. */
-data class RouteEdge(val lengthM: Double, val speedLimitKmh: Int?, val endNodeType: String?, val names: List<String>, val countryCode: String?)
+data class RouteEdge(
+    val lengthM: Double,
+    val speedLimitKmh: Int?,
+    val endNodeType: String?,
+    val names: List<String>,
+    val countryCode: String?,
+    val endTrafficSignal: Boolean = false,
+)
 
 object RouteAttributesBuilder {
     /** Une arête sans limitation plus courte que ceci (carrefour, bretelle courte) prolonge la limitation précédente. */
     const val ABSORB_UNKNOWN_M = 40.0
     /** Écart admis entre la longueur Valhalla des arêtes et celle de la géométrie ; au-delà, le profil n'est pas fiable. */
     const val MAX_LENGTH_MISMATCH = 0.05
+    /** Guichets d'une même gare de péage (un nœud par voie) : fusionnés en deçà de cet écart. */
+    const val TOLL_PLAZA_MERGE_M = 400.0
+    /** Feux d'un même carrefour (un par branche) : fusionnés en deçà de cet écart. */
+    const val SIGNAL_MERGE_M = 40.0
+
+    private fun MutableList<Double>.addMerged(at: Double, mergeM: Double) { if (isEmpty() || at - last() > mergeM) add(at) }
 
     /** Null si les arêtes ne correspondent pas à la géométrie (longueurs trop différentes). */
     fun build(routeId: String, geometryTotalM: Double, edges: List<RouteEdge>): RouteAttributes? {
@@ -98,6 +115,8 @@ object RouteAttributesBuilder {
         if (kotlin.math.abs(scale - 1.0) > MAX_LENGTH_MISMATCH) return null
         val spans = ArrayList<SpeedLimitSpan>()
         val gantries = ArrayList<TollGantry>()
+        val booths = ArrayList<Double>()
+        val signals = ArrayList<Double>()
         var at = 0.0
         for (e in edges) {
             val start = at * scale
@@ -111,8 +130,10 @@ object RouteAttributesBuilder {
                 contiguous && e.lengthM < ABSORB_UNKNOWN_M -> spans[spans.lastIndex] = last!!.copy(endAlongM = end)
             }
             if (e.endNodeType == "toll_gantry") gantries += TollGantry(end, e.names.firstOrNull(), e.countryCode)
+            if (e.endNodeType == "toll_booth") booths.addMerged(end, TOLL_PLAZA_MERGE_M)
+            if (e.endTrafficSignal) signals.addMerged(end, SIGNAL_MERGE_M)
         }
-        return RouteAttributes(routeId, geometryTotalM, spans, gantries)
+        return RouteAttributes(routeId, geometryTotalM, spans, gantries, booths, signals)
     }
 }
 
@@ -120,6 +141,7 @@ object RouteAttributesBuilder {
 object ValhallaRouteAttributes {
     val ATTRIBUTES = listOf(
         "edge.length", "edge.speed_limit", "edge.names", "edge.end_node", "node.type", "node.admin_index", "admin.country_code",
+        "node.traffic_signal",
     )
 
     fun request(encodedPolyline6: String, costing: String = "auto"): JsonObject = buildJsonObject {
@@ -147,7 +169,8 @@ object ValhallaRouteAttributes {
             val type = (node?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
             val country = (node?.get("admin_index") as? JsonPrimitive)?.takeIf { !it.isString }?.intOrNull?.let { countries.getOrNull(it) }
             val names = (o["names"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
-            RouteEdge(km * 1000.0, limit, type, names, country)
+            val signal = (node?.get("traffic_signal") as? JsonPrimitive)?.takeIf { !it.isString }?.content == "true"
+            RouteEdge(km * 1000.0, limit, type, names, country, signal)
         }
     }.getOrNull()
 }

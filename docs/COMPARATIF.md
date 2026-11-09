@@ -11,9 +11,10 @@ Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (foncti
 | Guidage vocal, voies, ronds-points | ✅ | ✅ | ✅ | ✅ | ✅ voies, numéro de sortie, panneaux, **carrefours en 3D** |
 | Route à venir en un coup d'œil | ? | ❌ | ? | ❌ | ✅ **Horizon** (manœuvres, virages, zones, incidents) |
 | Trafic et incidents en temps réel | ✅ communauté | ✅ | ✅ communauté | ❌ | 🟡 **incidents officiels Bison Futé** (routes nationales) + signalements communautaires ; pas de vitesse du trafic |
-| Recalcul selon le trafic | ✅ | ✅ | ? | ❌ | 🟡 recalcul hors itinéraire et à la demande ; pas de déviation automatique sur bouchon |
+| Recalcul selon le trafic | ✅ | ✅ | ? | ❌ | 🟡 **routes fermées (Bison Futé) contournées automatiquement**, au choix et au recalcul ; pas de déviation sur bouchon |
 | Radars, zones de danger | ✅ | ? | ✅ | ❌ | ✅ zones de vigilance issues de la liste officielle, sans point exact (règle française) |
 | Limitation de vitesse, alerte | ✅ | ? | ✅ | ? | ✅ OpenStreetMap, baisse annoncée, abaissée par la pluie |
+| Alerte péage, feux tricolores | ✅ (2026) | ? | ? | ❌ | ✅ « Péage dans 1 km » annoncé, gares et feux dans l'Horizon et sur la carte d'identité du trajet (OpenStreetMap) |
 | ZFE et Crit'Air | ? | ? | ? | ❌ | ✅ **base nationale**, verdict selon votre vignette, la date et les horaires |
 | Éviter péages, autoroutes, tunnels, ferries | ? | ✅ | ? | ✅ | ✅ les quatre, aussi à la voix |
 | Coût du trajet, prix des carburants | ? | ? | ? | ❌ | ✅ coût selon votre véhicule, **prix officiels** des stations |
@@ -31,7 +32,7 @@ Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (foncti
 ## Écarts restants, par priorité
 
 1. **Trafic fluide / chargé sur toutes les routes.** Waze et Google calculent la vitesse réelle à partir des téléphones de leurs utilisateurs. Aucune source ouverte équivalente n'existe en France ; Roadly affiche les incidents officiels et les signalements, sans couleur de densité.
-2. **Déviation automatique sur bouchon.** Possible à partir des incidents officiels (route fermée, bouchon long) en passant les zones à éviter à Valhalla (`exclude_polygons`) ; à faire.
+2. **Déviation automatique sur bouchon.** Les routes fermées sont déjà contournées (`exclude_polygons` Valhalla) ; pour un bouchon, il faudrait comparer le temps perdu annoncé au détour, ce que le flux officiel ne donne pas.
 3. **Navigation entièrement hors ligne.** Il faudrait embarquer un moteur d'itinéraires (Valhalla compilé pour Android, tuiles par région) : chantier important.
 4. **Voies et limitations partout.** Le serveur public FOSSGIS renvoie peu de voies ; un Valhalla auto-hébergé récent les fournit (voir [`API-PROVIDERS.md`](API-PROVIDERS.md)).
 5. **Commandes vocales dans Android Auto.** La reconnaissance vocale de la voiture passe par la bibliothèque Car App ; à brancher sur le même interpréteur.

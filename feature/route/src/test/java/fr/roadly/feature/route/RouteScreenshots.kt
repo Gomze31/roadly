@@ -82,7 +82,7 @@ class RouteScreenshots {
     @Composable
     private fun choiceContent() {
         val s = RouteUiState.Content(
-            GeoPoint(43.6, 1.44), "Capitole de Toulouse", listOf(option("a", 17, 5.3, cost = 0.62), option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
+            GeoPoint(43.6, 1.44), "Capitole de Toulouse", listOf(option("a", 17, 5.3, cost = 0.62).let { it.copy(route = it.route.copy(avoidedClosures = 1)) }, option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
             activeId = "a", hasVehicleProfile = true, departAtEpochMs = System.currentTimeMillis(), dangerZones = mapOf("c" to 1),
             zfe = mapOf("a" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN)), "b" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.ALLOWED))),
             traffic = mapOf("a" to listOf(jam), "b" to listOf(jam)),

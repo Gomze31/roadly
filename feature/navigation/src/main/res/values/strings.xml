@@ -27,6 +27,8 @@
     <string name="nav_horizon_maneuver">manœuvre</string>
     <string name="nav_horizon_curve">virage</string>
     <string name="nav_horizon_zone">zone de vigilance</string>
+    <string name="nav_horizon_toll">péage</string>
+    <string name="nav_horizon_light">feu</string>
     <string name="nav_horizon_zone_limit">zone · %1$d</string>
     <string name="nav_zone_active">Zone de danger</string>
     <string name="nav_danger_in">dans %1$s</string>

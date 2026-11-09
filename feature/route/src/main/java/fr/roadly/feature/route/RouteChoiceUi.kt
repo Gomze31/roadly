@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -196,6 +197,13 @@ internal fun RouteChoicePanel(
                         StatusPill(
                             if (hits.size == 1) stringResource(R.string.route_incident_one) else stringResource(R.string.route_incident_n, hits.size),
                             Icons.Default.Warning, c.accent, onClick = { onTraffic(hits) },
+                        )
+                    }
+                    // Route fermée (Bison Futé) contournée automatiquement : dit pourquoi le tracé peut sembler plus long.
+                    if (active.route.avoidedClosures > 0) {
+                        StatusPill(
+                            pluralStringResource(R.plurals.route_closures_avoided, active.route.avoidedClosures, active.route.avoidedClosures),
+                            Icons.Default.Block, c.success,
                         )
                     }
                     // Rappel des options d'évitement actives (pour ne jamais rouler sans savoir qu'on évite les péages, par exemple).

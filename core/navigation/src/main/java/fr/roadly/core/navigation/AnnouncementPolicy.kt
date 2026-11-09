@@ -116,6 +116,9 @@ internal object SpokenPhrases {
         if (countryCode == "FR") "Péage en flux libre. Pensez à le payer en ligne sous 72 heures."
         else "Péage sans barrière. Vérifiez comment le payer."
 
+    /** Gare de péage à barrières devant : rappel pour préparer le paiement (annoncé une fois par gare). */
+    fun tollBooth(meters: Double): String = "Péage dans ${distance(meters)}. Préparez votre moyen de paiement."
+
     fun inDistance(meters: Double, instruction: String): String =
         "Dans ${distance(meters)}, ${instruction.replaceFirstChar { it.lowercase(Locale.FRANCE) }}"
 

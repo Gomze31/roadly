@@ -555,8 +555,18 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
         val what = stringResource(r.report.kind.labelRes())
         HorizonItem(r.report.kind.horizonKind(), r.distanceM, "${r.distanceText} · $what", "$what dans ${r.distanceText}")
     }
-    val hazards = state.hazards.map { h ->
+    // Feux : seul le prochain, à moins d'1 km (en ville, la liste entière noierait le ruban).
+    val firstLight = state.hazards.firstOrNull { it.kind == HazardKind.TRAFFIC_LIGHT && it.distanceM <= TRAFFIC_LIGHT_HORIZON_M }
+    val hazards = state.hazards.filter { it.kind != HazardKind.TRAFFIC_LIGHT || it === firstLight }.map { h ->
         when (h.kind) {
+            HazardKind.TOLL_BOOTH -> {
+                val what = stringResource(R.string.nav_horizon_toll)
+                HorizonItem(HorizonKind.TOLL, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
+            }
+            HazardKind.TRAFFIC_LIGHT -> {
+                val what = stringResource(R.string.nav_horizon_light)
+                HorizonItem(HorizonKind.TRAFFIC_LIGHT, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
+            }
             HazardKind.CURVE -> {
                 val what = stringResource(R.string.nav_horizon_curve)
                 HorizonItem(HorizonKind.CURVE, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
@@ -569,6 +579,9 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
     }
     return (maneuvers + hazards + community).sortedBy { it.distanceM }
 }
+
+/** Portée des feux tricolores dans l'Horizon (m). */
+private const val TRAFFIC_LIGHT_HORIZON_M = 1_000.0
 
 /** Zone de danger (Radar Intelligence), prochaine limitation, péage en flux libre et pluie, au-dessus du compteur. */
 @Composable

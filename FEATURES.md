@@ -2,7 +2,7 @@
 
 Référentiel : `docs/SILLAXE-ANALYSE.md` (fonctions vérifiées sur les pages publiques de Sillaxe) et `docs/BENCHMARK-SILLAXE.md` (sources de données et contraintes). Statuts : **non commencée** · **en cours** · **fonctionnelle** · **bloquée** (dépend d'une source externe non configurée). « Palier Sillaxe » = gratuit (G) ou Sillaxe+ (+) chez Sillaxe ; Roadly ne reproduit pas le modèle économique, l'information sert à prioriser.
 
-Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage en flux libre, véhicule garé — voir `docs/ROADLY-1.0.md`). Auparavant : 2026-10-31 (LOT 1 design system). La matrice de parité complète avec Sillaxe est dans `SILLAXE_PARITY.md` (référence pour les lots suivants) ; le design system est décrit dans `docs/DESIGN-SYSTEM.md`.
+Mise à jour : 2026-11-09 (péage annoncé, feux, routes fermées contournées). Auparavant : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage en flux libre, véhicule garé — voir `docs/ROADLY-1.0.md`). Auparavant : 2026-10-31 (LOT 1 design system). La matrice de parité complète avec Sillaxe est dans `SILLAXE_PARITY.md` (référence pour les lots suivants) ; le design system est décrit dans `docs/DESIGN-SYSTEM.md`.
 
 État de la Phase 2 : code livré, 224 tests unitaires (JVM) et 3 tests instrumentés passent. Vérifié sur HONOR Magic 8 Pro (Android 17) **à l'arrêt** : démarrage du guidage, service de premier plan, notification et son action « Arrêter », voix et focus audio, écran maintenu allumé, refus de `POST_NOTIFICATIONS` sans plantage. **Non vérifié en conduite** : recalcul, paliers d'annonces, arrivée, « GPS perdu ».
 
@@ -167,6 +167,8 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Profils véhicule PL / taxi / dimensions | + | fonctionnelle | 4 | LOT 7 ; un seul profil enregistré |
 | Partage de trajet en direct | + | non commencée | 4 | Supabase + page web |
 | Rappel péage flux libre | + | fonctionnelle | 1.0 | Portiques OSM `toll_gantry` du profil du tracé ; annonce au premier passage, rappel sur l'accueil (France : échéance 72 h) jusqu'à « C'est payé » ; aucun montant ; testé JVM |
+| Alerte gare de péage, feux tricolores | + | fonctionnelle | 1.1 | Nœuds OSM `toll_booth` et `traffic_signal` du profil `trace_attributes` ; gares voisines fusionnées (400 m) ; annonce « Péage dans 1 km » une fois par gare (1,2 km → 300 m), Horizon (prochain feu à moins d'1 km), carte d'identité du trajet ; contrôle réel Toulouse → Carcassonne : 2 gares |
+| Contournement des routes fermées | + | fonctionnelle | 1.1 | Fermetures Bison Futé en cours dans le sens du trajet : nouveau calcul avec `exclude_polygons` (carrés de 80 m), deux passes au plus, tracé d'origine gardé sans autre chemin ; pastille « Route fermée évitée » ; s'applique aussi au recalcul en guidage et à Android Auto ; contrôle réel sur les fermetures du 2026-11-09 (D8, N122) |
 | Replay des trajets | + | fonctionnelle | 4 | LOT 9 |
 | Historique des dépenses | + | non commencée | 4 | |
 | Personnalisation (teintes, icône, silhouettes) | + | en cours | 5 | 5 teintes de cockpit (LOT 10) ; icône, silhouettes : non commencées |

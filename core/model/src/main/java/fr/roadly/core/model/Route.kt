@@ -123,6 +123,8 @@ data class Route(
     val elevationIntervalM: Double? = null,
     /** Variante trottinette calculée (null = itinéraire motorisé). */
     val scooterGoal: ScooterRouteGoal? = null,
+    /** Routes fermées (incidents officiels) contournées par ce tracé ; 0 = aucune. */
+    val avoidedClosures: Int = 0,
 )
 
 data class RouteRequest(

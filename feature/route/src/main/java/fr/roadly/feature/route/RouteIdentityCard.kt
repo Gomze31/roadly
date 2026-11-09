@@ -23,20 +23,21 @@ import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.navigation.RouteIdentity
 
 /**
- * S5 — carte d'identité de l'itinéraire choisi : part à limitation connue, temps sur routes à plus de 90, portiques de péage en flux
- * libre, zones de danger. Chaque valeur vient du profil réel du tracé ; « — » quand elle n'est pas connue.
+ * S5 — carte d'identité de l'itinéraire choisi : feux, temps sur routes à plus de 90, péages (gares et flux libre), zones de danger.
+ * La part à limitation connue reste dans la description lue par TalkBack. Chaque valeur vient du profil réel du tracé ; « — » quand elle n'est pas connue.
  */
 @Composable
 internal fun RouteIdentityCard(identity: RouteIdentity, dangerZones: Int?, modifier: Modifier = Modifier) {
     val c = LocalRoadlyColors.current
     val fast = identity.fastRoadMinutes
     val stats = listOf(
-        stringResource(R.string.route_identity_percent, identity.knownLimitPercent) to stringResource(R.string.route_identity_known_limit),
+        identity.trafficSignals.toString() to pluralStringResource(R.plurals.route_identity_lights, identity.trafficSignals),
         (fast?.let { stringResource(R.string.route_identity_minutes, it) } ?: "—") to stringResource(R.string.route_identity_fast_roads, RouteIdentity.FAST_ROAD_ABOVE_KMH),
-        identity.tollGantries.toString() to pluralStringResource(R.plurals.route_identity_gantries, identity.tollGantries),
+        identity.tolls.toString() to pluralStringResource(R.plurals.route_identity_tolls, identity.tolls),
         (dangerZones?.toString() ?: "—") to pluralStringResource(R.plurals.route_identity_zones, dangerZones ?: 2),
     )
-    val description = stats.joinToString(", ") { "${it.first} ${it.second}" }
+    val known = stringResource(R.string.route_identity_percent, identity.knownLimitPercent) + " " + stringResource(R.string.route_identity_known_limit)
+    val description = (stats.map { "${it.first} ${it.second}" } + known).joinToString(", ")
     Column(
         modifier.fillMaxWidth().border(1.dp, c.glassBorder, RoadlyShapes.Tile)
             .padding(horizontal = RoadlySpacing.sm, vertical = RoadlySpacing.s)

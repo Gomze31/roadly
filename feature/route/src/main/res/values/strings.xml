@@ -45,10 +45,20 @@
     <string name="route_identity_known_limit">limitation connue</string>
     <string name="route_identity_minutes">%1$d min</string>
     <string name="route_identity_fast_roads">à plus de %1$d</string>
-    <plurals name="route_identity_gantries">
-        <item quantity="one">péage flux libre</item>
-        <item quantity="many">péages flux libre</item>
-        <item quantity="other">péages flux libre</item>
+    <plurals name="route_closures_avoided">
+        <item quantity="one">Route fermée évitée</item>
+        <item quantity="many">%d routes fermées évitées</item>
+        <item quantity="other">%d routes fermées évitées</item>
+    </plurals>
+    <plurals name="route_identity_lights">
+        <item quantity="one">feu</item>
+        <item quantity="many">feux</item>
+        <item quantity="other">feux</item>
+    </plurals>
+    <plurals name="route_identity_tolls">
+        <item quantity="one">péage</item>
+        <item quantity="many">péages</item>
+        <item quantity="other">péages</item>
     </plurals>
     <plurals name="route_identity_zones">
         <item quantity="one">zone de danger</item>
