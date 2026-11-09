@@ -7,6 +7,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.pollNearby
+import fr.roadly.core.data.traffic.asReport
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.UserPreferencesRepository
@@ -74,6 +75,8 @@ class NavigationViewModel @Inject constructor(
     private val scooter: ScooterServices? = null,
     /** Fausses alertes (zones masquées) ; défaut immuable pour les tests existants. */
     private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
+    /** Incidents officiels Bison Futé ; null (tests existants) = aucun. */
+    private val traffic: fr.roadly.core.data.traffic.TrafficSource? = null,
 ) : ViewModel() {
     /** Zone de danger dont l'utilisateur veut signaler une fausse alerte (confirmation affichée) ; null = aucune. */
     private val _zoneToHide = MutableStateFlow<String?>(null)
@@ -94,7 +97,30 @@ class NavigationViewModel @Inject constructor(
     fun cancelHideZone() { _zoneToHide.value = null }
     val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     /** Signalements autour de la position projetée (toutes les 60 s), affichés sur la carte. */
-    val reports: StateFlow<List<CommunityReport>> = community.pollNearby({ (session.state.value as? NavigationState.Guiding)?.progress?.snapped }).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val communityReports = community.pollNearby({ (session.state.value as? NavigationState.Guiding)?.progress?.snapped })
+
+    /**
+     * Incidents officiels (Bison Futé) sur le tracé courant, dans le sens de circulation, rafraîchis toutes les 5 minutes
+     * pendant le guidage ; montrés comme des signalements (carte, Horizon).
+     */
+    private val officialReports: kotlinx.coroutines.flow.Flow<List<CommunityReport>> = traffic?.let { src ->
+        kotlinx.coroutines.flow.flow {
+            while (true) {
+                val g = session.state.value as? NavigationState.Guiding
+                if (g != null) {
+                    val events = try { src.events() } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                    val now = System.currentTimeMillis()
+                    emit(kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        fr.roadly.core.data.traffic.TrafficOnRoute.along(g.route.geometry, events).map { it.asReport(now) }
+                    })
+                } else emit(emptyList())
+                kotlinx.coroutines.delay(fr.roadly.core.data.traffic.TrafficRepository.MAX_AGE_MS)
+            }
+        }
+    } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    val reports: StateFlow<List<CommunityReport>> = combine(communityReports, officialReports) { a, b -> a + b }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val _reportMessage = MutableStateFlow<String?>(null)
     val reportMessage: StateFlow<String?> = _reportMessage
 

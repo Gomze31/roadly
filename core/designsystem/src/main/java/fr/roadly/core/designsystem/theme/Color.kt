@@ -131,3 +131,5 @@ object RoadlyColors {
 
 val LocalRoadlyColors = staticCompositionLocalOf { RoadlyColors.Night }
 val LocalDrivingMode = staticCompositionLocalOf { false }
+/** L'activité est en mode image dans l'image (petite fenêtre) : les écrans affichent une version réduite. */
+val LocalPictureInPicture = androidx.compose.runtime.compositionLocalOf { false }

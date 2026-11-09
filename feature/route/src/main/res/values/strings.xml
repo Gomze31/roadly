@@ -78,4 +78,22 @@
     <string name="route_zfe_info">Site d\'information</string>
     <string name="route_zfe_set_critair">Renseigner ma vignette</string>
     <string name="route_time_confirm_ok">OK</string>
+    <string name="route_incident_one">Incident détecté</string>
+    <string name="route_incident_n">%1$d incidents</string>
+    <plurals name="route_incidents">
+        <item quantity="one">%1$d incident sur cet itinéraire</item>
+        <item quantity="other">%1$d incidents sur cet itinéraire</item>
+    </plurals>
+    <string name="route_traffic_title">Sur votre itinéraire</string>
+    <string name="route_traffic_at">à %1$s du départ</string>
+    <string name="route_traffic_source">Événements publiés par Bison Futé (routes nationales), mis à jour toutes les 5 minutes.</string>
+    <string name="route_traffic_accident">Accident</string>
+    <string name="route_traffic_jam">Bouchon</string>
+    <string name="route_traffic_slow">Ralentissement</string>
+    <string name="route_traffic_broken">Véhicule en panne</string>
+    <string name="route_traffic_closure">Route fermée</string>
+    <string name="route_traffic_obstacle">Obstacle</string>
+    <string name="route_traffic_weather">Conditions météo</string>
+    <string name="route_traffic_lanes">Voie fermée</string>
+    <string name="route_traffic_works">Travaux</string>
 </resources>

@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CarCrash
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsBoat
@@ -157,6 +159,7 @@ internal fun RouteChoicePanel(
     onOptimize: () -> Unit,
     modifier: Modifier = Modifier,
     onZfe: (fr.roadly.core.data.zfe.ZfeCrossing) -> Unit = {},
+    onTraffic: (List<fr.roadly.core.data.traffic.TrafficHit>) -> Unit = {},
 ) {
     val c = LocalRoadlyColors.current
     val active = s.options.firstOrNull { it.route.id == s.activeId } ?: s.options.first()
@@ -185,7 +188,14 @@ internal fun RouteChoicePanel(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // ZFE en premier : une interdiction doit se voir sans faire défiler.
+                    // Incidents officiels en premier (comme « Incident détecté » de la référence), puis la ZFE.
+                    s.traffic[active.route.id]?.filter { it.event.kind.notable }?.takeIf { it.isNotEmpty() }?.let { hits ->
+                        StatusPill(
+                            if (hits.size == 1) stringResource(R.string.route_incident_one) else stringResource(R.string.route_incident_n, hits.size),
+                            Icons.Default.Warning, c.accent, onClick = { onTraffic(hits) },
+                        )
+                    }
+                    // ZFE : une interdiction doit se voir sans faire défiler.
                     s.zfe[active.route.id]?.firstOrNull { it.verdict != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION }?.let { z ->
                         val (text, color) = zfePill(z)
                         StatusPill(text, Icons.Default.Eco, color, onClick = { onZfe(z) })
@@ -221,7 +231,10 @@ internal fun RouteChoicePanel(
             // Alternatives : durée, écart avec le choix, distance, icônes (péage, zones).
             s.options.filter { it.route.id != active.route.id }.forEach { o ->
                 RowDivider(inset = 0.dp)
-                AlternativeRow(o, active, s.dangerZones[o.route.id] ?: 0, onClick = { onSelect(o.route.id) }, zfe = s.zfe[o.route.id]?.firstOrNull()?.verdict)
+                AlternativeRow(
+                    o, active, s.dangerZones[o.route.id] ?: 0, onClick = { onSelect(o.route.id) }, zfe = s.zfe[o.route.id]?.firstOrNull()?.verdict,
+                    incidents = s.traffic[o.route.id]?.count { it.event.kind.notable } ?: 0,
+                )
             }
             RowDivider(inset = 0.dp)
             if (s.stops.isNotEmpty() || s.optimizing) {
@@ -258,7 +271,7 @@ internal fun StatusPill(text: String, icon: ImageVector, color: Color, onClick: 
 }
 
 @Composable
-private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int, onClick: () -> Unit, zfe: fr.roadly.core.data.zfe.ZfeVerdict? = null) {
+private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int, onClick: () -> Unit, zfe: fr.roadly.core.data.zfe.ZfeVerdict? = null, incidents: Int = 0) {
     val c = LocalRoadlyColors.current
     Row(
         Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.RadioButton, onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
@@ -278,6 +291,10 @@ private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int
         Spacer(Modifier.weight(1f))
         Text(Formatters.distance(o.route.distanceMeters), style = StatValue.copy(fontSize = 19.sp, fontWeight = FontWeight.ExtraBold), color = c.textPrimary)
         if (o.route.hasToll) { Spacer(Modifier.width(10.dp)); Icon(Icons.Default.Euro, contentDescription = stringResource(R.string.route_toll_yes), tint = c.accent, modifier = Modifier.size(20.dp)) }
+        if (incidents > 0) {
+            Spacer(Modifier.width(10.dp))
+            Icon(Icons.Default.CarCrash, contentDescription = pluralStringResource(R.plurals.route_incidents, incidents, incidents), tint = c.accent, modifier = Modifier.size(20.dp))
+        }
         if (zfe != null && zfe != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION) {
             Spacer(Modifier.width(10.dp))
             Icon(Icons.Default.Eco, contentDescription = stringResource(R.string.route_zfe_short), tint = zfeColor(zfe), modifier = Modifier.size(20.dp))
@@ -406,4 +423,49 @@ internal fun zfeShapes(byRoute: Map<String, List<fr.roadly.core.data.zfe.ZfeCros
         val worst = list.minBy { rank.indexOf(state(it.verdict)) }
         fr.roadly.core.map.ZfeShape(state(worst.verdict), worst.rule.polygons.map { p -> listOf(p.outer) + p.holes })
     }
+}
+
+@Composable
+private fun trafficLabel(k: fr.roadly.core.data.traffic.TrafficKind): String = stringResource(when (k) {
+    fr.roadly.core.data.traffic.TrafficKind.ACCIDENT -> R.string.route_traffic_accident
+    fr.roadly.core.data.traffic.TrafficKind.JAM -> R.string.route_traffic_jam
+    fr.roadly.core.data.traffic.TrafficKind.SLOW -> R.string.route_traffic_slow
+    fr.roadly.core.data.traffic.TrafficKind.BROKEN_DOWN -> R.string.route_traffic_broken
+    fr.roadly.core.data.traffic.TrafficKind.CLOSURE -> R.string.route_traffic_closure
+    fr.roadly.core.data.traffic.TrafficKind.OBSTACLE -> R.string.route_traffic_obstacle
+    fr.roadly.core.data.traffic.TrafficKind.WEATHER -> R.string.route_traffic_weather
+    fr.roadly.core.data.traffic.TrafficKind.LANE_CLOSURE -> R.string.route_traffic_lanes
+    fr.roadly.core.data.traffic.TrafficKind.ROADWORK -> R.string.route_traffic_works
+})
+
+/** Liste des incidents officiels de l'itinéraire choisi : nature, route, sens, distance depuis le départ, longueur de bouchon. */
+@Composable
+internal fun TrafficDialog(hits: List<fr.roadly.core.data.traffic.TrafficHit>, onDismiss: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surfaceElevated,
+        icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = c.accent) },
+        title = { Text(stringResource(R.string.route_traffic_title), style = MaterialTheme.typography.titleLarge, color = c.textPrimary) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                hits.take(12).forEach { h ->
+                    val e = h.event
+                    Column {
+                        Text(
+                            listOfNotNull(trafficLabel(e.kind), e.road).joinToString(" · ") +
+                                (e.queueLengthM?.let { " · " + Formatters.distance(it.toDouble()) } ?: ""),
+                            style = MaterialTheme.typography.titleSmall, color = c.textPrimary,
+                        )
+                        Text(
+                            listOfNotNull(stringResource(R.string.route_traffic_at, Formatters.distance(h.alongM)), e.direction, e.description).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall, color = c.textSecondary,
+                        )
+                    }
+                }
+                Text(stringResource(R.string.route_traffic_source), style = MaterialTheme.typography.bodySmall, color = c.textTertiary)
+            }
+        },
+        confirmButton = { fr.roadly.core.designsystem.component.GlassButton(stringResource(R.string.route_time_confirm_ok), onClick = onDismiss) },
+    )
 }

@@ -9,6 +9,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
 import fr.roadly.core.map.RouteLabelPlacement
+import fr.roadly.core.data.traffic.asReport
 import kotlin.math.roundToInt
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -119,6 +120,7 @@ fun RouteScreen(
     var showTimePicker by remember { mutableStateOf(false) }
     var detailsOpen by rememberSaveable { mutableStateOf(false) }
     var zfeShown by remember { mutableStateOf<fr.roadly.core.data.zfe.ZfeCrossing?>(null) }
+    var trafficShown by remember { mutableStateOf<List<fr.roadly.core.data.traffic.TrafficHit>?>(null) }
     var panelCollapsed by rememberSaveable { mutableStateOf(false) }
     val myPosition = stringResource(R.string.route_from_my_position)
     val context = LocalContext.current
@@ -133,6 +135,12 @@ fun RouteScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
+        // Incidents officiels de l'itinéraire choisi sur la carte (icônes des signalements).
+        LaunchedEffect((phase as? RouteUiState.Content)?.traffic, (phase as? RouteUiState.Content)?.activeId) {
+            val content = phase as? RouteUiState.Content
+            val now = System.currentTimeMillis()
+            map.setReports(content?.traffic?.get(content.activeId).orEmpty().map { it.asReport(now) })
+        }
         // Périmètres des ZFE traversées (une seule fois par agglomération, couleur selon le verdict le plus strict).
         LaunchedEffect((phase as? RouteUiState.Content)?.zfe) {
             map.setZfeZones(fr.roadly.core.map.ZfeFeatures.build(zfeShapes((phase as? RouteUiState.Content)?.zfe.orEmpty())))
@@ -250,6 +258,7 @@ fun RouteScreen(
                             onPreferences = vm::setPreferences,
                             onAddStop = onAddStop, onMoveStop = vm::moveStop, onRemoveStop = vm::removeStop, onOptimize = vm::optimizeStops,
                             onZfe = { zfeShown = it },
+                            onTraffic = { trafficShown = it },
                         )
                     }
                     RollButton(onClick = { onStartNavigation(vm::startGuidance) })
@@ -259,6 +268,7 @@ fun RouteScreen(
     }
 
     zfeShown?.let { z -> ZfeDialog(z, onOpenVehicle = onOpenSettings, onDismiss = { zfeShown = null }) }
+    trafficShown?.let { hits -> TrafficDialog(hits, onDismiss = { trafficShown = null }) }
 
     if (showTimePicker) {
         val now = Instant.now().atZone(ZoneId.systemDefault())

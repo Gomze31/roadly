@@ -96,4 +96,5 @@
     <string name="nav_share_eta_title">Envoyer mon heure d\'arrivée</string>
     <string name="nav_share_eta">J\'arrive à %1$s (dans %2$s). Envoyé depuis Roadly.</string>
     <string name="nav_share_eta_to">J\'arrive à %1$s à %2$s (dans %3$s). Envoyé depuis Roadly.</string>
+    <string name="nav_pip_eta">Arrivée %1$s</string>
 </resources>

@@ -1,6 +1,16 @@
 package fr.roadly.app
 
 import android.Manifest
+import kotlinx.coroutines.launch
+import fr.roadly.core.navigation.NavigationState
+import fr.roadly.core.navigation.NavigationSession
+import fr.roadly.core.designsystem.theme.LocalPictureInPicture
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.compose.runtime.CompositionLocalProvider
+import android.util.Rational
+import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -31,6 +41,9 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var location: LocationRepository
     @Inject lateinit var permissionEvents: PermissionEvents
     @Inject lateinit var navigator: AppNavigator
+    @Inject lateinit var session: NavigationSession
+    /** Mode image dans l'image en cours (petite fenêtre de guidage). */
+    private val inPip = MutableStateFlow(false)
     private val themeVm: ThemeViewModel by viewModels()
 
     /** Ouverture de l'écran de guidage demandée par la notification. */
@@ -66,6 +79,8 @@ class MainActivity : ComponentActivity() {
             val isDark = ThemeResolver.isDark(mode, isSystemInDarkTheme(), p?.lat, p?.lon, now)
             // Interface sombre en permanence (panneaux violets sur carte claire, comme la référence) ; la carte, elle, suit jour / nuit.
             // Seul le choix explicite « Clair » rend l'interface claire.
+            val pip by inPip.collectAsStateWithLifecycle()
+            CompositionLocalProvider(LocalPictureInPicture provides pip) {
             RoadlyTheme(darkTheme = isDark || mode != fr.roadly.core.data.repository.ThemeMode.LIGHT, tint = tint) {
                 RoadlyNavHost(
                     isDark = isDark,
@@ -79,7 +94,38 @@ class MainActivity : ComponentActivity() {
                     navRequests = navigator.requests,
                 )
             }
+            }
         }
+        // Image dans l'image : automatique pendant un guidage (Android 12+), désactivé sinon.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                session.state.collect { st -> updatePipParams(st is NavigationState.Guiding) }
+            }
+        }
+    }
+
+    private fun pipParams(guiding: Boolean): PictureInPictureParams {
+        val b = PictureInPictureParams.Builder().setAspectRatio(Rational(3, 4))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) b.setAutoEnterEnabled(guiding).setSeamlessResizeEnabled(false)
+        return b.build()
+    }
+
+    private fun updatePipParams(guiding: Boolean) {
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
+        runCatching { setPictureInPictureParams(pipParams(guiding)) }
+    }
+
+    /** Android 11 et moins : on quitte l'app (touche Accueil) pendant un guidage → petite fenêtre. */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && session.state.value is NavigationState.Guiding &&
+            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        ) runCatching { enterPictureInPictureMode(pipParams(true)) }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip.value = isInPictureInPictureMode
     }
 
     /** Toucher la notification de guidage ramène à l'écran de guidage (activité déjà ouverte). */

@@ -77,6 +77,8 @@ class RouteViewModel @Inject constructor(
     private val favorites: FavoritesRepository? = null,
     /** Base nationale des ZFE ; null (tests existants) = pas d'alerte ZFE. */
     private val zfe: fr.roadly.core.data.zfe.ZfeSource? = null,
+    /** Incidents officiels Bison Futé ; null (tests existants) = aucun. */
+    private val traffic: fr.roadly.core.data.traffic.TrafficSource? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -236,6 +238,24 @@ class RouteViewModel @Inject constructor(
         }
     }
 
+    /** Incidents officiels sur chaque variante (sens de circulation compris). */
+    private val trafficHits = MutableStateFlow<Map<String, List<fr.roadly.core.data.traffic.TrafficHit>>>(emptyMap())
+
+    init {
+        val source = traffic
+        if (source != null) viewModelScope.launch {
+            computed.collectLatest { s ->
+                trafficHits.value = emptyMap()
+                if (s !is RouteUiState.Content || s.scooter != null) return@collectLatest
+                val events = try { source.events() } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                if (events.isEmpty()) return@collectLatest
+                trafficHits.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    s.options.associate { o -> o.route.id to fr.roadly.core.data.traffic.TrafficOnRoute.along(o.route.geometry, events) }
+                }
+            }
+        }
+    }
+
     /**
      * S5 : carte d'identité de chaque variante (part à limitation connue, temps au-dessus de 90, portiques en flux libre). Une requête
      * `trace_attributes` par variante, mise en cache par le fournisseur (le guidage réutilise celle de la variante choisie).
@@ -263,8 +283,8 @@ class RouteViewModel @Inject constructor(
     val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings) { d, z -> d to z }, identities) { st, mode, reply, zones, ids ->
-        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, identities = ids) ?: st.phase
+    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings, trafficHits) { d, z, t -> Triple(d, z, t) }, identities) { st, mode, reply, zones, ids ->
+        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, traffic = zones.third, identities = ids) ?: st.phase
         st.copy(phase = phase, travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())

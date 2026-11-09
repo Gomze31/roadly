@@ -52,6 +52,8 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - **Horizon** : la route à venir en un coup d'œil (manœuvres, virages serrés, zones de vigilance, signalements).
 - Limitation de vitesse de la route (OpenStreetMap) et alerte de dépassement, annonce des baisses de limitation, limitation abaissée par temps de pluie.
 - Recalcul immédiat hors itinéraire, extrapolation dans les tunnels, carte 3D avec bâtiments.
+- **Incidents officiels Bison Futé** sur votre trajet (accident, bouchon et sa longueur, véhicule en panne, route fermée, travaux), dans le sens où vous roulez : pastille « Incident détecté », Horizon, carte, Android Auto.
+- **Image dans l'image** : quittez l'app, la prochaine manœuvre reste visible dans une petite fenêtre.
 - Envoyez votre heure d'arrivée en un geste.
 
 ### 🛣️ Itinéraires
@@ -83,6 +85,8 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - **Commandes vocales** : « Rentrer à la maison », « Évite les péages », « Signale un accident », « À quelle heure j'arrive ? »… Sans compte ni clé, rien n'est envoyé à un service d'IA.
 - Widget, raccourcis, ouverture des liens `geo:` et des demandes « Naviguer vers… ».
 - **Mises à jour intégrées** depuis les releases GitHub, vérifiées par empreinte.
+
+Comment Roadly se situe face à Waze, Google Maps, Coyote et Organic Maps : [`docs/COMPARATIF.md`](docs/COMPARATIF.md).
 
 ## Android Auto
 
@@ -148,6 +152,7 @@ Roadly existe grâce aux données ouvertes et aux projets libres :
 - Cartographie © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL), tuiles [OpenFreeMap](https://openfreemap.org), rendu [MapLibre](https://maplibre.org) (BSD-2).
 - Itinéraires [Valhalla](https://github.com/valhalla/valhalla), serveur public de [FOSSGIS](https://fossgis.de).
 - Adresses : [Base Adresse Nationale](https://adresse.data.gouv.fr) (Licence Ouverte 2.0) ; lieux : [Photon](https://photon.komoot.io).
+- Incidents de circulation : [Bison Futé](https://www.bison-fute.gouv.fr) (DATEX II, données publiques).
 - [Base nationale consolidée des ZFE](https://transport.data.gouv.fr/datasets/base-nationale-consolidee-des-zones-a-faibles-emissions), [prix des carburants](https://data.economie.gouv.fr), liste des équipements de contrôle routier : données publiques sous Licence Ouverte.
 - Météo : [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
 - Polices [Nunito](https://github.com/googlefonts/nunito) et [Inter](https://rsms.me/inter/) (SIL Open Font License 1.1).

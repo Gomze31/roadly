@@ -273,6 +273,8 @@ private fun NavigationContent(
             PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel, junctionSlot)
         }
         ReportResultPillNav(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp))
+        // Image dans l'image : la carte continue sous une carte opaque lisible à petite taille (manœuvre, distance, rue, arrivée).
+        if (fr.roadly.core.designsystem.theme.LocalPictureInPicture.current) PipGuidance(full, Modifier.fillMaxSize())
     }
 
     val communityEnabled by vm.communityEnabled.collectAsStateWithLifecycle()

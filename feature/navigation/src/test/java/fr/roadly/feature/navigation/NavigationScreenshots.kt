@@ -78,3 +78,29 @@ class NavigationScreenshots {
         }
     }
 }
+
+/** Rendu de la fenêtre image dans l'image, à sa taille réelle. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [35], qualifiers = "w160dp-h213dp-xhdpi")
+class PipScreenshots {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    private val dir = System.getProperty("roadly.screenshots.dir")
+
+    @Before fun enabled() = assumeTrue(dir != null)
+
+    @Test fun pip() {
+        val banner = BannerUi(ManeuverType.ROUNDABOUT_ENTER, "600 m", "Au rond-point, prenez la 2e sortie.", "Rd-pt du Pr Jean-Jacques Laffont", null, 2)
+        rule.setContent {
+            RoadlyTheme(darkTheme = true, drivingMode = true) {
+                PipGuidance(NavigationUiState(phase = NavigationPhase.GUIDING, banner = banner, etaClock = "14:03", roundabout = previewRoundabout(180.0, 2, "Rd-pt du Pr Jean-Jacques Laffont")), Modifier.fillMaxSize())
+            }
+        }
+        rule.waitForIdle()
+        val view = rule.activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        rule.runOnIdle { view.draw(android.graphics.Canvas(bmp)) }
+        File(dir!!).mkdirs()
+        File(dir, "navigation_pip.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+}

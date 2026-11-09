@@ -1,0 +1,44 @@
+# Roadly face aux GPS de référence
+
+Comparaison par aspect avec Waze, Google Maps, Coyote et Organic Maps (novembre 2026). Les colonnes des autres applications résument leurs points forts reconnus, pas une liste exhaustive. Pour Roadly, l'état fonction par fonction est dans [`FEATURES.md`](../FEATURES.md).
+
+Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (fonction non confirmée par les sources consultées).
+
+## Tableau
+
+| Aspect | Waze | Google Maps | Coyote | Organic Maps | **Roadly** |
+|---|---|---|---|---|---|
+| Guidage vocal, voies, ronds-points | ✅ | ✅ | ✅ | ✅ | ✅ voies, numéro de sortie, panneaux, **carrefours en 3D** |
+| Route à venir en un coup d'œil | ? | ❌ | ? | ❌ | ✅ **Horizon** (manœuvres, virages, zones, incidents) |
+| Trafic et incidents en temps réel | ✅ communauté | ✅ | ✅ communauté | ❌ | 🟡 **incidents officiels Bison Futé** (routes nationales) + signalements communautaires ; pas de vitesse du trafic |
+| Recalcul selon le trafic | ✅ | ✅ | ? | ❌ | 🟡 recalcul hors itinéraire et à la demande ; pas de déviation automatique sur bouchon |
+| Radars, zones de danger | ✅ | ? | ✅ | ❌ | ✅ zones de vigilance issues de la liste officielle, sans point exact (règle française) |
+| Limitation de vitesse, alerte | ✅ | ? | ✅ | ? | ✅ OpenStreetMap, baisse annoncée, abaissée par la pluie |
+| ZFE et Crit'Air | ? | ? | ? | ❌ | ✅ **base nationale**, verdict selon votre vignette, la date et les horaires |
+| Éviter péages, autoroutes, tunnels, ferries | ? | ✅ | ? | ✅ | ✅ les quatre, aussi à la voix |
+| Coût du trajet, prix des carburants | ? | ? | ? | ❌ | ✅ coût selon votre véhicule, **prix officiels** des stations |
+| Arrêts multiples, optimisation | 🟡 | 🟡 | ? | 🟡 | ✅ 10 arrêts, ordre optimisé |
+| Partir à / arriver à | ? | ✅ | ? | ❌ | ✅ |
+| Commandes vocales | ✅ | ✅ | ? | ❌ | ✅ **sur le téléphone, sans service d'IA** |
+| Android Auto | ✅ | ✅ | ? | ? | ✅ guidage, incidents, ZFE, vitesse |
+| Image dans l'image | ? | ✅ | ? | ? | ✅ |
+| Cartes hors connexion | ❌ | ✅ | ❌ | ✅ | 🟡 carte du trajet téléchargeable ; pas de calcul d'itinéraire hors ligne |
+| Vie privée | ❌ | ❌ | ? | ✅ | ✅ pas de compte, pas de traqueur, données ouvertes |
+| Code libre | ❌ | ❌ | ❌ | ✅ | ✅ GPL-3.0 |
+| Voiture garée, péages en flux libre, historique | ? | 🟡 | ? | ❌ | ✅ |
+| Transports en commun, marche, vélo | ❌ | ✅ | ❌ | ✅ | ❌ hors du champ (GPS voiture) ; mode trottinette |
+
+## Écarts restants, par priorité
+
+1. **Trafic fluide / chargé sur toutes les routes.** Waze et Google calculent la vitesse réelle à partir des téléphones de leurs utilisateurs. Aucune source ouverte équivalente n'existe en France ; Roadly affiche les incidents officiels et les signalements, sans couleur de densité.
+2. **Déviation automatique sur bouchon.** Possible à partir des incidents officiels (route fermée, bouchon long) en passant les zones à éviter à Valhalla (`exclude_polygons`) ; à faire.
+3. **Navigation entièrement hors ligne.** Il faudrait embarquer un moteur d'itinéraires (Valhalla compilé pour Android, tuiles par région) : chantier important.
+4. **Voies et limitations partout.** Le serveur public FOSSGIS renvoie peu de voies ; un Valhalla auto-hébergé récent les fournit (voir [`API-PROVIDERS.md`](API-PROVIDERS.md)).
+5. **Commandes vocales dans Android Auto.** La reconnaissance vocale de la voiture passe par la bibliothèque Car App ; à brancher sur le même interpréteur.
+6. **Bornes de recharge détaillées.** Puissance et connecteurs disponibles dans la base nationale IRVE (transport.data.gouv.fr) ; disponibilité temps réel non publiée librement.
+7. **Horaires d'ouverture des lieux.** Présents dans OpenStreetMap (`opening_hours`), pas encore lus.
+
+## Sources
+
+- Comparatifs Waze, Google Maps et Coyote : [Test Achats](https://www.test-achats.be/mobilite/autos/news/meilleure-app-gps-waze-ou-maps), [Fiches Auto](https://www.fiches-auto.fr/articles-auto/infractions-radars-exces-de-vitesse/s-2892-waze-vs-coyote-qui-est-le-plus-efficace-.php), [Presse-citron](https://www.presse-citron.net/meilleure-application-gps-laquelle-choisir-pour-prendre-la-route-sereinement/), [BGR](https://bgr.com/2180839/reasons-waze-better-worse-google-maps/).
+- Applications respectueuses de la vie privée : [Privacy Guides](https://www.privacyguides.org/fr/maps), [Proton](https://proton.me/learn/european-alternatives/european-navigation-maps).
