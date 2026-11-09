@@ -75,6 +75,9 @@ internal class RoadlyCarSession(private val deps: CarDependencies) : Session() {
                 .distinctUntilChanged()
                 .collect { renderer.setStyle(it) }
         }
+        lifecycleScope.launch(Dispatchers.Main) {
+            combine(deps.prefs.mapAerial, dark) { a, d -> a to d }.distinctUntilChanged().collect { (a, d) -> renderer.setAerial(a, d) }
+        }
         lifecycleScope.launch(Dispatchers.Main) { deps.navigation.state.collect(::onNavigationState) }
         lifecycleScope.launch(Dispatchers.Main) { deps.freeDrive.state.collect(::onFreeDriveState) }
         val home = CarHomeScreen(carContext, deps, renderer)

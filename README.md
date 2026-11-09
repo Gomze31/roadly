@@ -101,7 +101,7 @@ Comment Roadly se situe face à Waze, Google Maps, Coyote et Organic Maps : [`do
 
 ## Android Auto
 
-Roadly s'affiche sur l'écran de la voiture : recherche, favoris, choix de l'itinéraire, guidage pas à pas, conduite libre, vitesse et limitation sur la carte, alertes de zones et ZFE.
+Roadly s'affiche sur l'écran de la voiture : recherche, favoris, choix de l'itinéraire, guidage pas à pas, conduite libre, vitesse et limitation sur la carte, alertes de zones et ZFE, **photos aériennes IGN** (bouton sur l'accueil).
 
 <img src="docs/images/android-auto-hud.png" alt="Vitesse, limitation et alerte de zone sur la carte d'Android Auto" width="520">
 
