@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Subway
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.ElectricScooter
@@ -321,7 +322,7 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
             NavigationGroup(navigation, vm)
         }
         SettingsPage.ROUTES -> {
-            RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries, onTunnels = vm::setAvoidTunnels)
+            RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries, onTunnels = vm::setAvoidTunnels, onUnpaved = vm::setAvoidUnpaved)
             val zfe by vm.zfeEnabled.collectAsStateWithLifecycle()
             SettingsGroup(stringResource(R.string.settings_group_local_rules), footer = stringResource(R.string.settings_zfe_footer)) {
                 ToggleRow(stringResource(R.string.settings_zfe), checked = zfe, onCheckedChange = vm::setZfeEnabled, icon = Icons.Default.Eco, subtitle = stringResource(R.string.settings_zfe_sub), divider = false)
@@ -605,12 +606,13 @@ private fun DriverAidGroup(
 // ── Itinéraires ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit, onTunnels: (Boolean) -> Unit) {
+private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit, onTunnels: (Boolean) -> Unit, onUnpaved: (Boolean) -> Unit = {}) {
     SettingsGroup(stringResource(R.string.settings_group_routes)) {
         ToggleRow(stringResource(R.string.settings_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = onTolls, icon = Icons.Default.Euro)
         ToggleRow(stringResource(R.string.settings_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = onHighways, icon = Icons.Default.Route)
         ToggleRow(stringResource(R.string.settings_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = onTunnels, icon = Icons.Default.Subway)
-        ToggleRow(stringResource(R.string.settings_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = onFerries, icon = Icons.Default.DirectionsBoat, divider = false)
+        ToggleRow(stringResource(R.string.settings_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = onFerries, icon = Icons.Default.DirectionsBoat)
+        ToggleRow(stringResource(R.string.settings_avoid_unpaved), checked = prefs.avoidUnpaved, onCheckedChange = onUnpaved, icon = Icons.Default.Terrain, divider = false)
     }
 }
 

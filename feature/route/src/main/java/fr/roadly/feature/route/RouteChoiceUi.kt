@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -195,6 +197,10 @@ internal fun RouteChoicePanel(
                             Icons.Default.Warning, c.accent, onClick = { onTraffic(hits) },
                         )
                     }
+                    // Rappel des options d'évitement actives (pour ne jamais rouler sans savoir qu'on évite les péages, par exemple).
+                    if (s.preferences.any) {
+                        StatusPill(avoidSummary(s.preferences), Icons.Default.Tune, c.brandBright, onClick = onToggleDetails)
+                    }
                     // ZFE : une interdiction doit se voir sans faire défiler.
                     s.zfe[active.route.id]?.firstOrNull { it.verdict != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION }?.let { z ->
                         val (text, color) = zfePill(z)
@@ -224,6 +230,7 @@ internal fun RouteChoicePanel(
                             GlassChip(stringResource(R.string.route_opt_no_highways), onClick = { onPreferences(p.copy(avoidHighways = !p.avoidHighways)) }, icon = Icons.Default.AltRoute, compact = true, selected = p.avoidHighways)
                             GlassChip(stringResource(R.string.route_opt_no_tunnels), onClick = { onPreferences(p.copy(avoidTunnels = !p.avoidTunnels)) }, icon = Icons.Default.Subway, compact = true, selected = p.avoidTunnels)
                             GlassChip(stringResource(R.string.route_opt_no_ferries), onClick = { onPreferences(p.copy(avoidFerries = !p.avoidFerries)) }, icon = Icons.Default.DirectionsBoat, compact = true, selected = p.avoidFerries)
+                            GlassChip(stringResource(R.string.route_opt_no_unpaved), onClick = { onPreferences(p.copy(avoidUnpaved = !p.avoidUnpaved)) }, icon = Icons.Default.Terrain, compact = true, selected = p.avoidUnpaved)
                         }
                     }
                 }
@@ -469,3 +476,15 @@ internal fun TrafficDialog(hits: List<fr.roadly.core.data.traffic.TrafficHit>, o
         confirmButton = { fr.roadly.core.designsystem.component.GlassButton(stringResource(R.string.route_time_confirm_ok), onClick = onDismiss) },
     )
 }
+
+/** « Sans péage · sans tunnel » : options d'évitement actives, en toutes lettres. */
+@Composable
+internal fun avoidSummary(p: RoutePreferences): String = p.active.map { a ->
+    stringResource(when (a) {
+        fr.roadly.core.model.RouteAvoid.TOLLS -> R.string.route_avoid_tolls_short
+        fr.roadly.core.model.RouteAvoid.HIGHWAYS -> R.string.route_avoid_highways_short
+        fr.roadly.core.model.RouteAvoid.TUNNELS -> R.string.route_avoid_tunnels_short
+        fr.roadly.core.model.RouteAvoid.FERRIES -> R.string.route_avoid_ferries_short
+        fr.roadly.core.model.RouteAvoid.UNPAVED -> R.string.route_avoid_unpaved_short
+    })
+}.joinToString(" · ").replaceFirstChar { it.uppercase() }

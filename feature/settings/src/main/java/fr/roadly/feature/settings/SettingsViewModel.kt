@@ -209,6 +209,7 @@ class SettingsViewModel @Inject constructor(
     fun setAvoidHighways(value: Boolean) = updateRoutePreferences { it.copy(avoidHighways = value) }
     fun setAvoidFerries(value: Boolean) = updateRoutePreferences { it.copy(avoidFerries = value) }
     fun setAvoidTunnels(value: Boolean) = updateRoutePreferences { it.copy(avoidTunnels = value) }
+    fun setAvoidUnpaved(value: Boolean) = updateRoutePreferences { it.copy(avoidUnpaved = value) }
 
     private fun updateRoutePreferences(change: (RoutePreferences) -> RoutePreferences) {
         viewModelScope.launch { prefs.setRoutePreferences(change(prefs.routePreferences.first())) }

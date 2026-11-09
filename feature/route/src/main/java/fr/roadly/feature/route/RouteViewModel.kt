@@ -79,6 +79,8 @@ class RouteViewModel @Inject constructor(
     private val zfe: fr.roadly.core.data.zfe.ZfeSource? = null,
     /** Incidents officiels Bison Futé ; null (tests existants) = aucun. */
     private val traffic: fr.roadly.core.data.traffic.TrafficSource? = null,
+    /** Options « pour ce trajet seulement » choisies dans la recherche ; null (tests existants) = préférences enregistrées. */
+    private val tripPreferences: fr.roadly.core.data.repository.TripPreferences? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -135,7 +137,8 @@ class RouteViewModel @Inject constructor(
         }
         scooter?.let { sc -> viewModelScope.launch { sc.ensureProfile() } }
         viewModelScope.launch {
-            val base = combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, stops, reload) { values ->
+            val routePrefs = tripPreferences?.effective(prefs.routePreferences) ?: prefs.routePreferences
+            val base = combine(origin, departAt, arriveAt, vehicleRepo.profile, routePrefs, stops, reload) { values ->
                 @Suppress("UNCHECKED_CAST")
                 Params(values[0] as GeoPoint?, values[1] as Long, values[2] as Long?, values[3] as VehicleProfile?, values[4] as RoutePreferences, values[5] as List<Place>)
             }
@@ -328,7 +331,11 @@ class RouteViewModel @Inject constructor(
     fun setDepartAt(epochMs: Long) { arriveAt.value = null; departAt.value = epochMs }
     /** Mode « Arriver à » : le départ est déduit de la durée du plus rapide (sans trafic prédictif). */
     fun setArriveAt(epochMs: Long) { arriveAt.value = epochMs }
-    fun setPreferences(value: RoutePreferences) { viewModelScope.launch { prefs.setRoutePreferences(value) } }
+    /** Options d'un trajet en cours de choix (recherche) : modifiées pour ce trajet ; sinon, préférences enregistrées. */
+    fun setPreferences(value: RoutePreferences) {
+        val trip = tripPreferences
+        if (trip?.override?.value != null) trip.set(value) else viewModelScope.launch { prefs.setRoutePreferences(value) }
+    }
     fun retry() { reload.value++ }
     /** Origine choisie par appui long sur la carte quand la position est inconnue. */
     fun setOrigin(point: GeoPoint) { origin.value = point }
@@ -399,6 +406,7 @@ class RouteViewModel @Inject constructor(
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
         guidance.start(option, computedWith, computedVehicle, stops.value, destName.ifBlank { null }, scooter = computedScooter)
         departurePlanner?.clear()
+        tripPreferences?.clear()
         return true
     }
 

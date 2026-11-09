@@ -257,6 +257,17 @@ class ValhallaRoutingProviderTest {
         assertNull(second["exclude_tunnels"])
     }
 
+    @Test fun `avoid unpaved sends exclude_unpaved, and falls back without it when no path exists`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error_code":442,"error":"No path could be found for input","status_code":400}"""))
+        server.enqueue(MockResponse().setBody(fixture()))
+        val out = provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, preferences = RoutePreferences(avoidUnpaved = true)))
+        assertTrue(out is Outcome.Success)
+        val first = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        val second = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertEquals("true", first["exclude_unpaved"]!!.jsonPrimitive.content)
+        assertNull(second["exclude_unpaved"])
+    }
+
     @Test fun `default preferences never exclude tunnels`() = runTest {
         server.enqueue(MockResponse().setBody(fixture()))
         provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST))

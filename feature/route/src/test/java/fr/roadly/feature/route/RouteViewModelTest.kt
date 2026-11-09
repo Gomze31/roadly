@@ -174,6 +174,31 @@ class RouteViewModelTest {
         assertEquals(RouteRoute(48.9, 2.4, "Test"), second.swapped("Ma position"))
     }
 
+    @Test fun `options chosen for this trip are used, and cleared when guidance starts`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val seen = mutableListOf<RoutePreferences>()
+        val base = routing
+        val recording = object : RoutingProvider by base {
+            override suspend fun route(request: RouteRequest) = base.route(request).also { seen += request.preferences }
+        }
+        routing = recording
+        val trip = fr.roadly.core.data.repository.TripPreferences().apply { set(RoutePreferences(avoidTolls = true)) }
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
+        val v = RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing, tripPreferences = trip)
+        v.uiState.test {
+            advanceUntilIdle()
+            expectMostRecentItem()
+            assertTrue("options du trajet utilisées : $seen", seen.isNotEmpty() && seen.all { it == RoutePreferences(avoidTolls = true) })
+            assertEquals("préférences enregistrées intactes", RoutePreferences(), prefs.route.value)
+            assertTrue(v.startGuidance())
+            assertNull(trip.override.value)
+        }
+    }
+
     @Test fun `the header star adds the destination to favorites, then removes it`() = runTest {
         location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
         val saved = kotlinx.coroutines.flow.MutableStateFlow<List<Place>>(emptyList())

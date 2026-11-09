@@ -80,7 +80,34 @@ data class RoutePreferences(
     val avoidHighways: Boolean = false,
     val avoidFerries: Boolean = false,
     val avoidTunnels: Boolean = false,
-)
+    /** Chemins non revêtus évités (Valhalla `exclude_unpaved` : autorisés seulement au départ et à l'arrivée). */
+    val avoidUnpaved: Boolean = false,
+) {
+    /** Au moins une option d'évitement active. */
+    val any: Boolean get() = avoidTolls || avoidHighways || avoidFerries || avoidTunnels || avoidUnpaved
+
+    fun avoids(a: RouteAvoid): Boolean = when (a) {
+        RouteAvoid.TOLLS -> avoidTolls
+        RouteAvoid.HIGHWAYS -> avoidHighways
+        RouteAvoid.TUNNELS -> avoidTunnels
+        RouteAvoid.FERRIES -> avoidFerries
+        RouteAvoid.UNPAVED -> avoidUnpaved
+    }
+
+    fun with(a: RouteAvoid, on: Boolean): RoutePreferences = when (a) {
+        RouteAvoid.TOLLS -> copy(avoidTolls = on)
+        RouteAvoid.HIGHWAYS -> copy(avoidHighways = on)
+        RouteAvoid.TUNNELS -> copy(avoidTunnels = on)
+        RouteAvoid.FERRIES -> copy(avoidFerries = on)
+        RouteAvoid.UNPAVED -> copy(avoidUnpaved = on)
+    }
+
+    /** Options actives, dans l'ordre d'affichage. */
+    val active: List<RouteAvoid> get() = RouteAvoid.entries.filter { avoids(it) }
+}
+
+/** Types de voies que l'utilisateur peut faire éviter. */
+enum class RouteAvoid { TOLLS, HIGHWAYS, TUNNELS, FERRIES, UNPAVED }
 
 data class Route(
     val id: String,

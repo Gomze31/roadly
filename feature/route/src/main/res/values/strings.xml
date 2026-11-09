@@ -96,4 +96,10 @@
     <string name="route_traffic_weather">Conditions météo</string>
     <string name="route_traffic_lanes">Voie fermée</string>
     <string name="route_traffic_works">Travaux</string>
+    <string name="route_opt_no_unpaved">Éviter les chemins non revêtus</string>
+    <string name="route_avoid_tolls_short">sans péage</string>
+    <string name="route_avoid_highways_short">sans autoroute</string>
+    <string name="route_avoid_tunnels_short">sans tunnel</string>
+    <string name="route_avoid_ferries_short">sans ferry</string>
+    <string name="route_avoid_unpaved_short">sans chemin non revêtu</string>
 </resources>

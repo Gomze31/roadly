@@ -40,13 +40,17 @@ class ValhallaRoutingProvider @Inject constructor(
     override val id = "valhalla"
 
     override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
-        val first = routeOnce(request, excludeTunnels = request.preferences.avoidTunnels && request.scooter == null && !request.pedestrian)
-        // « Éviter les tunnels » est une exclusion stricte : sans chemin possible, on relance sans elle (tunnel inévitable).
-        if (first is Outcome.Failure && first.error == AppError.NoResult && request.preferences.avoidTunnels) return routeOnce(request, excludeTunnels = false)
+        val motor = request.scooter == null && !request.pedestrian
+        val p = request.preferences
+        val first = routeOnce(request, excludeTunnels = p.avoidTunnels && motor, excludeUnpaved = p.avoidUnpaved && motor)
+        // Tunnels et chemins non revêtus sont des exclusions strictes : sans chemin possible, on relance sans elles (passage inévitable).
+        if (first is Outcome.Failure && first.error == AppError.NoResult && motor && (p.avoidTunnels || p.avoidUnpaved)) {
+            return routeOnce(request, excludeTunnels = false, excludeUnpaved = false)
+        }
         return first
     }
 
-    private suspend fun routeOnce(request: RouteRequest, excludeTunnels: Boolean): Outcome<List<Route>> {
+    private suspend fun routeOnce(request: RouteRequest, excludeTunnels: Boolean, excludeUnpaved: Boolean = false): Outcome<List<Route>> {
         // Lecture de la configuration (DataStore) : une IOException/CorruptionException ne doit jamais s'échapper.
         val base = try {
             config.config.first().valhallaBaseUrl
@@ -104,6 +108,7 @@ class ValhallaRoutingProvider @Inject constructor(
                     if (prefs.avoidHighways) put("use_highways", 0)
                     if (prefs.avoidFerries) put("use_ferry", 0)
                     if (excludeTunnels) put("exclude_tunnels", true)
+                    if (excludeUnpaved) put("exclude_unpaved", true)
                     // Gabarit : seulement en costing poids lourd, et seulement les valeurs saisies (Valhalla garde ses défauts sinon).
                     val d = request.vehicle?.dimensions
                     if (costingName == "truck" && d != null) {

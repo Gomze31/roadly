@@ -38,3 +38,11 @@ data class SearchUiState(
     val fuel: FuelType = FuelType.DIESEL,
     val fuelSort: FuelSort = FuelSort.DISTANCE,
 )
+
+/** Options du trajet affichées sous la barre de recherche. [tripOnly] = choisies pour ce trajet (pas encore enregistrées). */
+data class TripOptionsUi(
+    val preferences: fr.roadly.core.model.RoutePreferences = fr.roadly.core.model.RoutePreferences(),
+    val remember: Boolean = false,
+    val departure: fr.roadly.core.data.repository.DeparturePlan? = null,
+    val tripOnly: Boolean = false,
+)

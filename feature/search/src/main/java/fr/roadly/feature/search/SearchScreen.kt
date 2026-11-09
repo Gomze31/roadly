@@ -1,5 +1,29 @@
 package fr.roadly.feature.search
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.filled.Euro
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Subway
+import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
+import fr.roadly.core.designsystem.component.rememberVoiceInput
+import fr.roadly.core.designsystem.theme.LocalRoadlyColors
+import fr.roadly.core.designsystem.theme.RoadlyShapes
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,6 +92,11 @@ import fr.roadly.core.model.PlaceKind
 @Composable
 fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, onPick: ((Place) -> Unit)? = null, vm: SearchViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val trip by vm.tripOptions.collectAsStateWithLifecycle()
+    var showDeparture by remember { mutableStateOf(false) }
+    val listen = rememberVoiceInput(stringResource(R.string.search_voice_prompt), onText = vm::onQueryChange)
+    // « Y aller » : directement l'écran d'itinéraires (avec les options du trajet), sans passer par la fiche.
+    val go: ((Place) -> Unit)? = if (onPick == null) ({ p -> vm.onGo(p); onNavigateToRoute(p) }) else null
     val focus = remember { FocusRequester() }
     // Mode « choisir un arrêt » : un lieu touché est rendu tout de suite (pas de fiche), après enregistrement dans les récents.
     val select: (Place) -> Unit = if (onPick != null) ({ p -> vm.onPlaceSelected(p); vm.onDismissPlace(); onPick(p) }) else vm::onPlaceSelected
@@ -83,6 +112,13 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, onPick:
                 value = state.query, onValueChange = vm::onQueryChange, placeholder = stringResource(if (onPick != null) R.string.search_placeholder_stop else R.string.search_placeholder),
                 onClear = vm::onClear, focusRequester = focus, modifier = Modifier.weight(1f),
             )
+            Spacer(Modifier.width(RoadlySpacing.s))
+            GlassIconButton(Icons.Default.Mic, stringResource(R.string.search_voice), onClick = listen)
+        }
+        // Options du trajet (avant même de choisir la destination) : départ, péages, autoroutes, tunnels, ferries, chemins.
+        if (onPick == null) {
+            TripOptionsBar(trip, onDeparture = { showDeparture = true }, onToggle = vm::onToggleAvoid, onRemember = vm::onRememberOptions)
+            Spacer(Modifier.height(RoadlySpacing.xs))
         }
         CategoryChips(selected = state.category, onSelect = vm::onCategory)
         Spacer(Modifier.height(RoadlySpacing.xs))
@@ -90,7 +126,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, onPick:
         val lon = state.hereLon
         val here = if (lat != null && lon != null) GeoPoint(lat, lon) else null
         when (val r = state.results) {
-            SearchResults.Idle -> SuggestionsList(state, onSelect = select)
+            SearchResults.Idle -> SuggestionsList(state, onSelect = select, onGo = go)
             SearchResults.Loading -> Box(Modifier.fillMaxWidth().padding(RoadlySpacing.xl), contentAlignment = Alignment.Center) {
                 LoadingRow(stringResource(if (state.category != null) R.string.search_loading_nearby else R.string.search_loading), Modifier.width(IntrinsicSize.Min))
             }
@@ -108,7 +144,7 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, onPick:
                 val fuelMode = r.category == PoiCategory.FUEL && r.stations.isNotEmpty()
                 if (fuelMode) FuelControls(state.fuel, state.fuelSort, onFuel = vm::onFuel, onSort = vm::onFuelSort)
                 ResultsList(
-                    r.places, here, onSelect = select,
+                    r.places, here, onSelect = select, onGo = go,
                     header = r.category?.let { stringResource(R.string.search_nearby_header, stringResource(it.labelRes()), it.radiusKm) },
                     footer = if (fuelMode) stringResource(R.string.search_fuel_footer) else null,
                     value = if (fuelMode) ({ p -> r.stations[p.id]?.let { s -> fuelPriceText(s, state.fuel) } }) else null,
@@ -116,6 +152,12 @@ fun SearchScreen(onBack: () -> Unit, onNavigateToRoute: (Place) -> Unit, onPick:
             }
         }
     }
+
+    if (showDeparture) fr.roadly.core.designsystem.component.DepartureTimeDialog(
+        initialEpochMs = trip.departure?.epochMs, initialArrive = trip.departure?.arrive == true,
+        onConfirm = { ms, arrive -> vm.onDeparture(fr.roadly.core.data.repository.DeparturePlan(ms, arrive)); showDeparture = false },
+        onNow = { vm.onDeparture(null); showDeparture = false }, onDismiss = { showDeparture = false },
+    )
 
     state.selected?.let { place ->
         PlaceSheet(
@@ -191,7 +233,7 @@ private val listPadding = PaddingValues(start = RoadlySpacing.m, end = RoadlySpa
 
 /** [value] : texte de droite par lieu (prix) ; à défaut, la distance depuis [here]. */
 @Composable
-private fun ResultsList(places: List<Place>, here: GeoPoint?, onSelect: (Place) -> Unit, header: String? = null, footer: String? = null, value: ((Place) -> String?)? = null) {
+private fun ResultsList(places: List<Place>, here: GeoPoint?, onSelect: (Place) -> Unit, header: String? = null, footer: String? = null, value: ((Place) -> String?)? = null, onGo: ((Place) -> Unit)? = null) {
     val rightText: (Place) -> String? = { p -> value?.invoke(p) ?: here?.let { Formatters.distance(it.distanceTo(p.point)) } }
     val subtitle: (Place) -> String? = { p ->
         val d = if (value != null) here?.let { Formatters.distance(it.distanceTo(p.point)) } else null
@@ -201,12 +243,12 @@ private fun ResultsList(places: List<Place>, here: GeoPoint?, onSelect: (Place) 
         item {
             if (header != null) {
                 SettingsGroup(header, footer = footer ?: stringResource(R.string.search_nearby_footer)) {
-                    places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = rightText(p), subtitle = subtitle(p)) }
+                    places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = rightText(p), subtitle = subtitle(p), onGo = onGo?.let { g -> { g(p) } }) }
                 }
             } else {
                 SurfaceCard(Modifier.fillMaxWidth()) {
                     Column {
-                        places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = rightText(p)) }
+                        places.forEachIndexed { i, p -> PlaceRow(p, onClick = { onSelect(p) }, divider = i < places.lastIndex, distance = rightText(p), onGo = onGo?.let { g -> { g(p) } }) }
                     }
                 }
             }
@@ -215,7 +257,7 @@ private fun ResultsList(places: List<Place>, here: GeoPoint?, onSelect: (Place) 
 }
 
 @Composable
-private fun SuggestionsList(state: SearchUiState, onSelect: (Place) -> Unit, header: (@Composable () -> Unit)? = null) {
+private fun SuggestionsList(state: SearchUiState, onSelect: (Place) -> Unit, header: (@Composable () -> Unit)? = null, onGo: ((Place) -> Unit)? = null) {
     if (state.recents.isEmpty() && state.favorites.isEmpty()) {
         if (header != null) header()
         else EmptyState(Icons.Default.Search, stringResource(R.string.search_idle_title), stringResource(R.string.search_empty_subtitle))
@@ -227,7 +269,7 @@ private fun SuggestionsList(state: SearchUiState, onSelect: (Place) -> Unit, hea
             item {
                 SettingsGroup(stringResource(R.string.search_favorites)) {
                     state.favorites.forEachIndexed { i, p ->
-                        PlaceRow(p, onClick = { onSelect(p) }, icon = Icons.Default.Star, iconStyle = IconTileStyle.Accent, divider = i < state.favorites.lastIndex)
+                        PlaceRow(p, onClick = { onSelect(p) }, icon = Icons.Default.Star, iconStyle = IconTileStyle.Accent, divider = i < state.favorites.lastIndex, onGo = onGo?.let { g -> { g(p) } })
                     }
                 }
             }
@@ -254,6 +296,8 @@ internal fun PlaceRow(
     divider: Boolean = true,
     distance: String? = null,
     subtitle: String? = place.address,
+    /** Bouton « Y aller » à droite (itinéraire direct) ; null = pas de bouton. */
+    onGo: (() -> Unit)? = null,
 ) {
     val leading = icon ?: when {
         place.source == "prix-carburants" -> Icons.Default.LocalGasStation
@@ -261,5 +305,70 @@ internal fun PlaceRow(
         place.kind == PlaceKind.COORDINATES -> Icons.Default.MyLocation
         else -> Icons.Default.Place
     }
-    ListRow(title = place.name, subtitle = subtitle, icon = leading, iconStyle = iconStyle, value = distance, onClick = onClick, chevron = false, divider = divider)
+    val c = LocalRoadlyColors.current
+    ListRow(
+        title = place.name, subtitle = subtitle, icon = leading, iconStyle = iconStyle, value = distance, onClick = onClick, chevron = false, divider = divider,
+        trailing = onGo?.let { go ->
+            {
+                Box(
+                    Modifier.size(40.dp).clip(RoadlyShapes.Pill).background(c.brandSoft).clickable(role = Role.Button, onClickLabel = stringResource(R.string.search_go), onClick = go),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Navigation, contentDescription = stringResource(R.string.search_go), tint = c.brand, modifier = Modifier.size(20.dp)) }
+            }
+        },
+    )
+}
+
+/** Options du trajet : départ, éviter péages / autoroutes / tunnels / ferries / chemins, et « Mémoriser » (sinon : ce trajet seulement). */
+@Composable
+internal fun TripOptionsBar(
+    trip: TripOptionsUi,
+    onDeparture: () -> Unit,
+    onToggle: (fr.roadly.core.model.RouteAvoid) -> Unit,
+    onRemember: (Boolean) -> Unit,
+) {
+    val c = LocalRoadlyColors.current
+    val zone = java.time.ZoneId.systemDefault()
+    Column {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = RoadlySpacing.m),
+            horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val d = trip.departure
+            GlassChip(
+                when {
+                    d == null -> stringResource(R.string.search_depart_now)
+                    d.arrive -> stringResource(R.string.search_arrive_at, Formatters.clockTime(d.epochMs, zone))
+                    else -> stringResource(R.string.search_depart_at, Formatters.clockTime(d.epochMs, zone))
+                },
+                onClick = onDeparture, icon = Icons.Default.Schedule, compact = true, selected = d != null,
+            )
+            fr.roadly.core.model.RouteAvoid.entries.forEach { a ->
+                GlassChip(stringResource(a.labelRes()), onClick = { onToggle(a) }, icon = a.icon(), compact = true, selected = trip.preferences.avoids(a))
+            }
+            GlassChip(stringResource(R.string.search_remember), onClick = { onRemember(!trip.remember) }, icon = if (trip.remember) Icons.Default.Bookmark else Icons.Default.BookmarkBorder, compact = true, selected = trip.remember)
+        }
+        if (trip.tripOnly && trip.preferences.any) {
+            Text(
+                stringResource(R.string.search_trip_only), style = MaterialTheme.typography.bodySmall, color = c.textTertiary,
+                modifier = Modifier.padding(start = RoadlySpacing.m + 6.dp, top = 4.dp),
+            )
+        }
+    }
+}
+
+internal fun fr.roadly.core.model.RouteAvoid.labelRes(): Int = when (this) {
+    fr.roadly.core.model.RouteAvoid.TOLLS -> R.string.search_avoid_tolls
+    fr.roadly.core.model.RouteAvoid.HIGHWAYS -> R.string.search_avoid_highways
+    fr.roadly.core.model.RouteAvoid.TUNNELS -> R.string.search_avoid_tunnels
+    fr.roadly.core.model.RouteAvoid.FERRIES -> R.string.search_avoid_ferries
+    fr.roadly.core.model.RouteAvoid.UNPAVED -> R.string.search_avoid_unpaved
+}
+
+internal fun fr.roadly.core.model.RouteAvoid.icon(): ImageVector = when (this) {
+    fr.roadly.core.model.RouteAvoid.TOLLS -> Icons.Default.Euro
+    fr.roadly.core.model.RouteAvoid.HIGHWAYS -> Icons.Default.AltRoute
+    fr.roadly.core.model.RouteAvoid.TUNNELS -> Icons.Default.Subway
+    fr.roadly.core.model.RouteAvoid.FERRIES -> Icons.Default.DirectionsBoat
+    fr.roadly.core.model.RouteAvoid.UNPAVED -> Icons.Default.Terrain
 }

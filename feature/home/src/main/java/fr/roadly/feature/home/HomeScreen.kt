@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Subway
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -663,41 +664,18 @@ private fun RouteOptionsSheet(prefs: RoutePreferences, onChange: (RoutePreferenc
                 ToggleRow(stringResource(R.string.home_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = { onChange(prefs.copy(avoidTolls = it)) }, icon = Icons.Default.Euro)
                 ToggleRow(stringResource(R.string.home_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = { onChange(prefs.copy(avoidHighways = it)) }, icon = Icons.Default.AltRoute)
                 ToggleRow(stringResource(R.string.home_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = { onChange(prefs.copy(avoidTunnels = it)) }, icon = Icons.Default.Subway)
-                ToggleRow(stringResource(R.string.home_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = { onChange(prefs.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat, divider = false)
+                ToggleRow(stringResource(R.string.home_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = { onChange(prefs.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat)
+                ToggleRow(stringResource(R.string.home_avoid_unpaved), checked = prefs.avoidUnpaved, onCheckedChange = { onChange(prefs.copy(avoidUnpaved = it)) }, icon = Icons.Default.Terrain, divider = false)
             }
         }
     }
 }
 
-/** Choix de l'heure : « Partir à » ou « Arriver à » ; « Maintenant » efface le plan. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Choix de l'heure du départ planifié (boîte commune du design system). */
 @Composable
 private fun DepartureDialog(plan: DeparturePlan?, onPlan: (DeparturePlan?) -> Unit, onDismiss: () -> Unit) {
-    val c = LocalRoadlyColors.current
-    val zone = ZoneId.systemDefault()
-    val now = Instant.now().atZone(zone)
-    val initial = plan?.takeIf { it.epochMs > System.currentTimeMillis() }?.let { Instant.ofEpochMilli(it.epochMs).atZone(zone) } ?: now
-    val tp = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
-    var arriveMode by remember { mutableStateOf(plan?.arrive == true) }
-    val departLabel = stringResource(R.string.home_departure_mode_depart)
-    val arriveLabel = stringResource(R.string.home_departure_mode_arrive)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = c.surfaceElevated,
-        confirmButton = {
-            GlassButton(stringResource(R.string.home_departure_confirm), onClick = {
-                var target = now.withHour(tp.hour).withMinute(tp.minute).withSecond(0).withNano(0)
-                if (!target.isAfter(now)) target = target.plusDays(1)
-                onPlan(DeparturePlan(target.toInstant().toEpochMilli(), arriveMode))
-            })
-        },
-        dismissButton = { GlassButton(stringResource(R.string.home_departure_now), onClick = { onPlan(null) }, style = GlassButtonStyle.Secondary) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
-                SegmentedControl(listOf(false, true), arriveMode, { arriveMode = it }, { if (it) arriveLabel else departLabel })
-                if (arriveMode) Text(stringResource(R.string.home_departure_arrive_note), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
-                TimePicker(state = tp)
-            }
-        },
+    fr.roadly.core.designsystem.component.DepartureTimeDialog(
+        initialEpochMs = plan?.epochMs, initialArrive = plan?.arrive == true,
+        onConfirm = { ms, arrive -> onPlan(DeparturePlan(ms, arrive)) }, onNow = { onPlan(null) }, onDismiss = onDismiss,
     )
 }

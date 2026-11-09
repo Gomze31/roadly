@@ -143,6 +143,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kAvoidHighways = booleanPreferencesKey("route.avoid.highways")
     private val kAvoidFerries = booleanPreferencesKey("route.avoid.ferries")
     private val kAvoidTunnels = booleanPreferencesKey("route.avoid.tunnels")
+    private val kAvoidUnpaved = booleanPreferencesKey("route.avoid.unpaved")
     private val kVoiceEnabled = booleanPreferencesKey("voice.enabled")
     private val kVoiceVolume = intPreferencesKey("voice.volume")
     private val kTolerance = intPreferencesKey("speed.alert.tolerance")
@@ -178,10 +179,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setLocationDeniedForever(value: Boolean) { store.edit { it[kDeniedForever] = value } }
 
     override val routePreferences: Flow<RoutePreferences> = store.data.map { p ->
-        RoutePreferences(avoidTolls = p[kAvoidTolls] ?: false, avoidHighways = p[kAvoidHighways] ?: false, avoidFerries = p[kAvoidFerries] ?: false, avoidTunnels = p[kAvoidTunnels] ?: false)
+        RoutePreferences(avoidTolls = p[kAvoidTolls] ?: false, avoidHighways = p[kAvoidHighways] ?: false, avoidFerries = p[kAvoidFerries] ?: false, avoidTunnels = p[kAvoidTunnels] ?: false, avoidUnpaved = p[kAvoidUnpaved] ?: false)
     }
     override suspend fun setRoutePreferences(value: RoutePreferences) {
-        store.edit { it[kAvoidTolls] = value.avoidTolls; it[kAvoidHighways] = value.avoidHighways; it[kAvoidFerries] = value.avoidFerries; it[kAvoidTunnels] = value.avoidTunnels }
+        store.edit { it[kAvoidTolls] = value.avoidTolls; it[kAvoidHighways] = value.avoidHighways; it[kAvoidFerries] = value.avoidFerries; it[kAvoidTunnels] = value.avoidTunnels; it[kAvoidUnpaved] = value.avoidUnpaved }
     }
     override val voiceEnabled: Flow<Boolean> = store.data.map { it[kVoiceEnabled] ?: GuidanceDefaults.VOICE_ENABLED }
     override suspend fun setVoiceEnabled(value: Boolean) { store.edit { it[kVoiceEnabled] = value } }
