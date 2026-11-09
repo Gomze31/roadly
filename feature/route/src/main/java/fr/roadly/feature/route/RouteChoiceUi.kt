@@ -1,5 +1,6 @@
 package fr.roadly.feature.route
 
+import fr.roadly.core.designsystem.theme.LocalUiScale
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -87,9 +88,9 @@ internal fun RouteTopBar(
     modifier: Modifier = Modifier,
 ) {
     val c = LocalRoadlyColors.current
-    GlassPanel(modifier.fillMaxWidth().height(64.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp).clip(RoadlyShapes.Pill).background(c.brand), contentAlignment = Alignment.Center) {
+    GlassPanel(modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(36.dp).clip(RoadlyShapes.Pill).background(c.brand), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Navigation, contentDescription = null, tint = c.onBrandAuto, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(RoadlySpacing.sm))
@@ -121,10 +122,10 @@ private fun HeaderAction(icon: ImageVector, description: String, tint: Color, on
 @Composable
 internal fun RouteFromBar(originLabel: String, onSwap: (() -> Unit)?, modifier: Modifier = Modifier) {
     val c = LocalRoadlyColors.current
-    GlassPanel(modifier.fillMaxWidth().height(64.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.RadioButtonChecked, contentDescription = null, tint = c.brand, modifier = Modifier.size(34.dp))
+    GlassPanel(modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.RadioButtonChecked, contentDescription = null, tint = c.brand, modifier = Modifier.size(28.dp))
             }
             Spacer(Modifier.width(RoadlySpacing.sm))
             Column(Modifier.weight(1f)) {
@@ -133,7 +134,7 @@ internal fun RouteFromBar(originLabel: String, onSwap: (() -> Unit)?, modifier: 
             }
             if (onSwap != null) {
                 Box(
-                    Modifier.size(46.dp).clip(RoadlyShapes.Pill).background(c.surfaceElevated).clickable(role = Role.Button, onClick = onSwap),
+                    Modifier.size(44.dp).clip(RoadlyShapes.Pill).background(c.surfaceElevated).clickable(role = Role.Button, onClick = onSwap),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Default.SwapVert, contentDescription = stringResource(R.string.route_swap), tint = c.brand, modifier = Modifier.size(26.dp)) }
             }
@@ -258,7 +259,7 @@ private fun HeadStat(label: String, value: String, modifier: Modifier = Modifier
     Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         OverlineText(label, color = c.textSecondary, dash = false)
         Spacer(Modifier.height(2.dp))
-        Text(value, style = StatValue.copy(fontSize = 24.sp, lineHeight = 28.sp), color = c.textPrimary)
+        Text(value, style = StatValue.copy(fontSize = 20.sp * LocalUiScale.current, lineHeight = 24.sp * LocalUiScale.current), color = c.textPrimary)
     }
 }
 
@@ -273,7 +274,7 @@ internal fun StatusPill(text: String, icon: ImageVector, color: Color, onClick: 
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(7.dp))
-        Text(text, style = ButtonLabel.copy(fontSize = 15.sp), color = color, maxLines = 1)
+        Text(text, style = ButtonLabel.copy(fontSize = 14.sp), color = color, maxLines = 1)
     }
 }
 
@@ -281,7 +282,7 @@ internal fun StatusPill(text: String, icon: ImageVector, color: Color, onClick: 
 private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int, onClick: () -> Unit, zfe: fr.roadly.core.data.zfe.ZfeVerdict? = null, incidents: Int = 0) {
     val c = LocalRoadlyColors.current
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.RadioButton, onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.RadioButton, onClick = onClick).padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(Formatters.duration(o.route.durationSeconds), style = MaterialTheme.typography.headlineMedium, color = c.textPrimary)
@@ -296,17 +297,25 @@ private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int
             )
         }
         Spacer(Modifier.weight(1f))
-        Text(Formatters.distance(o.route.distanceMeters), style = StatValue.copy(fontSize = 19.sp, fontWeight = FontWeight.ExtraBold), color = c.textPrimary)
-        if (o.route.hasToll) { Spacer(Modifier.width(10.dp)); Icon(Icons.Default.Euro, contentDescription = stringResource(R.string.route_toll_yes), tint = c.accent, modifier = Modifier.size(20.dp)) }
-        if (incidents > 0) {
-            Spacer(Modifier.width(10.dp))
+        // Place réduite : au plus deux icônes (les plus importantes d'abord), pour ne jamais rogner la ligne.
+        val maxIcons = if (fr.roadly.core.designsystem.theme.isCompactSpace()) 2 else 4
+        var shown = 0
+        fun room(): Boolean = (shown < maxIcons).also { if (it) shown++ }
+        val showIncidents = incidents > 0 && room()
+        val showZfe = zfe != null && zfe != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION && room()
+        val showToll = o.route.hasToll && room()
+        val showZones = dangerZones > 0 && room()
+        Text(Formatters.distance(o.route.distanceMeters), style = StatValue.copy(fontSize = 17.sp * LocalUiScale.current, fontWeight = FontWeight.ExtraBold), color = c.textPrimary)
+        if (showToll) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Euro, contentDescription = stringResource(R.string.route_toll_yes), tint = c.accent, modifier = Modifier.size(20.dp)) }
+        if (showIncidents) {
+            Spacer(Modifier.width(8.dp))
             Icon(Icons.Default.CarCrash, contentDescription = pluralStringResource(R.plurals.route_incidents, incidents, incidents), tint = c.accent, modifier = Modifier.size(20.dp))
         }
-        if (zfe != null && zfe != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION) {
-            Spacer(Modifier.width(10.dp))
+        if (showZfe) {
+            Spacer(Modifier.width(8.dp))
             Icon(Icons.Default.Eco, contentDescription = stringResource(R.string.route_zfe_short), tint = zfeColor(zfe), modifier = Modifier.size(20.dp))
         }
-        if (dangerZones > 0) { Spacer(Modifier.width(10.dp)); Icon(Icons.Default.Warning, contentDescription = pluralStringResource(R.plurals.route_danger_zones, dangerZones, dangerZones), tint = c.warning, modifier = Modifier.size(20.dp)) }
+        if (showZones) { Spacer(Modifier.width(8.dp)); Icon(Icons.Default.Warning, contentDescription = pluralStringResource(R.plurals.route_danger_zones, dangerZones, dangerZones), tint = c.warning, modifier = Modifier.size(20.dp)) }
     }
 }
 
@@ -315,7 +324,7 @@ private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int
 internal fun AddStopButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalRoadlyColors.current
     Row(
-        modifier.fillMaxWidth().height(54.dp).clip(RoadlyShapes.Pill).border(1.5.dp, c.brand.copy(alpha = 0.55f), RoadlyShapes.Pill)
+        modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoadlyShapes.Pill).border(1.5.dp, c.brand.copy(alpha = 0.55f), RoadlyShapes.Pill)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
@@ -330,13 +339,13 @@ internal fun AddStopButton(enabled: Boolean, onClick: () -> Unit, modifier: Modi
 internal fun RollButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalRoadlyColors.current
     Row(
-        modifier.fillMaxWidth().height(68.dp).softShadow(RoadlyShapes.Pill, c.brand, 14.dp).clip(RoadlyShapes.Pill)
+        modifier.fillMaxWidth().heightIn(min = 56.dp).softShadow(RoadlyShapes.Pill, c.brand, 12.dp).clip(RoadlyShapes.Pill)
             .background(Brush.verticalGradient(listOf(c.brandBright, c.brand))).clickable(role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
-        Text(stringResource(R.string.route_start).uppercase(), style = ButtonLabel.copy(fontSize = 24.sp, letterSpacing = 2.sp), color = c.onBrandAuto)
-        Spacer(Modifier.width(16.dp))
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = c.onBrandAuto, modifier = Modifier.size(28.dp))
+        Text(stringResource(R.string.route_start).uppercase(), style = ButtonLabel.copy(fontSize = 20.sp, letterSpacing = 2.sp), color = c.onBrandAuto)
+        Spacer(Modifier.width(12.dp))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = c.onBrandAuto, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -360,10 +369,10 @@ internal fun ChooseLabel(onClick: () -> Unit, modifier: Modifier = Modifier) {
 internal fun SideRoundButton(icon: ImageVector, description: String, tint: Color, onClick: () -> Unit, iconModifier: Modifier = Modifier) {
     val c = LocalRoadlyColors.current
     Box(
-        Modifier.size(56.dp).softShadow(RoadlyShapes.Pill, Color.Black, 8.dp).clip(RoadlyShapes.Pill).background(c.surface).border(1.dp, c.glassBorder, RoadlyShapes.Pill)
+        Modifier.size(52.dp).softShadow(RoadlyShapes.Pill, Color.Black, 8.dp).clip(RoadlyShapes.Pill).background(c.surface).border(1.dp, c.glassBorder, RoadlyShapes.Pill)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription = description, tint = tint, modifier = iconModifier.size(28.dp)) }
+    ) { Icon(icon, contentDescription = description, tint = tint, modifier = iconModifier.size(24.dp)) }
 }
 
 @Composable

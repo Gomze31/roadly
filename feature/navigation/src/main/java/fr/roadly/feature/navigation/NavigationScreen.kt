@@ -328,7 +328,7 @@ internal fun PortraitOverlay(
                 RoundIconButton(
                     Icons.Default.KeyboardArrowDown,
                     stringResource(if (bannerExpanded) R.string.nav_collapse_banner else R.string.nav_expand_banner),
-                    onClick = onToggleBanner, size = 60.dp, iconTint = c.brand, iconModifier = Modifier.rotate(angle),
+                    onClick = onToggleBanner, size = 52.dp, iconTint = c.brand, iconModifier = Modifier.rotate(angle),
                 )
             }
         }
@@ -617,7 +617,7 @@ private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}) 
 @Composable
 private fun ReportButton(onClick: () -> Unit) {
     val c = LocalRoadlyColors.current
-    RoundIconButton(Icons.Default.Warning, stringResource(R.string.nav_report), onClick = onClick, size = 72.dp, iconTint = c.accent)
+    RoundIconButton(Icons.Default.Warning, stringResource(R.string.nav_report), onClick = onClick, size = 60.dp, iconTint = c.accent)
 }
 
 @Composable

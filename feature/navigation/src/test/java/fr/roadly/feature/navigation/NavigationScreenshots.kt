@@ -37,7 +37,7 @@ import java.io.File
 /** Rendu PNG des éléments du guidage (sans la carte native). Inactif sans -PscreenshotsDir. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w430dp-h932dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w372dp-h832dp-xhdpi")
 class NavigationScreenshots {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val dir = System.getProperty("roadly.screenshots.dir")
@@ -54,7 +54,12 @@ class NavigationScreenshots {
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test fun guidance() = shot("navigation_guidance") {
+    @Test @Config(qualifiers = "w360dp-h760dp-xhdpi", fontScale = 1.3f) fun guidanceSmallLargeFont() = shot("navigation_guidance_360_font130") { guidanceContent() }
+
+    @Test fun guidance() = shot("navigation_guidance") { guidanceContent() }
+
+    @Composable
+    private fun guidanceContent() {
         val banner = BannerUi(ManeuverType.ROUNDABOUT_ENTER, "600 m", "Au rond-point, prenez la 2e sortie.", "Rd-pt du Pr Jean-Jacques Laffont", null, 2)
         val state = NavigationUiState(
             phase = NavigationPhase.GUIDING, banner = banner, etaClock = "14:03", remainingDuration = "18 min", remainingDistance = "5,3 km",

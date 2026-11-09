@@ -1,5 +1,6 @@
 package fr.roadly.feature.navigation
 
+import fr.roadly.core.designsystem.theme.LocalUiScale
 import androidx.compose.material.icons.filled.Search
 
 import android.content.Intent
@@ -150,7 +151,7 @@ fun NavigationBottomPanel(
                         // Envoyer son heure d'arrivée (partage Android : SMS, messagerie…).
                         ShareEtaButton(state, destinationName)
                     }
-                    RoundIconButton(Icons.Default.Close, stringResource(R.string.nav_stop), onClick = onStop, style = RoundButtonStyle.Danger, size = 56.dp)
+                    RoundIconButton(Icons.Default.Close, stringResource(R.string.nav_stop), onClick = onStop, style = RoundButtonStyle.Danger, size = 52.dp)
                 }
             }
             AnimatedVisibility(expanded && compact) {
@@ -195,15 +196,16 @@ fun NavigationBottomPanel(
 private fun BarStat(value: String, label: String, labelColor: Color = LocalRoadlyColors.current.textSecondary, large: Boolean = false) {
     val c = LocalRoadlyColors.current
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = NavDigits.copy(fontSize = if (large) 32.sp else 27.sp, lineHeight = if (large) 34.sp else 29.sp), color = c.textPrimary, maxLines = 1)
-        Text(label, style = ButtonLabel.copy(fontSize = 16.sp), color = labelColor, maxLines = 1)
+        val s = LocalUiScale.current
+        Text(value, style = NavDigits.copy(fontSize = (if (large) 28.sp else 23.sp) * s, lineHeight = (if (large) 30.sp else 25.sp) * s), color = c.textPrimary, maxLines = 1)
+        Text(label, style = ButtonLabel.copy(fontSize = 14.sp * s), color = labelColor, maxLines = 1)
     }
 }
 
 @Composable
 private fun BarDivider() {
     val c = LocalRoadlyColors.current
-    Box(Modifier.padding(horizontal = 10.dp).width(1.dp).height(44.dp).background(c.glassBorder))
+    Box(Modifier.padding(horizontal = 8.dp).width(1.dp).height(38.dp).background(c.glassBorder))
 }
 
 /** Bouton « envoyer mon heure d'arrivée » : texte prêt à partager (heure, durée, destination). */
@@ -215,13 +217,13 @@ private fun ShareEtaButton(state: NavigationUiState, destinationName: String?) {
         else stringResource(R.string.nav_share_eta, state.etaClock, state.remainingDuration)
     val title = stringResource(R.string.nav_share_eta_title)
     Box(
-        Modifier.size(52.dp).clip(RoadlyShapes.Pill).background(c.brand.copy(alpha = 0.16f)).border(1.5.dp, c.brand.copy(alpha = 0.6f), RoadlyShapes.Pill)
+        Modifier.size(48.dp).clip(RoadlyShapes.Pill).background(c.brand.copy(alpha = 0.16f)).border(1.5.dp, c.brand.copy(alpha = 0.6f), RoadlyShapes.Pill)
             .clickable(role = Role.Button, onClickLabel = title) {
                 val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
                 context.startActivity(Intent.createChooser(send, title))
             },
         contentAlignment = Alignment.Center,
-    ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = title, tint = c.brand, modifier = Modifier.size(26.dp).rotate(-30f)) }
+    ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = title, tint = c.brand, modifier = Modifier.size(22.dp).rotate(-30f)) }
 }
 
 /** Paysage : partie dépliée sur une rangée (destination tronquée, « Trajet complet », « Itinéraires »), 56 dp + 8 dp de marge. */

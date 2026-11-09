@@ -7,8 +7,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 
+/** Agrandissement du texte en mode conduite. */
+const val DRIVING_TEXT_SCALE = 1.15f
+
 /**
- * Thème Roadly. [drivingMode] agrandit la typographie (×1,3) et les cibles tactiles (56 dp) ;
+ * Thème Roadly. [drivingMode] agrandit la typographie (×[DRIVING_TEXT_SCALE]) et les cibles tactiles (56 dp) ;
  * [tint] remplace la couleur de marque (personnalisation du cockpit).
  */
 @Composable
@@ -41,7 +44,9 @@ fun RoadlyTheme(
             outline = colors.glassBorder, error = colors.danger,
         )
     }
-    CompositionLocalProvider(LocalRoadlyColors provides colors, LocalDrivingMode provides drivingMode) {
-        MaterialTheme(colorScheme = material, typography = roadlyTypography(if (drivingMode) 1.3f else 1f), content = content)
+    // Écran étroit : interface réduite (≥ 0,85). Mode conduite : texte un peu plus grand (×1,15 ; la police arrondie est déjà très grasse).
+    val uiScale = UiScale.forWidth(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp)
+    CompositionLocalProvider(LocalRoadlyColors provides colors, LocalDrivingMode provides drivingMode, LocalUiScale provides uiScale) {
+        MaterialTheme(colorScheme = material, typography = roadlyTypography((if (drivingMode) DRIVING_TEXT_SCALE else 1f) * uiScale), content = content)
     }
 }

@@ -26,7 +26,7 @@ import java.io.File
 /** Rendus PNG de chaque étape (comparaison visuelle avec les captures de référence). Inactifs sans -PscreenshotsDir. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w430dp-h932dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w372dp-h832dp-xhdpi")
 class OnboardingScreenshots {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
     private val dir = System.getProperty("roadly.screenshots.dir")

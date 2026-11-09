@@ -42,7 +42,7 @@ import java.io.File
 /** Rendu PNG des éléments de l'accueil, disposés comme l'écran réel (sans la carte native). Inactif sans -PscreenshotsDir. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w430dp-h932dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w372dp-h832dp-xhdpi")
 class HomeScreenshots {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val dir = System.getProperty("roadly.screenshots.dir")
@@ -59,7 +59,12 @@ class HomeScreenshots {
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test fun home() = shot("home") {
+    @Test @Config(qualifiers = "w360dp-h760dp-xhdpi", fontScale = 1.3f) fun homeSmallLargeFont() = shot("home_360_font130") { homeContent() }
+
+    @Test fun home() = shot("home") { homeContent() }
+
+    @Composable
+    private fun homeContent() {
         val c = LocalRoadlyColors.current
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.padding(12.dp).padding(top = 36.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -351,9 +351,9 @@ private fun ProgressSegments(total: Int, filled: Int) {
 @Composable
 private fun FeatureCard(icon: ImageVector, title: String, body: String, style: IconTileStyle = IconTileStyle.Brand, footnote: String? = null) {
     val c = LocalRoadlyColors.current
-    SurfaceCard(Modifier.fillMaxWidth(), contentPadding = 18.dp) {
+    SurfaceCard(Modifier.fillMaxWidth(), contentPadding = 16.dp) {
         Row(verticalAlignment = Alignment.Top) {
-            IconTile(icon, style = style, size = 52.dp)
+            IconTile(icon, style = style, size = 44.dp)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = c.textPrimary, fontWeight = FontWeight.Bold)

@@ -40,7 +40,7 @@ import java.io.File
 /** Rendu PNG de l'écran d'itinéraires (sans la carte native, remplacée par un aplat clair). Inactif sans -PscreenshotsDir. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w430dp-h932dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w372dp-h832dp-xhdpi")
 class RouteScreenshots {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val dir = System.getProperty("roadly.screenshots.dir")
@@ -75,7 +75,12 @@ class RouteScreenshots {
         1200.0, 10.0, GeoPoint(43.6, 1.44),
     )
 
-    @Test fun choice() = shot("route_choice") {
+    @Test @Config(qualifiers = "w360dp-h760dp-xhdpi", fontScale = 1.3f) fun choiceSmallLargeFont() = shot("route_choice_360_font130") { choiceContent() }
+
+    @Test fun choice() = shot("route_choice") { choiceContent() }
+
+    @Composable
+    private fun choiceContent() {
         val s = RouteUiState.Content(
             GeoPoint(43.6, 1.44), "Capitole de Toulouse", listOf(option("a", 17, 5.3, cost = 0.62), option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
             activeId = "a", hasVehicleProfile = true, departAtEpochMs = System.currentTimeMillis(), dangerZones = mapOf("c" to 1),

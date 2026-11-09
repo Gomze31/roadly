@@ -1,5 +1,6 @@
 package fr.roadly.feature.navigation
 
+import fr.roadly.core.designsystem.theme.LocalUiScale
 import androidx.compose.material3.Icon
 
 import androidx.compose.foundation.layout.size
@@ -64,24 +65,25 @@ fun ManeuverBanner(
         modifier.testTag(BANNER_TAG).defaultMinSize(minHeight = RoadlySpacing.touchTargetDriving), contentPadding = 12.dp, onClick = onClick,
         onClickLabel = stringResource(R.string.nav_preview_title), role = Role.Button,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+        val s = LocalUiScale.current
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
             // Pictogramme posé sur le panneau, en couleur de marque (référence visuelle), sans tuile.
-            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(58.dp * s), contentAlignment = Alignment.Center) {
                 if (roundabout != null) {
                     RoundaboutManeuverView(roundabout, banner.roundaboutExit ?: roundabout.exitNumber, compact = true)
                 } else {
-                    Icon(banner.type.icon(), contentDescription = null, tint = c.brand, modifier = Modifier.size(60.dp))
+                    Icon(banner.type.icon(), contentDescription = null, tint = c.brand, modifier = Modifier.size(50.dp * s))
                 }
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(banner.distanceText, style = NavDigits.copy(fontSize = 40.sp, lineHeight = 44.sp, textAlign = TextAlign.Start), color = c.brand, maxLines = 1)
+                Text(banner.distanceText, style = NavDigits.copy(fontSize = 34.sp * s, lineHeight = 38.sp * s, textAlign = TextAlign.Start), color = c.brand, maxLines = 1)
                 // Ligne principale : « 2e sortie · rue » (ou « Sortie 12 · rue »), en gras ; l'instruction complète si rien d'autre.
                 val exit = if (signShownBelow) null else exitLabel(banner)
                 val mainLine = listOfNotNull(exit, street).joinToString(" · ").ifEmpty { null }
                 if (mainLine != null) {
                     Text(
-                        mainLine, style = MaterialTheme.typography.titleLarge.copy(fontSize = 21.sp, lineHeight = 26.sp), color = c.textPrimary,
+                        mainLine, style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp * s, lineHeight = 23.sp * s), color = c.textPrimary,
                         maxLines = if (expanded) 2 else 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
