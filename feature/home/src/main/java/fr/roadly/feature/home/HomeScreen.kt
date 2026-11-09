@@ -4,6 +4,40 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Subway
+import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import fr.roadly.core.common.Formatters
+import fr.roadly.core.data.repository.DeparturePlan
+import fr.roadly.core.designsystem.component.OverlineText
+import fr.roadly.core.designsystem.component.SegmentedControl
+import fr.roadly.core.designsystem.component.SettingsGroup
+import fr.roadly.core.designsystem.component.ToggleRow
+import fr.roadly.core.designsystem.component.rememberVoiceInput
+import fr.roadly.core.designsystem.theme.brandGradient
+import fr.roadly.core.model.RoutePreferences
+import java.time.Instant
+import java.time.ZoneId
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,7 +46,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,24 +61,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalGasStation
-import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Work
@@ -57,9 +85,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,14 +104,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import fr.roadly.core.designsystem.component.ComingSoonTag
 import fr.roadly.core.designsystem.component.GlassBottomSheet
 import fr.roadly.core.designsystem.component.GlassButton
 import fr.roadly.core.designsystem.component.GlassButtonStyle
-import fr.roadly.core.designsystem.component.GlassChip
-import fr.roadly.core.designsystem.component.GlassIconButton
 import fr.roadly.core.designsystem.component.GlassPanel
-import fr.roadly.core.designsystem.component.GlassSearchBar
 import fr.roadly.core.designsystem.component.IconTile
 import fr.roadly.core.designsystem.component.IconTileStyle
 import fr.roadly.core.designsystem.component.OfflineBanner
@@ -125,6 +149,7 @@ fun HomeScreen(
     assistantButton: @Composable () -> Unit = {},
     assistantPanel: @Composable () -> Unit = {},
     onFreeDrive: () -> Unit = {},
+    onSearchText: (String) -> Unit = {},
     vm: HomeViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -144,6 +169,13 @@ fun HomeScreen(
     val parkedNear = stringResource(R.string.home_parked_near)
     var showReport by rememberSaveable { mutableStateOf(false) }
     var showPosition by rememberSaveable { mutableStateOf(false) }
+    var showRouteOptions by rememberSaveable { mutableStateOf(false) }
+    var showDeparture by rememberSaveable { mutableStateOf(false) }
+    /** Chevron : replie la carte « Départ » et les boutons latéraux pour dégager la carte. */
+    var collapsed by rememberSaveable { mutableStateOf(false) }
+    val departurePlan by vm.departurePlan.collectAsStateWithLifecycle()
+    val routePreferences by vm.routePreferences.collectAsStateWithLifecycle()
+    val listen = rememberVoiceInput(stringResource(R.string.home_voice_prompt), onText = onSearchText)
 
     LaunchedEffect(isDark) { vm.setDarkTheme(isDark) }
     LaunchedEffect(c.routeActive, c.routeInactive, c.routeCasing) { map.setRouteColors(c.routeActive.toHex(), c.routeInactive.toHex(), c.routeCasing.toHex()) }
@@ -186,45 +218,52 @@ fun HomeScreen(
             )
         }
 
+        // Haut : bannière hors-ligne, barre de recherche (micro, flèche), carte « Départ » (repliable).
+        Column(
+            Modifier.fillMaxWidth(if (landscape) 0.5f else 1f).statusBarsPadding().padding(RoadlySpacing.screenEdge),
+            verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
+        ) {
+            if (!state.isOnline) OfflineBanner()
+            HomeSearchPill(onSearch = onSearch, onVoice = listen)
+            AnimatedVisibility(!collapsed, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                DepartureCard(departurePlan, onClick = { showDeparture = true })
+            }
+            // Colonnes latérales sous la recherche : carburant et boussole à gauche, outils à droite.
+            Row(Modifier.fillMaxWidth().padding(top = RoadlySpacing.xs), verticalAlignment = Alignment.Top) {
+                Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
+                    AnimatedVisibility(!collapsed, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+                        RoundIconButton(Icons.Default.LocalGasStation, stringResource(R.string.home_stations), onClick = { onSearchCategory(PoiCategory.FUEL) }, iconTint = c.accent)
+                    }
+                    AnimatedVisibility(state.isRotated, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+                        CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm), horizontalAlignment = Alignment.End) {
+                    val chevron by animateFloatAsState(if (collapsed) 180f else 0f, label = "chevron")
+                    RoundIconButton(
+                        Icons.Default.KeyboardArrowUp, stringResource(if (collapsed) R.string.home_expand else R.string.home_collapse),
+                        onClick = { collapsed = !collapsed }, iconModifier = Modifier.rotate(chevron),
+                    )
+                    AnimatedVisibility(!collapsed, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm), horizontalAlignment = Alignment.End) {
+                            ParkingButton(onClick = { onSearchCategory(PoiCategory.PARKING) })
+                            RoundIconButton(Icons.Default.EmojiEvents, stringResource(R.string.home_ranking), onClick = onOpenProfile, iconTint = c.warning)
+                            RoundIconButton(Icons.Default.Settings, stringResource(R.string.home_settings), onClick = onSettings, iconTint = c.brandBright)
+                            assistantButton()
+                            // 1.0 : conduite libre (compteur, limitation, zones de vigilance sans itinéraire) ; pas pendant un guidage.
+                            if (!isGuiding && state.permission == LocationPermissionState.GRANTED) {
+                                RoundIconButton(Icons.Default.Speed, stringResource(R.string.home_free_drive), onClick = onFreeDrive)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Résultat du dernier signalement, 4 s, sous la barre de recherche.
         val reportMessage by vm.reportMessage.collectAsStateWithLifecycle()
         ReportResultPill(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 76.dp))
-
-        // Colonne d'actions à droite : Roadly AI, signaler (feuille des types), boussole si la carte est tournée.
-        Column(
-            Modifier.align(if (landscape) Alignment.TopEnd else Alignment.CenterEnd).statusBarsPadding().padding(RoadlySpacing.screenEdge).padding(top = if (landscape) 60.dp else 0.dp),
-            verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
-            horizontalAlignment = Alignment.End,
-        ) {
-            assistantButton()
-            RoundIconButton(Icons.Default.Warning, stringResource(R.string.home_report), onClick = { showReport = true }, style = RoundButtonStyle.Accent)
-            // 1.0 : conduite libre (compteur, limitation, zones de vigilance sans itinéraire) ; pas pendant un guidage.
-            if (!isGuiding && state.permission == LocationPermissionState.GRANTED) {
-                RoundIconButton(Icons.Default.Speed, stringResource(R.string.home_free_drive), onClick = onFreeDrive)
-            }
-            AnimatedVisibility(state.isRotated, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
-                CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
-            }
-        }
-
-        // Barre du haut : bannière hors-ligne, recherche (ouvre l'écran de recherche) et réglages.
-        Column(Modifier.fillMaxWidth(if (landscape) 0.5f else 1f).statusBarsPadding().padding(RoadlySpacing.screenEdge)) {
-            if (!state.isOnline) OfflineBanner(Modifier.padding(bottom = RoadlySpacing.s))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                GlassSearchBar(
-                    value = "",
-                    onValueChange = {},
-                    placeholder = stringResource(R.string.home_search_placeholder),
-                    readOnly = true,
-                    onClick = onSearch,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(RoadlySpacing.s))
-                GlassIconButton(Icons.Default.Person, stringResource(R.string.home_profile), onClick = onOpenProfile)
-                Spacer(Modifier.width(RoadlySpacing.s))
-                GlassIconButton(Icons.Default.Settings, stringResource(R.string.home_settings), onClick = onSettings)
-            }
-        }
 
         // Bas d'écran : compteur à gauche, recentrage à droite, puis panneau d'accueil.
         val bottomModifier = if (landscape) {
@@ -251,14 +290,18 @@ fun HomeScreen(
                     onClick = vm::onRecenter,
                     style = if (state.cameraMode == CameraMode.FREE) RoundButtonStyle.Glass else RoundButtonStyle.Brand,
                 )
+                Spacer(Modifier.width(RoadlySpacing.sm))
+                // Signaler : grand bouton rond, icône ambre (feuille des types).
+                RoundIconButton(Icons.Default.Warning, stringResource(R.string.home_report), onClick = { showReport = true }, size = 64.dp, iconTint = c.accent)
             }
             Spacer(Modifier.height(RoadlySpacing.sm))
             when (state.permission) {
                 LocationPermissionState.GRANTED -> BottomPanel(
-                    state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance, onPosition = { showPosition = true }, onCategory = onSearchCategory,
+                    state, isGuiding, onNavigateToRoute, onDefine = onSearch, onResumeGuidance = onResumeGuidance, onPosition = { showPosition = true },
                     resumeCard = resumeCard, onResumeLast = { resumeRequested = vm.resumeLastGuidance() }, onDismissResume = { resumeRequested = false; vm.dismissResume() },
                     tollReminders = tollReminders, onTollPaid = vm::dismissTollReminder,
                     parked = parked,
+                    onRouteOptions = { showRouteOptions = true },
                     onShowParked = {
                         parked?.let { v ->
                             vm.showParkedVehicle(parkedName, v.label?.let { parkedNear.format(it) })
@@ -275,6 +318,8 @@ fun HomeScreen(
     val reports by vm.reports.collectAsStateWithLifecycle()
     LaunchedEffect(reports) { map.setReports(reports) }
     if (showReport) ReportSheet(onDismiss = { showReport = false }, enabled = communityEnabled, onSelect = vm::report)
+    if (showRouteOptions) RouteOptionsSheet(routePreferences, onChange = vm::setRoutePreferences, onDismiss = { showRouteOptions = false })
+    if (showDeparture) DepartureDialog(departurePlan, onPlan = { vm.setDeparturePlan(it); showDeparture = false }, onDismiss = { showDeparture = false })
     val fix = state.fix
     if (showPosition && fix != null) PositionSheet(point = fix.point, address = state.address, onDismiss = { showPosition = false }, onParkHere = { vm.parkHere(); showPosition = false })
 
@@ -316,13 +361,13 @@ private fun BottomPanel(
     onDefine: () -> Unit,
     onResumeGuidance: () -> Unit,
     onPosition: () -> Unit,
-    onCategory: (PoiCategory) -> Unit,
     resumeCard: ResumeCardUi? = null,
     onResumeLast: () -> Unit = {},
     onDismissResume: () -> Unit = {},
     tollReminders: List<TollReminder> = emptyList(),
     onTollPaid: (Long) -> Unit = {},
     parked: ParkedVehicle? = null,
+    onRouteOptions: () -> Unit = {},
     onShowParked: () -> Unit = {},
 ) {
     val c = LocalRoadlyColors.current
@@ -365,23 +410,16 @@ private fun BottomPanel(
                 )
                 if (state.fix != null) Icon(Icons.Default.IosShare, contentDescription = null, tint = c.textTertiary, modifier = Modifier.size(18.dp))
             }
-            Spacer(Modifier.height(RoadlySpacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+            Spacer(Modifier.height(RoadlySpacing.s))
+            // Barre Domicile | options d'itinéraire | Travail.
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 ShortcutTile(stringResource(R.string.home_home), Icons.Default.Home, state.home, onNavigateToRoute, onDefine, Modifier.weight(1f))
+                Box(
+                    Modifier.size(44.dp).clip(RoadlyShapes.Pill).border(1.dp, c.glassBorder, RoadlyShapes.Pill)
+                        .clickable(role = Role.Button, onClick = onRouteOptions),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.home_route_options), tint = c.textSecondary, modifier = Modifier.size(20.dp)) }
                 ShortcutTile(stringResource(R.string.home_work), Icons.Default.Work, state.work, onNavigateToRoute, onDefine, Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(RoadlySpacing.sm))
-            // Catégories « à proximité » (lieux OSM via Photon) ; « Incidents » reste sans source (LOT 4/8) : désactivé et marqué « Bientôt ».
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                listOf(
-                    Triple(R.string.home_stations, Icons.Default.LocalGasStation, PoiCategory.FUEL),
-                    Triple(R.string.home_chargers, Icons.Default.EvStation, PoiCategory.CHARGING),
-                    Triple(R.string.home_parkings, Icons.Default.LocalParking, PoiCategory.PARKING),
-                    Triple(R.string.home_rest_areas, Icons.Default.Park, PoiCategory.REST_AREA),
-                ).forEach { (label, icon, cat) ->
-                    GlassChip(stringResource(label), onClick = { onCategory(cat) }, icon = icon, compact = true)
-                }
-                GlassChip(stringResource(R.string.home_incidents), onClick = {}, icon = Icons.Default.Warning, enabled = false, compact = true, trailing = { ComingSoonTag() })
             }
         }
     }
@@ -402,15 +440,14 @@ private fun ShortcutTile(
         modifier
             .defaultMinSize(minHeight = 56.dp)
             .clip(RoadlyShapes.Tile)
-            .background(c.glassBorder)
             .clickable(role = Role.Button, onClick = { if (place != null) onNavigateToRoute(place) else onDefine() })
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconTile(icon, style = if (place != null) IconTileStyle.Brand else IconTileStyle.Neutral, size = 36.dp)
-        Spacer(Modifier.width(RoadlySpacing.s))
+        Icon(icon, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.width(RoadlySpacing.sm))
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = c.textPrimary, maxLines = 1)
+            OverlineText(label, color = c.textPrimary, dash = false)
             Text(
                 place?.address ?: place?.name ?: stringResource(R.string.home_define),
                 style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -526,4 +563,126 @@ internal fun ReportResultPill(message: String?, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+/** Barre de recherche de l'accueil : marque, champ (ouvre la recherche), dictée, flèche « aller ». */
+@Composable
+private fun HomeSearchPill(onSearch: () -> Unit, onVoice: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    GlassPanel(Modifier.fillMaxWidth().height(64.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp, onClick = onSearch) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp).clip(RoadlyShapes.Pill).background(brandGradient()), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Navigation, contentDescription = null, tint = c.onBrandAuto, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(RoadlySpacing.sm))
+            Text(
+                stringResource(R.string.home_search_placeholder), style = MaterialTheme.typography.titleMedium, color = c.textSecondary,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
+            Box(Modifier.size(44.dp).clip(RoadlyShapes.Pill).clickable(role = Role.Button, onClick = onVoice), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.home_voice_search), tint = c.textSecondary, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(4.dp))
+            Box(Modifier.size(44.dp).clip(RoadlyShapes.Pill).background(c.brandSoft).clickable(role = Role.Button, onClick = onSearch), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.home_search_go), tint = c.brandBright, modifier = Modifier.size(22.dp))
+            }
+        }
+    }
+}
+
+/** Carte « Départ » : partir maintenant, partir à… ou arriver à… ; l'heure est reprise par l'écran d'itinéraires. */
+@Composable
+private fun DepartureCard(plan: DeparturePlan?, onClick: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    val now = System.currentTimeMillis()
+    val active = plan?.takeIf { it.epochMs > now }
+    val zone = ZoneId.systemDefault()
+    GlassPanel(Modifier.fillMaxWidth(), shape = RoadlyShapes.Panel, contentPadding = 0.dp, onClick = onClick) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp).clip(RoadlyShapes.Pill).background(c.brandSoft), contentAlignment = Alignment.Center) {
+                Icon(if (active == null) Icons.Default.Bolt else Icons.Default.Schedule, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(RoadlySpacing.sm))
+            Column(Modifier.weight(1f)) {
+                OverlineText(stringResource(R.string.home_departure), color = c.brandBright, dash = false)
+                Text(
+                    when {
+                        active == null -> stringResource(R.string.home_departure_now)
+                        active.arrive -> stringResource(R.string.home_departure_arrive_at, Formatters.clockTime(active.epochMs, zone))
+                        else -> stringResource(R.string.home_departure_at, Formatters.clockTime(active.epochMs, zone))
+                    },
+                    style = MaterialTheme.typography.titleMedium, color = c.textPrimary, maxLines = 1,
+                )
+            }
+            OverlineText(stringResource(R.string.home_departure_edit), color = c.textSecondary, dash = false)
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+/** Bouton « P » (parkings à proximité), pastille bleue des panneaux de stationnement. */
+@Composable
+private fun ParkingButton(onClick: () -> Unit) {
+    val blue = Color(0xFF2F6FDB)
+    val label = stringResource(R.string.home_parkings)
+    Box(
+        Modifier.semantics(mergeDescendants = true) { contentDescription = label }.size(RoadlySpacing.touchTarget).clip(RoadlyShapes.Pill)
+            .background(Brush.verticalGradient(listOf(Color(0xFF6FA2F5), blue)))
+            .border(1.dp, Color.White.copy(alpha = 0.25f), RoadlyShapes.Pill)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("P", style = MaterialTheme.typography.titleLarge, color = Color(0xFF0B1B3A), fontWeight = FontWeight.Black, modifier = Modifier.clearAndSetSemantics {})
+    }
+}
+
+/** Options d'itinéraire depuis l'accueil (mêmes préférences que l'écran d'itinéraires et les réglages). */
+@Composable
+private fun RouteOptionsSheet(prefs: RoutePreferences, onChange: (RoutePreferences) -> Unit, onDismiss: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    GlassBottomSheet(onDismiss = onDismiss) {
+        Column(Modifier.padding(horizontal = RoadlySpacing.l).padding(bottom = RoadlySpacing.l).navigationBarsPadding()) {
+            Text(stringResource(R.string.home_route_options_title), style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
+            Spacer(Modifier.height(RoadlySpacing.m))
+            SettingsGroup(stringResource(R.string.home_route_options_avoid), footer = stringResource(R.string.home_route_options_footer)) {
+                ToggleRow(stringResource(R.string.home_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = { onChange(prefs.copy(avoidTolls = it)) }, icon = Icons.Default.Toll)
+                ToggleRow(stringResource(R.string.home_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = { onChange(prefs.copy(avoidHighways = it)) }, icon = Icons.Default.AltRoute)
+                ToggleRow(stringResource(R.string.home_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = { onChange(prefs.copy(avoidTunnels = it)) }, icon = Icons.Default.Subway)
+                ToggleRow(stringResource(R.string.home_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = { onChange(prefs.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat, divider = false)
+            }
+        }
+    }
+}
+
+/** Choix de l'heure : « Partir à » ou « Arriver à » ; « Maintenant » efface le plan. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DepartureDialog(plan: DeparturePlan?, onPlan: (DeparturePlan?) -> Unit, onDismiss: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    val zone = ZoneId.systemDefault()
+    val now = Instant.now().atZone(zone)
+    val initial = plan?.takeIf { it.epochMs > System.currentTimeMillis() }?.let { Instant.ofEpochMilli(it.epochMs).atZone(zone) } ?: now
+    val tp = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
+    var arriveMode by remember { mutableStateOf(plan?.arrive == true) }
+    val departLabel = stringResource(R.string.home_departure_mode_depart)
+    val arriveLabel = stringResource(R.string.home_departure_mode_arrive)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surfaceElevated,
+        confirmButton = {
+            GlassButton(stringResource(R.string.home_departure_confirm), onClick = {
+                var target = now.withHour(tp.hour).withMinute(tp.minute).withSecond(0).withNano(0)
+                if (!target.isAfter(now)) target = target.plusDays(1)
+                onPlan(DeparturePlan(target.toInstant().toEpochMilli(), arriveMode))
+            })
+        },
+        dismissButton = { GlassButton(stringResource(R.string.home_departure_now), onClick = { onPlan(null) }, style = GlassButtonStyle.Secondary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
+                SegmentedControl(listOf(false, true), arriveMode, { arriveMode = it }, { if (it) arriveLabel else departLabel })
+                if (arriveMode) Text(stringResource(R.string.home_departure_arrive_note), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
+                TimePicker(state = tp)
+            }
+        },
+    )
 }

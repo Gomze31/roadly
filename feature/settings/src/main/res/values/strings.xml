@@ -148,6 +148,7 @@
     <string name="settings_avoid_tolls">Éviter les péages</string>
     <string name="settings_avoid_highways">Éviter les autoroutes</string>
     <string name="settings_avoid_ferries">Éviter les ferries</string>
+    <string name="settings_avoid_tunnels">Éviter les tunnels</string>
 
     <string name="settings_data">Données</string>
     <string name="settings_clear_history">Effacer l\'historique de recherche</string>

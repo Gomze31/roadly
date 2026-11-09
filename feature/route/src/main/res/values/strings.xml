@@ -32,6 +32,7 @@
     <string name="route_opt_no_tolls">Éviter les péages</string>
     <string name="route_opt_no_highways">Éviter les autoroutes</string>
     <string name="route_opt_no_ferries">Éviter les ferries</string>
+    <string name="route_opt_no_tunnels">Éviter les tunnels</string>
     <string name="route_vehicle_cta">Renseigner le véhicule</string>
     <string name="route_cost_line">Carburant ≈ %1$s · %2$s/km</string>
     <string name="route_cost_chip">Carburant ≈ %1$s</string>
@@ -54,4 +55,7 @@
         <item quantity="many">zones de danger</item>
         <item quantity="other">zones de danger</item>
     </plurals>
+    <string name="route_favorite_add">Ajouter aux favoris</string>
+    <string name="route_favorite_remove">Retirer des favoris</string>
+    <string name="route_pick_time">Heure de départ ou d\'arrivée</string>
 </resources>

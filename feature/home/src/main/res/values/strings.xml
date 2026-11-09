@@ -1,5 +1,5 @@
 <resources>
-    <string name="home_search_placeholder">Où allez-vous ?</string>
+    <string name="home_search_placeholder">Adresse, ville ou lieu</string>
     <string name="home_recenter">Recentrer</string>
     <string name="home_settings">Réglages</string>
     <string name="home_profile">Mon profil</string>
@@ -59,4 +59,27 @@
     <string name="home_position_copy">Copier</string>
     <string name="home_position_share">Partager</string>
     <string name="home_position_share_title">Partager ma position</string>
+    <string name="home_voice_prompt">Où allez-vous ?</string>
+    <string name="home_voice_search">Recherche vocale</string>
+    <string name="home_search_go">Rechercher</string>
+    <string name="home_departure">Départ</string>
+    <string name="home_departure_now">Partir maintenant</string>
+    <string name="home_departure_at">Partir à %1$s</string>
+    <string name="home_departure_arrive_at">Arriver à %1$s</string>
+    <string name="home_departure_edit">Modifier</string>
+    <string name="home_departure_mode_depart">Partir à</string>
+    <string name="home_departure_mode_arrive">Arriver à</string>
+    <string name="home_departure_confirm">Valider</string>
+    <string name="home_departure_arrive_note">L\'heure de départ sera déduite de la durée de l\'itinéraire le plus rapide.</string>
+    <string name="home_collapse">Replier les commandes</string>
+    <string name="home_expand">Afficher les commandes</string>
+    <string name="home_ranking">Classement et profil</string>
+    <string name="home_route_options">Options d\'itinéraire</string>
+    <string name="home_route_options_title">Options d\'itinéraire</string>
+    <string name="home_route_options_avoid">Routes à contourner</string>
+    <string name="home_route_options_footer">Appliquées aux trois itinéraires proposés et au recalcul. Un tunnel inévitable reste sur le trajet.</string>
+    <string name="home_avoid_tolls">Péages</string>
+    <string name="home_avoid_highways">Autoroutes</string>
+    <string name="home_avoid_tunnels">Tunnels</string>
+    <string name="home_avoid_ferries">Ferries</string>
 </resources>

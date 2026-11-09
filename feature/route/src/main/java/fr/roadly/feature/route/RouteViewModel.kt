@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfigRepository
+import fr.roadly.core.data.repository.DeparturePlanner
+import kotlinx.coroutines.flow.map
+import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.location.LocationMode
@@ -68,6 +71,10 @@ class RouteViewModel @Inject constructor(
     private val dangerZoneProvider: VigilanceZoneProvider? = null,
     /** S5 : profil réel (limitations, portiques) de chaque variante ; null (tests existants) = pas de carte d'identité. */
     private val routeAttributes: RouteAttributesProvider? = null,
+    /** Heure choisie sur la carte « Départ » de l'accueil ; null (tests existants) = départ immédiat. */
+    private val departurePlanner: DeparturePlanner? = null,
+    /** Étoile de l'en-tête ; null (tests existants) = pas d'étoile. */
+    private val favorites: FavoritesRepository? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -78,9 +85,10 @@ class RouteViewModel @Inject constructor(
         requireNotNull(savedStateHandle.get<Double>("destLon")) { "destLon manquant" },
     )
     private val origin = MutableStateFlow(location.lastKnown?.point)
-    private val departAt = MutableStateFlow(System.currentTimeMillis())
+    private val plannedAtOpen = departurePlanner?.active(System.currentTimeMillis())
+    private val departAt = MutableStateFlow(plannedAtOpen?.takeIf { !it.arrive }?.epochMs ?: System.currentTimeMillis())
     /** Heure d'arrivée souhaitée ; null = mode « Partir à ». */
-    private val arriveAt = MutableStateFlow<Long?>(null)
+    private val arriveAt = MutableStateFlow<Long?>(plannedAtOpen?.takeIf { it.arrive }?.epochMs)
     private val stops = MutableStateFlow<List<Place>>(emptyList())
     private val optimizing = MutableStateFlow(false)
     private val activeId = MutableStateFlow<String?>(null)
@@ -279,6 +287,25 @@ class RouteViewModel @Inject constructor(
     fun setOrigin(point: GeoPoint) { origin.value = point }
     val destinationPoint: GeoPoint get() = destination
 
+    /** Favori correspondant à la destination (même point à [FAVORITE_MATCH_M] près, l'écran ne reçoit pas l'identifiant du lieu). */
+    private val matchingFavorite: StateFlow<Place?> = (favorites?.observeAll() ?: flowOf(emptyList()))
+        .map { list -> list.firstOrNull { it.point.distanceTo(destination) <= FAVORITE_MATCH_M } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    /** null = favoris indisponibles (pas d'étoile). */
+    val isFavorite: StateFlow<Boolean?> = matchingFavorite.map { fav -> if (favorites == null) null else fav != null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, if (favorites == null) null else false)
+
+    fun toggleFavorite() {
+        val repo = favorites ?: return
+        viewModelScope.launch {
+            repo.toggle(matchingFavorite.value ?: Place(
+                "fav:%.5f,%.5f".format(java.util.Locale.ROOT, destination.lat, destination.lon),
+                destName.ifBlank { "%.5f, %.5f".format(java.util.Locale.ROOT, destination.lat, destination.lon) },
+                null, destination, fr.roadly.core.model.PlaceKind.COORDINATES, "local",
+            ))
+        }
+    }
+
     // ── Arrêts (≤ 10) ──
     fun addStop(place: Place) {
         val current = stops.value
@@ -310,10 +337,14 @@ class RouteViewModel @Inject constructor(
         val id = activeId.value ?: content.activeId
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
         guidance.start(option, computedWith, computedVehicle, stops.value, destName.ifBlank { null }, scooter = computedScooter)
+        departurePlanner?.clear()
         return true
     }
 
     companion object {
+        /** Distance sous laquelle un favori est considéré comme la destination affichée. */
+        const val FAVORITE_MATCH_M = 30.0
+
         /** Départ = arrivée souhaitée − durée du plus rapide ; chaque option reçoit l'arrivée correspondante. */
         internal fun shiftToArrival(options: List<RouteOption>, arriveAtMs: Long): Pair<List<RouteOption>, Long> {
             val reference = options.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: options.first()

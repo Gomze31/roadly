@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.ElectricScooter
@@ -317,7 +318,7 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
             val navigation by vm.navigation.collectAsStateWithLifecycle()
             NavigationGroup(navigation, vm)
         }
-        SettingsPage.ROUTES -> RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
+        SettingsPage.ROUTES -> RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries, onTunnels = vm::setAvoidTunnels)
         SettingsPage.SPEED -> {
             val coach by vm.coach.collectAsStateWithLifecycle()
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
@@ -596,10 +597,11 @@ private fun DriverAidGroup(
 // ── Itinéraires ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit) {
+private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit, onTunnels: (Boolean) -> Unit) {
     SettingsGroup(stringResource(R.string.settings_group_routes)) {
         ToggleRow(stringResource(R.string.settings_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = onTolls, icon = Icons.Default.Toll)
         ToggleRow(stringResource(R.string.settings_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = onHighways, icon = Icons.Default.Route)
+        ToggleRow(stringResource(R.string.settings_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = onTunnels, icon = Icons.Default.Subway)
         ToggleRow(stringResource(R.string.settings_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = onFerries, icon = Icons.Default.DirectionsBoat, divider = false)
     }
 }

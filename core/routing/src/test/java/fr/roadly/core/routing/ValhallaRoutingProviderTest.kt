@@ -238,6 +238,32 @@ class ValhallaRoutingProviderTest {
         assertNull(auto["use_tolls"]); assertNull(auto["use_highways"]); assertNull(auto["use_ferry"])
     }
 
+    @Test fun `avoid tunnels sends the strict exclude_tunnels flag`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, preferences = RoutePreferences(avoidTunnels = true)))
+        val auto = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertEquals("true", auto["exclude_tunnels"]!!.jsonPrimitive.content)
+        assertNull(auto["use_tolls"])
+    }
+
+    @Test fun `when no path exists without tunnels the route is computed again without the exclusion`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error_code":442,"error":"No path could be found for input","status_code":400}"""))
+        server.enqueue(MockResponse().setBody(fixture()))
+        val out = provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST, preferences = RoutePreferences(avoidTunnels = true)))
+        assertTrue(out is Outcome.Success)
+        val first = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        val second = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertEquals("true", first["exclude_tunnels"]!!.jsonPrimitive.content)
+        assertNull(second["exclude_tunnels"])
+    }
+
+    @Test fun `default preferences never exclude tunnels`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture()))
+        provider.route(RouteRequest(origin, dest, costing = RouteCosting.FASTEST))
+        val auto = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject["costing_options"]!!.jsonObject["auto"]!!.jsonObject
+        assertNull(auto["exclude_tunnels"])
+    }
+
     @Test fun `shortest variant keeps the avoid preferences`() = runTest {
         server.enqueue(MockResponse().setBody(fixture()))
         provider.route(RouteRequest(origin, dest, costing = RouteCosting.SHORTEST, preferences = RoutePreferences(avoidFerries = true)))

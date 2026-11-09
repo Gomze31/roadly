@@ -27,6 +27,11 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.Toll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -95,6 +100,7 @@ fun RouteScreen(
     vm: RouteViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val favorite by vm.isFavorite.collectAsStateWithLifecycle()
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
     val density = LocalDensity.current
@@ -148,14 +154,14 @@ fun RouteScreen(
 
         if (!landscape) {
             Column(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(RoadlySpacing.screenEdge), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                TripHeader(destinationName, onBack)
+                TripHeader(destinationName, onBack, favorite, vm::toggleFavorite, onPickTime = { showTimePicker = true })
                 if (state.scooterAvailable) TravelModeSelector(state.travelMode, vm::setTravelMode)
                 state.assistantReply?.let { AssistantBubble(it) }
             }
         }
 
         Column(panelModifier, verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-            if (landscape) TripHeader(destinationName, onBack)
+            if (landscape) TripHeader(destinationName, onBack, favorite, vm::toggleFavorite, onPickTime = { showTimePicker = true })
             if (landscape && state.scooterAvailable) TravelModeSelector(state.travelMode, vm::setTravelMode)
             if (landscape) state.assistantReply?.let { AssistantBubble(it) }
             if (landscape) Spacer(Modifier.weight(1f))
@@ -230,7 +236,14 @@ private const val arriveLabel = "Arriver à"
 
 /** En-tête : retour, destination (tuile + nom), ligne « Partir de · Ma position ». */
 @Composable
-private fun TripHeader(destinationName: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+private fun TripHeader(
+    destinationName: String,
+    onBack: () -> Unit,
+    favorite: Boolean?,
+    onToggleFavorite: () -> Unit,
+    onPickTime: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val c = LocalRoadlyColors.current
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.route_back), onClick = onBack)
@@ -240,7 +253,20 @@ private fun TripHeader(destinationName: String, onBack: () -> Unit, modifier: Mo
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconTile(Icons.Default.Place, style = IconTileStyle.BrandFilled, size = 32.dp)
                     Spacer(Modifier.width(10.dp))
-                    Text(destinationName, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(destinationName, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    // Étoile (favori) et horloge (partir à / arriver à), comme l'en-tête de l'écran d'itinéraires de référence.
+                    if (favorite != null) {
+                        IconButton(onClick = onToggleFavorite) {
+                            Icon(
+                                if (favorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = stringResource(if (favorite) R.string.route_favorite_remove else R.string.route_favorite_add),
+                                tint = if (favorite) c.warning else c.textSecondary,
+                            )
+                        }
+                    }
+                    IconButton(onClick = onPickTime) {
+                        Icon(Icons.Default.Schedule, contentDescription = stringResource(R.string.route_pick_time), tint = c.textSecondary)
+                    }
                 }
                 RowDivider(inset = 0.dp)
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -293,6 +319,7 @@ private fun ChoicePanel(
                 val p = s.preferences
                 GlassChip(stringResource(R.string.route_opt_no_tolls), onClick = { onPreferences(p.copy(avoidTolls = !p.avoidTolls)) }, icon = Icons.Default.Toll, compact = true, selected = p.avoidTolls)
                 GlassChip(stringResource(R.string.route_opt_no_highways), onClick = { onPreferences(p.copy(avoidHighways = !p.avoidHighways)) }, icon = Icons.Default.AltRoute, compact = true, selected = p.avoidHighways)
+                GlassChip(stringResource(R.string.route_opt_no_tunnels), onClick = { onPreferences(p.copy(avoidTunnels = !p.avoidTunnels)) }, icon = Icons.Default.Subway, compact = true, selected = p.avoidTunnels)
                 GlassChip(stringResource(R.string.route_opt_no_ferries), onClick = { onPreferences(p.copy(avoidFerries = !p.avoidFerries)) }, icon = Icons.Default.DirectionsBoat, compact = true, selected = p.avoidFerries)
             }
             Spacer(Modifier.height(RoadlySpacing.sm))

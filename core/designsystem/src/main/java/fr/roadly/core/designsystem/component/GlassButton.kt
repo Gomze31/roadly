@@ -135,6 +135,10 @@ fun RoundIconButton(
     style: RoundButtonStyle = RoundButtonStyle.Glass,
     size: Dp = if (LocalDrivingMode.current) RoadlySpacing.touchTargetDriving else RoadlySpacing.touchTarget,
     enabled: Boolean = true,
+    /** Couleur de l'icône ; null = couleur du style (accueil : carburant ambre, réglages en marque…). */
+    iconTint: Color? = null,
+    /** Modificateur de l'icône (rotation d'un chevron, par exemple). */
+    iconModifier: Modifier = Modifier,
 ) {
     val c = LocalRoadlyColors.current
     val (bg, fg, shadow) = when (style) {
@@ -153,7 +157,7 @@ fun RoundIconButton(
             .then(if (style == RoundButtonStyle.Glass) Modifier.border(1.dp, c.glassBorder, RoadlyShapes.Pill) else Modifier)
             .clickable(enabled = enabled, onClick = onClick, role = Role.Button),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription = contentDescription, tint = fg, modifier = Modifier.size(size * 0.46f)) }
+    ) { Icon(icon, contentDescription = contentDescription, tint = iconTint ?: fg, modifier = iconModifier.size(size * 0.46f)) }
 }
 
 @Composable

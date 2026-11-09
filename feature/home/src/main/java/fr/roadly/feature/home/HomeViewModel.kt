@@ -1,5 +1,8 @@
 package fr.roadly.feature.home
 
+import fr.roadly.core.data.repository.DeparturePlan
+import fr.roadly.core.data.repository.DeparturePlanner
+import fr.roadly.core.model.RoutePreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -81,7 +84,17 @@ class HomeViewModel @Inject constructor(
     private val freeDrive: FreeDriveSession? = null,
     /** Routage (null dans les tests existants) : trajet à pied vers la voiture garée. */
     private val routing: RoutingProvider? = null,
+    /** Carte « Départ » (null dans les tests existants : départ immédiat, carte inactive). */
+    private val departurePlanner: DeparturePlanner? = null,
 ) : ViewModel() {
+
+    /** Départ planifié sur la carte « Départ » ; null = partir maintenant. */
+    val departurePlan: StateFlow<DeparturePlan?> = departurePlanner?.plan ?: MutableStateFlow(null)
+    fun setDeparturePlan(plan: DeparturePlan?) { departurePlanner?.set(plan) }
+
+    /** Options d'itinéraire (bouton « réglages » de la barre Domicile / Travail) : les mêmes que l'écran d'itinéraires. */
+    val routePreferences: StateFlow<RoutePreferences> = prefs.routePreferences.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RoutePreferences())
+    fun setRoutePreferences(value: RoutePreferences) { viewModelScope.launch { prefs.setRoutePreferences(value) } }
 
     /**
      * Limitation de la conduite libre en cours (lancée depuis Android Auto alors que le téléphone montre l'accueil, par exemple) ;

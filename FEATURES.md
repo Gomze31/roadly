@@ -29,7 +29,10 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Départ planifié (heure de départ) | G | fonctionnelle | 1 | Décale seulement l'heure d'arrivée |
 | « Arriver à l'heure » | G | fonctionnelle | 1 | Départ déduit de la durée du plus rapide, sans trafic (LOT 3) ; rappel avant départ : Phase 4 |
 | Itinéraire alternatif en cours de guidage | G | fonctionnelle | 2 | Feuille « Changer d'itinéraire » depuis la position projetée (LOT 3) |
-| Options d'itinéraire sur l'écran de choix | G | fonctionnelle | 1 | Puces éviter péages / autoroutes / ferries (LOT 3) |
+| Options d'itinéraire sur l'écran de choix | G | fonctionnelle | 1 | Puces éviter péages / autoroutes / tunnels / ferries (LOT 3, tunnels 2026-11-09) ; aussi depuis l'accueil (bouton réglages de la barre Domicile / Travail) |
+| Éviter les tunnels | G | fonctionnelle | 1 | Exclusion stricte Valhalla `exclude_tunnels` ; sans chemin possible, recalcul sans l'exclusion (tunnel inévitable). Testé JVM ; non vérifié sur l'instance FOSSGIS depuis le conteneur de développement |
+| Accueil du premier lancement | G | fonctionnelle | 1 | `feature:onboarding` (2026-11-09) : 7 étapes (bienvenue, position, notifications, véhicule, voix et alertes, « Votre route », classement), barre segmentée, « Ignorer » / « Continuer » ; chaque interrupteur écrit le réglage réel. Non vérifié sur appareil |
+| Carte « Départ » de l'accueil | G | fonctionnelle | 1 | Partir maintenant / partir à / arriver à, repris par l'écran d'itinéraires (`DeparturePlanner`, en mémoire), effacé au démarrage du guidage |
 | Mode paysage | G | en cours | 1 | Accueil, itinéraires et guidage en deux colonnes (LOT 1) ; non vérifié sur appareil |
 | Thème clair / sombre / automatique | G | fonctionnelle | 1 | Auto solaire (position) + système |
 | Mode Silence | G | fonctionnelle | 2 | Bouton voix de l'écran de guidage |

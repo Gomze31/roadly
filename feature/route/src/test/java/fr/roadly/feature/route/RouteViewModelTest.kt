@@ -11,6 +11,7 @@ import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.GeoPoint
+import fr.roadly.core.model.Place
 import fr.roadly.core.model.LocationFix
 import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.ManeuverType
@@ -46,6 +47,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -124,6 +126,57 @@ class RouteViewModelTest {
             assertEquals(RouteCosting.FASTEST, s.options.first { it.route.id == s.activeId }.route.costing)
             assertTrue(s.options.all { it.cost == null })
         }
+    }
+
+    @Test fun `a departure planned on the home card is applied, then cleared when guidance starts`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val planner = fr.roadly.core.data.repository.DeparturePlanner()
+        val at = System.currentTimeMillis() + 3_600_000
+        planner.set(fr.roadly.core.data.repository.DeparturePlan(at, arrive = false))
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
+        val v = RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing, departurePlanner = planner)
+        v.uiState.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals(at, s.departAtEpochMs)
+            assertNull(s.arriveAtEpochMs)
+            assertTrue(v.startGuidance())
+            assertNull(planner.plan.value)
+        }
+    }
+
+    @Test fun `the header star adds the destination to favorites, then removes it`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val saved = kotlinx.coroutines.flow.MutableStateFlow<List<Place>>(emptyList())
+        val favorites = object : fr.roadly.core.data.repository.FavoritesRepository {
+            override fun observeAll() = saved
+            override fun observeHome() = kotlinx.coroutines.flow.flowOf<Place?>(null)
+            override fun observeWork() = kotlinx.coroutines.flow.flowOf<Place?>(null)
+            override suspend fun isFavorite(id: String) = saved.value.any { it.id == id }
+            override suspend fun toggle(place: Place) { saved.value = if (saved.value.any { it.id == place.id }) saved.value.filterNot { it.id == place.id } else saved.value + place }
+            override suspend fun setHome(place: Place) = Unit
+            override suspend fun setWork(place: Place) = Unit
+            override suspend fun clear() { saved.value = emptyList() }
+        }
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
+        val v = RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing, favorites = favorites)
+        advanceUntilIdle()
+        assertEquals(false, v.isFavorite.value)
+        v.toggleFavorite(); advanceUntilIdle()
+        assertEquals(true, v.isFavorite.value)
+        assertEquals("Test", saved.value.single().name)
+        assertEquals(GeoPoint(48.9, 2.4), saved.value.single().point)
+        v.toggleFavorite(); advanceUntilIdle()
+        assertEquals(false, v.isFavorite.value)
+        assertTrue(saved.value.isEmpty())
     }
 
     @Test fun `each variant gets its identity card from its real profile, a failed one gets none`() = runTest {

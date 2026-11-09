@@ -10,5 +10,5 @@ include(
     ":app",
     ":core:model", ":core:common", ":core:designsystem", ":core:data",
     ":core:location", ":core:map", ":core:geocoding", ":core:routing", ":core:navigation", ":core:scooter", ":core:assistant", ":core:radar",
-    ":feature:home", ":feature:search", ":feature:route", ":feature:settings", ":feature:navigation", ":feature:assistant", ":feature:trips", ":feature:car",
+    ":feature:home", ":feature:search", ":feature:route", ":feature:settings", ":feature:navigation", ":feature:assistant", ":feature:trips", ":feature:car", ":feature:onboarding",
 )
