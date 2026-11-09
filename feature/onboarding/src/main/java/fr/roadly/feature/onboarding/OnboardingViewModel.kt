@@ -31,6 +31,7 @@ data class OnboardingSettings(
     val limitDropVoice: Boolean = true,
     val rainLowersLimit: Boolean = false,
     val breakReminder: Boolean = true,
+    val zfe: Boolean = true,
     val vehicle: VehicleProfile? = null,
     val permission: LocationPermissionState = LocationPermissionState.UNKNOWN,
 )
@@ -47,12 +48,12 @@ class OnboardingViewModel @Inject constructor(
 
     val settings: StateFlow<OnboardingSettings> = combine(
         prefs.routePreferences, prefs.voiceEnabled, prefs.vigilanceEnabled, prefs.vigilanceSound, prefs.speedAlertSound,
-        prefs.limitDropVoice, prefs.rainLowersLimit, prefs.breakReminder, vehicles.profile, location.permissionState,
+        prefs.limitDropVoice, prefs.rainLowersLimit, prefs.breakReminder, vehicles.profile, location.permissionState, prefs.zfeEnabled,
     ) { v ->
         OnboardingSettings(
             route = v[0] as RoutePreferences, voice = v[1] as Boolean, vigilance = v[2] as Boolean, vigilanceSound = v[3] as Boolean,
             speedAlertSound = v[4] as Boolean, limitDropVoice = v[5] as Boolean, rainLowersLimit = v[6] as Boolean, breakReminder = v[7] as Boolean,
-            vehicle = v[8] as VehicleProfile?, permission = v[9] as LocationPermissionState,
+            vehicle = v[8] as VehicleProfile?, permission = v[9] as LocationPermissionState, zfe = v[10] as Boolean,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OnboardingSettings())
 
@@ -64,6 +65,7 @@ class OnboardingViewModel @Inject constructor(
     fun setLimitDropVoice(value: Boolean) = launch { prefs.setLimitDropVoice(value) }
     fun setRainLowersLimit(value: Boolean) = launch { prefs.setRainLowersLimit(value) }
     fun setBreakReminder(value: Boolean) = launch { prefs.setBreakReminder(value) }
+    fun setZfe(value: Boolean) = launch { prefs.setZfeEnabled(value) }
 
     /**
      * Enregistre le véhicule si la consommation est lisible ; le prix, le gabarit et les autres champs déjà saisis sont conservés.

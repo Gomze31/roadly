@@ -96,4 +96,6 @@
     <string name="onboarding_thanks_privacy">Roadly ne revend pas vos données personnelles.</string>
     <string name="onboarding_thanks_profile">Voir mon profil et le classement</string>
     <string name="onboarding_thanks_profile_note">Le classement s\'active quand le service communautaire est configuré (Réglages › Communauté).</string>
+    <string name="onboarding_route_zfe">Zones à faibles émissions</string>
+    <string name="onboarding_route_zfe_sub">Frontière de la zone sur la carte, alerte selon votre Crit\'Air</string>
 </resources>

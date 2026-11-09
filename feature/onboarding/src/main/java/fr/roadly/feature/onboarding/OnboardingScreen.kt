@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Insights
@@ -159,7 +160,7 @@ fun OnboardingScreen(
         OnboardingActions(
             setRoute = vm::setRoute, setVoice = vm::setVoice, setVigilance = vm::setVigilance, setVigilanceSound = vm::setVigilanceSound,
             setSpeedAlertSound = vm::setSpeedAlertSound, setLimitDropVoice = vm::setLimitDropVoice, setRainLowersLimit = vm::setRainLowersLimit,
-            setBreakReminder = vm::setBreakReminder,
+            setBreakReminder = vm::setBreakReminder, setZfe = vm::setZfe,
         )
     }
     OnboardingSheet(
@@ -210,6 +211,7 @@ internal class OnboardingActions(
     val setLimitDropVoice: (Boolean) -> Unit = {},
     val setRainLowersLimit: (Boolean) -> Unit = {},
     val setBreakReminder: (Boolean) -> Unit = {},
+    val setZfe: (Boolean) -> Unit = {},
 )
 
 /** Saisie du véhicule en cours. */
@@ -488,6 +490,10 @@ private fun RouteContent(s: OnboardingSettings, vm: OnboardingActions) {
             ToggleRow(stringResource(R.string.onboarding_route_ferries), checked = r.avoidFerries, onCheckedChange = { vm.setRoute(r.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat, divider = false)
         }
         SettingsGroup(stringResource(R.string.onboarding_route_group_local)) {
+            ToggleRow(
+                stringResource(R.string.onboarding_route_zfe), checked = s.zfe, onCheckedChange = vm.setZfe,
+                icon = Icons.Default.Eco, subtitle = stringResource(R.string.onboarding_route_zfe_sub),
+            )
             ToggleRow(
                 stringResource(R.string.onboarding_route_rain), checked = s.rainLowersLimit, onCheckedChange = vm.setRainLowersLimit,
                 icon = Icons.Default.Umbrella, subtitle = stringResource(R.string.onboarding_route_rain_sub), divider = false,

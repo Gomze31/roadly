@@ -112,6 +112,9 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true to true)
     fun setLimitDropVoice(value: Boolean) { viewModelScope.launch { prefs.setLimitDropVoice(value) } }
     fun setBreakReminder(value: Boolean) { viewModelScope.launch { prefs.setBreakReminder(value) } }
+    /** Zones à faibles émissions (frontière sur la carte, alerte selon la vignette Crit'Air). */
+    val zfeEnabled: StateFlow<Boolean> = prefs.zfeEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setZfeEnabled(value: Boolean) { viewModelScope.launch { prefs.setZfeEnabled(value) } }
     /** E2 : réglages du groupe « Navigation », appliqués immédiatement au guidage en cours (flux `Eagerly` du guidage). */
     val navigation: StateFlow<NavigationSettings> = combine(
         prefs.defaultCameraMode, prefs.zoomOffset, prefs.pitchPreset, prefs.autoRotate,

@@ -17,6 +17,8 @@ subprojects {
         if (shots != null) systemProperty("roadly.screenshots.dir", shots)
         // Sans -PscreenshotsDir, les rendus sont exclus : Robolectric téléchargerait son image Android pour rien.
         else filter { excludeTestsMatching("*Screenshots"); isFailOnNoMatchingTests = false }
+        // -PzfeFile=/chemin/aires.geojson : contrôle des règles ZFE sur le vrai fichier national (test inactif sinon).
+        (project.findProperty("zfeFile") as String?)?.let { systemProperty("roadly.zfe.file", it) }
         (project.findProperty("robolectricDir") as String?)?.let { systemProperty("robolectric.offline", "true"); systemProperty("robolectric.dependency.dir", it) }
     }
 }

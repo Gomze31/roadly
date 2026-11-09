@@ -118,6 +118,7 @@ fun RouteScreen(
     val density = LocalDensity.current
     var showTimePicker by remember { mutableStateOf(false) }
     var detailsOpen by rememberSaveable { mutableStateOf(false) }
+    var zfeShown by remember { mutableStateOf<fr.roadly.core.data.zfe.ZfeCrossing?>(null) }
     var panelCollapsed by rememberSaveable { mutableStateOf(false) }
     val myPosition = stringResource(R.string.route_from_my_position)
     val context = LocalContext.current
@@ -132,6 +133,10 @@ fun RouteScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
+        // Périmètres des ZFE traversées (une seule fois par agglomération, couleur selon le verdict le plus strict).
+        LaunchedEffect((phase as? RouteUiState.Content)?.zfe) {
+            map.setZfeZones(fr.roadly.core.map.ZfeFeatures.build(zfeShapes((phase as? RouteUiState.Content)?.zfe.orEmpty())))
+        }
         LaunchedEffect(phase, landscape, panelCollapsed) {
             when (phase) {
                 is RouteUiState.Content -> {
@@ -244,6 +249,7 @@ fun RouteScreen(
                             onSelect = vm::selectRoute, onPickTime = { showTimePicker = true }, onOpenSettings = onOpenSettings,
                             onPreferences = vm::setPreferences,
                             onAddStop = onAddStop, onMoveStop = vm::moveStop, onRemoveStop = vm::removeStop, onOptimize = vm::optimizeStops,
+                            onZfe = { zfeShown = it },
                         )
                     }
                     RollButton(onClick = { onStartNavigation(vm::startGuidance) })
@@ -251,6 +257,8 @@ fun RouteScreen(
             }
         }
     }
+
+    zfeShown?.let { z -> ZfeDialog(z, onOpenVehicle = onOpenSettings, onDismiss = { zfeShown = null }) }
 
     if (showTimePicker) {
         val now = Instant.now().atZone(ZoneId.systemDefault())

@@ -37,6 +37,9 @@ import org.maplibre.android.style.expressions.Expression.toColor
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
+import org.maplibre.android.style.layers.PropertyFactory.fillColor
+import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
@@ -92,6 +95,7 @@ class MapController(internal val context: Context) {
     private var arrowColorCasing = "#F03CDC"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
     private var lastDanger: String = DangerZoneFeatures.EMPTY
+    private var lastZfe: String = ZfeFeatures.EMPTY
     private var buildings3d = false
     private var buildingsColor = "#2A2236"
 
@@ -207,6 +211,7 @@ class MapController(internal val context: Context) {
         style.addImage(MapIds.IMG_ARROW_HEAD, drawableToBitmap(R.drawable.ic_arrow_head))
         style.addSource(GeoJsonSource(MapIds.SRC_ARROW))
         style.addSource(GeoJsonSource(MapIds.SRC_DANGER))
+        style.addSource(GeoJsonSource(MapIds.SRC_ZFE))
         style.addSource(GeoJsonSource(MapIds.SRC_REPORTS))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
@@ -217,6 +222,12 @@ class MapController(internal val context: Context) {
         // Bâtiments d'abord : leur ancrage ne voit que les calques du style, et le repli `addLayer` reste sous ceux de Roadly.
         installBuildings(style)
 
+        // Zones à faibles émissions : remplissage translucide et contour pointillé, sous les tracés.
+        val zfeColor = toColor(match(get("state"), literal(ZfeFeatures.OK_COLOR), stop("forbidden", ZfeFeatures.FORBIDDEN_COLOR), stop("caution", ZfeFeatures.CAUTION_COLOR)))
+        style.addLayer(FillLayer(MapIds.LYR_ZFE_FILL, MapIds.SRC_ZFE).withProperties(fillColor(zfeColor), fillOpacity(0.10f)))
+        style.addLayer(LineLayer(MapIds.LYR_ZFE_LINE, MapIds.SRC_ZFE).withProperties(
+            lineColor(zfeColor), lineWidth(2.5f), lineOpacity(0.9f), lineDasharray(arrayOf(2f, 1.2f)), lineJoin(Property.LINE_JOIN_ROUND),
+        ))
         // Halo lumineux large et translucide sous le tracé actif (lueur), puis liseré, puis trait.
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_GLOW, MapIds.SRC_ROUTES).withProperties(
             lineColor(routeColorActive), lineWidth(18f), lineOpacity(0.22f), lineBlur(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
@@ -317,6 +328,7 @@ class MapController(internal val context: Context) {
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(lastReports))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_DANGER)?.setGeoJson(lastDanger)
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_ZFE)?.setGeoJson(lastZfe)
         applyRouteColors(style)
         applyArrowColors(style)
         applyBuildings(style)
@@ -446,6 +458,13 @@ class MapController(internal val context: Context) {
         if (geoJson == lastDanger) return
         lastDanger = geoJson
         if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_DANGER)?.setGeoJson(geoJson)
+    }
+
+    /** Périmètres ZFE (GeoJSON de [ZfeFeatures.build]) ; [ZfeFeatures.EMPTY] pour les effacer. */
+    fun setZfeZones(geoJson: String) {
+        if (geoJson == lastZfe) return
+        lastZfe = geoJson
+        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_ZFE)?.setGeoJson(geoJson)
     }
 
     /** Couleurs CSS de la flèche : trait et liseré propres, contrastés quel que soit le thème du fond de carte. */

@@ -36,6 +36,8 @@ sealed interface RouteUiState {
         val dangerZones: Map<String, Int> = emptyMap(),
         /** S5 : carte d'identité par itinéraire (profil réel) ; absent = pas encore obtenue ou indisponible (hors ligne, échec). */
         val identities: Map<String, RouteIdentity> = emptyMap(),
+        /** ZFE traversées par itinéraire (verdict selon la vignette Crit'Air du véhicule) ; absent = pas de ZFE ou pas encore calculé. */
+        val zfe: Map<String, List<fr.roadly.core.data.zfe.ZfeCrossing>> = emptyMap(),
     ) : RouteUiState
 }
 

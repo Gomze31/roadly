@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Subway
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Dashboard
@@ -318,7 +319,13 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
             val navigation by vm.navigation.collectAsStateWithLifecycle()
             NavigationGroup(navigation, vm)
         }
-        SettingsPage.ROUTES -> RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries, onTunnels = vm::setAvoidTunnels)
+        SettingsPage.ROUTES -> {
+            RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries, onTunnels = vm::setAvoidTunnels)
+            val zfe by vm.zfeEnabled.collectAsStateWithLifecycle()
+            SettingsGroup(stringResource(R.string.settings_group_local_rules), footer = stringResource(R.string.settings_zfe_footer)) {
+                ToggleRow(stringResource(R.string.settings_zfe), checked = zfe, onCheckedChange = vm::setZfeEnabled, icon = Icons.Default.Eco, subtitle = stringResource(R.string.settings_zfe_sub), divider = false)
+            }
+        }
         SettingsPage.SPEED -> {
             val coach by vm.coach.collectAsStateWithLifecycle()
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)

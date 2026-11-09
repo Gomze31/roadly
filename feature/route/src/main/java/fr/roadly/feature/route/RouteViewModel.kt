@@ -75,6 +75,8 @@ class RouteViewModel @Inject constructor(
     private val departurePlanner: DeparturePlanner? = null,
     /** Étoile de l'en-tête ; null (tests existants) = pas d'étoile. */
     private val favorites: FavoritesRepository? = null,
+    /** Base nationale des ZFE ; null (tests existants) = pas d'alerte ZFE. */
+    private val zfe: fr.roadly.core.data.zfe.ZfeSource? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -214,6 +216,26 @@ class RouteViewModel @Inject constructor(
         }
     }
 
+    /** ZFE traversées par chaque variante, avec le verdict pour le véhicule (Crit'Air) à l'heure de départ ; vide si désactivé. */
+    private val zfeCrossings = MutableStateFlow<Map<String, List<fr.roadly.core.data.zfe.ZfeCrossing>>>(emptyMap())
+
+    init {
+        val source = zfe
+        if (source != null) viewModelScope.launch {
+            combine(computed, prefs.zfeEnabled, vehicleRepo.profile) { s, on, v -> Triple(s, on, v) }.collectLatest { (s, on, v) ->
+                zfeCrossings.value = emptyMap()
+                if (!on || s !is RouteUiState.Content || s.scooter != null) return@collectLatest
+                val rules = try { source.rules() } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                if (rules.isEmpty()) return@collectLatest
+                val at = java.time.Instant.ofEpochMilli(s.departAtEpochMs).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                val cls = fr.roadly.core.data.zfe.ZfeVehicleClass.of(v?.type)
+                zfeCrossings.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    s.options.associate { o -> o.route.id to fr.roadly.core.data.zfe.ZfeRules.crossings(o.route.geometry, rules, cls, v?.critAir, at) }
+                }
+            }
+        }
+    }
+
     /**
      * S5 : carte d'identité de chaque variante (part à limitation connue, temps au-dessus de 90, portiques en flux libre). Une requête
      * `trace_attributes` par variante, mise en cache par le fournisseur (le guidage réutilise celle de la variante choisie).
@@ -241,8 +263,8 @@ class RouteViewModel @Inject constructor(
     val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }, travelMode, assistantReply, dangerZoneCounts, identities) { st, mode, reply, zones, ids ->
-        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones, identities = ids) ?: st.phase
+    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings) { d, z -> d to z }, identities) { st, mode, reply, zones, ids ->
+        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, identities = ids) ?: st.phase
         st.copy(phase = phase, travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.RadioButtonChecked
@@ -155,6 +156,7 @@ internal fun RouteChoicePanel(
     onRemoveStop: (Int) -> Unit,
     onOptimize: () -> Unit,
     modifier: Modifier = Modifier,
+    onZfe: (fr.roadly.core.data.zfe.ZfeCrossing) -> Unit = {},
 ) {
     val c = LocalRoadlyColors.current
     val active = s.options.firstOrNull { it.route.id == s.activeId } ?: s.options.first()
@@ -183,6 +185,11 @@ internal fun RouteChoicePanel(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // ZFE en premier : une interdiction doit se voir sans faire défiler.
+                    s.zfe[active.route.id]?.firstOrNull { it.verdict != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION }?.let { z ->
+                        val (text, color) = zfePill(z)
+                        StatusPill(text, Icons.Default.Eco, color, onClick = { onZfe(z) })
+                    }
                     val arrive = s.arriveAtEpochMs
                     StatusPill(
                         when {
@@ -214,7 +221,7 @@ internal fun RouteChoicePanel(
             // Alternatives : durée, écart avec le choix, distance, icônes (péage, zones).
             s.options.filter { it.route.id != active.route.id }.forEach { o ->
                 RowDivider(inset = 0.dp)
-                AlternativeRow(o, active, s.dangerZones[o.route.id] ?: 0, onClick = { onSelect(o.route.id) })
+                AlternativeRow(o, active, s.dangerZones[o.route.id] ?: 0, onClick = { onSelect(o.route.id) }, zfe = s.zfe[o.route.id]?.firstOrNull()?.verdict)
             }
             RowDivider(inset = 0.dp)
             if (s.stops.isNotEmpty() || s.optimizing) {
@@ -251,7 +258,7 @@ internal fun StatusPill(text: String, icon: ImageVector, color: Color, onClick: 
 }
 
 @Composable
-private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int, onClick: () -> Unit) {
+private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int, onClick: () -> Unit, zfe: fr.roadly.core.data.zfe.ZfeVerdict? = null) {
     val c = LocalRoadlyColors.current
     Row(
         Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(role = Role.RadioButton, onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
@@ -271,6 +278,10 @@ private fun AlternativeRow(o: RouteOption, active: RouteOption, dangerZones: Int
         Spacer(Modifier.weight(1f))
         Text(Formatters.distance(o.route.distanceMeters), style = StatValue.copy(fontSize = 19.sp, fontWeight = FontWeight.ExtraBold), color = c.textPrimary)
         if (o.route.hasToll) { Spacer(Modifier.width(10.dp)); Icon(Icons.Default.Euro, contentDescription = stringResource(R.string.route_toll_yes), tint = c.accent, modifier = Modifier.size(20.dp)) }
+        if (zfe != null && zfe != fr.roadly.core.data.zfe.ZfeVerdict.NO_RESTRICTION) {
+            Spacer(Modifier.width(10.dp))
+            Icon(Icons.Default.Eco, contentDescription = stringResource(R.string.route_zfe_short), tint = zfeColor(zfe), modifier = Modifier.size(20.dp))
+        }
         if (dangerZones > 0) { Spacer(Modifier.width(10.dp)); Icon(Icons.Default.Warning, contentDescription = pluralStringResource(R.plurals.route_danger_zones, dangerZones, dangerZones), tint = c.warning, modifier = Modifier.size(20.dp)) }
     }
 }
@@ -329,4 +340,70 @@ internal fun SideRoundButton(icon: ImageVector, description: String, tint: Color
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = description, tint = tint, modifier = iconModifier.size(28.dp)) }
+}
+
+@Composable
+internal fun zfeColor(v: fr.roadly.core.data.zfe.ZfeVerdict): Color {
+    val c = LocalRoadlyColors.current
+    return when (v) {
+        fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN -> c.danger
+        fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN_OTHER_HOURS, fr.roadly.core.data.zfe.ZfeVerdict.CRITAIR_UNKNOWN -> c.accent
+        else -> c.success
+    }
+}
+
+/** Texte et couleur de la pastille ZFE de l'itinéraire choisi. */
+@Composable
+internal fun zfePill(z: fr.roadly.core.data.zfe.ZfeCrossing): Pair<String, Color> {
+    val text = when (z.verdict) {
+        fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN -> stringResource(R.string.route_zfe_forbidden)
+        fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN_OTHER_HOURS -> stringResource(R.string.route_zfe_hours)
+        fr.roadly.core.data.zfe.ZfeVerdict.CRITAIR_UNKNOWN -> stringResource(R.string.route_zfe_unknown)
+        else -> stringResource(R.string.route_zfe_allowed)
+    }
+    return text to zfeColor(z.verdict)
+}
+
+/** Détail d'une ZFE traversée : réglementation, vignettes interdites, horaires, liens officiels. */
+@Composable
+internal fun ZfeDialog(z: fr.roadly.core.data.zfe.ZfeCrossing, onOpenVehicle: () -> Unit, onDismiss: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val (headline, color) = zfePill(z)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surfaceElevated,
+        icon = { Icon(Icons.Default.Eco, contentDescription = null, tint = color) },
+        title = { Text(z.rule.name, style = MaterialTheme.typography.titleLarge, color = c.textPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(headline, style = MaterialTheme.typography.titleSmall, color = color)
+                fr.roadly.core.data.zfe.zfeRestrictionLabel(z.restriction)?.let {
+                    Text(stringResource(R.string.route_zfe_rule, it), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary)
+                }
+                Text(stringResource(R.string.route_zfe_hours_label, z.hours ?: stringResource(R.string.route_zfe_hours_unknown)), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary)
+                Text(stringResource(R.string.route_zfe_source), style = MaterialTheme.typography.bodySmall, color = c.textTertiary)
+                z.rule.decreeUrl?.let { url -> Text(stringResource(R.string.route_zfe_decree), style = MaterialTheme.typography.labelLarge, color = c.brandBright, modifier = Modifier.clickable { runCatching { uri.openUri(url) } }.padding(vertical = 4.dp)) }
+                z.rule.infoUrl?.let { url -> Text(stringResource(R.string.route_zfe_info), style = MaterialTheme.typography.labelLarge, color = c.brandBright, modifier = Modifier.clickable { runCatching { uri.openUri(url) } }.padding(vertical = 4.dp)) }
+            }
+        },
+        confirmButton = {
+            if (z.verdict == fr.roadly.core.data.zfe.ZfeVerdict.CRITAIR_UNKNOWN) fr.roadly.core.designsystem.component.GlassButton(stringResource(R.string.route_zfe_set_critair), onClick = { onDismiss(); onOpenVehicle() })
+            else fr.roadly.core.designsystem.component.GlassButton(stringResource(R.string.route_time_confirm_ok), onClick = onDismiss)
+        },
+    )
+}
+
+/** Périmètres à dessiner : chaque agglomération une fois, avec l'état le plus strict parmi les itinéraires affichés. */
+internal fun zfeShapes(byRoute: Map<String, List<fr.roadly.core.data.zfe.ZfeCrossing>>): List<fr.roadly.core.map.ZfeShape> {
+    fun state(v: fr.roadly.core.data.zfe.ZfeVerdict) = when (v) {
+        fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN -> "forbidden"
+        fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN_OTHER_HOURS, fr.roadly.core.data.zfe.ZfeVerdict.CRITAIR_UNKNOWN -> "caution"
+        else -> "ok"
+    }
+    val rank = listOf("forbidden", "caution", "ok")
+    return byRoute.values.flatten().groupBy { it.rule.name }.map { (_, list) ->
+        val worst = list.minBy { rank.indexOf(state(it.verdict)) }
+        fr.roadly.core.map.ZfeShape(state(worst.verdict), worst.rule.polygons.map { p -> listOf(p.outer) + p.holes })
+    }
 }

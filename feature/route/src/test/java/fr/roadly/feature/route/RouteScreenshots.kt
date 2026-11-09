@@ -62,10 +62,19 @@ class RouteScreenshots {
         id, System.currentTimeMillis() + min * 60_000L, cost?.let { CostEstimate(it, null, it, it / km) }, false,
     )
 
+    private fun zfe(v: fr.roadly.core.data.zfe.ZfeVerdict) = fr.roadly.core.data.zfe.ZfeCrossing(
+        fr.roadly.core.data.zfe.ZfeRule(
+            "243100518-ZFE-003", "Toulouse Métropole", null, null, emptyMap(), emptyMap(), null, null,
+            listOf(fr.roadly.core.data.zfe.ZfePolygon(listOf(GeoPoint(43.59, 1.43), GeoPoint(43.59, 1.46), GeoPoint(43.61, 1.46)))),
+        ),
+        v, "V4", "24/7",
+    )
+
     @Test fun choice() = shot("route_choice") {
         val s = RouteUiState.Content(
             GeoPoint(43.6, 1.44), "6 Impasse Miguel Villabona", listOf(option("a", 17, 5.3, cost = 0.62), option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
             activeId = "a", hasVehicleProfile = true, departAtEpochMs = System.currentTimeMillis(), dangerZones = mapOf("c" to 1),
+            zfe = mapOf("a" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN)), "b" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.ALLOWED))),
         )
         val c = LocalRoadlyColors.current
         Box(Modifier.fillMaxSize()) {

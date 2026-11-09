@@ -86,6 +86,9 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val onboarding = MutableStateFlow(false)
     override val onboardingDone: Flow<Boolean> = onboarding
     override suspend fun setOnboardingDone(value: Boolean) { onboarding.value = value }
+    val zfe = MutableStateFlow(true)
+    override val zfeEnabled: Flow<Boolean> = zfe
+    override suspend fun setZfeEnabled(value: Boolean) { zfe.value = value }
     val limitDrop = MutableStateFlow(true)
     override val limitDropVoice: Flow<Boolean> = limitDrop
     override suspend fun setLimitDropVoice(value: Boolean) { limitDrop.value = value }

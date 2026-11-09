@@ -65,4 +65,17 @@
     <string name="route_collapse">Replier le panneau</string>
     <string name="route_expand">Afficher le panneau</string>
     <string name="route_fuel">Stations-service</string>
+    <string name="route_zfe_short">Zone à faibles émissions</string>
+    <string name="route_zfe_forbidden">ZFE interdite</string>
+    <string name="route_zfe_hours">ZFE : certaines heures</string>
+    <string name="route_zfe_unknown">ZFE : Crit\'Air ?</string>
+    <string name="route_zfe_allowed">ZFE autorisée</string>
+    <string name="route_zfe_rule">Interdite à partir de : %1$s (et au-delà)</string>
+    <string name="route_zfe_hours_label">Horaires de la restriction : %1$s</string>
+    <string name="route_zfe_hours_unknown">non précisés</string>
+    <string name="route_zfe_source">Base nationale consolidée des ZFE (transport.data.gouv.fr). En cas de doute, l\'arrêté fait foi.</string>
+    <string name="route_zfe_decree">Lire l\'arrêté</string>
+    <string name="route_zfe_info">Site d\'information</string>
+    <string name="route_zfe_set_critair">Renseigner ma vignette</string>
+    <string name="route_time_confirm_ok">OK</string>
 </resources>

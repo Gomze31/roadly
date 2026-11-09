@@ -129,6 +129,9 @@ interface UserPreferencesRepository {
     /** Accueil du premier lancement (7 étapes) terminé ou ignoré. */
     val onboardingDone: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
     suspend fun setOnboardingDone(value: Boolean) = Unit
+    /** Zones à faibles émissions : frontière sur la carte et alerte sur l'itinéraire selon la vignette Crit'Air. */
+    val zfeEnabled: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setZfeEnabled(value: Boolean) = Unit
 }
 
 @Singleton
@@ -165,6 +168,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kLastRoute = stringPreferencesKey("guidance.last.route")
     private val kLastAt = longPreferencesKey("guidance.last.at")
     private val kOnboarding = booleanPreferencesKey("onboarding.done")
+    private val kZfe = booleanPreferencesKey("zfe.enabled")
 
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
     override suspend fun setThemeMode(mode: ThemeMode) { store.edit { it[kTheme] = mode.name } }
@@ -229,6 +233,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
     override val onboardingDone: Flow<Boolean> = store.data.map { it[kOnboarding] ?: false }
     override suspend fun setOnboardingDone(value: Boolean) { store.edit { it[kOnboarding] = value } }
+    override val zfeEnabled: Flow<Boolean> = store.data.map { it[kZfe] ?: true }
+    override suspend fun setZfeEnabled(value: Boolean) { store.edit { it[kZfe] = value } }
     override val lastGuidance: Flow<LastGuidance?> = store.data.map { p ->
         val lat = p[kLastLat]; val lon = p[kLastLon]; val routeId = p[kLastRoute]; val at = p[kLastAt]
         if (lat == null || lon == null || routeId == null || at == null) null else LastGuidance(GeoPoint(lat, lon), p[kLastName], routeId, at)

@@ -38,7 +38,7 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Mode Silence | G | fonctionnelle | 2 | Bouton voix de l'écran de guidage |
 | Import GPX | ? | non commencée | 5 | |
 | Guidage allégé hors connexion | G | non commencée | 5 | Cache tuiles MapLibre + itinéraire mémorisé |
-| ZFE / Crit'Air | ? | non commencée | 3 | Source à identifier |
+| ZFE / Crit'Air | ? | fonctionnelle | 3 | Base nationale consolidée des ZFE (transport.data.gouv.fr, `aires.geojson`, cache 7 j) : verdict selon la catégorie, la vignette Crit'Air, la date et les horaires (`opening_hours`) ; pastille sur l'écran d'itinéraires + détail (arrêté), feuille sur les alternatives, périmètre sur la carte, ligne sur Android Auto ; réglage « Zones à faibles émissions ». 10 tests JVM, dont un sur le vrai fichier national (`-PzfeFile`) |
 | Tunnels (perte GPS) | G | fonctionnelle | 2 | Extrapolation sur la polyligne après 3 s sans fix, plafonnée à 150 m / 10 s ; badge « GPS perdu » après 10 s |
 
 ## 2. Horizon (route à venir)
