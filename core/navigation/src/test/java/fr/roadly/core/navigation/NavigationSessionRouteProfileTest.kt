@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,7 +56,7 @@ class NavigationSessionRouteProfileTest {
         listOf(TollGantry(700.0, "A 79", "FR")),
     )
 
-    private fun TestScope.session(attrs: RouteAttributes? = profile): NavigationSession {
+    private fun TestScope.session(attrs: RouteAttributes? = profile, bumps: List<Double> = emptyList()): NavigationSession {
         val d = StandardTestDispatcher(testScheduler)
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
@@ -68,6 +69,9 @@ class NavigationSessionRouteProfileTest {
             location, routing, providerLimits, speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime },
             NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope,
             NoScooterRouteAnalyzer, provider, memory,
+            speedBumps = object : SpeedBumpProvider {
+                override suspend fun bumps(route: Route, attributes: RouteAttributes) = Outcome.Success(bumps)
+            },
         )
     }
 
@@ -130,6 +134,97 @@ class NavigationSessionRouteProfileTest {
         assertEquals(1, speech.spoken.count { it.startsWith("Péage dans 1 kilomètre") })
         location.emit(fixAt(booth - 600.0)); runCurrent()
         assertEquals(1, speech.spoken.count { it.startsWith("Péage dans") })
+    }
+
+    @Test fun `a turn at a traffic light is announced and shown as at the light`() = runTest {
+        val turnAt = RouteGeometry(route.geometry).cumulative[route.maneuvers[1].beginShapeIndex]
+        val s = session(profile.copy(tollGantries = emptyList(), trafficSignals = listOf(turnAt - 15.0)))
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(200.0)); runCurrent()
+        assertTrue(guiding(s).nextAtTrafficLight)
+        location.emit(fixAt(turnAt - 120.0)); runCurrent()
+        assertTrue(speech.spoken.joinToString(" | "), speech.spoken.any { "au feu, tournez à droite dans Rue d'Essai" in it })
+        assertTrue(speech.spoken.none { it.startsWith("Dans") && "au feu" !in it && "Rue d'Essai" in it })
+    }
+
+    @Test fun `without a light the Valhalla instruction is unchanged`() = runTest {
+        val s = session(profile.copy(tollGantries = emptyList()))
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(200.0)); runCurrent()
+        assertFalse(guiding(s).nextAtTrafficLight)
+        location.emit(fixAt(RouteGeometry(route.geometry).cumulative[10] - 120.0)); runCurrent()
+        assertTrue(speech.spoken.none { "au feu" in it })
+    }
+
+    @Test fun `a sharp bend on an open road is announced once with its side, not in town`() = runTest {
+        // 600 m vers l'est, coude de 90° vers le nord (virage à gauche), 600 m vers le nord ; aucune manœuvre au coude.
+        val pts = (0..20).map { fr.roadly.core.navigation.testing.TestRoutes.xy(it * 30.0, 0.0) } +
+            (1..20).map { fr.roadly.core.navigation.testing.TestRoutes.xy(600.0, it * 30.0) }
+        val bend = Route(
+            "bend", fr.roadly.core.model.RouteCosting.FASTEST, 1_200.0, 60.0, pts,
+            listOf(
+                fr.roadly.core.model.Maneuver(fr.roadly.core.model.ManeuverType.DEPART, "Conduisez vers l'est.", null, 1_200.0, 60.0, 0, null),
+                fr.roadly.core.model.Maneuver(fr.roadly.core.model.ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, pts.lastIndex, null),
+            ),
+            false, "test",
+        )
+        val t = RouteTracker(bend)
+        fun at(along: Double, mps: Float) = LocationFix(t.pointAt(along), 90f, mps, 5f, 0L)
+        val s = session(attrs = null)
+        s.start(RouteOption(bend, "x", 0L, null, sameAsFastest = false), RoutePreferences()); runCurrent()
+        location.emit(at(20.0, 22f)); runCurrent()
+        val curveStart = guiding(s).hazards.first { it.kind == fr.roadly.core.model.HazardKind.CURVE }.startAlongM
+        assertEquals(false, guiding(s).hazards.first { it.kind == fr.roadly.core.model.HazardKind.CURVE }.rightHand)
+        location.emit(at(curveStart - 400.0, 22f)); runCurrent()
+        location.emit(at(curveStart - 300.0, 22f)); runCurrent()
+        assertEquals(0, speech.spoken.count { it.startsWith("Attention, virage") })
+        location.emit(at(curveStart - 150.0, 22f)); runCurrent()
+        assertEquals(1, speech.spoken.count { it == "Attention, virage serré à gauche." })
+        location.emit(at(curveStart - 80.0, 22f)); runCurrent()
+        assertEquals(1, speech.spoken.count { it.startsWith("Attention, virage") })
+    }
+
+    @Test fun `a sharp bend taken slowly is not announced`() = runTest {
+        val pts = (0..20).map { fr.roadly.core.navigation.testing.TestRoutes.xy(it * 30.0, 0.0) } +
+            (1..20).map { fr.roadly.core.navigation.testing.TestRoutes.xy(600.0, -it * 30.0) }
+        val bend = Route(
+            "bend2", fr.roadly.core.model.RouteCosting.FASTEST, 1_200.0, 60.0, pts,
+            listOf(
+                fr.roadly.core.model.Maneuver(fr.roadly.core.model.ManeuverType.DEPART, "Conduisez vers l'est.", null, 1_200.0, 60.0, 0, null),
+                fr.roadly.core.model.Maneuver(fr.roadly.core.model.ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, pts.lastIndex, null),
+            ),
+            false, "test",
+        )
+        val t = RouteTracker(bend)
+        val s = session(attrs = null)
+        s.start(RouteOption(bend, "x", 0L, null, sameAsFastest = false), RoutePreferences()); runCurrent()
+        location.emit(LocationFix(t.pointAt(20.0), 90f, 8f, 5f, 0L)); runCurrent()
+        assertEquals(true, guiding(s).hazards.first { it.kind == fr.roadly.core.model.HazardKind.CURVE }.rightHand)
+        for (a in listOf(300.0, 400.0, 480.0, 540.0)) { location.emit(LocationFix(t.pointAt(a), 90f, 8f, 5f, 0L)); runCurrent() }
+        assertEquals(0, speech.spoken.count { it.startsWith("Attention, virage") })
+    }
+
+    @Test fun `speed bumps are shown and announced once per series, only above 30 km per h, and can be muted`() = runTest {
+        val s = session(profile.copy(tollGantries = emptyList()), bumps = listOf(600.0, 700.0, 1_200.0))
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(100.0, mps = 12f)); runCurrent()
+        assertEquals(3, guiding(s).hazards.count { it.kind == fr.roadly.core.model.HazardKind.SPEED_BUMP })
+        location.emit(fixAt(555.0, mps = 12f)); runCurrent()
+        assertEquals(speech.spoken.joinToString(" | "), 1, speech.spoken.count { it == "Attention, ralentisseurs." })
+        location.emit(fixAt(650.0, mps = 12f)); runCurrent()
+        assertEquals(1, speech.spoken.count { it.startsWith("Attention, ralentisseur") })
+        // 1 200 m, seul : abordé au pas (5 km/h, vitesse lissée sur plusieurs positions), rien n'est dit.
+        for (a in listOf(1_000.0, 1_040.0, 1_080.0, 1_110.0, 1_130.0, 1_150.0)) { location.emit(fixAt(a, mps = 1.5f)); runCurrent() }
+        assertEquals(1, speech.spoken.count { it.startsWith("Attention, ralentisseur") })
+    }
+
+    @Test fun `road hazard voice off silences bumps`() = runTest {
+        prefs.setRoadHazardVoice(false)
+        val s = session(profile.copy(tollGantries = emptyList()), bumps = listOf(600.0))
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(100.0, mps = 12f)); runCurrent()
+        location.emit(fixAt(555.0, mps = 12f)); runCurrent()
+        assertEquals(0, speech.spoken.count { it.startsWith("Attention, ralentisseur") })
     }
 
     @Test fun `stopping after a gantry still records the reminder, but parks nothing`() = runTest {

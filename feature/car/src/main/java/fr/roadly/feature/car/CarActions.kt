@@ -8,6 +8,9 @@ import androidx.car.app.model.Header
 import androidx.car.app.model.MessageTemplate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Satellite
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -33,6 +36,12 @@ internal object CarActions {
         Action.Builder().setTitle(carContext.getString(titleRes)).setOnClickListener(onClick).build()
 
     /** Bandeau de carte : défilement (mode panoramique de l'hôte), zoom avant / arrière, recentrage sur le véhicule. */
+    /** Accueil : recherche et bascule plan / photos aériennes (l'icône montre la vue vers laquelle on bascule). */
+    fun homeStrip(aerial: Boolean, onSearch: () -> Unit, onToggleAerial: () -> Unit): ActionStrip = ActionStrip.Builder()
+        .addAction(icon(Icons.Default.Search, onSearch))
+        .addAction(icon(if (aerial) Icons.Default.Map else Icons.Default.Satellite, onToggleAerial))
+        .build()
+
     fun mapStrip(renderer: CarMapRenderer): ActionStrip = ActionStrip.Builder()
         .addAction(Action.PAN)
         .addAction(icon(Icons.Default.Add) { renderer.zoom(1.0) })

@@ -2,6 +2,8 @@ package fr.roadly.feature.navigation
 
 import fr.roadly.core.designsystem.theme.LocalUiScale
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Traffic
 
 import androidx.compose.foundation.layout.size
 
@@ -77,7 +79,21 @@ fun ManeuverBanner(
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(banner.distanceText, style = NavDigits.copy(fontSize = 34.sp * s, lineHeight = 38.sp * s, textAlign = TextAlign.Start), color = c.brand, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(banner.distanceText, style = NavDigits.copy(fontSize = 34.sp * s, lineHeight = 38.sp * s, textAlign = TextAlign.Start), color = c.brand, maxLines = 1)
+                    // Repère « au feu » (feu OSM au point de manœuvre), comme les directions par repère de Google Maps.
+                    if (banner.atTrafficLight) {
+                        Spacer(Modifier.width(10.dp))
+                        Row(
+                            Modifier.background(c.success.copy(alpha = 0.16f), RoadlyShapes.Pill).padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Default.Traffic, contentDescription = null, tint = c.success, modifier = Modifier.size(18.dp * s))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.nav_at_light), style = MaterialTheme.typography.labelLarge, color = c.success, maxLines = 1)
+                        }
+                    }
+                }
                 // Ligne principale : « 2e sortie · rue » (ou « Sortie 12 · rue »), en gras ; l'instruction complète si rien d'autre.
                 val exit = if (signShownBelow) null else exitLabel(banner)
                 val mainLine = listOfNotNull(exit, street).joinToString(" · ").ifEmpty { null }

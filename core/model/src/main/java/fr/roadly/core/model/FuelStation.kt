@@ -15,6 +15,8 @@ data class FuelStation(
     val prices: List<FuelPrice>,
     val open24h: Boolean,
     val services: List<String>,
+    /** Station d'autoroute (champ `pop` = « A » du flux officiel) : accessible depuis un seul sens de circulation. */
+    val onMotorway: Boolean = false,
 ) {
     fun price(fuel: FuelType): FuelPrice? = prices.firstOrNull { it.fuel == fuel }
 

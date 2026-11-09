@@ -30,6 +30,8 @@ data class BannerUi(
     val roundaboutExit: Int?,
     /** Direction du panneau de sortie (« Lyon · Mâcon »), si Valhalla la fournit. */
     val exitToward: String? = null,
+    /** La manœuvre a lieu à un feu tricolore (repère « au feu »). */
+    val atTrafficLight: Boolean = false,
 )
 
 /** Manœuvre à venir ; [distanceM] sert au ruban Horizon (échelle), [distanceText] à l'affichage ; [instruction] et [sign] servent à l'aperçu (D1, D3). */
@@ -215,7 +217,7 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 phase = NavigationPhase.GUIDING,
                 route = s.route,
                 progress = p,
-                banner = BannerUi(m.type, Formatters.maneuverDistance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit, m.exitToward),
+                banner = BannerUi(m.type, Formatters.maneuverDistance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit, m.exitToward, atTrafficLight = s.nextAtTrafficLight),
                 approach = if (approaching) ApproachUi(m.type, m.exitNumber, m.exitToward, m.beginShapeIndex) else null,
                 roundabout = s.roundabout?.takeIf { m.type == ManeuverType.ROUNDABOUT_ENTER || m.type == ManeuverType.ROUNDABOUT_EXIT },
                 then = thenFor(s.upcoming.firstOrNull(), p.distancesToManeuversM.firstOrNull()?.let { it - p.distanceToNextManeuverM }),

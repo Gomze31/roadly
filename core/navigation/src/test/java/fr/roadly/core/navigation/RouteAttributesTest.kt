@@ -18,11 +18,14 @@ class RouteAttributesTest {
 
     @Test fun `parse reads traffic signals on end nodes`() {
         // Forme réelle FOSSGIS (Toulouse → Carcassonne, 2026-11-09) : traffic_signal booléen sur chaque nœud.
+        // Toulouse, Capitole → Purpan : 12 feux en edge.traffic_signal (bout d'arête, sens parcouru), 2 en node.traffic_signal.
         val body = """{"edges":[{"length":0.1,"end_node":{"type":"street_intersection","traffic_signal":true}},
-            {"length":0.2,"end_node":{"type":"toll_booth","traffic_signal":false}}]}"""
+            {"length":0.2,"end_node":{"type":"toll_booth","traffic_signal":false}},
+            {"length":0.3,"traffic_signal":true,"end_node":{"type":"street_intersection","traffic_signal":false}}]}"""
         val edges = ValhallaRouteAttributes.parse(json, body)!!
         assertTrue(edges[0].endTrafficSignal)
         assertEquals(false, edges[1].endTrafficSignal)
+        assertTrue(edges[2].endTrafficSignal)
         assertEquals("toll_booth", edges[1].endNodeType)
     }
 
@@ -68,7 +71,7 @@ class RouteAttributesTest {
         val r = ValhallaRouteAttributes.request("abc")
         assertEquals("edge_walk", r["shape_match"]!!.jsonPrimitive.content)
         val attrs = r["filters"]!!.let { (it as kotlinx.serialization.json.JsonObject)["attributes"]!!.jsonArray.map { a -> a.jsonPrimitive.content } }
-        assertTrue(attrs.containsAll(listOf("edge.speed_limit", "node.type", "edge.length", "node.traffic_signal")))
+        assertTrue(attrs.containsAll(listOf("edge.speed_limit", "node.type", "edge.length", "node.traffic_signal", "edge.traffic_signal")))
     }
 
     @Test fun `consecutive equal limits merge and short unknown edges are absorbed`() {
@@ -108,5 +111,52 @@ class RouteAttributesTest {
         val same = RouteAttributesBuilder.build("r", 1_000.0, listOf(edge(400.0, 50), edge(200.0, null), edge(400.0, 50)))!!
         assertNull("même limitation après une portion inconnue : pas un changement", same.nextChange(300.0, 1_000.0))
         assertNotNull(same.nextChange(450.0, 1_000.0)) // depuis l'inconnu, la limitation à venir est annoncée
+    }
+}
+
+class TrafficLightCuesTest {
+    @Test fun `only turns whose point has a light just before or at it are cued`() {
+        val r = fr.roadly.core.navigation.testing.TestRoutes.straight()
+        val turnAt = RouteGeometry(r.geometry).cumulative[r.maneuvers[1].beginShapeIndex]
+        org.junit.Assert.assertEquals(setOf(1), TrafficLightCues.indexes(r, listOf(turnAt - 30.0)))
+        org.junit.Assert.assertEquals(setOf(1), TrafficLightCues.indexes(r, listOf(turnAt + 5.0)))
+        org.junit.Assert.assertEquals(emptySet<Int>(), TrafficLightCues.indexes(r, listOf(turnAt - 80.0)))
+        // Le départ et l'arrivée ne sont jamais « au feu ».
+        org.junit.Assert.assertEquals(emptySet<Int>(), TrafficLightCues.indexes(r, listOf(0.0, RouteGeometry(r.geometry).totalM)))
+        org.junit.Assert.assertEquals("Au feu, tournez à droite dans Rue d'Essai.", TrafficLightCues.phrase("Tournez à droite dans Rue d'Essai."))
+    }
+}
+
+class SpeedBumpQueryTest {
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    @Test fun `only slow ways are kept for the overpass query, in order and once`() {
+        val a = RouteAttributesBuilder.build("r", 400.0, listOf(
+            RouteEdge(100.0, 30, null, emptyList(), "FR", wayId = 11), RouteEdge(100.0, 130, null, emptyList(), "FR", wayId = 22),
+            RouteEdge(100.0, null, null, emptyList(), "FR", wayId = 11), RouteEdge(100.0, 50, null, emptyList(), "FR", wayId = 33),
+        ))!!
+        org.junit.Assert.assertEquals(listOf(11L, 33L), a.slowWayIds)
+        val q = SpeedBumpQuery.query(a.slowWayIds)
+        assertTrue(q.contains("way(id:11,33)") && q.contains("node(w)[traffic_calming~"))
+    }
+
+    @Test fun `parse reads way ids from trace attributes`() {
+        val edges = ValhallaRouteAttributes.parse(json, """{"edges":[{"length":0.1,"way_id":123456789}]}""")!!
+        org.junit.Assert.assertEquals(123456789L, edges.single().wayId)
+    }
+
+    @Test fun `bumps near the route are projected, merged per crossing, others dropped`() {
+        val r = fr.roadly.core.navigation.testing.TestRoutes.straight()
+        val g = RouteGeometry(r.geometry)
+        val onRoute = g.pointAt(300.0)
+        val sameBumpOtherLane = fr.roadly.core.model.GeoPoint(onRoute.lat + 0.00006, onRoute.lon) // ~7 m au nord
+        val farStreet = fr.roadly.core.model.GeoPoint(onRoute.lat + 0.001, onRoute.lon)          // ~110 m
+        val second = g.pointAt(700.0)
+        val along = SpeedBumpQuery.along(r.geometry, listOf(second, sameBumpOtherLane, onRoute, farStreet))
+        org.junit.Assert.assertEquals(2, along.size)
+        org.junit.Assert.assertEquals(300.0, along[0], 2.0)
+        org.junit.Assert.assertEquals(700.0, along[1], 2.0)
+        val nodes = SpeedBumpQuery.parse(json, """{"elements":[{"type":"node","id":1,"lat":43.6,"lon":1.44},{"type":"way","id":2}]}""")!!
+        org.junit.Assert.assertEquals(1, nodes.size)
     }
 }

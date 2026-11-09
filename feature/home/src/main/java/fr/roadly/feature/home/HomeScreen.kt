@@ -15,6 +15,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Satellite
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.DirectionsBoat
@@ -167,6 +169,7 @@ fun HomeScreen(
     val parked by vm.parkedVehicle.collectAsStateWithLifecycle()
     val freeDriveLimit by vm.freeDriveLimitKmh.collectAsStateWithLifecycle()
     val walk by vm.walkToCar.collectAsStateWithLifecycle()
+    val aerial by vm.mapAerial.collectAsStateWithLifecycle()
     // E3 : après « Reprendre », l'écran de guidage s'ouvre dès que la session guide (même chemin que « Reprendre le guidage »).
     var resumeRequested by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(resumeRequested, isGuiding) { if (resumeRequested && isGuiding) { resumeRequested = false; onResumeGuidance() } }
@@ -244,6 +247,14 @@ fun HomeScreen(
                     }
                     AnimatedVisibility(!collapsed, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                         CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
+                    }
+                    // Plan / photos aériennes (IGN), comme le bouton « calques » des autres GPS.
+                    AnimatedVisibility(!collapsed, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+                        RoundIconButton(
+                            if (aerial) Icons.Default.Map else Icons.Default.Satellite,
+                            stringResource(if (aerial) R.string.home_map_plan else R.string.home_map_aerial),
+                            onClick = vm::toggleMapAerial, iconTint = if (aerial) c.brand else c.success, size = 52.dp,
+                        )
                     }
                 }
                 Spacer(Modifier.weight(1f))

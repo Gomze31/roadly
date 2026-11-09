@@ -51,13 +51,21 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - Voies conseillées, ronds-points avec le numéro de sortie, panneaux de sortie d'autoroute, **vue 3D des carrefours**.
 - **Horizon** : la route à venir en un coup d'œil (manœuvres, virages serrés, zones de vigilance, signalements).
 - Limitation de vitesse de la route (OpenStreetMap) et alerte de dépassement, annonce des baisses de limitation, limitation abaissée par temps de pluie.
+- **Repères « au feu »** : « Au feu, tournez à droite… » quand le carrefour a des feux (OpenStreetMap), avec un badge sur le bandeau.
+- **Virages serrés et ralentisseurs annoncés** (« Attention, virage serré à gauche », « Attention, ralentisseurs »), d'après OpenStreetMap ; désactivables dans les réglages.
 - **Péage annoncé** à l'approche (« Péage dans 1 kilomètre, préparez votre moyen de paiement »), feux tricolores dans l'Horizon.
 - Recalcul immédiat hors itinéraire, extrapolation dans les tunnels, carte 3D avec bâtiments.
+- **Vue photos aériennes (IGN)** : la carte réaliste, avec les vraies photos de l'IGN sous les routes et le tracé, assombries la nuit ; un bouton sur l'accueil, sans clé ni compte.
+
+<img src="docs/images/aerial-view.jpg" alt="Plan, photos aériennes de jour et de nuit à Toulouse" width="100%">
+<sub>Plan, photos aériennes de jour, puis de nuit (Toulouse, rendu MapLibre). Photos aériennes © IGN – Géoplateforme (Licence Ouverte), données © contributeurs OpenStreetMap.</sub>
+
 - **Incidents officiels Bison Futé** sur votre trajet (accident, bouchon et sa longueur, véhicule en panne, route fermée, travaux), dans le sens où vous roulez : pastille « Incident détecté », Horizon, carte, Android Auto. Les **routes fermées sont contournées automatiquement**, au calcul comme au recalcul.
 - **Image dans l'image** : quittez l'app, la prochaine manœuvre reste visible dans une petite fenêtre.
 - Envoyez votre heure d'arrivée en un geste.
 
 ### 🛣️ Itinéraires
+- **Le plus économe** : consommation estimée selon la vitesse de chaque tronçon, badge et litres économisés quand une variante consomme au moins 5 % de moins que la plus rapide.
 - Jusqu'à trois variantes distinctes (rapide, court, sans péage) avec l'**écart de durée**, l'heure d'arrivée et la distance ; les tracés identiques sont fusionnés.
 - Éviter **péages, autoroutes, tunnels, ferries, chemins non revêtus** sur toutes les variantes, choisis **dès la recherche** pour ce trajet seulement ou mémorisés ; les options actives restent affichées sur le choix d'itinéraire.
 - Bouton **« Y aller »** sur chaque résultat de recherche, recherche vocale.
@@ -93,7 +101,7 @@ Comment Roadly se situe face à Waze, Google Maps, Coyote et Organic Maps : [`do
 
 ## Android Auto
 
-Roadly s'affiche sur l'écran de la voiture : recherche, favoris, choix de l'itinéraire, guidage pas à pas, conduite libre, vitesse et limitation sur la carte, alertes de zones et ZFE.
+Roadly s'affiche sur l'écran de la voiture : recherche, favoris, choix de l'itinéraire, guidage pas à pas, conduite libre, vitesse et limitation sur la carte, alertes de zones et ZFE, **photos aériennes IGN** (bouton sur l'accueil).
 
 <img src="docs/images/android-auto-hud.png" alt="Vitesse, limitation et alerte de zone sur la carte d'Android Auto" width="520">
 
@@ -158,6 +166,7 @@ Roadly existe grâce aux données ouvertes et aux projets libres :
 - Incidents de circulation : [Bison Futé](https://www.bison-fute.gouv.fr) (DATEX II, données publiques).
 - [Base nationale consolidée des ZFE](https://transport.data.gouv.fr/datasets/base-nationale-consolidee-des-zones-a-faibles-emissions), [prix des carburants](https://data.economie.gouv.fr), liste des équipements de contrôle routier : données publiques sous Licence Ouverte.
 - Météo : [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
+- Photos aériennes : [IGN – Géoplateforme](https://geoservices.ign.fr) (orthophotographies, Licence Ouverte 2.0).
 - Polices [Nunito](https://github.com/googlefonts/nunito) et [Inter](https://rsms.me/inter/) (SIL Open Font License 1.1).
 
 Les serveurs publics de Valhalla et Photon sont offerts en *fair-use* : pour une diffusion à grande échelle, auto-hébergez-les (voir [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md)).

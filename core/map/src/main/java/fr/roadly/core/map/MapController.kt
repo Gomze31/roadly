@@ -40,6 +40,10 @@ import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.fillColor
 import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.RasterLayer
+import org.maplibre.android.style.layers.PropertyFactory.rasterBrightnessMax
+import org.maplibre.android.style.sources.RasterSource
+import org.maplibre.android.style.sources.TileSet
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
@@ -98,6 +102,9 @@ class MapController(internal val context: Context) {
     private var lastZfe: String = ZfeFeatures.EMPTY
     private var buildings3d = false
     private var buildingsColor = "#2A2236"
+    /** Photos aériennes IGN sous les routes et les étiquettes ([AerialImagery]) ; [aerialNight] = assombries. */
+    private var aerial = false
+    private var aerialNight = false
 
     /** Commande caméra reçue avant que la carte et son style soient prêts ; la dernière l'emporte, rejouée en fin de `replayState`. */
     private var pendingCamera: ((MapLibreMap) -> Unit)? = null
@@ -333,6 +340,7 @@ class MapController(internal val context: Context) {
         applyArrowColors(style)
         applyBuildings(style)
         applyDetailTo(style)
+        applyAerial(style)
         map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
@@ -352,8 +360,49 @@ class MapController(internal val context: Context) {
 
     private fun applyBuildings(style: Style) {
         (style.getLayer(MapIds.LYR_BUILDINGS_3D) as? FillExtrusionLayer)?.setProperties(
-            fillExtrusionColor(buildingsColor), visibility(if (buildings3d) Property.VISIBLE else Property.NONE),
+            // Sur les photos aériennes, les toits réels sont visibles : des volumes gris par-dessus brouilleraient l'image.
+            fillExtrusionColor(buildingsColor), visibility(if (buildings3d && !aerial) Property.VISIBLE else Property.NONE),
         )
+    }
+
+    /**
+     * Vue « photos aériennes » : active ou non, assombrie la nuit. La désactivation recharge le style (retour exact aux réglages du
+     * style, sans mémoriser chaque propriété modifiée) ; l'état de Roadly est rejoué comme après tout changement de style.
+     */
+    fun setAerial(enabled: Boolean, night: Boolean) {
+        val turnedOff = aerial && !enabled
+        aerial = enabled
+        aerialNight = night
+        if (!styleReady) return
+        if (turnedOff) { currentStyleUrl?.let { loadStyle(it) }; return }
+        map?.style?.let { applyAerial(it); applyBuildings(it) }
+    }
+
+    /** Photo sous la première ligne de route du style : les routes, les étiquettes et les calques de Roadly restent au-dessus. */
+    private fun applyAerial(style: Style) {
+        if (!aerial) return
+        if (style.getSource(MapIds.SRC_AERIAL) == null) {
+            val tiles = TileSet("2.1.0", AerialImagery.TILE_URL).apply {
+                attribution = AerialImagery.ATTRIBUTION
+                maxZoom = AerialImagery.MAX_ZOOM.toFloat()
+            }
+            style.addSource(RasterSource(MapIds.SRC_AERIAL, tiles, 256))
+            val layer = RasterLayer(MapIds.LYR_AERIAL, MapIds.SRC_AERIAL)
+            val anchor = style.layers.firstOrNull { (it as? LineLayer)?.sourceLayer == MapIds.STYLE_LYR_TRANSPORTATION }?.id
+                ?: style.layers.firstOrNull { it is SymbolLayer }?.id
+            if (anchor != null) style.addLayerBelow(layer, anchor) else style.addLayer(layer)
+        }
+        (style.getLayer(MapIds.LYR_AERIAL) as? RasterLayer)?.setProperties(
+            rasterBrightnessMax(if (aerialNight) AerialImagery.NIGHT_BRIGHTNESS_MAX else 1f),
+        )
+        for (layer in style.layers) {
+            when {
+                // Bâtiments plats du style : ils cacheraient les toits de la photo.
+                layer is FillLayer && layer.sourceLayer == MapIds.STYLE_LYR_BUILDING -> layer.setProperties(visibility(Property.NONE))
+                // Routes du style allégées : la photo montre déjà la chaussée, le tracé de Roadly reste opaque.
+                layer is LineLayer && layer.sourceLayer == MapIds.STYLE_LYR_TRANSPORTATION -> layer.setProperties(lineOpacity(0.55f))
+            }
+        }
     }
 
     /**

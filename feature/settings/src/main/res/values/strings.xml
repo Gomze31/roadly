@@ -76,6 +76,8 @@
     <string name="settings_theme_light">Clair</string>
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_theme_auto">Auto (jour/nuit solaire)</string>
+    <string name="settings_map_aerial">Photos aériennes (IGN)</string>
+    <string name="settings_map_aerial_subtitle">Vue réaliste : photos aériennes de l\'IGN sous les routes et le tracé, assombries la nuit. France uniquement ; ailleurs, le plan reste affiché. Consomme plus de données.</string>
     <string name="settings_map_3d">Bâtiments 3D</string>
     <string name="settings_map_3d_subtitle">Bâtiments en relief en vue 3D. Jamais en économie d\'énergie.</string>
     <string name="settings_junction_3d">Vue 3D des carrefours</string>
@@ -313,6 +315,8 @@
     <string name="radar_community_footer">Points signalés par des conducteurs (MapAtlas, instantané de 2024) à plus de 100 m de tout équipement officiel : radars récents, mais aussi radars démontés ou erreurs. Alerte visuelle seulement, sans voix. Les signalements qui confirment un équipement officiel servent toujours.</string>
     <string name="settings_limit_drop">Annoncer les baisses de limitation</string>
     <string name="settings_limit_drop_subtitle">« Limitation 70. » quand la limitation baisse, en guidage et en conduite libre.</string>
+    <string name="settings_road_hazard_voice">Ralentisseurs et virages serrés</string>
+    <string name="settings_road_hazard_voice_subtitle">Annoncés à la voix avant d\'y arriver (OpenStreetMap), au-dessus de 30 et 50 km/h.</string>
     <string name="settings_break_reminder">Rappel de pause</string>
     <string name="settings_break_reminder_subtitle">Toutes les deux heures de conduite, comme le recommande la Sécurité routière.</string>
     <string name="settings_group_local_rules">Règles locales</string>

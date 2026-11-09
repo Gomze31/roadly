@@ -561,8 +561,15 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
     }
     // Feux : seul le prochain, à moins d'1 km (en ville, la liste entière noierait le ruban).
     val firstLight = state.hazards.firstOrNull { it.kind == HazardKind.TRAFFIC_LIGHT && it.distanceM <= TRAFFIC_LIGHT_HORIZON_M }
-    val hazards = state.hazards.filter { it.kind != HazardKind.TRAFFIC_LIGHT || it === firstLight }.map { h ->
+    val firstBump = state.hazards.firstOrNull { it.kind == HazardKind.SPEED_BUMP && it.distanceM <= TRAFFIC_LIGHT_HORIZON_M }
+    val hazards = state.hazards.filter {
+        (it.kind != HazardKind.TRAFFIC_LIGHT || it === firstLight) && (it.kind != HazardKind.SPEED_BUMP || it === firstBump)
+    }.map { h ->
         when (h.kind) {
+            HazardKind.SPEED_BUMP -> {
+                val what = stringResource(R.string.nav_horizon_bump)
+                HorizonItem(HorizonKind.SPEED_BUMP, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
+            }
             HazardKind.TOLL_BOOTH -> {
                 val what = stringResource(R.string.nav_horizon_toll)
                 HorizonItem(HorizonKind.TOLL, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")

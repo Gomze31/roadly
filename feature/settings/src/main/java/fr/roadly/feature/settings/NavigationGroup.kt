@@ -2,6 +2,7 @@ package fr.roadly.feature.settings
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Satellite
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Landscape
@@ -56,6 +57,11 @@ internal fun NavigationGroup(s: NavigationSettings, vm: SettingsViewModel) {
         ToggleRow(
             stringResource(R.string.settings_map_3d), checked = s.buildings3d, onCheckedChange = vm::setMap3d,
             subtitle = stringResource(R.string.settings_map_3d_subtitle), icon = Icons.Default.LocationCity,
+        )
+        val aerial = vm.mapAerial.collectAsStateWithLifecycle()
+        ToggleRow(
+            stringResource(R.string.settings_map_aerial), checked = aerial.value, onCheckedChange = vm::setMapAerial,
+            subtitle = stringResource(R.string.settings_map_aerial_subtitle), icon = Icons.Default.Satellite,
         )
         val junction3d = vm.junction3d.collectAsStateWithLifecycle()
         ToggleRow(

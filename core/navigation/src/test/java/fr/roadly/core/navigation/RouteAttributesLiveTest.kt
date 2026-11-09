@@ -40,4 +40,27 @@ class RouteAttributesLiveTest {
         assertTrue(a.tollBooths.isNotEmpty())
         assertTrue(a.trafficSignals.isNotEmpty())
     }
+
+    @Test fun turnsAtTrafficLightsInTown() = runBlocking {
+        assumeTrue(System.getProperty("roadly.live") == "true")
+        val dispatchers = object : DispatcherProvider {
+            override val io = Dispatchers.IO; override val default = Dispatchers.Default; override val main = Dispatchers.Unconfined
+        }
+        val config = object : ProviderConfigRepository {
+            override val config = flowOf(ProviderConfig.DEFAULT)
+            override suspend fun override(config: ProviderConfig) = Unit
+            override suspend fun reset() = Unit
+        }
+        val json = Json { ignoreUnknownKeys = true }
+        val api = ApiClient(OkHttpClient(), dispatchers)
+        // Capitole → hôpital Purpan (Toulouse), trajet urbain à feux.
+        val route = (ValhallaRoutingProvider(api, config, json).route(
+            RouteRequest(GeoPoint(43.6045, 1.4440), GeoPoint(43.6085, 1.3970), costing = RouteCosting.FASTEST, departAtEpochMs = 0L),
+        ) as Outcome.Success).value.first()
+        val a = (ValhallaRouteAttributesProvider(api, config, json).attributes(route) as Outcome.Success).value
+        val cued = TrafficLightCues.indexes(route, a.trafficSignals)
+        println("Feux : ${a.trafficSignals.size} · manœuvres : ${route.maneuvers.size} · au feu : " +
+            cued.joinToString(" | ") { TrafficLightCues.phrase(route.maneuvers[it].verbalPre ?: route.maneuvers[it].instruction) })
+        assertTrue(a.trafficSignals.isNotEmpty())
+    }
 }

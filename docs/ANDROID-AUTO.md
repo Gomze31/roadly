@@ -144,3 +144,7 @@ Pour la DHU : Android Auto › ⋮ › « Démarrer serveur unité princ. », `a
 - **Suite** :
   - P0 : passe DHU puis voiture (affichage, défilement, verrouillage du téléphone, appel entrant).
   - P1 : alerte de l'hôte (`Alert`) à l'entrée d'une zone de danger ; arrêts et alternatives depuis la voiture ; rappel de péage à l'arrivée.
+
+## Photos aériennes
+
+Le bouton à côté de « Rechercher », sur l'accueil de la voiture, bascule la carte entre le plan et les photos aériennes de l'IGN (même réglage que sur le téléphone, Réglages › Navigation). Les photos sont assombries quand l'écran de la voiture passe en mode nuit. Hors de France, le plan reste affiché.

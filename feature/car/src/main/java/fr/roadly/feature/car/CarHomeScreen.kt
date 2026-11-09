@@ -57,10 +57,15 @@ internal class CarHomeScreen(
     private var guiding = false
     private var permission = deps.location.permissionState.value
     private var lastFix: LocationFix? = deps.location.lastKnown
+    /** Fond de carte en photos aériennes IGN (même réglage que sur le téléphone). */
+    private var aerial = false
     /** Localisation du téléphone coupée (réglages rapides) : aucune position n'arrivera, on le dit dans la liste. */
     private var locationOff = !CarLocationSwitch.isOn(carContext)
 
     init {
+        lifecycleScope.launch(Dispatchers.Main) {
+            deps.prefs.mapAerial.distinctUntilChanged().collect { if (it != aerial) { aerial = it; invalidate() } }
+        }
         lifecycleScope.launch(Dispatchers.Main) {
             combine(
                 deps.favorites.observeHome(), deps.favorites.observeWork(), deps.favorites.observeAll(), deps.recents.observe(),
@@ -102,6 +107,11 @@ internal class CarHomeScreen(
         (p.home ?: p.work)?.let { renderer.follow(it.point, null, FollowProfile.BROWSE) }
     }
 
+    /** Recherche, et bascule plan / photos aériennes (l'icône montre la vue vers laquelle on bascule). */
+    private fun homeActions(): ActionStrip = CarActions.homeStrip(aerial, onSearch = ::openSearch) {
+        lifecycleScope.launch { deps.prefs.setMapAerial(!aerial) }
+    }
+
     override fun onGetTemplate(): Template {
         if (permission != LocationPermissionState.GRANTED) return permissionTemplate()
         val caps = carContext.capabilities()
@@ -119,7 +129,7 @@ internal class CarHomeScreen(
         return MapWithContentTemplate.Builder()
             .setContentTemplate(list.build())
             .setMapController(MapController.Builder().setMapActionStrip(CarActions.mapStrip(renderer)).setPanModeListener { }.build())
-            .setActionStrip(ActionStrip.Builder().addAction(CarActions.icon(Icons.Default.Search) { openSearch() }).build())
+            .setActionStrip(homeActions())
             .build()
     }
 
@@ -146,7 +156,7 @@ internal class CarHomeScreen(
             rows(p).take(limit.coerceAtLeast(1)).forEach(items::addItem)
             builder.setItemList(items.build())
         }
-        builder.setActionStrip(ActionStrip.Builder().addAction(CarActions.icon(Icons.Default.Search) { openSearch() }).build())
+        builder.setActionStrip(homeActions())
         if (caps.listMapStrip) builder.setMapActionStrip(CarActions.mapStrip(renderer)).setPanModeListener { }
         return builder.build()
     }

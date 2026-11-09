@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.ColorLens
@@ -330,10 +331,12 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
         }
         SettingsPage.SPEED -> {
             val coach by vm.coach.collectAsStateWithLifecycle()
+            val roadHazards by vm.roadHazardVoice.collectAsStateWithLifecycle()
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
             DriverAidGroup(
                 state.alerts, onRain = vm::setRainLowersLimit,
                 limitDropVoice = coach.first, onLimitDropVoice = vm::setLimitDropVoice, breakReminder = coach.second, onBreakReminder = vm::setBreakReminder,
+                roadHazardVoice = roadHazards, onRoadHazardVoice = vm::setRoadHazardVoice,
             )
         }
         SettingsPage.VOICE -> VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
@@ -595,10 +598,12 @@ private fun vigilanceSummary(alerts: AlertSettings, refresh: RefreshState): Stri
 private fun DriverAidGroup(
     alerts: AlertSettings, onRain: (Boolean) -> Unit,
     limitDropVoice: Boolean = true, onLimitDropVoice: (Boolean) -> Unit = {}, breakReminder: Boolean = true, onBreakReminder: (Boolean) -> Unit = {},
+    roadHazardVoice: Boolean = true, onRoadHazardVoice: (Boolean) -> Unit = {},
 ) {
     SettingsGroup(stringResource(R.string.settings_group_driver_aids)) {
         ToggleRow(stringResource(R.string.settings_rain_limit), checked = alerts.rainLowersLimit, onCheckedChange = onRain, icon = Icons.Default.WaterDrop, subtitle = stringResource(R.string.settings_rain_limit_subtitle))
         ToggleRow(stringResource(R.string.settings_limit_drop), checked = limitDropVoice, onCheckedChange = onLimitDropVoice, icon = Icons.Default.Speed, subtitle = stringResource(R.string.settings_limit_drop_subtitle))
+        ToggleRow(stringResource(R.string.settings_road_hazard_voice), checked = roadHazardVoice, onCheckedChange = onRoadHazardVoice, icon = Icons.Default.Warning, subtitle = stringResource(R.string.settings_road_hazard_voice_subtitle))
         ToggleRow(stringResource(R.string.settings_break_reminder), checked = breakReminder, onCheckedChange = onBreakReminder, icon = Icons.Default.LocalCafe, subtitle = stringResource(R.string.settings_break_reminder_subtitle), divider = false)
     }
 }

@@ -112,6 +112,9 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true to true)
     fun setLimitDropVoice(value: Boolean) { viewModelScope.launch { prefs.setLimitDropVoice(value) } }
     fun setBreakReminder(value: Boolean) { viewModelScope.launch { prefs.setBreakReminder(value) } }
+    /** Annonce des ralentisseurs et des virages serrés. */
+    val roadHazardVoice: StateFlow<Boolean> = prefs.roadHazardVoice.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setRoadHazardVoice(value: Boolean) { viewModelScope.launch { prefs.setRoadHazardVoice(value) } }
     /** Zones à faibles émissions (frontière sur la carte, alerte selon la vignette Crit'Air). */
     val zfeEnabled: StateFlow<Boolean> = prefs.zfeEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     fun setZfeEnabled(value: Boolean) { viewModelScope.launch { prefs.setZfeEnabled(value) } }
@@ -185,6 +188,10 @@ class SettingsViewModel @Inject constructor(
     fun setVigilanceEnabled(value: Boolean) { viewModelScope.launch { prefs.setVigilanceEnabled(value) } }
     fun setVigilanceSound(value: Boolean) { viewModelScope.launch { prefs.setVigilanceSound(value) } }
     /** E2 « Bâtiments 3D » : la vue au départ, qui suivait l'ancien réglage tant qu'elle n'était pas choisie, est d'abord figée (écart 8). */
+    /** Fond de carte en photos aériennes IGN. */
+    val mapAerial: StateFlow<Boolean> = prefs.mapAerial.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setMapAerial(value: Boolean) { viewModelScope.launch { prefs.setMapAerial(value) } }
+
     fun setMap3d(value: Boolean) {
         viewModelScope.launch {
             prefs.setDefaultCameraMode(prefs.defaultCameraMode.first())

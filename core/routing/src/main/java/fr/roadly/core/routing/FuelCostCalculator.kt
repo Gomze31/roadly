@@ -1,6 +1,7 @@
 package fr.roadly.core.routing
 
 import fr.roadly.core.model.CostEstimate
+import fr.roadly.core.model.Route
 import fr.roadly.core.model.VehicleProfile
 
 object FuelCostCalculator {
@@ -11,5 +12,12 @@ object FuelCostCalculator {
         val km = distanceMeters / 1000.0
         val fuel = km * profile.consumptionPer100 / 100.0 * price
         return CostEstimate(fuelEur = fuel, tollEur = null, totalEur = fuel, perKmEur = if (km > 0) fuel / km else 0.0)
+    }
+
+    /** Coût d'un tracé selon la vitesse de ses tronçons ([FuelSpeedModel]) ; le coût au km reste rapporté à la distance réelle. */
+    fun estimate(route: Route, profile: VehicleProfile): CostEstimate? {
+        val base = estimate(FuelSpeedModel.equivalentMeters(route, profile.fuel), profile) ?: return null
+        val km = route.distanceMeters / 1000.0
+        return base.copy(perKmEur = if (km > 0) base.fuelEur / km else 0.0)
     }
 }
