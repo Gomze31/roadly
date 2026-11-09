@@ -47,6 +47,8 @@ class CarDependencies @Inject constructor(
     val foregroundService: NavigationServiceController,
     /** Base nationale des ZFE : alerte sur les variantes selon la vignette Crit'Air. */
     val zfe: fr.roadly.core.data.zfe.ZfeSource,
+    /** Incidents officiels Bison Futé (nombre par variante). */
+    val traffic: fr.roadly.core.data.traffic.TrafficSource,
 )
 
 /** Point d'entrée Android Auto (catégorie navigation). */

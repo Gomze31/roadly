@@ -51,12 +51,16 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - Voies conseillées, ronds-points avec le numéro de sortie, panneaux de sortie d'autoroute, **vue 3D des carrefours**.
 - **Horizon** : la route à venir en un coup d'œil (manœuvres, virages serrés, zones de vigilance, signalements).
 - Limitation de vitesse de la route (OpenStreetMap) et alerte de dépassement, annonce des baisses de limitation, limitation abaissée par temps de pluie.
+- **Péage annoncé** à l'approche (« Péage dans 1 kilomètre, préparez votre moyen de paiement »), feux tricolores dans l'Horizon.
 - Recalcul immédiat hors itinéraire, extrapolation dans les tunnels, carte 3D avec bâtiments.
+- **Incidents officiels Bison Futé** sur votre trajet (accident, bouchon et sa longueur, véhicule en panne, route fermée, travaux), dans le sens où vous roulez : pastille « Incident détecté », Horizon, carte, Android Auto. Les **routes fermées sont contournées automatiquement**, au calcul comme au recalcul.
+- **Image dans l'image** : quittez l'app, la prochaine manœuvre reste visible dans une petite fenêtre.
 - Envoyez votre heure d'arrivée en un geste.
 
 ### 🛣️ Itinéraires
-- Trois variantes comparées (rapide, court, sans péage) avec l'**écart de durée**, l'heure d'arrivée et la distance.
-- Éviter **péages, autoroutes, tunnels, ferries**.
+- Jusqu'à trois variantes distinctes (rapide, court, sans péage) avec l'**écart de durée**, l'heure d'arrivée et la distance ; les tracés identiques sont fusionnés.
+- Éviter **péages, autoroutes, tunnels, ferries, chemins non revêtus** sur toutes les variantes, choisis **dès la recherche** pour ce trajet seulement ou mémorisés ; les options actives restent affichées sur le choix d'itinéraire.
+- Bouton **« Y aller »** sur chaque résultat de recherche, recherche vocale.
 - **Partir à** / **arriver à** une heure donnée, inversion départ ↔ arrivée.
 - Jusqu'à **10 arrêts**, réordonnables, avec optimisation de l'ordre (mode tournée).
 - **Coût carburant** du trajet selon votre véhicule ; gabarit poids lourd (hauteur, largeur, poids) ; moto, taxi.
@@ -68,6 +72,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 
 ### ⛽ Autour de vous
 - **Stations-service avec les prix officiels** (flux de l'État, mis à jour en continu), tri par prix ou par distance.
+- **Les stations les moins chères sur votre trajet**, pendant le guidage : à moins de 1,5 km de la route sur les 80 prochains km, avec le détour ; un appui en fait un arrêt.
 - Bornes de recharge, parkings, aires de repos à proximité.
 - **Voiture garée** mémorisée à l'arrivée, avec le trajet à pied pour la retrouver.
 
@@ -83,6 +88,8 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - **Commandes vocales** : « Rentrer à la maison », « Évite les péages », « Signale un accident », « À quelle heure j'arrive ? »… Sans compte ni clé, rien n'est envoyé à un service d'IA.
 - Widget, raccourcis, ouverture des liens `geo:` et des demandes « Naviguer vers… ».
 - **Mises à jour intégrées** depuis les releases GitHub, vérifiées par empreinte.
+
+Comment Roadly se situe face à Waze, Google Maps, Coyote et Organic Maps : [`docs/COMPARATIF.md`](docs/COMPARATIF.md).
 
 ## Android Auto
 
@@ -148,6 +155,7 @@ Roadly existe grâce aux données ouvertes et aux projets libres :
 - Cartographie © [contributeurs OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL), tuiles [OpenFreeMap](https://openfreemap.org), rendu [MapLibre](https://maplibre.org) (BSD-2).
 - Itinéraires [Valhalla](https://github.com/valhalla/valhalla), serveur public de [FOSSGIS](https://fossgis.de).
 - Adresses : [Base Adresse Nationale](https://adresse.data.gouv.fr) (Licence Ouverte 2.0) ; lieux : [Photon](https://photon.komoot.io).
+- Incidents de circulation : [Bison Futé](https://www.bison-fute.gouv.fr) (DATEX II, données publiques).
 - [Base nationale consolidée des ZFE](https://transport.data.gouv.fr/datasets/base-nationale-consolidee-des-zones-a-faibles-emissions), [prix des carburants](https://data.economie.gouv.fr), liste des équipements de contrôle routier : données publiques sous Licence Ouverte.
 - Météo : [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
 - Polices [Nunito](https://github.com/googlefonts/nunito) et [Inter](https://rsms.me/inter/) (SIL Open Font License 1.1).

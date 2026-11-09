@@ -131,3 +131,32 @@ object RoadlyColors {
 
 val LocalRoadlyColors = staticCompositionLocalOf { RoadlyColors.Night }
 val LocalDrivingMode = staticCompositionLocalOf { false }
+/**
+ * Échelle de l'interface selon la largeur de l'écran : 1 à partir de [UiScale.REFERENCE_WIDTH_DP], réduite en dessous
+ * (jusqu'à [UiScale.MIN]) pour que tout tienne sur les téléphones étroits. La taille de police choisie par l'utilisateur
+ * (sp) s'y ajoute : on ne la neutralise jamais.
+ */
+val LocalUiScale = staticCompositionLocalOf { 1f }
+
+object UiScale {
+    /** Largeur de référence (dp) de la maquette : téléphone Android courant. */
+    const val REFERENCE_WIDTH_DP = 400f
+    const val MIN = 0.85f
+    fun forWidth(widthDp: Int): Float = (widthDp / REFERENCE_WIDTH_DP).coerceIn(MIN, 1f)
+}
+
+/**
+ * Place réduite : écran étroit (< 380 dp) ou grande police système (> 115 %). Les écrans masquent alors les libellés
+ * secondaires plutôt que de couper le texte principal.
+ */
+@androidx.compose.runtime.Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun isCompactSpace(): Boolean = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp < 380 || it.fontScale > 1.15f }
+
+/** Dimension mise à l'échelle de l'écran ([LocalUiScale]). */
+@androidx.compose.runtime.Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun androidx.compose.ui.unit.Dp.scaled(): androidx.compose.ui.unit.Dp = this * LocalUiScale.current
+
+/** L'activité est en mode image dans l'image (petite fenêtre) : les écrans affichent une version réduite. */
+val LocalPictureInPicture = androidx.compose.runtime.compositionLocalOf { false }

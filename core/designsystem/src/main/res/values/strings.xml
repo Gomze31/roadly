@@ -12,4 +12,9 @@
     <string name="report_pothole">Nid-de-poule</string>
     <string name="report_work_light">Feu de chantier</string>
     <string name="report_hazard">Danger</string>
+    <string name="departure_mode_depart">Partir à</string>
+    <string name="departure_mode_arrive">Arriver à</string>
+    <string name="departure_confirm">Valider</string>
+    <string name="departure_now">Partir maintenant</string>
+    <string name="departure_arrive_note">L\'heure de départ sera déduite de la durée de l\'itinéraire le plus rapide.</string>
 </resources>

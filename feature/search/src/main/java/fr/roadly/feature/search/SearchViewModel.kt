@@ -47,7 +47,44 @@ class SearchViewModel @Inject constructor(
     private val fuelStations: FuelStationProvider,
     vehicle: VehicleProfileRepository,
     savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    /** Options du trajet (péages, autoroutes…) et départ planifié ; null dans les tests existants. */
+    private val prefs: fr.roadly.core.data.repository.UserPreferencesRepository? = null,
+    private val trip: fr.roadly.core.data.repository.TripPreferences? = null,
+    private val departure: fr.roadly.core.data.repository.DeparturePlanner? = null,
 ) : ViewModel() {
+
+    // ── Options du trajet, choisies avant la destination ──
+    /** Mémoriser les options choisies ici comme préférences (sinon : pour ce trajet seulement). */
+    private val rememberOptions = MutableStateFlow(false)
+
+    val tripOptions: StateFlow<TripOptionsUi> = run {
+        val saved = prefs?.routePreferences ?: kotlinx.coroutines.flow.flowOf(fr.roadly.core.model.RoutePreferences())
+        val effective = trip?.effective(saved) ?: saved
+        val plan = departure?.plan ?: kotlinx.coroutines.flow.flowOf(null)
+        combine(effective, rememberOptions, plan, trip?.override ?: kotlinx.coroutines.flow.flowOf(null)) { p, remember, d, o ->
+            TripOptionsUi(p, remember, d?.takeIf { it.epochMs > System.currentTimeMillis() }, tripOnly = o != null)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TripOptionsUi())
+    }
+
+    /** Active ou désactive une option : pour ce trajet, ou enregistrée si « Mémoriser » est actif. */
+    fun onToggleAvoid(a: fr.roadly.core.model.RouteAvoid) {
+        val next = tripOptions.value.preferences.let { it.with(a, !it.avoids(a)) }
+        if (rememberOptions.value || trip == null) { trip?.clear(); viewModelScope.launch { prefs?.setRoutePreferences(next) } }
+        else trip.set(next)
+    }
+
+    /** « Mémoriser » : les options du trajet deviennent les préférences enregistrées. */
+    fun onRememberOptions(on: Boolean) {
+        rememberOptions.value = on
+        val pending = trip?.override?.value
+        if (on && pending != null) { trip.clear(); viewModelScope.launch { prefs?.setRoutePreferences(pending) } }
+    }
+
+    fun onDeparture(plan: fr.roadly.core.data.repository.DeparturePlan?) { departure?.set(plan) }
+
+    /** « Y aller » depuis un résultat : enregistré dans les récents, sans fiche intermédiaire. */
+    fun onGo(place: Place) { viewModelScope.launch { runCatching { recents.record(place) } } }
+
 
     // Requête initiale passée par la route (intent geo: / google.navigation: sans coordonnée).
     private val query = MutableStateFlow(savedStateHandle.get<String>("query") ?: "")

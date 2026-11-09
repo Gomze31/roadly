@@ -45,10 +45,20 @@
     <string name="route_identity_known_limit">limitation connue</string>
     <string name="route_identity_minutes">%1$d min</string>
     <string name="route_identity_fast_roads">à plus de %1$d</string>
-    <plurals name="route_identity_gantries">
-        <item quantity="one">péage flux libre</item>
-        <item quantity="many">péages flux libre</item>
-        <item quantity="other">péages flux libre</item>
+    <plurals name="route_closures_avoided">
+        <item quantity="one">Route fermée évitée</item>
+        <item quantity="many">%d routes fermées évitées</item>
+        <item quantity="other">%d routes fermées évitées</item>
+    </plurals>
+    <plurals name="route_identity_lights">
+        <item quantity="one">feu</item>
+        <item quantity="many">feux</item>
+        <item quantity="other">feux</item>
+    </plurals>
+    <plurals name="route_identity_tolls">
+        <item quantity="one">péage</item>
+        <item quantity="many">péages</item>
+        <item quantity="other">péages</item>
     </plurals>
     <plurals name="route_identity_zones">
         <item quantity="one">zone de danger</item>
@@ -78,4 +88,28 @@
     <string name="route_zfe_info">Site d\'information</string>
     <string name="route_zfe_set_critair">Renseigner ma vignette</string>
     <string name="route_time_confirm_ok">OK</string>
+    <string name="route_incident_one">Incident détecté</string>
+    <string name="route_incident_n">%1$d incidents</string>
+    <plurals name="route_incidents">
+        <item quantity="one">%1$d incident sur cet itinéraire</item>
+        <item quantity="other">%1$d incidents sur cet itinéraire</item>
+    </plurals>
+    <string name="route_traffic_title">Sur votre itinéraire</string>
+    <string name="route_traffic_at">à %1$s du départ</string>
+    <string name="route_traffic_source">Événements publiés par Bison Futé (routes nationales), mis à jour toutes les 5 minutes.</string>
+    <string name="route_traffic_accident">Accident</string>
+    <string name="route_traffic_jam">Bouchon</string>
+    <string name="route_traffic_slow">Ralentissement</string>
+    <string name="route_traffic_broken">Véhicule en panne</string>
+    <string name="route_traffic_closure">Route fermée</string>
+    <string name="route_traffic_obstacle">Obstacle</string>
+    <string name="route_traffic_weather">Conditions météo</string>
+    <string name="route_traffic_lanes">Voie fermée</string>
+    <string name="route_traffic_works">Travaux</string>
+    <string name="route_opt_no_unpaved">Éviter les chemins non revêtus</string>
+    <string name="route_avoid_tolls_short">sans péage</string>
+    <string name="route_avoid_highways_short">sans autoroute</string>
+    <string name="route_avoid_tunnels_short">sans tunnel</string>
+    <string name="route_avoid_ferries_short">sans ferry</string>
+    <string name="route_avoid_unpaved_short">sans chemin non revêtu</string>
 </resources>

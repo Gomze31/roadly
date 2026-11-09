@@ -24,6 +24,9 @@ Depuis la racine du dépôt (PowerShell sous Windows) :
 # Tests unitaires (les deux modules JVM purs ne sont pas couverts par testDebugUnitTest)
 .\gradlew.bat testDebugUnitTest :core:model:test :core:common:test
 
+# Contrôle sur le vrai serveur Valhalla (réseau requis) : « Sans péage » appliqué à toutes les variantes
+.\gradlew.bat :core:routing:testDebugUnitTest --tests "*ValhallaTollsLiveTest*" -ProadlyLive=true
+
 # Tests instrumentés (DAO Room, barre de recherche Compose) : appareil ou émulateur requis
 .\gradlew.bat connectedDebugAndroidTest
 ```

@@ -1,5 +1,6 @@
 package fr.roadly.feature.home
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.sp
 
 import fr.roadly.core.designsystem.theme.softShadow
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Subway
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -238,7 +240,7 @@ fun HomeScreen(
             Row(Modifier.fillMaxWidth().padding(top = RoadlySpacing.xs), verticalAlignment = Alignment.Top) {
                 Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
                     AnimatedVisibility(!collapsed, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
-                        RoundIconButton(Icons.Default.LocalGasStation, stringResource(R.string.home_stations), onClick = { onSearchCategory(PoiCategory.FUEL) }, iconTint = c.accent, size = 56.dp)
+                        RoundIconButton(Icons.Default.LocalGasStation, stringResource(R.string.home_stations), onClick = { onSearchCategory(PoiCategory.FUEL) }, iconTint = c.accent, size = 52.dp)
                     }
                     AnimatedVisibility(!collapsed, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                         CompassButton(bearingDeg = state.mapBearingDeg, onClick = map::resetBearing)
@@ -249,13 +251,13 @@ fun HomeScreen(
                     val chevron by animateFloatAsState(if (collapsed) 180f else 0f, label = "chevron")
                     RoundIconButton(
                         Icons.Default.KeyboardArrowUp, stringResource(if (collapsed) R.string.home_expand else R.string.home_collapse),
-                        onClick = { collapsed = !collapsed }, iconModifier = Modifier.rotate(chevron), iconTint = c.brand, size = 56.dp,
+                        onClick = { collapsed = !collapsed }, iconModifier = Modifier.rotate(chevron), iconTint = c.brand, size = 52.dp,
                     )
                     AnimatedVisibility(!collapsed, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                         Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm), horizontalAlignment = Alignment.End) {
                             ParkingButton(onClick = { onSearchCategory(PoiCategory.PARKING) })
-                            RoundIconButton(Icons.Default.EmojiEvents, stringResource(R.string.home_ranking), onClick = onOpenProfile, iconTint = c.warning, size = 56.dp)
-                            RoundIconButton(Icons.Default.Settings, stringResource(R.string.home_settings), onClick = onSettings, iconTint = c.brand, size = 56.dp)
+                            RoundIconButton(Icons.Default.EmojiEvents, stringResource(R.string.home_ranking), onClick = onOpenProfile, iconTint = c.warning, size = 52.dp)
+                            RoundIconButton(Icons.Default.Settings, stringResource(R.string.home_settings), onClick = onSettings, iconTint = c.brand, size = 52.dp)
                             assistantButton()
                             // 1.0 : conduite libre (compteur, limitation, zones de vigilance sans itinéraire) ; pas pendant un guidage.
                             if (!isGuiding && state.permission == LocationPermissionState.GRANTED) {
@@ -298,7 +300,7 @@ fun HomeScreen(
                 )
                 Spacer(Modifier.width(RoadlySpacing.sm))
                 // Signaler : grand bouton rond, icône ambre (feuille des types).
-                RoundIconButton(Icons.Default.Warning, stringResource(R.string.home_report), onClick = { showReport = true }, size = 64.dp, iconTint = c.accent)
+                RoundIconButton(Icons.Default.Warning, stringResource(R.string.home_report), onClick = { showReport = true }, size = 56.dp, iconTint = c.accent)
             }
             Spacer(Modifier.height(RoadlySpacing.sm))
             when (state.permission) {
@@ -447,11 +449,12 @@ private fun ShortcutTile(
             .defaultMinSize(minHeight = 56.dp)
             .clip(RoadlyShapes.Tile)
             .clickable(role = Role.Button, onClick = { if (place != null) onNavigateToRoute(place) else onDefine() })
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.width(RoadlySpacing.sm))
+        val compact = fr.roadly.core.designsystem.theme.isCompactSpace()
+        Icon(icon, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(if (compact) 22.dp else 28.dp))
+        Spacer(Modifier.width(if (compact) RoadlySpacing.s else RoadlySpacing.sm))
         Column(Modifier.weight(1f)) {
             OverlineText(label, color = c.textPrimary, dash = false)
             Text(
@@ -496,7 +499,7 @@ internal fun CompassButton(bearingDeg: Double, onClick: () -> Unit) {
     val angle by animateFloatAsState((-bearingDeg).toFloat(), label = "compass")
     val description = stringResource(R.string.home_compass)
     Box(
-        Modifier.size(56.dp).softShadow(RoadlyShapes.Pill, Color.Black, 8.dp).clip(RoadlyShapes.Pill).background(c.surface).border(1.dp, c.glassBorder, RoadlyShapes.Pill)
+        Modifier.size(52.dp).softShadow(RoadlyShapes.Pill, Color.Black, 8.dp).clip(RoadlyShapes.Pill).background(c.surface).border(1.dp, c.glassBorder, RoadlyShapes.Pill)
             .semantics { contentDescription = description }.clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -584,9 +587,9 @@ internal fun ReportResultPill(message: String?, modifier: Modifier = Modifier) {
 @Composable
 internal fun HomeSearchPill(onSearch: () -> Unit, onVoice: () -> Unit) {
     val c = LocalRoadlyColors.current
-    GlassPanel(Modifier.fillMaxWidth().height(64.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp, onClick = onSearch) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp).clip(RoadlyShapes.Pill).background(brandGradient()), contentAlignment = Alignment.Center) {
+    GlassPanel(Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoadlyShapes.Panel, contentPadding = 0.dp, onClick = onSearch) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(38.dp).clip(RoadlyShapes.Pill).background(brandGradient()), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Navigation, contentDescription = null, tint = c.onBrandAuto, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(RoadlySpacing.sm))
@@ -614,7 +617,7 @@ internal fun DepartureCard(plan: DeparturePlan?, onClick: () -> Unit) {
     val zone = ZoneId.systemDefault()
     GlassPanel(Modifier.fillMaxWidth(), shape = RoadlyShapes.Panel, contentPadding = 0.dp, onClick = onClick) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp).clip(RoadlyShapes.Pill).background(c.brandSoft), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(38.dp).clip(RoadlyShapes.Pill).background(c.brandSoft), contentAlignment = Alignment.Center) {
                 Icon(if (active == null) Icons.Default.Bolt else Icons.Default.Schedule, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(RoadlySpacing.sm))
@@ -626,10 +629,11 @@ internal fun DepartureCard(plan: DeparturePlan?, onClick: () -> Unit) {
                         active.arrive -> stringResource(R.string.home_departure_arrive_at, Formatters.clockTime(active.epochMs, zone))
                         else -> stringResource(R.string.home_departure_at, Formatters.clockTime(active.epochMs, zone))
                     },
-                    style = MaterialTheme.typography.titleMedium, color = c.textPrimary, maxLines = 1,
+                    style = MaterialTheme.typography.titleMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            OverlineText(stringResource(R.string.home_departure_edit), color = c.textSecondary, dash = false)
+            // « MODIFIER » seulement s'il y a la place : le libellé principal passe avant.
+            if (!fr.roadly.core.designsystem.theme.isCompactSpace()) OverlineText(stringResource(R.string.home_departure_edit), color = c.textSecondary, dash = false)
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = c.brandBright, modifier = Modifier.size(24.dp))
         }
     }
@@ -641,7 +645,7 @@ internal fun ParkingButton(onClick: () -> Unit) {
     val blue = Color(0xFF2F6FDB)
     val label = stringResource(R.string.home_parkings)
     Box(
-        Modifier.semantics(mergeDescendants = true) { contentDescription = label }.size(56.dp).clip(RoadlyShapes.Pill)
+        Modifier.semantics(mergeDescendants = true) { contentDescription = label }.size(52.dp).clip(RoadlyShapes.Pill)
             .background(Brush.verticalGradient(listOf(Color(0xFF6FA2F5), blue)))
             .border(1.dp, Color.White.copy(alpha = 0.25f), RoadlyShapes.Pill)
             .clickable(role = Role.Button, onClick = onClick),
@@ -663,41 +667,18 @@ private fun RouteOptionsSheet(prefs: RoutePreferences, onChange: (RoutePreferenc
                 ToggleRow(stringResource(R.string.home_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = { onChange(prefs.copy(avoidTolls = it)) }, icon = Icons.Default.Euro)
                 ToggleRow(stringResource(R.string.home_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = { onChange(prefs.copy(avoidHighways = it)) }, icon = Icons.Default.AltRoute)
                 ToggleRow(stringResource(R.string.home_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = { onChange(prefs.copy(avoidTunnels = it)) }, icon = Icons.Default.Subway)
-                ToggleRow(stringResource(R.string.home_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = { onChange(prefs.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat, divider = false)
+                ToggleRow(stringResource(R.string.home_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = { onChange(prefs.copy(avoidFerries = it)) }, icon = Icons.Default.DirectionsBoat)
+                ToggleRow(stringResource(R.string.home_avoid_unpaved), checked = prefs.avoidUnpaved, onCheckedChange = { onChange(prefs.copy(avoidUnpaved = it)) }, icon = Icons.Default.Terrain, divider = false)
             }
         }
     }
 }
 
-/** Choix de l'heure : « Partir à » ou « Arriver à » ; « Maintenant » efface le plan. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Choix de l'heure du départ planifié (boîte commune du design system). */
 @Composable
 private fun DepartureDialog(plan: DeparturePlan?, onPlan: (DeparturePlan?) -> Unit, onDismiss: () -> Unit) {
-    val c = LocalRoadlyColors.current
-    val zone = ZoneId.systemDefault()
-    val now = Instant.now().atZone(zone)
-    val initial = plan?.takeIf { it.epochMs > System.currentTimeMillis() }?.let { Instant.ofEpochMilli(it.epochMs).atZone(zone) } ?: now
-    val tp = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
-    var arriveMode by remember { mutableStateOf(plan?.arrive == true) }
-    val departLabel = stringResource(R.string.home_departure_mode_depart)
-    val arriveLabel = stringResource(R.string.home_departure_mode_arrive)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = c.surfaceElevated,
-        confirmButton = {
-            GlassButton(stringResource(R.string.home_departure_confirm), onClick = {
-                var target = now.withHour(tp.hour).withMinute(tp.minute).withSecond(0).withNano(0)
-                if (!target.isAfter(now)) target = target.plusDays(1)
-                onPlan(DeparturePlan(target.toInstant().toEpochMilli(), arriveMode))
-            })
-        },
-        dismissButton = { GlassButton(stringResource(R.string.home_departure_now), onClick = { onPlan(null) }, style = GlassButtonStyle.Secondary) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
-                SegmentedControl(listOf(false, true), arriveMode, { arriveMode = it }, { if (it) arriveLabel else departLabel })
-                if (arriveMode) Text(stringResource(R.string.home_departure_arrive_note), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
-                TimePicker(state = tp)
-            }
-        },
+    fr.roadly.core.designsystem.component.DepartureTimeDialog(
+        initialEpochMs = plan?.epochMs, initialArrive = plan?.arrive == true,
+        onConfirm = { ms, arrive -> onPlan(DeparturePlan(ms, arrive)) }, onNow = { onPlan(null) }, onDismiss = onDismiss,
     )
 }

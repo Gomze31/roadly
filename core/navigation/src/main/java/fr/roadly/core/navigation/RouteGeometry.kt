@@ -12,6 +12,18 @@ class RouteGeometry(val points: List<GeoPoint>) {
     }
     val totalM: Double get() = if (cumulative.isEmpty()) 0.0 else cumulative.last()
 
+    /** Point à l'abscisse [alongM] (bornée au tracé), par interpolation sur le segment qui la contient. */
+    fun pointAt(alongM: Double): GeoPoint {
+        if (points.size < 2) return points.first()
+        val d = alongM.coerceIn(0.0, totalM)
+        var i = java.util.Arrays.binarySearch(cumulative, d).let { if (it >= 0) it else -it - 2 }.coerceIn(0, points.size - 2)
+        while (i < points.size - 2 && cumulative[i + 1] < d) i++
+        val len = cumulative[i + 1] - cumulative[i]
+        val t = if (len <= 0.0) 0.0 else (d - cumulative[i]) / len
+        val a = points[i]; val b = points[i + 1]
+        return GeoPoint(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t)
+    }
+
     /** Projection équirectangulaire locale : abscisse curviligne (m) et écart perpendiculaire (m) du point le plus proche. */
     fun project(p: GeoPoint): Projection? {
         if (points.size < 2) return null

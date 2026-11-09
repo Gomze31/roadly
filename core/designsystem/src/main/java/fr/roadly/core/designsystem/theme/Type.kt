@@ -26,16 +26,16 @@ val Display = FontFamily(
 private val noPadding = PlatformTextStyle(includeFontPadding = false)
 
 fun roadlyTypography(scale: Float = 1f) = Typography(
-    displayLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 44.sp * scale, lineHeight = 48.sp * scale, letterSpacing = (-0.5).sp, platformStyle = noPadding),
-    displayMedium = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 36.sp * scale, lineHeight = 40.sp * scale, letterSpacing = (-0.4).sp, platformStyle = noPadding),
-    headlineLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 31.sp * scale, lineHeight = 36.sp * scale, letterSpacing = (-0.3).sp),
-    headlineMedium = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 26.sp * scale, lineHeight = 32.sp * scale, letterSpacing = (-0.2).sp),
-    headlineSmall = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp * scale, lineHeight = 28.sp * scale),
-    titleLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp * scale, lineHeight = 26.sp * scale),
-    titleMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 17.sp * scale, lineHeight = 22.sp * scale),
-    titleSmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 15.sp * scale, lineHeight = 20.sp * scale),
-    bodyLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 16.sp * scale, lineHeight = 23.sp * scale),
-    bodyMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 14.sp * scale, lineHeight = 20.sp * scale),
+    displayLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 38.sp * scale, lineHeight = 42.sp * scale, letterSpacing = (-0.5).sp, platformStyle = noPadding),
+    displayMedium = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 32.sp * scale, lineHeight = 36.sp * scale, letterSpacing = (-0.4).sp, platformStyle = noPadding),
+    headlineLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 28.sp * scale, lineHeight = 34.sp * scale, letterSpacing = (-0.3).sp),
+    headlineMedium = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 24.sp * scale, lineHeight = 30.sp * scale, letterSpacing = (-0.2).sp),
+    headlineSmall = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp * scale, lineHeight = 27.sp * scale),
+    titleLarge = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp * scale, lineHeight = 24.sp * scale),
+    titleMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp * scale, lineHeight = 21.sp * scale),
+    titleSmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 14.sp * scale, lineHeight = 19.sp * scale),
+    bodyLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 15.sp * scale, lineHeight = 21.sp * scale),
+    bodyMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 14.sp * scale, lineHeight = 19.sp * scale),
     bodySmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 12.sp * scale, lineHeight = 16.sp * scale),
     labelLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp * scale, lineHeight = 20.sp * scale),
     labelMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 12.sp * scale, lineHeight = 16.sp * scale),
@@ -51,7 +51,7 @@ val NavDigits = TextStyle(
 
 /** Petit titre en capitales espacées (« VOTRE CHOIX », « DENSITÉ À VENIR »). */
 val Overline = TextStyle(
-    fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 12.sp, lineHeight = 15.sp, letterSpacing = 2.2.sp,
+    fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 1.8.sp,
     platformStyle = noPadding,
 )
 
@@ -62,7 +62,7 @@ val StatValue = TextStyle(
 )
 
 /** Libellé des boutons (« Continuer », « ROULER ») : arrondi, très gras. */
-val ButtonLabel = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 17.sp, lineHeight = 22.sp, platformStyle = noPadding)
+val ButtonLabel = TextStyle(fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 16.sp, lineHeight = 20.sp, platformStyle = noPadding)
 
 /** Intitulé d'une ligne de réglage (« Péages », « Autoroutes ») : arrondi, gras. */
-val RowTitle = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, lineHeight = 23.sp)
+val RowTitle = TextStyle(fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, lineHeight = 22.sp)

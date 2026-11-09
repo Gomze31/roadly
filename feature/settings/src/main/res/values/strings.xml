@@ -331,4 +331,5 @@
     <string name="settings_voice_ex_fuel">« Trouve une station » · « Trouve un parking »</string>
     <string name="settings_voice_ex_mute">« Coupe la voix » · « Remets la voix »</string>
     <string name="settings_voice_ex_stop">« Arrête le guidage » · « Aide »</string>
+    <string name="settings_avoid_unpaved">Éviter les chemins non revêtus</string>
 </resources>

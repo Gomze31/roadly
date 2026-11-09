@@ -40,7 +40,7 @@ import java.io.File
 /** Rendu PNG de l'écran d'itinéraires (sans la carte native, remplacée par un aplat clair). Inactif sans -PscreenshotsDir. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w430dp-h932dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w372dp-h832dp-xhdpi")
 class RouteScreenshots {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val dir = System.getProperty("roadly.screenshots.dir")
@@ -70,11 +70,22 @@ class RouteScreenshots {
         v, "V4", "24/7",
     )
 
-    @Test fun choice() = shot("route_choice") {
+    private val jam = fr.roadly.core.data.traffic.TrafficHit(
+        fr.roadly.core.data.traffic.TrafficEvent("e1", fr.roadly.core.data.traffic.TrafficKind.JAM, listOf(GeoPoint(43.6, 1.44)), false, "A62", "De Bordeaux vers Toulouse", null, null, null, 2100, "medium"),
+        1200.0, 10.0, GeoPoint(43.6, 1.44),
+    )
+
+    @Test @Config(qualifiers = "w360dp-h760dp-xhdpi", fontScale = 1.3f) fun choiceSmallLargeFont() = shot("route_choice_360_font130") { choiceContent() }
+
+    @Test fun choice() = shot("route_choice") { choiceContent() }
+
+    @Composable
+    private fun choiceContent() {
         val s = RouteUiState.Content(
-            GeoPoint(43.6, 1.44), "Capitole de Toulouse", listOf(option("a", 17, 5.3, cost = 0.62), option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
+            GeoPoint(43.6, 1.44), "Capitole de Toulouse", listOf(option("a", 17, 5.3, cost = 0.62).let { it.copy(route = it.route.copy(avoidedClosures = 1)) }, option("b", 19, 16.0, toll = true), option("c", 21, 6.8), option("d", 19, 6.6)),
             activeId = "a", hasVehicleProfile = true, departAtEpochMs = System.currentTimeMillis(), dangerZones = mapOf("c" to 1),
             zfe = mapOf("a" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN)), "b" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.ALLOWED))),
+            traffic = mapOf("a" to listOf(jam), "b" to listOf(jam)),
         )
         val c = LocalRoadlyColors.current
         Box(Modifier.fillMaxSize()) {

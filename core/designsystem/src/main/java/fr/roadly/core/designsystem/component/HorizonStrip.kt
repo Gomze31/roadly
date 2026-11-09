@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Shield
@@ -52,7 +53,7 @@ import fr.roadly.core.designsystem.theme.RoadlyTheme
 import kotlin.math.ln
 
 /** Catégories d'événements de l'Horizon ; la couleur et l'icône dépendent du thème. */
-enum class HorizonKind { MANEUVER, CURVE, SLOWDOWN, INCIDENT, ROADWORK, CLOSURE, VIGILANCE, SERVICE, SPEED_BUMP, TRAFFIC_LIGHT, ARRIVAL }
+enum class HorizonKind { MANEUVER, CURVE, SLOWDOWN, INCIDENT, ROADWORK, CLOSURE, VIGILANCE, SERVICE, SPEED_BUMP, TRAFFIC_LIGHT, TOLL, ARRIVAL }
 
 /** Un événement à venir sur l'itinéraire : [distanceM] depuis la position courante, [label] court (ex. « 800 m »). */
 data class HorizonItem(val kind: HorizonKind, val distanceM: Double, val label: String, val contentDescription: String)
@@ -82,6 +83,7 @@ fun HorizonKind.icon(): ImageVector = when (this) {
     HorizonKind.CLOSURE -> Icons.Default.Block
     HorizonKind.SERVICE -> Icons.Default.LocalGasStation
     HorizonKind.TRAFFIC_LIGHT -> Icons.Default.Traffic
+    HorizonKind.TOLL -> Icons.Default.Euro
     HorizonKind.ARRIVAL -> Icons.Default.Flag
 }
 
@@ -98,6 +100,7 @@ fun HorizonKind.color(): Color {
         HorizonKind.SERVICE -> c.success
         HorizonKind.SPEED_BUMP -> c.textSecondary
         HorizonKind.TRAFFIC_LIGHT -> c.success
+        HorizonKind.TOLL -> c.warning
         HorizonKind.ARRIVAL -> c.brandBright
     }
 }

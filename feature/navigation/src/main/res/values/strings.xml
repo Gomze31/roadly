@@ -27,6 +27,8 @@
     <string name="nav_horizon_maneuver">manœuvre</string>
     <string name="nav_horizon_curve">virage</string>
     <string name="nav_horizon_zone">zone de vigilance</string>
+    <string name="nav_horizon_toll">péage</string>
+    <string name="nav_horizon_light">feu</string>
     <string name="nav_horizon_zone_limit">zone · %1$d</string>
     <string name="nav_zone_active">Zone de danger</string>
     <string name="nav_danger_in">dans %1$s</string>
@@ -58,6 +60,23 @@
     <string name="nav_failed_title">Guidage impossible</string>
     <string name="nav_retry">Réessayer</string>
     <string name="nav_alternatives">Itinéraires</string>
+    <string name="fuel_ahead_overline">Sur votre trajet</string>
+    <string name="fuel_ahead_title">Stations les moins chères</string>
+    <string name="fuel_ahead_loading">Recherche des stations le long du trajet…</string>
+    <string name="fuel_ahead_subtitle">%1$s · à moins de 1,5 km du trajet, sur les 80 prochains km</string>
+    <string name="fuel_ahead_where">dans %1$s · détour ≈ %2$s</string>
+    <string name="fuel_ahead_best">la moins chère</string>
+    <string name="fuel_ahead_add">Ajouter comme arrêt</string>
+    <string name="fuel_ahead_empty">Aucune station à moins de 1,5 km du trajet sur les 80 prochains km.</string>
+    <string name="fuel_ahead_electric">Véhicule électrique : les prix de recharge ne sont pas publiés dans le flux officiel.</string>
+    <string name="fuel_ahead_source">Prix officiels (data.economie.gouv.fr), mis à jour en continu. Un appui ajoute la station comme arrêt.</string>
+    <string name="fuel_sp95">SP95</string>
+    <string name="fuel_sp98">SP98</string>
+    <string name="fuel_e10">SP95-E10</string>
+    <string name="fuel_e85">E85</string>
+    <string name="fuel_diesel">Gazole</string>
+    <string name="fuel_lpg">GPL</string>
+    <string name="fuel_electric">Électrique</string>
     <string name="nav_roundabout_desc">Rond-point, %1$s</string>
     <string name="nav_roundabout_desc_unknown">Rond-point</string>
     <string name="nav_roundabout_desc_street">%1$s, vers %2$s</string>
@@ -96,4 +115,5 @@
     <string name="nav_share_eta_title">Envoyer mon heure d\'arrivée</string>
     <string name="nav_share_eta">J\'arrive à %1$s (dans %2$s). Envoyé depuis Roadly.</string>
     <string name="nav_share_eta_to">J\'arrive à %1$s à %2$s (dans %3$s). Envoyé depuis Roadly.</string>
+    <string name="nav_pip_eta">Arrivée %1$s</string>
 </resources>

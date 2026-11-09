@@ -45,13 +45,28 @@ class RouteAlternativesUseCaseTest {
         assertTrue(r.none { it.sameAsFastest })
     }
 
-    @Test fun `identical geometry flagged sameAsFastest`() = runTest {
+    @Test fun `variant repeating an earlier geometry is dropped`() = runTest {
         val uc = RouteAlternativesUseCase(FakeRouting(mapOf(
             RouteCosting.FASTEST to Outcome.Success(listOf(route(RouteCosting.FASTEST, 100.0, 60.0, g1))),
+            RouteCosting.SHORTEST to Outcome.Success(listOf(route(RouteCosting.SHORTEST, 90.0, 80.0, g2))),
             RouteCosting.NO_TOLL to Outcome.Success(listOf(route(RouteCosting.NO_TOLL, 100.0, 60.0, g1))),
         )))
         val r = (uc(o, d, null, 0L) as Outcome.Success).value
-        assertTrue(r.first { it.route.costing == RouteCosting.NO_TOLL }.sameAsFastest)
+        assertEquals(listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST), r.map { it.route.costing })
+    }
+
+    @Test fun `no toll variant is not computed when tolls are already avoided`() = runTest {
+        val seen = mutableListOf<RouteCosting>()
+        val routing = object : RoutingProvider {
+            override val id = "fake"
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
+                synchronized(seen) { seen += request.costing }
+                return Outcome.Success(listOf(route(request.costing, 100.0, 60.0, if (request.costing == RouteCosting.FASTEST) g1 else g2)))
+            }
+        }
+        val r = (RouteAlternativesUseCase(routing)(o, d, null, 0L, RoutePreferences(avoidTolls = true)) as Outcome.Success).value
+        assertEquals(setOf(RouteCosting.FASTEST, RouteCosting.SHORTEST), seen.toSet())
+        assertEquals(listOf("Le plus rapide", "Le plus court"), r.map { it.label })
     }
 
     @Test fun `all failures propagate first error`() = runTest {

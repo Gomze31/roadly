@@ -6,6 +6,10 @@ enum class HazardKind {
     CURVE,
     /** Zone de vigilance (France : jamais un point exact, une zone de plusieurs centaines de mètres à quelques kilomètres). */
     VIGILANCE_ZONE,
+    /** Gare de péage à barrières (OSM `barrier=toll_booth`, via Valhalla) : point du tracé. */
+    TOLL_BOOTH,
+    /** Feu tricolore (OSM `highway=traffic_signals`, via Valhalla) : point du tracé. */
+    TRAFFIC_LIGHT,
 }
 
 /**

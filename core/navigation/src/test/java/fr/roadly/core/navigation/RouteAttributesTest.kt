@@ -13,8 +13,30 @@ import org.junit.Test
 class RouteAttributesTest {
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun edge(m: Double, kmh: Int?, node: String? = null, name: String? = null, cc: String? = "FR") =
-        RouteEdge(m, kmh, node, listOfNotNull(name), cc)
+    private fun edge(m: Double, kmh: Int?, node: String? = null, name: String? = null, cc: String? = "FR", signal: Boolean = false) =
+        RouteEdge(m, kmh, node, listOfNotNull(name), cc, signal)
+
+    @Test fun `parse reads traffic signals on end nodes`() {
+        // Forme réelle FOSSGIS (Toulouse → Carcassonne, 2026-11-09) : traffic_signal booléen sur chaque nœud.
+        val body = """{"edges":[{"length":0.1,"end_node":{"type":"street_intersection","traffic_signal":true}},
+            {"length":0.2,"end_node":{"type":"toll_booth","traffic_signal":false}}]}"""
+        val edges = ValhallaRouteAttributes.parse(json, body)!!
+        assertTrue(edges[0].endTrafficSignal)
+        assertEquals(false, edges[1].endTrafficSignal)
+        assertEquals("toll_booth", edges[1].endNodeType)
+    }
+
+    @Test fun `toll booths of one plaza and lights of one junction are merged`() {
+        val a = RouteAttributesBuilder.build("r", 3_000.0, listOf(
+            edge(500.0, 50, signal = true), edge(20.0, 50, signal = true), edge(480.0, 50),
+            edge(1_000.0, 130, node = "toll_booth"), edge(50.0, 130, node = "toll_booth"), edge(950.0, 130, node = "toll_booth"),
+        ))!!
+        assertEquals(listOf(500.0), a.trafficSignals)
+        assertEquals(listOf(2_000.0, 3_000.0), a.tollBooths)
+        val id = RouteIdentity.from(a)
+        assertEquals(1, id.trafficSignals)
+        assertEquals(2, id.tolls)
+    }
 
     @Test fun `parse reads lengths, limits, end node types and country from admins`() {
         // Extrait d'une réponse réelle FOSSGIS (A79, 2026-11-05), réduit à trois arêtes.
@@ -46,7 +68,7 @@ class RouteAttributesTest {
         val r = ValhallaRouteAttributes.request("abc")
         assertEquals("edge_walk", r["shape_match"]!!.jsonPrimitive.content)
         val attrs = r["filters"]!!.let { (it as kotlinx.serialization.json.JsonObject)["attributes"]!!.jsonArray.map { a -> a.jsonPrimitive.content } }
-        assertTrue(attrs.containsAll(listOf("edge.speed_limit", "node.type", "edge.length")))
+        assertTrue(attrs.containsAll(listOf("edge.speed_limit", "node.type", "edge.length", "node.traffic_signal")))
     }
 
     @Test fun `consecutive equal limits merge and short unknown edges are absorbed`() {

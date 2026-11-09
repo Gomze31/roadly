@@ -77,6 +77,10 @@ class RouteViewModel @Inject constructor(
     private val favorites: FavoritesRepository? = null,
     /** Base nationale des ZFE ; null (tests existants) = pas d'alerte ZFE. */
     private val zfe: fr.roadly.core.data.zfe.ZfeSource? = null,
+    /** Incidents officiels Bison Futé ; null (tests existants) = aucun. */
+    private val traffic: fr.roadly.core.data.traffic.TrafficSource? = null,
+    /** Options « pour ce trajet seulement » choisies dans la recherche ; null (tests existants) = préférences enregistrées. */
+    private val tripPreferences: fr.roadly.core.data.repository.TripPreferences? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -133,7 +137,8 @@ class RouteViewModel @Inject constructor(
         }
         scooter?.let { sc -> viewModelScope.launch { sc.ensureProfile() } }
         viewModelScope.launch {
-            val base = combine(origin, departAt, arriveAt, vehicleRepo.profile, prefs.routePreferences, stops, reload) { values ->
+            val routePrefs = tripPreferences?.effective(prefs.routePreferences) ?: prefs.routePreferences
+            val base = combine(origin, departAt, arriveAt, vehicleRepo.profile, routePrefs, stops, reload) { values ->
                 @Suppress("UNCHECKED_CAST")
                 Params(values[0] as GeoPoint?, values[1] as Long, values[2] as Long?, values[3] as VehicleProfile?, values[4] as RoutePreferences, values[5] as List<Place>)
             }
@@ -236,6 +241,24 @@ class RouteViewModel @Inject constructor(
         }
     }
 
+    /** Incidents officiels sur chaque variante (sens de circulation compris). */
+    private val trafficHits = MutableStateFlow<Map<String, List<fr.roadly.core.data.traffic.TrafficHit>>>(emptyMap())
+
+    init {
+        val source = traffic
+        if (source != null) viewModelScope.launch {
+            computed.collectLatest { s ->
+                trafficHits.value = emptyMap()
+                if (s !is RouteUiState.Content || s.scooter != null) return@collectLatest
+                val events = try { source.events() } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                if (events.isEmpty()) return@collectLatest
+                trafficHits.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    s.options.associate { o -> o.route.id to fr.roadly.core.data.traffic.TrafficOnRoute.along(o.route.geometry, events) }
+                }
+            }
+        }
+    }
+
     /**
      * S5 : carte d'identité de chaque variante (part à limitation connue, temps au-dessus de 90, portiques en flux libre). Une requête
      * `trace_attributes` par variante, mise en cache par le fournisseur (le guidage réutilise celle de la variante choisie).
@@ -263,8 +286,8 @@ class RouteViewModel @Inject constructor(
     val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings) { d, z -> d to z }, identities) { st, mode, reply, zones, ids ->
-        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, identities = ids) ?: st.phase
+    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings, trafficHits) { d, z, t -> Triple(d, z, t) }, identities) { st, mode, reply, zones, ids ->
+        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, traffic = zones.third, identities = ids) ?: st.phase
         st.copy(phase = phase, travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())
@@ -308,7 +331,11 @@ class RouteViewModel @Inject constructor(
     fun setDepartAt(epochMs: Long) { arriveAt.value = null; departAt.value = epochMs }
     /** Mode « Arriver à » : le départ est déduit de la durée du plus rapide (sans trafic prédictif). */
     fun setArriveAt(epochMs: Long) { arriveAt.value = epochMs }
-    fun setPreferences(value: RoutePreferences) { viewModelScope.launch { prefs.setRoutePreferences(value) } }
+    /** Options d'un trajet en cours de choix (recherche) : modifiées pour ce trajet ; sinon, préférences enregistrées. */
+    fun setPreferences(value: RoutePreferences) {
+        val trip = tripPreferences
+        if (trip?.override?.value != null) trip.set(value) else viewModelScope.launch { prefs.setRoutePreferences(value) }
+    }
     fun retry() { reload.value++ }
     /** Origine choisie par appui long sur la carte quand la position est inconnue. */
     fun setOrigin(point: GeoPoint) { origin.value = point }
@@ -379,6 +406,7 @@ class RouteViewModel @Inject constructor(
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
         guidance.start(option, computedWith, computedVehicle, stops.value, destName.ifBlank { null }, scooter = computedScooter)
         departurePlanner?.clear()
+        tripPreferences?.clear()
         return true
     }
 

@@ -1,5 +1,6 @@
 package fr.roadly.core.designsystem.component
 
+import fr.roadly.core.designsystem.theme.LocalUiScale
 import fr.roadly.core.designsystem.theme.softShadow
 
 import fr.roadly.core.designsystem.theme.Display
@@ -51,18 +52,21 @@ fun SpeedBadge(speedKmh: Double?, limitKmh: Int?, modifier: Modifier = Modifier,
     val digitsColor by animateColorAsState(if (over) c.danger else c.textPrimary, label = "speedColor")
     val description = "Vitesse ${speedKmh?.roundToInt() ?: "inconnue"} km/h, limitation ${limitKmh ?: "inconnue"}"
     // Bulle ronde ; le panneau de limitation la chevauche en haut à droite (absent si la limitation est inconnue).
-    Box(modifier.semantics { contentDescription = description }.size(width = if (limitKmh != null) 132.dp else 104.dp, height = if (limitKmh != null) 128.dp else 104.dp)) {
+    val s = LocalUiScale.current
+    val bubble = 88.dp * s
+    val sign = 50.dp * s
+    Box(modifier.semantics { contentDescription = description }.size(width = if (limitKmh != null) bubble + sign * 0.55f else bubble, height = if (limitKmh != null) bubble + sign * 0.45f else bubble)) {
         Box(
-            Modifier.align(Alignment.BottomStart).size(104.dp).softShadow(CircleShape, Color.Black, 10.dp).clip(CircleShape)
+            Modifier.align(Alignment.BottomStart).size(bubble).softShadow(CircleShape, Color.Black, 10.dp).clip(CircleShape)
                 .background(c.glass).border(1.dp, c.glassBorder, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(speedKmh?.roundToInt()?.toString() ?: "–", style = NavDigits.copy(fontSize = 44.sp, lineHeight = 46.sp), color = digitsColor)
-                Text("km/h", style = ButtonLabel.copy(fontSize = 15.sp), color = c.textSecondary)
+                Text(speedKmh?.roundToInt()?.toString() ?: "–", style = NavDigits.copy(fontSize = 36.sp * s, lineHeight = 38.sp * s), color = digitsColor)
+                Text("km/h", style = ButtonLabel.copy(fontSize = 13.sp * s), color = c.textSecondary)
             }
         }
-        if (limitKmh != null) SpeedLimitSign(limitKmh, Modifier.align(Alignment.TopEnd), size = 60.dp)
+        if (limitKmh != null) SpeedLimitSign(limitKmh, Modifier.align(Alignment.TopEnd), size = sign)
     }
 }
 

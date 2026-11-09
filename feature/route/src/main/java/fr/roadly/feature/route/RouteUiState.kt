@@ -38,6 +38,8 @@ sealed interface RouteUiState {
         val identities: Map<String, RouteIdentity> = emptyMap(),
         /** ZFE traversées par itinéraire (verdict selon la vignette Crit'Air du véhicule) ; absent = pas de ZFE ou pas encore calculé. */
         val zfe: Map<String, List<fr.roadly.core.data.zfe.ZfeCrossing>> = emptyMap(),
+        /** Incidents officiels (Bison Futé) par itinéraire, dans l'ordre du trajet. */
+        val traffic: Map<String, List<fr.roadly.core.data.traffic.TrafficHit>> = emptyMap(),
     ) : RouteUiState
 }
 

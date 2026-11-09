@@ -72,7 +72,7 @@ class RouteViewModelTest {
         override val id = "fake"
         override suspend fun route(request: RouteRequest) = Outcome.Success(listOf(
             Route(
-                request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, request.destination),
+                request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, GeoPoint(request.origin.lat, request.origin.lon + 0.001 * (request.costing.ordinal + 1)), request.destination),
                 listOf(
                     Maneuver(ManeuverType.DEPART, "Conduisez.", null, 10_000.0, 600.0, 0, null),
                     Maneuver(ManeuverType.ARRIVE, "Vous êtes arrivé.", null, 0.0, 0.0, 1, null),
@@ -172,6 +172,31 @@ class RouteViewModelTest {
             assertEquals("Test", second.originName)
         }
         assertEquals(RouteRoute(48.9, 2.4, "Test"), second.swapped("Ma position"))
+    }
+
+    @Test fun `options chosen for this trip are used, and cleared when guidance starts`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        val seen = mutableListOf<RoutePreferences>()
+        val base = routing
+        val recording = object : RoutingProvider by base {
+            override suspend fun route(request: RouteRequest) = base.route(request).also { seen += request.preferences }
+        }
+        routing = recording
+        val trip = fr.roadly.core.data.repository.TripPreferences().apply { set(RoutePreferences(avoidTolls = true)) }
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
+        val v = RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing, tripPreferences = trip)
+        v.uiState.test {
+            advanceUntilIdle()
+            expectMostRecentItem()
+            assertTrue("options du trajet utilisées : $seen", seen.isNotEmpty() && seen.all { it == RoutePreferences(avoidTolls = true) })
+            assertEquals("préférences enregistrées intactes", RoutePreferences(), prefs.route.value)
+            assertTrue(v.startGuidance())
+            assertNull(trip.override.value)
+        }
     }
 
     @Test fun `the header star adds the destination to favorites, then removes it`() = runTest {
@@ -307,7 +332,8 @@ class RouteViewModelTest {
             prefs.setRoutePreferences(RoutePreferences(avoidHighways = true, avoidTolls = true))
             advanceUntilIdle()
             expectMostRecentItem()
-            assertEquals(6, seen.size)
+            // Péages évités : « Sans péage » n'est plus calculée (elle doublerait le plus rapide).
+            assertEquals(5, seen.size)
             assertTrue(seen.drop(3).all { it.preferences.avoidTolls })
         }
     }
@@ -319,7 +345,7 @@ class RouteViewModelTest {
         routing = object : RoutingProvider {
             override val id = "fake"
             override suspend fun route(request: RouteRequest) = Outcome.Success(listOf(
-                Route(request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin) + request.waypoints + request.destination,
+                Route(request.costing.name, request.costing, 10_000.0, 600.0, listOf(request.origin, GeoPoint(request.origin.lat, request.origin.lon + 0.001 * (request.costing.ordinal + 1))) + request.waypoints + request.destination,
                     listOf(Maneuver(ManeuverType.DEPART, "", null, 10_000.0, 600.0, 0, null), Maneuver(ManeuverType.ARRIVE, "", null, 0.0, 0.0, 1, null)), false, "fake"),
             )).also { seen += request.waypoints }
         }

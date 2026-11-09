@@ -37,7 +37,7 @@ import java.io.File
 /** Rendu PNG des éléments du guidage (sans la carte native). Inactif sans -PscreenshotsDir. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w430dp-h932dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w372dp-h832dp-xhdpi")
 class NavigationScreenshots {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val dir = System.getProperty("roadly.screenshots.dir")
@@ -54,7 +54,12 @@ class NavigationScreenshots {
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test fun guidance() = shot("navigation_guidance") {
+    @Test @Config(qualifiers = "w360dp-h760dp-xhdpi", fontScale = 1.3f) fun guidanceSmallLargeFont() = shot("navigation_guidance_360_font130") { guidanceContent() }
+
+    @Test fun guidance() = shot("navigation_guidance") { guidanceContent() }
+
+    @Composable
+    private fun guidanceContent() {
         val banner = BannerUi(ManeuverType.ROUNDABOUT_ENTER, "600 m", "Au rond-point, prenez la 2e sortie.", "Rd-pt du Pr Jean-Jacques Laffont", null, 2)
         val state = NavigationUiState(
             phase = NavigationPhase.GUIDING, banner = banner, etaClock = "14:03", remainingDuration = "18 min", remainingDistance = "5,3 km",
@@ -69,12 +74,41 @@ class NavigationScreenshots {
                     SpeedBadge(0.0, 50)
                     Spacer(Modifier.width(10.dp))
                     HorizonStrip(
-                        listOf(HorizonItem(HorizonKind.CLOSURE, 420.0, "dans 25 s", "fermeture"), HorizonItem(HorizonKind.MANEUVER, 600.0, "600 m", "rond-point")),
+                        listOf(
+                            HorizonItem(HorizonKind.TRAFFIC_LIGHT, 180.0, "180 m · feu", "feu"), HorizonItem(HorizonKind.CLOSURE, 420.0, "dans 25 s", "fermeture"),
+                            HorizonItem(HorizonKind.MANEUVER, 600.0, "600 m", "rond-point"), HorizonItem(HorizonKind.TOLL, 2_400.0, "2,4 km · péage", "péage"),
+                        ),
                         title = "Horizon", modifier = Modifier.weight(1f),
                     )
                 }
                 NavigationBottomPanel(state, expanded = false, destinationName = "Capitole de Toulouse", {}, {}, {}, {}, {}, {})
             }
         }
+    }
+}
+
+/** Rendu de la fenêtre image dans l'image, à sa taille réelle. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [35], qualifiers = "w160dp-h213dp-xhdpi")
+class PipScreenshots {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    private val dir = System.getProperty("roadly.screenshots.dir")
+
+    @Before fun enabled() = assumeTrue(dir != null)
+
+    @Test fun pip() {
+        val banner = BannerUi(ManeuverType.ROUNDABOUT_ENTER, "600 m", "Au rond-point, prenez la 2e sortie.", "Rd-pt du Pr Jean-Jacques Laffont", null, 2)
+        rule.setContent {
+            RoadlyTheme(darkTheme = true, drivingMode = true) {
+                PipGuidance(NavigationUiState(phase = NavigationPhase.GUIDING, banner = banner, etaClock = "14:03", roundabout = previewRoundabout(180.0, 2, "Rd-pt du Pr Jean-Jacques Laffont")), Modifier.fillMaxSize())
+            }
+        }
+        rule.waitForIdle()
+        val view = rule.activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        rule.runOnIdle { view.draw(android.graphics.Canvas(bmp)) }
+        File(dir!!).mkdirs()
+        File(dir, "navigation_pip.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

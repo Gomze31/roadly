@@ -118,6 +118,20 @@ class NavigationSessionRouteProfileTest {
         assertEquals("Gare", memory.parked.value?.label)
     }
 
+    @Test fun `a toll booth is shown in the horizon and announced once about a kilometre before`() = runTest {
+        val booth = total - 100.0
+        val s = session(profile.copy(tollGantries = emptyList(), tollBooths = listOf(booth), trafficSignals = listOf(300.0)))
+        s.start(option, RoutePreferences()); runCurrent()
+        location.emit(fixAt(booth - 1_300.0)); runCurrent()
+        assertTrue(guiding(s).hazards.any { it.kind == fr.roadly.core.model.HazardKind.TOLL_BOOTH && it.startAlongM == booth })
+        assertTrue(guiding(s).hazards.any { it.kind == fr.roadly.core.model.HazardKind.TRAFFIC_LIGHT })
+        assertEquals(0, speech.spoken.count { it.startsWith("Péage dans") })
+        location.emit(fixAt(booth - 1_000.0)); runCurrent()
+        assertEquals(1, speech.spoken.count { it.startsWith("Péage dans 1 kilomètre") })
+        location.emit(fixAt(booth - 600.0)); runCurrent()
+        assertEquals(1, speech.spoken.count { it.startsWith("Péage dans") })
+    }
+
     @Test fun `stopping after a gantry still records the reminder, but parks nothing`() = runTest {
         val s = session()
         s.start(option, RoutePreferences()); runCurrent()

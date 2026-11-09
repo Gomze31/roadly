@@ -41,7 +41,7 @@ import fr.roadly.core.navigation.RoundaboutInfo
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val COMPACT_SIZE = 64.dp
+private val COMPACT_SIZE = 54.dp
 private val LARGE_SIZE = 160.dp
 
 /**

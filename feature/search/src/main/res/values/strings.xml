@@ -35,4 +35,17 @@
     <string name="place_share">Partager</string>
     <string name="place_share_title">Partager le lieu</string>
     <string name="place_distance">à %1$s</string>
+    <string name="search_voice">Recherche vocale</string>
+    <string name="search_voice_prompt">Où allez-vous ?</string>
+    <string name="search_go">Y aller</string>
+    <string name="search_depart_now">Partir maintenant</string>
+    <string name="search_depart_at">Partir à %1$s</string>
+    <string name="search_arrive_at">Arriver à %1$s</string>
+    <string name="search_avoid_tolls">Sans péage</string>
+    <string name="search_avoid_highways">Sans autoroute</string>
+    <string name="search_avoid_tunnels">Sans tunnel</string>
+    <string name="search_avoid_ferries">Sans ferry</string>
+    <string name="search_avoid_unpaved">Sans chemin non revêtu</string>
+    <string name="search_remember">Mémoriser</string>
+    <string name="search_trip_only">Pour ce trajet seulement. Touchez « Mémoriser » pour les garder.</string>
 </resources>

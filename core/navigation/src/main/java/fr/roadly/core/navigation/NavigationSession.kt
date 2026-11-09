@@ -315,6 +315,9 @@ class NavigationSession @Inject constructor(
         private var nextLimit: SpeedLimitChange? = null
         /** Abscisse au-delà de laquelle les portiques du tracé courant n'ont pas encore été comptés. */
         private var gantryCursorM = 0.0
+        /** Gares de péage et feux du profil (Horizon) ; gares déjà annoncées (abscisses). */
+        private var profileHazards: List<RouteHazard> = emptyList()
+        private val announcedBooths = HashSet<Double>()
         val startedAtMs = clock.nowMs()
         private var lastFixAtMs = startedAtMs
         private var lastAdvanceAtMs = lastFixAtMs
@@ -502,6 +505,9 @@ class NavigationSession @Inject constructor(
             attributes = a
             // Un tracé recalculé commence à la position du recalcul : aucun de ses portiques n'est derrière nous.
             gantryCursorM = 0.0
+            announcedBooths.clear()
+            profileHazards = a.tollBooths.map { RouteHazard(HazardKind.TOLL_BOOTH, it, it) } +
+                a.trafficSignals.map { RouteHazard(HazardKind.TRAFFIC_LIGHT, it, it) }
         }
 
         /** Horizon d'affichage de la prochaine limitation : 20 s de trajet, entre 250 m et 1,5 km. */
@@ -524,6 +530,14 @@ class NavigationSession @Inject constructor(
             val passed = a.tollGantries.filter { it.alongM > gantryCursorM && it.alongM <= progress.distanceAlongM }
             gantryCursorM = maxOf(gantryCursorM, progress.distanceAlongM)
             for (g in passed) passGantry(g, progress.routeId)
+            announceTollBooth(a, progress)
+        }
+
+        /** Gare de péage à barrières : une annonce entre 1,2 km et 300 m avant (temps de préparer le paiement). */
+        private suspend fun announceTollBooth(a: RouteAttributes, progress: RouteProgress) {
+            val booth = a.tollBooths.firstOrNull { it - progress.distanceAlongM in TOLL_BOOTH_MIN_M..TOLL_BOOTH_ANNOUNCE_M } ?: return
+            if (!announcedBooths.add(booth)) return
+            say(SpokenPhrases.tollBooth(booth - progress.distanceAlongM), routeId = progress.routeId, priority = SpeechPriority.LOW)
         }
 
         private suspend fun passGantry(g: TollGantry, routeId: String) {
@@ -688,7 +702,7 @@ class NavigationSession @Inject constructor(
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
                     // Nouvelles abscisses : les zones déjà annoncées gardent leur clé (équipement), donc pas de seconde annonce.
                     hazards = emptyList(); activeZone = null; radarActive = null; radarNext = null
-                    attributes = null; routeLimitKmh = null; nextLimit = null
+                    attributes = null; routeLimitKmh = null; nextLimit = null; profileHazards = emptyList()
                     refreshScooterAfterReroute(fresh)
                     runScope.launch { loadAttributes(fresh) }
                     loadHazards()
@@ -783,7 +797,7 @@ class NavigationSession @Inject constructor(
                 progress = progress,
                 speedKmh = rawSpeedKmh,
                 speedLimitKmh = limit,
-                hazards = hazards,
+                hazards = if (profileHazards.isEmpty()) hazards else (hazards + profileHazards).sortedBy { it.startAlongM },
                 activeZone = activeZone,
                 radarActive = radarActive,
                 radarNext = radarNext,
@@ -816,6 +830,9 @@ class NavigationSession @Inject constructor(
 
     private companion object {
         const val LIMIT_HORIZON_S = 20.0
+        /** Gare de péage annoncée entre ces distances (m). */
+        const val TOLL_BOOTH_ANNOUNCE_M = 1_200.0
+        const val TOLL_BOOTH_MIN_M = 300.0
         const val TOPOLOGY_MAX_ATTEMPTS = 3
         const val TOPOLOGY_RETRY_MS = 5_000L
         const val LIMIT_HORIZON_MIN_M = 250.0

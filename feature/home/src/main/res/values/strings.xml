@@ -82,4 +82,5 @@
     <string name="home_avoid_highways">Autoroutes</string>
     <string name="home_avoid_tunnels">Tunnels</string>
     <string name="home_avoid_ferries">Ferries</string>
+    <string name="home_avoid_unpaved">Chemins non revêtus</string>
 </resources>
