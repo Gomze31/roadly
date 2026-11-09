@@ -278,7 +278,7 @@ fun HomeScreen(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(RoadlySpacing.screenEdge)
         }
         Column(bottomModifier) {
-            // Fenêtre compacte Roadly AI, au-dessus du compteur ; invisible hors session.
+            // Fenêtre compacte l'assistant vocal, au-dessus du compteur ; invisible hors session.
             assistantPanel()
             Spacer(Modifier.height(RoadlySpacing.sm))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {

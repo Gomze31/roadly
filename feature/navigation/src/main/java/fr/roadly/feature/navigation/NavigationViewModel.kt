@@ -326,7 +326,7 @@ class NavigationViewModel @Inject constructor(
     private val _assistantReply = MutableStateFlow<String?>(null)
     val assistantReply: StateFlow<String?> = _assistantReply
 
-    /** Roadly AI : réponse calculée sur l'état réel du guidage et du profil, prononcée puis affichée 8 s. */
+    /** l'assistant vocal : réponse calculée sur l'état réel du guidage et du profil, prononcée puis affichée 8 s. */
     fun onAssistantText(text: String) {
         val sc = scooter ?: return
         val g = session.state.value as? NavigationState.Guiding

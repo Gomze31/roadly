@@ -124,8 +124,8 @@ fun RouteScreen(
     val context = LocalContext.current
     val offlineDownloader = remember { OfflineMapDownloader(context.applicationContext) }
     val offline by offlineDownloader.state.collectAsStateWithLifecycle()
-    // Roadly AI : reconnaissance vocale du système, réponse calculée sur les données du moteur.
-    val listen = rememberVoiceInput("Roadly AI — votre demande", onText = vm::onAssistantText)
+    // l'assistant vocal : reconnaissance vocale du système, réponse calculée sur les données du moteur.
+    val listen = rememberVoiceInput("Votre question", onText = vm::onAssistantText)
 
     LaunchedEffect(isDark) { vm.setDarkTheme(isDark) }
     LaunchedEffect(c.routeActive, c.routeInactive, c.routeCasing) { map.setRouteColors(c.routeActive.toHex(), c.routeInactive.toHex(), c.routeCasing.toHex()) }
@@ -288,7 +288,7 @@ fun RouteScreen(
     }
 }
 
-/** Réponse de Roadly AI (texte de ce qui a été prononcé). */
+/** Réponse de l'assistant vocal (texte de ce qui a été prononcé). */
 @Composable
 private fun AssistantBubble(text: String) {
     val c = LocalRoadlyColors.current

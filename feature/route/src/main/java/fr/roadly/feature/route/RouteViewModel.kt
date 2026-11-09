@@ -282,7 +282,7 @@ class RouteViewModel @Inject constructor(
         viewModelScope.launch { sc.mobility.setScooterBattery(pct?.let { BatteryReading(it.coerceIn(0, 100), System.currentTimeMillis()) }) }
     }
 
-    /** Roadly AI (texte reconnu par la reconnaissance vocale du système) : réponse affichée et prononcée. */
+    /** l'assistant vocal (texte reconnu par la reconnaissance vocale du système) : réponse affichée et prononcée. */
     fun onAssistantText(text: String) {
         val sc = scooter ?: return
         val content = computed.value as? RouteUiState.Content

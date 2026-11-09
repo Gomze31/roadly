@@ -209,7 +209,7 @@ class HomeViewModel @Inject constructor(
     /**
      * E3 « Reprendre » : nouvel itinéraire depuis la position actuelle vers la destination mémorisée (pas le tracé enregistré), avec les
      * préférences et le véhicule du moment, puis départ comme « ROULER » (`session.start` avec le nom). Même calcul que
-     * `GuidanceActions.startTo` de Roadly AI. Échec : la carte le dit, la course reste mémorisée. Sans position connue : rien.
+     * `GuidanceActions.startTo` de l'assistant vocal. Échec : la carte le dit, la course reste mémorisée. Sans position connue : rien.
      * @return vrai si une reprise est en cours (l'écran attend alors le guidage), faux si rien n'a été lancé.
      */
     fun resumeLastGuidance(): Boolean {

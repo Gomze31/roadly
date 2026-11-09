@@ -375,7 +375,7 @@ internal fun PortraitOverlay(
     }
 }
 
-/** Panneau trottinette (voie, transitions, alertes, autonomie) et réponse de Roadly AI, sous le bandeau. */
+/** Panneau trottinette (voie, transitions, alertes, autonomie) et réponse de l'assistant vocal, sous le bandeau. */
 @Composable
 private fun ScooterExtras(state: NavigationUiState, vm: NavigationViewModel) {
     val scooter = state.scooter ?: return
@@ -386,11 +386,11 @@ private fun ScooterExtras(state: NavigationUiState, vm: NavigationViewModel) {
     if (batteryDialog) BatteryDialog(scooter.range?.batteryNowPct?.roundToInt(), onDismiss = { batteryDialog = false }, onSave = { vm.setBattery(it); batteryDialog = false })
 }
 
-/** Actions trottinette : Roadly AI (voix), stationnement près de l'arrivée, recharge à proximité. */
+/** Actions trottinette : l'assistant vocal (voix), stationnement près de l'arrivée, recharge à proximité. */
 @Composable
 private fun ScooterActions(vm: NavigationViewModel) {
-    val listen = rememberVoiceInput("Roadly AI — votre demande", onText = vm::onAssistantText)
-    RoundIconButton(Icons.Default.Mic, "Roadly AI", onClick = listen)
+    val listen = rememberVoiceInput("Votre question", onText = vm::onAssistantText)
+    RoundIconButton(Icons.Default.Mic, "Question vocale", onClick = listen)
     RoundIconButton(Icons.Default.LocalParking, "Stationnement trottinettes", onClick = { vm.searchPois(ScooterPoiKind.PARKING) })
     RoundIconButton(Icons.Default.EvStation, "Recharge", onClick = { vm.searchPois(ScooterPoiKind.CHARGING) })
 }

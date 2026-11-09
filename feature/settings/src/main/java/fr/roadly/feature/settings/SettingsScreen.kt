@@ -138,6 +138,7 @@ enum class SettingsPage(val title: Int, val subtitle: Int, val icon: ImageVector
     ROUTES(R.string.settings_page_routes, R.string.settings_page_routes_sub, Icons.Default.Route),
     SPEED(R.string.settings_page_speed, R.string.settings_page_speed_sub, Icons.Default.Speed),
     VOICE(R.string.settings_page_voice, R.string.settings_page_voice_sub, Icons.Default.RecordVoiceOver),
+    /** Commandes vocales intégrées (aide : phrases comprises). */
     AI(R.string.settings_page_ai, R.string.settings_page_ai_sub, Icons.Default.Mic),
     DISPLAY(R.string.settings_section_display, R.string.settings_section_display_sub, Icons.Default.Palette),
     ANDROID_AUTO(R.string.settings_section_android_auto, R.string.settings_section_android_auto_sub, Icons.Default.Dashboard),
@@ -335,7 +336,7 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
             )
         }
         SettingsPage.VOICE -> VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
-        SettingsPage.AI -> AssistantGroup()
+        SettingsPage.AI -> VoiceCommandsGroup()
         SettingsPage.DISPLAY -> {
             val tint by vm.tint.collectAsStateWithLifecycle()
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
@@ -834,3 +835,18 @@ internal fun CritAir.label(): String = when (this) {
 }
 
 internal fun String.toFrDoubleOrNull(): Double? = trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
+
+// ── Commandes vocales ───────────────────────────────────────────────────────
+
+/** Phrases comprises par le bouton micro (interprétées sur le téléphone, sans service d'IA ni clé). */
+@Composable
+private fun VoiceCommandsGroup() {
+    val examples = listOf(
+        R.string.settings_voice_ex_home, R.string.settings_voice_ex_go, R.string.settings_voice_ex_avoid, R.string.settings_voice_ex_report,
+        R.string.settings_voice_ex_arrival, R.string.settings_voice_ex_remaining, R.string.settings_voice_ex_limit, R.string.settings_voice_ex_fuel,
+        R.string.settings_voice_ex_mute, R.string.settings_voice_ex_stop,
+    )
+    SettingsGroup(stringResource(R.string.settings_voice_commands_group), footer = stringResource(R.string.settings_voice_commands_footer)) {
+        examples.forEachIndexed { i, res -> ListRow(stringResource(res), icon = Icons.Default.Mic, divider = i < examples.lastIndex) }
+    }
+}

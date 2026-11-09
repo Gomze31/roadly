@@ -50,6 +50,12 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Services (stations, aires) dans le bandeau | G | bloquée | 3 | Dépend POI |
 | Zones de vigilance dans le bandeau | G | fonctionnelle | Radar | Zones de danger dans l'Horizon, la pastille et sur le tracé ; jamais de point d'équipement |
 
+## 2 bis. Commandes vocales
+
+| Fonction | Palier | Statut | Phase | Notes |
+|---|---|---|---|---|
+| Commandes vocales intégrées | G | fonctionnelle | 2026-11-09 | Bouton micro (accueil, guidage) : reconnaissance du téléphone (hors ligne si possible), interprétation locale `VoiceCommandParser` (aucun service d'IA, aucune clé) ; domicile / travail / adresse, éviter péages / autoroutes / tunnels / ferries avec l'écart d'arrivée, signalements, heure d'arrivée, reste, prochaine manœuvre, limitation, stations / parkings / bornes / aires / restaurants, couper la voix, recalcul, arrêt, aide. Réponse affichée et prononcée (canal assistant). Remplace le copilote Roadly AI (Gemini), retiré. 12 tests JVM |
+
 ## 3. Recherche, lieux, favoris
 
 | Fonction | Palier | Statut | Phase | Notes |
@@ -210,7 +216,7 @@ Détail, sources et limites : `docs/SCOOTER.md`. « Code livré » = compilé et
 | Stationnement / recharge trottinette | en cours | Overpass ; uniquement les lieux présents dans OSM |
 | Récapitulatif de trajet, bilan semaine / mois | en cours | Dénivelé et énergie estimés |
 | Carte hors connexion du trajet | en cours | Tuiles seulement ; calcul et recalcul en ligne |
-| Roadly AI en mode trottinette | en cours | Reconnaissance vocale du système + intentions locales ; copilote Gemini (spec AI-1) non implémenté |
+| Questions vocales en mode trottinette | fonctionnelle | Reconnaissance vocale du système + intentions locales (itinéraire le plus sûr, autonomie) |
 
 ## Mises à jour depuis GitHub (2026-11-01)
 

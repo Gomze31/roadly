@@ -59,6 +59,6 @@ data class RouteScreenState(
     /** Mode de déplacement actif (sélecteur) ; [scooterAvailable] = services trottinette présents. */
     val travelMode: TravelMode = TravelMode.CAR,
     val scooterAvailable: Boolean = false,
-    /** Dernière réponse de Roadly AI (affichée quelques secondes). */
+    /** Dernière réponse de l'assistant vocal (affichée quelques secondes). */
     val assistantReply: String? = null,
 )
