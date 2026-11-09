@@ -36,6 +36,8 @@ sealed interface RouteUiState {
         val dangerZones: Map<String, Int> = emptyMap(),
         /** S5 : carte d'identité par itinéraire (profil réel) ; absent = pas encore obtenue ou indisponible (hors ligne, échec). */
         val identities: Map<String, RouteIdentity> = emptyMap(),
+        /** ZFE traversées par itinéraire (verdict selon la vignette Crit'Air du véhicule) ; absent = pas de ZFE ou pas encore calculé. */
+        val zfe: Map<String, List<fr.roadly.core.data.zfe.ZfeCrossing>> = emptyMap(),
     ) : RouteUiState
 }
 
@@ -57,6 +59,6 @@ data class RouteScreenState(
     /** Mode de déplacement actif (sélecteur) ; [scooterAvailable] = services trottinette présents. */
     val travelMode: TravelMode = TravelMode.CAR,
     val scooterAvailable: Boolean = false,
-    /** Dernière réponse de Roadly AI (affichée quelques secondes). */
+    /** Dernière réponse de l'assistant vocal (affichée quelques secondes). */
     val assistantReply: String? = null,
 )

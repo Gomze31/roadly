@@ -6,11 +6,12 @@ import androidx.compose.ui.unit.dp
 
 object RoadlyShapes {
     val Tile = RoundedCornerShape(12.dp)
-    val Card = RoundedCornerShape(18.dp)
-    val Chip = RoundedCornerShape(20.dp)
-    val Button = RoundedCornerShape(16.dp)
+    val Card = RoundedCornerShape(24.dp)
+    val Chip = RoundedCornerShape(50)
+    /** Boutons en pilule (« Continuer », « Rouler »). */
+    val Button = RoundedCornerShape(50)
     val Pill = CircleShape
-    val Panel = RoundedCornerShape(24.dp)
+    val Panel = RoundedCornerShape(30.dp)
     val Sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 }
 

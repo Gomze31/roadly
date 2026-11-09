@@ -47,6 +47,8 @@ fun StopsList(
     onRemove: (Int) -> Unit,
     onOptimize: () -> Unit,
     modifier: Modifier = Modifier,
+    /** false : le bouton « Ajouter un arrêt » est affiché ailleurs (panneau de choix). */
+    showAdd: Boolean = true,
 ) {
     val c = LocalRoadlyColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs)) {
@@ -66,7 +68,7 @@ fun StopsList(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalAlignment = Alignment.CenterVertically) {
-            GlassChip(
+            if (showAdd) GlassChip(
                 stringResource(if (stops.isEmpty()) R.string.route_add_stop else R.string.route_add_stop_n, stops.size, StopOrdering.MAX_STOPS),
                 onClick = onAdd, icon = Icons.Default.AddLocationAlt, compact = true, enabled = stops.size < StopOrdering.MAX_STOPS,
             )

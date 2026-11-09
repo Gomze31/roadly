@@ -89,7 +89,7 @@ class ScooterServices @Inject constructor(
     suspend fun calibration(profile: ElectricScooterProfile): RangeCalibration = TripCalibration.of(trips.trips.first(), profile)
 
     /**
-     * Roadly AI en mode trottinette : comprend la demande, applique les actions génériques (préférences, batterie,
+     * l'assistant vocal en mode trottinette : comprend la demande, applique les actions génériques (préférences, batterie,
      * autonomie jusqu'au domicile calculée sur un vrai itinéraire) et renvoie la réponse à prononcer. Les actions
      * propres à l'écran (recherche dans le rayon atteignable) sont renvoyées dans [AssistantReply.action].
      */

@@ -1,5 +1,15 @@
 package fr.roadly.core.designsystem.component
 
+import androidx.compose.material.icons.filled.Construction
+
+import androidx.compose.material.icons.filled.Block
+
+import androidx.compose.foundation.border
+
+import androidx.compose.ui.graphics.compositeOver
+
+import androidx.compose.material.icons.filled.MonitorHeart
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -67,7 +77,9 @@ fun HorizonKind.icon(): ImageVector = when (this) {
     HorizonKind.MANEUVER -> Icons.Default.TurnRight
     HorizonKind.CURVE -> Icons.Default.Timeline
     HorizonKind.VIGILANCE -> Icons.Default.Shield
-    HorizonKind.SLOWDOWN, HorizonKind.INCIDENT, HorizonKind.ROADWORK, HorizonKind.CLOSURE, HorizonKind.SPEED_BUMP -> Icons.Default.Warning
+    HorizonKind.SLOWDOWN, HorizonKind.INCIDENT, HorizonKind.SPEED_BUMP -> Icons.Default.Warning
+    HorizonKind.ROADWORK -> Icons.Default.Construction
+    HorizonKind.CLOSURE -> Icons.Default.Block
     HorizonKind.SERVICE -> Icons.Default.LocalGasStation
     HorizonKind.TRAFFIC_LIGHT -> Icons.Default.Traffic
     HorizonKind.ARRIVAL -> Icons.Default.Flag
@@ -79,7 +91,8 @@ fun HorizonKind.color(): Color {
     return when (this) {
         HorizonKind.MANEUVER, HorizonKind.CURVE -> c.brand
         HorizonKind.SLOWDOWN -> c.warning
-        HorizonKind.INCIDENT, HorizonKind.CLOSURE -> c.danger
+        HorizonKind.INCIDENT -> c.danger
+        HorizonKind.CLOSURE -> c.accent
         HorizonKind.ROADWORK -> c.accent
         HorizonKind.VIGILANCE -> c.warning
         HorizonKind.SERVICE -> c.success
@@ -104,47 +117,57 @@ fun HorizonStrip(
     val c = LocalRoadlyColors.current
     val description = if (items.isEmpty()) title else "$title : " + items.joinToString(", ") { it.contentDescription }
     GlassPanel(modifier.fillMaxWidth().semantics { contentDescription = description }, shape = RoadlyShapes.Panel, contentPadding = 0.dp) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            // En-tête : pouls (titre lu par TalkBack) à gauche ; à droite, le prochain événement notable (hors manœuvres) en couleur.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OverlineText(title, color = c.accent)
+                Icon(Icons.Default.MonitorHeart, contentDescription = null, tint = c.brand, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.weight(1f))
-                Text(rangeLabel, style = Overline, color = c.textTertiary)
+                val headline = items.firstOrNull { it.kind != HorizonKind.MANEUVER && it.kind != HorizonKind.ARRIVAL } ?: items.firstOrNull()
+                if (headline != null) {
+                    val col = headline.kind.color()
+                    Box(Modifier.size(10.dp).background(col, RoadlyShapes.Pill))
+                    Spacer(Modifier.width(8.dp))
+                    Icon(headline.kind.icon(), contentDescription = null, tint = col, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(headline.label, style = Overline.copy(fontSize = 14.sp, letterSpacing = 0.3.sp), color = col, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else {
+                    Text(rangeLabel, style = Overline, color = c.textTertiary)
+                }
             }
-            Spacer(Modifier.height(10.dp))
-            BoxWithConstraints(Modifier.fillMaxWidth().height(30.dp)) {
+            Spacer(Modifier.height(6.dp))
+            BoxWithConstraints(Modifier.fillMaxWidth().height(40.dp)) {
                 val trackW = maxWidth - 24.dp
-                // Piste : dégradé marque → transparent ; densité en segments colorés si connue.
-                Box(Modifier.align(Alignment.CenterStart).padding(start = 12.dp).width(trackW).height(6.dp).background(Brush.horizontalGradient(listOf(c.brand, c.brand.copy(alpha = 0.25f))), RoundedCornerShape(3.dp)))
+                val rail = c.textTertiary.copy(alpha = 0.45f)
+                // Rail fin et graduations (1/3, 2/3) ; densité en segments colorés si connue.
+                Box(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 9.dp).width(trackW).height(4.dp).background(rail, RoundedCornerShape(2.dp)))
+                listOf(1f / 3f, 2f / 3f).forEach { f ->
+                    Box(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 4.dp).offset(x = trackW * f).width(2.dp).height(14.dp).background(rail, RoundedCornerShape(1.dp)))
+                }
                 if (density != null && density.segments.isNotEmpty()) {
-                    Row(Modifier.align(Alignment.CenterStart).padding(start = 12.dp).width(trackW).height(6.dp)) {
+                    Row(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 9.dp).width(trackW).height(4.dp)) {
                         density.segments.forEach { d ->
                             val col = when {
                                 d >= 0.75f -> c.danger
                                 d >= 0.45f -> c.warning
                                 else -> c.success
                             }
-                            Box(Modifier.weight(1f).height(6.dp).background(col.copy(alpha = 0.9f)))
+                            Box(Modifier.weight(1f).height(4.dp).background(col.copy(alpha = 0.9f)))
                         }
                     }
                 }
+                // Position actuelle : point de marque avec halo.
+                Box(Modifier.align(Alignment.BottomStart).padding(start = 3.dp).size(22.dp).background(c.brand.copy(alpha = 0.25f), RoadlyShapes.Pill), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(13.dp).background(c.brand, RoadlyShapes.Pill).border(2.dp, Color.White, RoadlyShapes.Pill))
+                }
+                // Événements : épingles posées au-dessus du rail.
                 items.take(8).forEach { item ->
                     val x = trackW * HorizonScale.position(item.distanceM)
-                    Column(Modifier.offset(x = x).align(Alignment.CenterStart), horizontalAlignment = Alignment.CenterHorizontally) {
-                        ColorDotIcon(item.kind.icon(), item.kind.color(), size = 24.dp)
-                    }
-                }
-            }
-            if (items.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Row(Modifier.fillMaxWidth()) {
-                    items.take(3).forEachIndexed { i, item ->
-                        if (i > 0) Spacer(Modifier.width(12.dp))
-                        Row(Modifier.weight(1f, fill = false), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(6.dp).background(item.kind.color(), RoadlyShapes.Pill))
-                            Spacer(Modifier.width(5.dp))
-                            Text(item.label, style = Overline.copy(letterSpacing = 0.4.sp), color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
+                    val col = item.kind.color()
+                    Box(
+                        Modifier.align(Alignment.TopStart).offset(x = x).size(28.dp).background(col.copy(alpha = 0.22f).compositeOver(c.surface), RoadlyShapes.Pill)
+                            .border(2.5.dp, col, RoadlyShapes.Pill),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(item.kind.icon(), contentDescription = null, tint = col, modifier = Modifier.size(16.dp)) }
                 }
             }
         }

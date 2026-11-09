@@ -70,11 +70,16 @@ data class Maneuver(
         }
 }
 
-/** Préférences d'itinéraire appliquées aux trois variantes et au recalcul (`costing_options.auto.use_* = 0`). */
+/**
+ * Préférences d'itinéraire appliquées aux trois variantes et au recalcul (`costing_options.auto.use_* = 0`).
+ * [avoidTunnels] est une exclusion stricte Valhalla (`exclude_tunnels`) : quand aucun chemin n'existe sans tunnel,
+ * le calcul est relancé sans l'exclusion (le tunnel est alors inévitable).
+ */
 data class RoutePreferences(
     val avoidTolls: Boolean = false,
     val avoidHighways: Boolean = false,
     val avoidFerries: Boolean = false,
+    val avoidTunnels: Boolean = false,
 )
 
 data class Route(

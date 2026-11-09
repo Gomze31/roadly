@@ -126,6 +126,12 @@ interface UserPreferencesRepository {
     /** B6 : course en cours, mémorisée au démarrage du guidage ; null après un arrêt ou une arrivée. */
     val lastGuidance: Flow<LastGuidance?>
     suspend fun setLastGuidance(value: LastGuidance?)
+    /** Accueil du premier lancement (7 étapes) terminé ou ignoré. */
+    val onboardingDone: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setOnboardingDone(value: Boolean) = Unit
+    /** Zones à faibles émissions : frontière sur la carte et alerte sur l'itinéraire selon la vignette Crit'Air. */
+    val zfeEnabled: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setZfeEnabled(value: Boolean) = Unit
 }
 
 @Singleton
@@ -136,6 +142,7 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kAvoidTolls = booleanPreferencesKey("route.avoid.tolls")
     private val kAvoidHighways = booleanPreferencesKey("route.avoid.highways")
     private val kAvoidFerries = booleanPreferencesKey("route.avoid.ferries")
+    private val kAvoidTunnels = booleanPreferencesKey("route.avoid.tunnels")
     private val kVoiceEnabled = booleanPreferencesKey("voice.enabled")
     private val kVoiceVolume = intPreferencesKey("voice.volume")
     private val kTolerance = intPreferencesKey("speed.alert.tolerance")
@@ -160,6 +167,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kLastName = stringPreferencesKey("guidance.last.name")
     private val kLastRoute = stringPreferencesKey("guidance.last.route")
     private val kLastAt = longPreferencesKey("guidance.last.at")
+    private val kOnboarding = booleanPreferencesKey("onboarding.done")
+    private val kZfe = booleanPreferencesKey("zfe.enabled")
 
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
     override suspend fun setThemeMode(mode: ThemeMode) { store.edit { it[kTheme] = mode.name } }
@@ -169,10 +178,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setLocationDeniedForever(value: Boolean) { store.edit { it[kDeniedForever] = value } }
 
     override val routePreferences: Flow<RoutePreferences> = store.data.map { p ->
-        RoutePreferences(avoidTolls = p[kAvoidTolls] ?: false, avoidHighways = p[kAvoidHighways] ?: false, avoidFerries = p[kAvoidFerries] ?: false)
+        RoutePreferences(avoidTolls = p[kAvoidTolls] ?: false, avoidHighways = p[kAvoidHighways] ?: false, avoidFerries = p[kAvoidFerries] ?: false, avoidTunnels = p[kAvoidTunnels] ?: false)
     }
     override suspend fun setRoutePreferences(value: RoutePreferences) {
-        store.edit { it[kAvoidTolls] = value.avoidTolls; it[kAvoidHighways] = value.avoidHighways; it[kAvoidFerries] = value.avoidFerries }
+        store.edit { it[kAvoidTolls] = value.avoidTolls; it[kAvoidHighways] = value.avoidHighways; it[kAvoidFerries] = value.avoidFerries; it[kAvoidTunnels] = value.avoidTunnels }
     }
     override val voiceEnabled: Flow<Boolean> = store.data.map { it[kVoiceEnabled] ?: GuidanceDefaults.VOICE_ENABLED }
     override suspend fun setVoiceEnabled(value: Boolean) { store.edit { it[kVoiceEnabled] = value } }
@@ -222,6 +231,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setPowerSaveMode(value: PowerSaveMode) { store.edit { it[kPowerSave] = value.name } }
     override val cockpitTint: Flow<String?> = store.data.map { it[kTint] }
     override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
+    override val onboardingDone: Flow<Boolean> = store.data.map { it[kOnboarding] ?: false }
+    override suspend fun setOnboardingDone(value: Boolean) { store.edit { it[kOnboarding] = value } }
+    override val zfeEnabled: Flow<Boolean> = store.data.map { it[kZfe] ?: true }
+    override suspend fun setZfeEnabled(value: Boolean) { store.edit { it[kZfe] = value } }
     override val lastGuidance: Flow<LastGuidance?> = store.data.map { p ->
         val lat = p[kLastLat]; val lon = p[kLastLon]; val routeId = p[kLastRoute]; val at = p[kLastAt]
         if (lat == null || lon == null || routeId == null || at == null) null else LastGuidance(GeoPoint(lat, lon), p[kLastName], routeId, at)

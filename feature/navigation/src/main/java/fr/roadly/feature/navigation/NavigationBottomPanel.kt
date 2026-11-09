@@ -1,5 +1,19 @@
 package fr.roadly.feature.navigation
 
+import androidx.compose.material.icons.filled.Search
+
+import android.content.Intent
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
+import fr.roadly.core.designsystem.theme.ButtonLabel
+import fr.roadly.core.designsystem.theme.NavDigits
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -88,6 +102,7 @@ fun NavigationBottomPanel(
     onAlternatives: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    onChangeDestination: (() -> Unit)? = null,
 ) {
     val c = LocalRoadlyColors.current
     val threshold = with(LocalDensity.current) { DRAG_THRESHOLD.toPx() }
@@ -109,7 +124,7 @@ fun NavigationBottomPanel(
             ) {
                 Box(Modifier.width(36.dp).height(4.dp).background(c.textTertiary.copy(alpha = 0.6f), RoundedCornerShape(2.dp)))
             }
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Spec D5 : toucher l'ETA ouvre le trajet complet.
                 Column(
                     Modifier.weight(1f)
@@ -119,25 +134,23 @@ fun NavigationBottomPanel(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        StatTile(state.etaClock, stringResource(R.string.nav_eta_label))
-                        Spacer(Modifier.width(16.dp))
-                        StatTile(state.remainingDurationSplit.value, state.remainingDurationSplit.unit)
-                        Spacer(Modifier.width(16.dp))
-                        StatTile(state.remainingDistanceSplit.value, state.remainingDistanceSplit.unit)
+                        // Heure d'arrivée en grand, libellé « arrivée » en couleur de marque (référence visuelle).
+                        BarStat(state.etaClock, stringResource(R.string.nav_eta_label).lowercase(), labelColor = c.brand, large = true)
+                        BarDivider()
+                        BarStat(state.remainingDurationSplit.value, state.remainingDurationSplit.unit.lowercase())
+                        Spacer(Modifier.width(14.dp))
+                        BarStat(state.remainingDistanceSplit.value, state.remainingDistanceSplit.unit.lowercase())
                     }
                 }
-                Spacer(Modifier.width(8.dp))
+                BarDivider()
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (!state.following) {
                         RoundIconButton(Icons.Default.Navigation, stringResource(R.string.nav_recenter), onClick = onRecenter, style = RoundButtonStyle.Brand)
                     } else {
-                        RoundIconButton(
-                            if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                            stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute),
-                            onClick = onToggleMute,
-                        )
+                        // Envoyer son heure d'arrivée (partage Android : SMS, messagerie…).
+                        ShareEtaButton(state, destinationName)
                     }
-                    RoundIconButton(Icons.Default.Close, stringResource(R.string.nav_stop), onClick = onStop, style = RoundButtonStyle.Danger)
+                    RoundIconButton(Icons.Default.Close, stringResource(R.string.nav_stop), onClick = onStop, style = RoundButtonStyle.Danger, size = 56.dp)
                 }
             }
             AnimatedVisibility(expanded && compact) {
@@ -160,10 +173,55 @@ fun NavigationBottomPanel(
                         GlassButton(stringResource(R.string.nav_trip_details), onClick = onTripDetails, icon = Icons.AutoMirrored.Filled.List, style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f))
                         GlassButton(stringResource(R.string.nav_alternatives), onClick = onAlternatives, icon = Icons.Default.AltRoute, style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f))
                     }
+                    // Voix et changement de destination (déplacés de la colonne d'actions).
+                    Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                        GlassButton(
+                            stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute), onClick = onToggleMute,
+                            icon = if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f),
+                        )
+                        if (onChangeDestination != null) GlassButton(
+                            stringResource(R.string.nav_change_destination), onClick = onChangeDestination, icon = Icons.Default.Search,
+                            style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun BarStat(value: String, label: String, labelColor: Color = LocalRoadlyColors.current.textSecondary, large: Boolean = false) {
+    val c = LocalRoadlyColors.current
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = NavDigits.copy(fontSize = if (large) 32.sp else 27.sp, lineHeight = if (large) 34.sp else 29.sp), color = c.textPrimary, maxLines = 1)
+        Text(label, style = ButtonLabel.copy(fontSize = 16.sp), color = labelColor, maxLines = 1)
+    }
+}
+
+@Composable
+private fun BarDivider() {
+    val c = LocalRoadlyColors.current
+    Box(Modifier.padding(horizontal = 10.dp).width(1.dp).height(44.dp).background(c.glassBorder))
+}
+
+/** Bouton « envoyer mon heure d'arrivée » : texte prêt à partager (heure, durée, destination). */
+@Composable
+private fun ShareEtaButton(state: NavigationUiState, destinationName: String?) {
+    val c = LocalRoadlyColors.current
+    val context = LocalContext.current
+    val text = if (destinationName != null) stringResource(R.string.nav_share_eta_to, destinationName, state.etaClock, state.remainingDuration)
+        else stringResource(R.string.nav_share_eta, state.etaClock, state.remainingDuration)
+    val title = stringResource(R.string.nav_share_eta_title)
+    Box(
+        Modifier.size(52.dp).clip(RoadlyShapes.Pill).background(c.brand.copy(alpha = 0.16f)).border(1.5.dp, c.brand.copy(alpha = 0.6f), RoadlyShapes.Pill)
+            .clickable(role = Role.Button, onClickLabel = title) {
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                context.startActivity(Intent.createChooser(send, title))
+            },
+        contentAlignment = Alignment.Center,
+    ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = title, tint = c.brand, modifier = Modifier.size(26.dp).rotate(-30f)) }
 }
 
 /** Paysage : partie dépliée sur une rangée (destination tronquée, « Trajet complet », « Itinéraires »), 56 dp + 8 dp de marge. */

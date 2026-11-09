@@ -24,7 +24,7 @@ Emplacement proposé : `docs/superpowers/plans/2026-11-01-roadly-3d-etape-e.md`.
   - `HomeViewModel` refait un itinéraire depuis la position actuelle (même calcul que `GuidanceActions.startTo` de l'IA), puis appelle `session.start` comme « ROULER » ;
   - l'écran ouvre le guidage par le rappel existant `onResumeGuidance`. Aucune signature d'écran ou de navigation n'est touchée.
 
-**Pile technique :** Kotlin 2.2.10, Jetpack Compose (BOM 2026.05.00, Material 3), Hilt 2.58, Android `TextToSpeech` / `AudioManager` (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`, `USAGE_ASSISTANCE_NAVIGATION_GUIDANCE`), DataStore Preferences, MapLibre Android 11.13.5, JUnit 4.13.2, kotlinx-coroutines-test, Turbine, adb (HONOR `AREE026226000174`).
+**Pile technique :** Kotlin 2.2.10, Jetpack Compose (BOM 2026.05.00, Material 3), Hilt 2.58, Android `TextToSpeech` / `AudioManager` (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`, `USAGE_ASSISTANCE_NAVIGATION_GUIDANCE`), DataStore Preferences, MapLibre Android 11.13.5, JUnit 4.13.2, kotlinx-coroutines-test, Turbine, adb (HONOR Magic 8 Pro).
 
 **Spécification :** `ROADLY_3D_NAVIGATION_PLAN.md`, § « Étape E — Audio et intégration » (E1 `NavigationVoiceCoordinator`, E2 Réglages, E3 Arrière-plan et reprise). Lire aussi :
 - `ROADLY_3D_NAVIGATION_TESTS.md` : scénarios 14, 16, 17 et 20, et le journal (lignes de l'étape C : « kill -9 → accueil sans reprise (E3) », « à faire en roulant : voix avec musique ») ;
@@ -80,7 +80,7 @@ Emplacement proposé : `docs/superpowers/plans/2026-11-01-roadly-3d-etape-e.md`.
 - Les chaînes vont dans le `strings.xml` du module :
   - `feature/settings` : insérer après la ligne 32, jamais en fin de fichier (l'IA y ajoute ses chaînes) ;
   - `feature/home` : insérer après la ligne 20.
-- Appareil : HONOR `adb -s AREE026226000174`, application `fr.roadly` (debug, débogable). Le fichier DataStore est `files/datastore/roadly_prefs.preferences_pb`.
+- Appareil : HONOR `adb -s (numéro de série retiré)`, application `fr.roadly` (debug, débogable). Le fichier DataStore est `files/datastore/roadly_prefs.preferences_pb`.
 - Modifier `ROADLY_3D_NAVIGATION_TESTS.md` uniquement avec l'outil Edit, en gardant les accents.
 
 ---
@@ -2933,7 +2933,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 .\gradlew.bat :app:assembleDebug --offline -q
 $n = 0; Get-ChildItem -Recurse -Filter 'TEST-*.xml' -Path core, feature | Where-Object FullName -match 'test-results' | ForEach-Object { $n += [int]([xml](Get-Content $_.FullName)).testsuite.tests }; $n
 git rev-parse --short HEAD
-adb -s AREE026226000174 install -r app\build\outputs\apk\debug\app-debug.apk
+adb -s (numéro de série retiré) install -r app\build\outputs\apk\debug\app-debug.apk
 .\gradlew.bat :feature:navigation:connectedDebugAndroidTest --offline
 ```
 Résultat attendu :
@@ -2947,7 +2947,7 @@ Noter le nombre de tests et l'empreinte.
 1. L'utilisateur lance une musique dans une autre application.
 2. Réglages → « Tester la voix ». Attendu : la musique baisse pendant la phrase, puis revient. Pendant la phrase :
    ```powershell
-   $d = 'AREE026226000174'
+   $d = '(numéro de série retiré)'
    adb -s $d shell dumpsys audio | Select-String -Pattern "fr.roadly|MAY_DUCK"
    ```
    Attendu : une entrée de focus `fr.roadly`, gain `GAIN_TRANSIENT_MAY_DUCK`. Après la phrase, la commande ne renvoie plus `fr.roadly` : le focus est rendu.

@@ -41,7 +41,7 @@ import fr.roadly.core.navigation.RoundaboutInfo
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val COMPACT_SIZE = 48.dp
+private val COMPACT_SIZE = 64.dp
 private val LARGE_SIZE = 160.dp
 
 /**
@@ -61,9 +61,10 @@ fun RoundaboutManeuverView(info: RoundaboutInfo, exitNumber: Int?, compact: Bool
     val sweep = remember(info) { RoundaboutGeometry.diagramSweepDeg(info) }
     val side = if (compact) COMPACT_SIZE else LARGE_SIZE
     val spec = if (compact) RoundaboutDiagramSpec.Compact else RoundaboutDiagramSpec.Large
-    val ring = if (compact) c.onBrand.copy(alpha = 0.35f) else c.brandSoft
-    val path = if (compact) c.onBrand else c.brandBright
-    val numberColor = if (compact) c.onBrand else c.textPrimary
+    // Bandeau : schéma posé directement sur le panneau (anneau gris, trajet en couleur de marque), sans tuile.
+    val ring = if (compact) c.textSecondary.copy(alpha = 0.55f) else c.brandSoft
+    val path = if (compact) c.brand else c.brandBright
+    val numberColor = c.textPrimary
     val label = when (exitNumber) {
         null -> null
         1 -> stringResource(R.string.nav_roundabout_exit_first)
@@ -74,13 +75,13 @@ fun RoundaboutManeuverView(info: RoundaboutInfo, exitNumber: Int?, compact: Bool
     val street = if (compact) null else info.exitStreet
     val description = street?.let { stringResource(R.string.nav_roundabout_desc_street, base, it) } ?: base
     Column(modifier.clearAndSetSemantics { contentDescription = description }, horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(side).then(if (compact) Modifier.background(c.brand, RoadlyShapes.Tile) else Modifier), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(side), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(side)) { drawRoundabout(sweep, info.exitBearingDeg != null, ring, path, spec) }
             if (exitNumber != null) {
                 Text(
                     exitNumber.toString(),
                     modifier = Modifier.offset(y = -(side * RoundaboutDiagram.CENTER_LIFT)),
-                    style = NavDigits.copy(fontSize = if (compact) 13.sp else 30.sp, lineHeight = if (compact) 15.sp else 34.sp),
+                    style = NavDigits.copy(fontSize = if (compact) 17.sp else 30.sp, lineHeight = if (compact) 19.sp else 34.sp),
                     color = numberColor,
                 )
             }

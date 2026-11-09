@@ -1,5 +1,7 @@
 package fr.roadly.core.designsystem.component
 
+import fr.roadly.core.designsystem.theme.RowTitle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,7 +78,7 @@ fun ListRow(
         ) {
             if (icon != null) { IconTile(icon, style = iconStyle, size = 36.dp); Spacer(Modifier.width(RoadlySpacing.sm)) }
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) c.textPrimary else c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = RowTitle, color = if (enabled) c.textPrimary else c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (value != null) { Spacer(Modifier.width(RoadlySpacing.s)); Text(value, style = MaterialTheme.typography.bodyMedium, color = c.textSecondary, maxLines = 1) }
@@ -115,7 +117,7 @@ fun ToggleRow(
         ) {
             if (icon != null) { IconTile(icon, style = iconStyle, size = 36.dp); Spacer(Modifier.width(RoadlySpacing.sm)) }
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) c.textPrimary else c.textTertiary)
+                Text(title, style = RowTitle, color = if (enabled) c.textPrimary else c.textTertiary)
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
             }
             Spacer(Modifier.width(RoadlySpacing.s))

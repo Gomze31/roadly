@@ -18,7 +18,7 @@ internal data class Arbitration(
  * LIMITE : `TextToSpeech` ne reprend pas au milieu d'une phrase ; un message préempté est redit depuis le début.
  */
 internal object VoiceArbiter {
-    /** Silence (ms) entre la fin du dernier énoncé du guidage et la reprise de l'assistant (`RESUME_AFTER_GUIDANCE_MS` de Roadly AI). */
+    /** Silence (ms) entre la fin du dernier énoncé du guidage et la reprise de l'assistant (`RESUME_AFTER_GUIDANCE_MS` de l'assistant vocal). */
     const val ASSISTANT_RESUME_GAP_MS = 300L
 
     /** Fin de course pendant un message de l'assistant : la libération du moteur attend qu'il se taise, au plus 10 s. */

@@ -29,13 +29,16 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Départ planifié (heure de départ) | G | fonctionnelle | 1 | Décale seulement l'heure d'arrivée |
 | « Arriver à l'heure » | G | fonctionnelle | 1 | Départ déduit de la durée du plus rapide, sans trafic (LOT 3) ; rappel avant départ : Phase 4 |
 | Itinéraire alternatif en cours de guidage | G | fonctionnelle | 2 | Feuille « Changer d'itinéraire » depuis la position projetée (LOT 3) |
-| Options d'itinéraire sur l'écran de choix | G | fonctionnelle | 1 | Puces éviter péages / autoroutes / ferries (LOT 3) |
+| Options d'itinéraire sur l'écran de choix | G | fonctionnelle | 1 | Puces éviter péages / autoroutes / tunnels / ferries (LOT 3, tunnels 2026-11-09) ; aussi depuis l'accueil (bouton réglages de la barre Domicile / Travail) |
+| Éviter les tunnels | G | fonctionnelle | 1 | Exclusion stricte Valhalla `exclude_tunnels` ; sans chemin possible, recalcul sans l'exclusion (tunnel inévitable). Testé JVM ; non vérifié sur l'instance FOSSGIS depuis le conteneur de développement |
+| Accueil du premier lancement | G | fonctionnelle | 1 | `feature:onboarding` (2026-11-09) : 7 étapes (bienvenue, position, notifications, véhicule, voix et alertes, « Votre route », classement), barre segmentée, « Ignorer » / « Continuer » ; chaque interrupteur écrit le réglage réel. Non vérifié sur appareil |
+| Carte « Départ » de l'accueil | G | fonctionnelle | 1 | Partir maintenant / partir à / arriver à, repris par l'écran d'itinéraires (`DeparturePlanner`, en mémoire), effacé au démarrage du guidage |
 | Mode paysage | G | en cours | 1 | Accueil, itinéraires et guidage en deux colonnes (LOT 1) ; non vérifié sur appareil |
 | Thème clair / sombre / automatique | G | fonctionnelle | 1 | Auto solaire (position) + système |
 | Mode Silence | G | fonctionnelle | 2 | Bouton voix de l'écran de guidage |
 | Import GPX | ? | non commencée | 5 | |
 | Guidage allégé hors connexion | G | non commencée | 5 | Cache tuiles MapLibre + itinéraire mémorisé |
-| ZFE / Crit'Air | ? | non commencée | 3 | Source à identifier |
+| ZFE / Crit'Air | ? | fonctionnelle | 3 | Base nationale consolidée des ZFE (transport.data.gouv.fr, `aires.geojson`, cache 7 j) : verdict selon la catégorie, la vignette Crit'Air, la date et les horaires (`opening_hours`) ; pastille sur l'écran d'itinéraires + détail (arrêté), feuille sur les alternatives, périmètre sur la carte, ligne sur Android Auto ; réglage « Zones à faibles émissions ». 10 tests JVM, dont un sur le vrai fichier national (`-PzfeFile`) |
 | Tunnels (perte GPS) | G | fonctionnelle | 2 | Extrapolation sur la polyligne après 3 s sans fix, plafonnée à 150 m / 10 s ; badge « GPS perdu » après 10 s |
 
 ## 2. Horizon (route à venir)
@@ -46,6 +49,12 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Ralentissements, bouchons, incidents dans le bandeau | G | bloquée | 3 | Dépend trafic |
 | Services (stations, aires) dans le bandeau | G | bloquée | 3 | Dépend POI |
 | Zones de vigilance dans le bandeau | G | fonctionnelle | Radar | Zones de danger dans l'Horizon, la pastille et sur le tracé ; jamais de point d'équipement |
+
+## 2 bis. Commandes vocales
+
+| Fonction | Palier | Statut | Phase | Notes |
+|---|---|---|---|---|
+| Commandes vocales intégrées | G | fonctionnelle | 2026-11-09 | Bouton micro (accueil, guidage) : reconnaissance du téléphone (hors ligne si possible), interprétation locale `VoiceCommandParser` (aucun service d'IA, aucune clé) ; domicile / travail / adresse, éviter péages / autoroutes / tunnels / ferries avec l'écart d'arrivée, signalements, heure d'arrivée, reste, prochaine manœuvre, limitation, stations / parkings / bornes / aires / restaurants, couper la voix, recalcul, arrêt, aide. Réponse affichée et prononcée (canal assistant). Remplace le copilote Roadly AI (Gemini), retiré. 12 tests JVM |
 
 ## 3. Recherche, lieux, favoris
 
@@ -207,7 +216,7 @@ Détail, sources et limites : `docs/SCOOTER.md`. « Code livré » = compilé et
 | Stationnement / recharge trottinette | en cours | Overpass ; uniquement les lieux présents dans OSM |
 | Récapitulatif de trajet, bilan semaine / mois | en cours | Dénivelé et énergie estimés |
 | Carte hors connexion du trajet | en cours | Tuiles seulement ; calcul et recalcul en ligne |
-| Roadly AI en mode trottinette | en cours | Reconnaissance vocale du système + intentions locales ; copilote Gemini (spec AI-1) non implémenté |
+| Questions vocales en mode trottinette | fonctionnelle | Reconnaissance vocale du système + intentions locales (itinéraire le plus sûr, autonomie) |
 
 ## Mises à jour depuis GitHub (2026-11-01)
 

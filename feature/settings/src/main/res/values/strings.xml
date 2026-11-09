@@ -14,7 +14,7 @@
     <string name="settings_section_alerts">Alertes et radars</string>
     <string name="settings_section_alerts_sub">Tolérance de vitesse, radars, zones, pauses</string>
     <string name="settings_section_voice">Voix et assistant</string>
-    <string name="settings_section_voice_sub">Annonces vocales, volume, Roadly AI</string>
+    <string name="settings_section_voice_sub">Annonces vocales, volume, commandes vocales</string>
     <string name="settings_section_display">Affichage</string>
     <string name="settings_section_display_sub">Thème clair ou sombre, teinte du cockpit</string>
     <string name="settings_section_android_auto">Android Auto</string>
@@ -41,8 +41,8 @@
     <string name="settings_page_speed_sub">Tolérance, baisses de limitation, pluie, rappel de pause</string>
     <string name="settings_page_voice">Annonces vocales</string>
     <string name="settings_page_voice_sub">Voix, volume, son de dépassement</string>
-    <string name="settings_page_ai">Roadly AI</string>
-    <string name="settings_page_ai_sub">Assistant vocal (Gemini), clé, plafond d\'écoute</string>
+    <string name="settings_page_ai">Commandes vocales</string>
+    <string name="settings_page_ai_sub">Ce que vous pouvez dire au micro</string>
     <string name="settings_page_community">Communauté</string>
     <string name="settings_page_community_sub">Service de signalements et de classement</string>
     <string name="settings_page_providers">Fournisseurs de données</string>
@@ -148,6 +148,7 @@
     <string name="settings_avoid_tolls">Éviter les péages</string>
     <string name="settings_avoid_highways">Éviter les autoroutes</string>
     <string name="settings_avoid_ferries">Éviter les ferries</string>
+    <string name="settings_avoid_tunnels">Éviter les tunnels</string>
 
     <string name="settings_data">Données</string>
     <string name="settings_clear_history">Effacer l\'historique de recherche</string>
@@ -261,24 +262,6 @@
     <string name="assist_history">Fil des demandes</string>
     <string name="assist_history_subtitle">Nécessite un compte Roadly</string>
     <string name="settings_provider_overpass">Données OSM détaillées (Overpass API)</string>
-    <string name="settings_group_assistant">Roadly AI</string>
-    <string name="settings_assistant_footer">Copilote vocal Gemini Live. Le guidage reste prioritaire et fonctionne sans l\'assistant, même hors ligne. La clé n\'est jamais affichée.</string>
-    <string name="settings_assistant_enabled">Activer Roadly AI</string>
-    <string name="settings_assistant_consent">Partager ma position et mon trajet avec Gemini</string>
-    <string name="settings_assistant_consent_subtitle">Seulement quand l\'assistant en a besoin pour répondre (position, destination, itinéraire, véhicule).</string>
-    <string name="settings_assistant_key">Clé API Gemini</string>
-    <string name="settings_assistant_key_override">Clé saisie ici (chiffrée sur le téléphone)</string>
-    <string name="settings_assistant_key_build">Clé de local.properties</string>
-    <string name="settings_assistant_key_none">Aucune clé</string>
-    <string name="settings_assistant_key_field">Nouvelle clé</string>
-    <string name="settings_assistant_key_clear">Oublier la clé saisie</string>
-    <string name="settings_assistant_verify">Vérifier la clé</string>
-    <string name="settings_assistant_verify_running">Vérification…</string>
-    <string name="settings_assistant_verify_ok">Clé acceptée par Gemini.</string>
-    <string name="settings_assistant_verify_failed">Échec : %1$s</string>
-    <string name="settings_assistant_cap">Plafond quotidien d\'écoute</string>
-    <string name="settings_assistant_cap_minutes">%1$d min</string>
-    <string name="settings_assistant_usage">Aujourd\'hui : %1$d / %2$d min d\'écoute · ≈ %3$d tokens</string>
 
     <!-- Radar Intelligence -->
     <string name="radar_title">Radars et zones de danger</string>
@@ -332,4 +315,20 @@
     <string name="settings_limit_drop_subtitle">« Limitation 70. » quand la limitation baisse, en guidage et en conduite libre.</string>
     <string name="settings_break_reminder">Rappel de pause</string>
     <string name="settings_break_reminder_subtitle">Toutes les deux heures de conduite, comme le recommande la Sécurité routière.</string>
+    <string name="settings_group_local_rules">Règles locales</string>
+    <string name="settings_zfe">Zones à faibles émissions</string>
+    <string name="settings_zfe_sub">Frontière de la zone sur la carte, alerte selon votre Crit\'Air</string>
+    <string name="settings_zfe_footer">Base nationale consolidée des ZFE (transport.data.gouv.fr), mise à jour chaque semaine. Renseignez votre vignette dans Réglages › Véhicule.</string>
+    <string name="settings_voice_commands_group">Exemples</string>
+    <string name="settings_voice_commands_footer">Touchez le micro sur l\'accueil ou pendant le guidage. La phrase est reconnue par le téléphone (sans connexion si le français est installé dans la reconnaissance vocale), puis interprétée par Roadly : aucun service d\'IA, aucune clé, aucun compte.</string>
+    <string name="settings_voice_ex_home">« Rentrer à la maison » · « Emmène-moi au travail »</string>
+    <string name="settings_voice_ex_go">« Emmène-moi au Capitole de Toulouse »</string>
+    <string name="settings_voice_ex_avoid">« Évite les péages » · « Autorise les autoroutes »</string>
+    <string name="settings_voice_ex_report">« Signale un accident » · « Il y a un bouchon »</string>
+    <string name="settings_voice_ex_arrival">« À quelle heure j\'arrive ? »</string>
+    <string name="settings_voice_ex_remaining">« Combien il reste ? » · « Je tourne où ? »</string>
+    <string name="settings_voice_ex_limit">« Quelle est la limitation ? »</string>
+    <string name="settings_voice_ex_fuel">« Trouve une station » · « Trouve un parking »</string>
+    <string name="settings_voice_ex_mute">« Coupe la voix » · « Remets la voix »</string>
+    <string name="settings_voice_ex_stop">« Arrête le guidage » · « Aide »</string>
 </resources>

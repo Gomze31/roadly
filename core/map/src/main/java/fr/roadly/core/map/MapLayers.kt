@@ -42,6 +42,10 @@ internal object MapIds {
     const val SRC_DANGER = "roadly-danger"
     const val LYR_DANGER_CASING = "roadly-danger-casing"
     const val LYR_DANGER = "roadly-danger-line"
+    /** Périmètres des zones à faibles émissions. */
+    const val SRC_ZFE = "roadly-zfe"
+    const val LYR_ZFE_FILL = "roadly-zfe-fill"
+    const val LYR_ZFE_LINE = "roadly-zfe-line"
     const val LYR_ARROW_CASING = "roadly-arrow-casing"
     const val LYR_ARROW = "roadly-arrow-line"
     const val LYR_ARROW_HEAD = "roadly-arrow-head"

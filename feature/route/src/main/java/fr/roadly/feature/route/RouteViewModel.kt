@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfigRepository
+import fr.roadly.core.data.repository.DeparturePlanner
+import kotlinx.coroutines.flow.map
+import fr.roadly.core.data.repository.FavoritesRepository
 import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.location.LocationMode
@@ -68,6 +71,12 @@ class RouteViewModel @Inject constructor(
     private val dangerZoneProvider: VigilanceZoneProvider? = null,
     /** S5 : profil réel (limitations, portiques) de chaque variante ; null (tests existants) = pas de carte d'identité. */
     private val routeAttributes: RouteAttributesProvider? = null,
+    /** Heure choisie sur la carte « Départ » de l'accueil ; null (tests existants) = départ immédiat. */
+    private val departurePlanner: DeparturePlanner? = null,
+    /** Étoile de l'en-tête ; null (tests existants) = pas d'étoile. */
+    private val favorites: FavoritesRepository? = null,
+    /** Base nationale des ZFE ; null (tests existants) = pas d'alerte ZFE. */
+    private val zfe: fr.roadly.core.data.zfe.ZfeSource? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -77,10 +86,16 @@ class RouteViewModel @Inject constructor(
         requireNotNull(savedStateHandle.get<Double>("destLat")) { "destLat manquant" },
         requireNotNull(savedStateHandle.get<Double>("destLon")) { "destLon manquant" },
     )
-    private val origin = MutableStateFlow(location.lastKnown?.point)
-    private val departAt = MutableStateFlow(System.currentTimeMillis())
+    /** Départ choisi par l'inversion ; null = position actuelle. */
+    private val fixedOrigin: GeoPoint? = savedStateHandle.get<Double>("fromLat")?.let { lat -> savedStateHandle.get<Double>("fromLon")?.let { lon -> GeoPoint(lat, lon) } }
+    /** Nom du départ affiché (« Partir de … ») ; null = « Ma position ». */
+    val originName: String? = if (fixedOrigin != null) savedStateHandle.get<String>("fromName") ?: "" else null
+    private val destIsMyPosition: Boolean = savedStateHandle.get<Boolean>("destIsMyPosition") ?: false
+    private val origin = MutableStateFlow(fixedOrigin ?: location.lastKnown?.point)
+    private val plannedAtOpen = departurePlanner?.active(System.currentTimeMillis())
+    private val departAt = MutableStateFlow(plannedAtOpen?.takeIf { !it.arrive }?.epochMs ?: System.currentTimeMillis())
     /** Heure d'arrivée souhaitée ; null = mode « Partir à ». */
-    private val arriveAt = MutableStateFlow<Long?>(null)
+    private val arriveAt = MutableStateFlow<Long?>(plannedAtOpen?.takeIf { it.arrive }?.epochMs)
     private val stops = MutableStateFlow<List<Place>>(emptyList())
     private val optimizing = MutableStateFlow(false)
     private val activeId = MutableStateFlow<String?>(null)
@@ -111,7 +126,7 @@ class RouteViewModel @Inject constructor(
     init {
         // Ouverture à froid (lien geo:, raccourci, Android Auto) : aucune position encore connue. Constaté sur le HONOR : l'écran restait
         // sur « Position inconnue ». On demande la position et on prend la première, sauf si un départ a été choisi entre-temps.
-        if (origin.value == null) viewModelScope.launch {
+        if (origin.value == null && fixedOrigin == null) viewModelScope.launch {
             location.setMode(LocationMode.MAP)
             val first = location.fixes.first()
             if (origin.value == null) origin.value = first.point
@@ -201,6 +216,26 @@ class RouteViewModel @Inject constructor(
         }
     }
 
+    /** ZFE traversées par chaque variante, avec le verdict pour le véhicule (Crit'Air) à l'heure de départ ; vide si désactivé. */
+    private val zfeCrossings = MutableStateFlow<Map<String, List<fr.roadly.core.data.zfe.ZfeCrossing>>>(emptyMap())
+
+    init {
+        val source = zfe
+        if (source != null) viewModelScope.launch {
+            combine(computed, prefs.zfeEnabled, vehicleRepo.profile) { s, on, v -> Triple(s, on, v) }.collectLatest { (s, on, v) ->
+                zfeCrossings.value = emptyMap()
+                if (!on || s !is RouteUiState.Content || s.scooter != null) return@collectLatest
+                val rules = try { source.rules() } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                if (rules.isEmpty()) return@collectLatest
+                val at = java.time.Instant.ofEpochMilli(s.departAtEpochMs).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                val cls = fr.roadly.core.data.zfe.ZfeVehicleClass.of(v?.type)
+                zfeCrossings.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    s.options.associate { o -> o.route.id to fr.roadly.core.data.zfe.ZfeRules.crossings(o.route.geometry, rules, cls, v?.critAir, at) }
+                }
+            }
+        }
+    }
+
     /**
      * S5 : carte d'identité de chaque variante (part à limitation connue, temps au-dessus de 90, portiques en flux libre). Une requête
      * `trace_attributes` par variante, mise en cache par le fournisseur (le guidage réutilise celle de la variante choisie).
@@ -228,8 +263,8 @@ class RouteViewModel @Inject constructor(
     val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }, travelMode, assistantReply, dangerZoneCounts, identities) { st, mode, reply, zones, ids ->
-        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones, identities = ids) ?: st.phase
+    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings) { d, z -> d to z }, identities) { st, mode, reply, zones, ids ->
+        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, identities = ids) ?: st.phase
         st.copy(phase = phase, travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())
@@ -247,7 +282,7 @@ class RouteViewModel @Inject constructor(
         viewModelScope.launch { sc.mobility.setScooterBattery(pct?.let { BatteryReading(it.coerceIn(0, 100), System.currentTimeMillis()) }) }
     }
 
-    /** Roadly AI (texte reconnu par la reconnaissance vocale du système) : réponse affichée et prononcée. */
+    /** l'assistant vocal (texte reconnu par la reconnaissance vocale du système) : réponse affichée et prononcée. */
     fun onAssistantText(text: String) {
         val sc = scooter ?: return
         val content = computed.value as? RouteUiState.Content
@@ -278,6 +313,39 @@ class RouteViewModel @Inject constructor(
     /** Origine choisie par appui long sur la carte quand la position est inconnue. */
     fun setOrigin(point: GeoPoint) { origin.value = point }
     val destinationPoint: GeoPoint get() = destination
+
+    /**
+     * Inversion départ / arrivée : depuis « Ma position », on part de la destination pour revenir à la position actuelle ;
+     * une nouvelle inversion repart de la position réelle. Null tant que le départ est inconnu.
+     */
+    fun swapped(myPositionLabel: String): RouteRoute? {
+        val o = origin.value ?: return null
+        val fromLabel = originName
+        return if (destIsMyPosition) RouteRoute(o.lat, o.lon, fromLabel ?: destName)
+        else RouteRoute(
+            destLat = o.lat, destLon = o.lon, destName = fromLabel?.ifBlank { null } ?: myPositionLabel,
+            fromLat = destination.lat, fromLon = destination.lon, fromName = destName, destIsMyPosition = fromLabel == null,
+        )
+    }
+
+    /** Favori correspondant à la destination (même point à [FAVORITE_MATCH_M] près, l'écran ne reçoit pas l'identifiant du lieu). */
+    private val matchingFavorite: StateFlow<Place?> = (favorites?.observeAll() ?: flowOf(emptyList()))
+        .map { list -> list.firstOrNull { it.point.distanceTo(destination) <= FAVORITE_MATCH_M } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    /** null = favoris indisponibles (pas d'étoile). */
+    val isFavorite: StateFlow<Boolean?> = matchingFavorite.map { fav -> if (favorites == null) null else fav != null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, if (favorites == null) null else false)
+
+    fun toggleFavorite() {
+        val repo = favorites ?: return
+        viewModelScope.launch {
+            repo.toggle(matchingFavorite.value ?: Place(
+                "fav:%.5f,%.5f".format(java.util.Locale.ROOT, destination.lat, destination.lon),
+                destName.ifBlank { "%.5f, %.5f".format(java.util.Locale.ROOT, destination.lat, destination.lon) },
+                null, destination, fr.roadly.core.model.PlaceKind.COORDINATES, "local",
+            ))
+        }
+    }
 
     // ── Arrêts (≤ 10) ──
     fun addStop(place: Place) {
@@ -310,10 +378,14 @@ class RouteViewModel @Inject constructor(
         val id = activeId.value ?: content.activeId
         val option = content.options.firstOrNull { it.route.id == id } ?: return false
         guidance.start(option, computedWith, computedVehicle, stops.value, destName.ifBlank { null }, scooter = computedScooter)
+        departurePlanner?.clear()
         return true
     }
 
     companion object {
+        /** Distance sous laquelle un favori est considéré comme la destination affichée. */
+        const val FAVORITE_MATCH_M = 30.0
+
         /** Départ = arrivée souhaitée − durée du plus rapide ; chaque option reçoit l'arrivée correspondante. */
         internal fun shiftToArrival(options: List<RouteOption>, arriveAtMs: Long): Pair<List<RouteOption>, Long> {
             val reference = options.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: options.first()

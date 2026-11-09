@@ -22,7 +22,7 @@ L'icône d'attribution de la carte redevient accessible en portrait.
 - Les composables nouveaux sont sans état et prennent des valeurs et des rappels : `RoundaboutManeuverView`, `LaneGuidanceView`, `ExitSignPanel`, `BannerStack` / `ThenRow`, `ManeuverPreviewSheet`, `NavigationBottomPanel`, `TripDetailsSheet`. Ils sont appelés depuis `BottomBlock` ou depuis une seule ligne par overlay (`BannerStack`).
 - Les états d'interface qui doivent survivre à la rotation passent par le ViewModel, en `StateFlow` séparées : feuille ouverte, panneau déplié, fraction mesurée, nom de destination. Les overlays, dont la signature est figée, n'ont que `vm` comme canal. Le `combine` de `uiState` n'est pas touché.
 
-**Pile technique :** Kotlin 2.2.10, Jetpack Compose (BOM 2026.05.00, Material 3, `ui-test-junit4`, `DeviceConfigurationOverride`), Hilt 2.58, MapLibre Android 11.13.5 (`UiSettings.setAttributionMargins` / `attributionGravity`), kotlinx.serialization (fixtures FOSSGIS), JUnit 4.13.2, kotlinx-coroutines-test, Turbine, adb (HONOR `AREE026226000174`).
+**Pile technique :** Kotlin 2.2.10, Jetpack Compose (BOM 2026.05.00, Material 3, `ui-test-junit4`, `DeviceConfigurationOverride`), Hilt 2.58, MapLibre Android 11.13.5 (`UiSettings.setAttributionMargins` / `attributionGravity`), kotlinx.serialization (fixtures FOSSGIS), JUnit 4.13.2, kotlinx-coroutines-test, Turbine, adb (HONOR Magic 8 Pro).
 
 **Spécification :** `ROADLY_3D_NAVIGATION_PLAN.md`, § « Étape D — Interface premium » (D1 à D5 et critères d'acceptation). Lire aussi :
 - `ROADLY_3D_NAVIGATION_TESTS.md` : scénarios 4, 5, 7, 8, 18 et 19, journal, et défaut « icône d'attribution sous la barre de navigation à 3 boutons en portrait » de la ligne C ;
@@ -77,7 +77,7 @@ L'icône d'attribution de la carte redevient accessible en portrait.
 - Les chaînes d'interface sont en français, dans `feature/navigation/src/main/res/values/strings.xml`.
 - En mode conduite, toute cible tactile fait au moins 56 dp : `RoadlySpacing.touchTargetDriving`, ou la taille par défaut de `RoundIconButton` et `GlassButton` sous `LocalDrivingMode`.
 - Chaque composant nouveau a ses aperçus `@Preview` Nuit et Jour.
-- Appareil : HONOR `adb -s AREE026226000174`, application `fr.roadly` (debug).
+- Appareil : HONOR `adb -s (numéro de série retiré)`, application `fr.roadly` (debug).
 - Modifier `ROADLY_3D_NAVIGATION_TESTS.md` uniquement avec l'outil Edit, en gardant les accents.
 
 ---
@@ -2857,7 +2857,7 @@ Note : « Couper la voix » est la description de `RoundIconButton` dans la lign
 Commande : `.\gradlew.bat :feature:navigation:compileDebugAndroidTestKotlin --offline -q`
 Résultat attendu : SUCCÈS.
 
-- [ ] **Étape 6 : lancer sur le HONOR** (téléphone branché, écran déverrouillé, `adb devices` liste `AREE026226000174`).
+- [ ] **Étape 6 : lancer sur le HONOR** (téléphone branché, écran déverrouillé, `adb devices` liste `(numéro de série retiré)`).
 
 Commande : `.\gradlew.bat :feature:navigation:connectedDebugAndroidTest --offline`
 Résultat attendu : `BUILD SUCCESSFUL`, 7 tests verts. Rapport : `feature\navigation\build\reports\androidTests\connected\debug\index.html`.
@@ -2906,8 +2906,8 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 .\gradlew.bat :app:assembleDebug --offline -q
 $n = 0; Get-ChildItem -Recurse -Filter 'TEST-*.xml' -Path core, feature | Where-Object FullName -match 'test-results' | ForEach-Object { $n += [int]([xml](Get-Content $_.FullName)).testsuite.tests }; $n
 git rev-parse --short HEAD
-adb -s AREE026226000174 install -r app\build\outputs\apk\debug\app-debug.apk
-adb -s AREE026226000174 shell wm density
+adb -s (numéro de série retiré) install -r app\build\outputs\apk\debug\app-debug.apk
+adb -s (numéro de série retiré) shell wm density
 ```
 Résultat attendu : SUCCÈS. Le nombre de tests vaut au moins 431 + 32 (1 : 8 ; 2 : 10 ; 3 : 4 ; 7 : 2 ; plus ceux de la tâche 8, instrumentés et non comptés ici). Noter ce nombre, l'empreinte et la densité (par exemple `440` → facteur 2,75).
 
@@ -2915,7 +2915,7 @@ Résultat attendu : SUCCÈS. Le nombre de tests vaut au moins 431 + 32 (1 : 8 ; 
 
 Lancer un guidage vers une destination choisie par l'utilisateur et notée dans le journal. Thème « Sombre » ou « Auto » de nuit. Pour chaque capture :
 ```powershell
-$d = 'AREE026226000174'
+$d = '(numéro de série retiré)'
 adb -s $d shell screencap -p /sdcard/Download/roadly-d.png
 adb -s $d pull /sdcard/Download/roadly-d.png docs\captures\etape-d\portrait-nuit-replie.png
 ```
@@ -2946,7 +2946,7 @@ Vérifier sur chaque capture :
 - [ ] **Étape 4 : accessibilité et cibles de 56 dp (mesure).**
 
 ```powershell
-$d = 'AREE026226000174'
+$d = '(numéro de série retiré)'
 adb -s $d shell uiautomator dump /sdcard/Download/roadly-ui.xml
 adb -s $d pull /sdcard/Download/roadly-ui.xml "$env:TEMP\roadly-ui.xml"
 [xml]$ui = Get-Content "$env:TEMP\roadly-ui.xml" -Encoding UTF8

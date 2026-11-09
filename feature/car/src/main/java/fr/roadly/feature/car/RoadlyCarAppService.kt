@@ -45,6 +45,8 @@ class CarDependencies @Inject constructor(
     val radarSettings: RadarSettingsRepository,
     val carScreen: CarScreenPresence,
     val foregroundService: NavigationServiceController,
+    /** Base nationale des ZFE : alerte sur les variantes selon la vignette Crit'Air. */
+    val zfe: fr.roadly.core.data.zfe.ZfeSource,
 )
 
 /** Point d'entrée Android Auto (catégorie navigation). */

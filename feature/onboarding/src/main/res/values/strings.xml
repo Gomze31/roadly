@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_skip">Ignorer</string>
+    <string name="onboarding_continue">Continuer</string>
+    <string name="onboarding_allow">Autoriser</string>
+    <string name="onboarding_open_settings">Ouvrir les réglages</string>
+    <string name="onboarding_done">Terminé</string>
+    <string name="onboarding_progress">Étape %1$d sur %2$d</string>
+
+    <string name="onboarding_welcome_title">Bienvenue sur Roadly</string>
+    <string name="onboarding_welcome_subtitle">Le GPS qui vous guide sans revendre vos données. Quelques réglages, et c\'est parti.</string>
+    <string name="onboarding_welcome_guidance_title">Guidage vocal pas à pas</string>
+    <string name="onboarding_welcome_guidance_body">Voies conseillées, ronds-points avec le numéro de sortie, carrefours en 3D et recalcul immédiat.</string>
+    <string name="onboarding_welcome_horizon_title">Horizon</string>
+    <string name="onboarding_welcome_horizon_body">La route à venir en un coup d\'œil : prochaines manœuvres, virages serrés, zones de vigilance et signalements.</string>
+    <string name="onboarding_welcome_vigilance_title">Zones de vigilance</string>
+    <string name="onboarding_welcome_vigilance_body">Liste officielle, jamais un point exact : une zone où rester prudent, annoncée à l\'avance.</string>
+    <string name="onboarding_welcome_community_title">Communauté</string>
+    <string name="onboarding_welcome_community_body">Accident, bouchon, objet sur la route : signalez en un geste, les autres conducteurs le voient sur leur trajet.</string>
+
+    <string name="onboarding_location_title">Votre position</string>
+    <string name="onboarding_location_subtitle">Indispensable pour la carte, le calcul des itinéraires et le guidage.</string>
+    <string name="onboarding_location_card_title">Reste sur votre téléphone</string>
+    <string name="onboarding_location_card_body">Roadly lit votre position pour vous situer et vous guider. Elle n\'est ni stockée sur un serveur, ni vendue.</string>
+    <string name="onboarding_location_card_note">Un signalement envoie seulement sa position, au moment où vous le faites.</string>
+    <string name="onboarding_location_granted">Localisation autorisée</string>
+    <string name="onboarding_location_pending">Pas encore autorisée</string>
+    <string name="onboarding_location_denied_forever">Refusée : à autoriser dans les réglages d\'Android</string>
+
+    <string name="onboarding_notifications_title">Notifications</string>
+    <string name="onboarding_notifications_subtitle">Le guidage reste visible quand l\'écran est verrouillé ou qu\'une autre appli est ouverte.</string>
+    <string name="onboarding_notifications_card_title">Guidage en arrière-plan</string>
+    <string name="onboarding_notifications_card_body">La notification affiche la prochaine manœuvre et l\'heure d\'arrivée, avec un bouton « Arrêter ». Sans elle, le guidage fonctionne quand même.</string>
+    <string name="onboarding_notifications_granted">Notifications autorisées</string>
+    <string name="onboarding_notifications_pending">Pas encore autorisées</string>
+
+    <string name="onboarding_vehicle_title">Votre véhicule</string>
+    <string name="onboarding_vehicle_subtitle">Pour estimer le coût de chaque trajet et adapter les itinéraires.</string>
+    <string name="onboarding_vehicle_type">Type</string>
+    <string name="onboarding_vehicle_energy">Énergie</string>
+    <string name="onboarding_vehicle_consumption">Consommation moyenne</string>
+    <string name="onboarding_vehicle_consumption_l">Litres aux 100 km</string>
+    <string name="onboarding_vehicle_consumption_kwh">kWh aux 100 km</string>
+    <string name="onboarding_vehicle_consumption_error">Entrez une valeur entre 0,1 et 60</string>
+    <string name="onboarding_vehicle_critair">Vignette Crit\'Air (facultatif)</string>
+    <string name="onboarding_vehicle_note">Sans consommation, rien n\'est enregistré et aucun coût n\'est affiché. Gabarit, poids lourd et prix : Réglages › Véhicule.</string>
+    <string name="onboarding_vehicle_city">Citadine</string>
+    <string name="onboarding_vehicle_sedan">Berline</string>
+    <string name="onboarding_vehicle_suv">SUV</string>
+    <string name="onboarding_vehicle_van">Utilitaire</string>
+    <string name="onboarding_vehicle_moto">Moto</string>
+    <string name="onboarding_vehicle_taxi">Taxi</string>
+    <string name="onboarding_vehicle_truck">Poids lourd</string>
+    <string name="onboarding_fuel_sp95">SP95</string>
+    <string name="onboarding_fuel_sp98">SP98</string>
+    <string name="onboarding_fuel_e10">SP95-E10</string>
+    <string name="onboarding_fuel_e85">E85</string>
+    <string name="onboarding_fuel_diesel">Gazole</string>
+    <string name="onboarding_fuel_lpg">GPL</string>
+    <string name="onboarding_fuel_electric">Électrique</string>
+
+    <string name="onboarding_alerts_title">Voix et alertes</string>
+    <string name="onboarding_alerts_subtitle">Ce que Roadly vous annonce pendant que vous roulez.</string>
+    <string name="onboarding_alerts_group_voice">Voix</string>
+    <string name="onboarding_alerts_voice">Guidage vocal</string>
+    <string name="onboarding_alerts_voice_sub">Annonces en français, à la bonne distance selon votre vitesse</string>
+    <string name="onboarding_alerts_limit_drop">Baisses de limitation</string>
+    <string name="onboarding_alerts_limit_drop_sub">« Limitation 70. », une fois, jamais pour une hausse</string>
+    <string name="onboarding_alerts_break">Rappel de pause</string>
+    <string name="onboarding_alerts_break_sub">Après deux heures de conduite</string>
+    <string name="onboarding_alerts_group_alerts">Alertes</string>
+    <string name="onboarding_alerts_vigilance">Zones de vigilance</string>
+    <string name="onboarding_alerts_vigilance_sub">Sur le tracé, dans l\'Horizon et à la voix</string>
+    <string name="onboarding_alerts_vigilance_sound">Bip à l\'entrée d\'une zone</string>
+    <string name="onboarding_alerts_speed_sound">Bip de dépassement</string>
+    <string name="onboarding_alerts_speed_sound_sub">Quand la limitation de la route est connue</string>
+
+    <string name="onboarding_route_title">Votre route</string>
+    <string name="onboarding_route_subtitle">Ce que vos itinéraires contournent, et les règles locales.</string>
+    <string name="onboarding_route_group_avoid">Routes à contourner</string>
+    <string name="onboarding_route_tolls">Péages</string>
+    <string name="onboarding_route_highways">Autoroutes</string>
+    <string name="onboarding_route_tunnels">Tunnels</string>
+    <string name="onboarding_route_ferries">Ferries</string>
+    <string name="onboarding_route_footer">Modifiable à tout moment depuis l\'écran des itinéraires ou Réglages › Itinéraires. Un tunnel inévitable reste sur le trajet.</string>
+    <string name="onboarding_route_group_local">Règles locales</string>
+    <string name="onboarding_route_rain">Limitation par temps de pluie</string>
+    <string name="onboarding_route_rain_sub">Limitation abaissée quand il pleut (Code de la route, R413-2)</string>
+
+    <string name="onboarding_thanks_title">Merci d\'avoir choisi Roadly</string>
+    <string name="onboarding_thanks_subtitle">Le classement, et votre profil en un geste.</string>
+    <string name="onboarding_thanks_ranking_title">Le classement Roadly</string>
+    <string name="onboarding_thanks_ranking_body">Chaque signalement rapporte 2 points, et 1 point de plus à chaque fois qu\'un autre conducteur le confirme.</string>
+    <string name="onboarding_thanks_ranking_note">Le trophée de l\'écran d\'accueil ouvre votre profil et le classement à tout moment.</string>
+    <string name="onboarding_thanks_trust">Merci de faire confiance à Roadly. Vos trajets, vos favoris et votre historique restent sur votre téléphone.</string>
+    <string name="onboarding_thanks_privacy">Roadly ne revend pas vos données personnelles.</string>
+    <string name="onboarding_thanks_profile">Voir mon profil et le classement</string>
+    <string name="onboarding_thanks_profile_note">Le classement s\'active quand le service communautaire est configuré (Réglages › Communauté).</string>
+    <string name="onboarding_route_zfe">Zones à faibles émissions</string>
+    <string name="onboarding_route_zfe_sub">Frontière de la zone sur la carte, alerte selon votre Crit\'Air</string>
+</resources>

@@ -32,6 +32,7 @@
     <string name="route_opt_no_tolls">Éviter les péages</string>
     <string name="route_opt_no_highways">Éviter les autoroutes</string>
     <string name="route_opt_no_ferries">Éviter les ferries</string>
+    <string name="route_opt_no_tunnels">Éviter les tunnels</string>
     <string name="route_vehicle_cta">Renseigner le véhicule</string>
     <string name="route_cost_line">Carburant ≈ %1$s · %2$s/km</string>
     <string name="route_cost_chip">Carburant ≈ %1$s</string>
@@ -54,4 +55,27 @@
         <item quantity="many">zones de danger</item>
         <item quantity="other">zones de danger</item>
     </plurals>
+    <string name="route_favorite_add">Ajouter aux favoris</string>
+    <string name="route_favorite_remove">Retirer des favoris</string>
+    <string name="route_pick_time">Heure de départ ou d\'arrivée</string>
+    <string name="route_choice_title">Choix Roadly</string>
+    <string name="route_details">Détails du trajet</string>
+    <string name="route_choose">Choisir</string>
+    <string name="route_swap">Inverser le départ et l\'arrivée</string>
+    <string name="route_collapse">Replier le panneau</string>
+    <string name="route_expand">Afficher le panneau</string>
+    <string name="route_fuel">Stations-service</string>
+    <string name="route_zfe_short">Zone à faibles émissions</string>
+    <string name="route_zfe_forbidden">ZFE interdite</string>
+    <string name="route_zfe_hours">ZFE : certaines heures</string>
+    <string name="route_zfe_unknown">ZFE : Crit\'Air ?</string>
+    <string name="route_zfe_allowed">ZFE autorisée</string>
+    <string name="route_zfe_rule">Interdite à partir de : %1$s (et au-delà)</string>
+    <string name="route_zfe_hours_label">Horaires de la restriction : %1$s</string>
+    <string name="route_zfe_hours_unknown">non précisés</string>
+    <string name="route_zfe_source">Base nationale consolidée des ZFE (transport.data.gouv.fr). En cas de doute, l\'arrêté fait foi.</string>
+    <string name="route_zfe_decree">Lire l\'arrêté</string>
+    <string name="route_zfe_info">Site d\'information</string>
+    <string name="route_zfe_set_critair">Renseigner ma vignette</string>
+    <string name="route_time_confirm_ok">OK</string>
 </resources>

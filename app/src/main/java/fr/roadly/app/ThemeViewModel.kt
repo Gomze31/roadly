@@ -38,7 +38,7 @@ object ThemeResolver {
 class ThemeViewModel @Inject constructor(prefs: UserPreferencesRepository) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = prefs.themeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.AUTO_SOLAR)
     /** Teinte du cockpit choisie dans Réglages → Personnalisation. */
-    val tint: StateFlow<CockpitTint> = prefs.cockpitTint.map { name -> CockpitTint.entries.firstOrNull { it.name == name } ?: CockpitTint.VIOLET }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CockpitTint.VIOLET)
+    val tint: StateFlow<CockpitTint> = prefs.cockpitTint.map { name -> CockpitTint.entries.firstOrNull { it.name == name } ?: CockpitTint.MAGENTA }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CockpitTint.MAGENTA)
 
     /** Horloge à la minute pour réévaluer le mode solaire. */
     val nowTick: StateFlow<Long> = flow { while (true) { emit(System.currentTimeMillis()); delay(60_000) } }
