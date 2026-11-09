@@ -29,20 +29,34 @@ object AndroidAutoReadiness {
             if (f.androidAutoVersion != null) AutoCheck("Android Auto ${f.androidAutoVersion} installé", "L'application Android Auto est présente.", CheckStatus.OK)
             else AutoCheck("Android Auto introuvable", "Installez ou mettez à jour « Android Auto » depuis le Play Store.", CheckStatus.BLOCKING),
         )
-        if (f.installerPackage != PLAY_STORE) {
-            add(AutoCheck(
-                "« Sources inconnues » à activer dans Android Auto",
-                "Roadly ne vient pas du Play Store : Android Auto le masque tant que cette option de développeur n'est pas activée. Roadly ne peut pas vérifier ce réglage lui-même.",
-                CheckStatus.ACTION,
-            ))
-        }
+        add(
+            if (f.installerPackage == PLAY_STORE) AutoCheck(
+                "Roadly est marqué « installé par le Play Store »",
+                "Android Auto l'accepte. Pour garder cette marque, installez les mises à jour avec UnknownAuto, pas avec le bouton « Installer » de Roadly.",
+                CheckStatus.OK,
+            ) else AutoCheck(
+                "Android Auto refuse Roadly installé par APK",
+                "Depuis Android Auto 17.9, les applications de navigation installées hors Play Store sont masquées, même avec « Sources inconnues » " +
+                    "(journal Android Auto : « Package DENIED »). Réinstallez Roadly avec UnknownAuto : l'installation est alors marquée comme venant du Play Store.",
+                CheckStatus.BLOCKING,
+            ),
+        )
     }
 
-    /** Étapes à suivre sur le téléphone (Android Auto n'offre aucun accès direct à ses options de développeur). */
+    /** Lien de l'outil libre (MIT) qui installe un APK avec la marque « Play Store » via Shizuku, sans ordinateur ni root. */
+    const val UNKNOWN_AUTO_URL = "https://github.com/GitMag/UnknownAuto/releases/latest"
+    const val SHIZUKU_PLAY_URL = "https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api"
+    const val ROADLY_RELEASES_URL = "https://github.com/Gomze31/roadly/releases/latest"
+
+    /**
+     * Étapes à suivre sur le téléphone. Android Auto (17.9 et suivantes) n'affiche une application de navigation installée hors Play
+     * Store que si Android la croit installée par le Play Store ; cette marque ne se pose qu'à l'installation (UnknownAuto + Shizuku).
+     */
     val steps = listOf(
-        "Ouvrez Android Auto : bouton ci-dessous, ou Paramètres › Plus de connexions (ou Appareils connectés) › Android Auto.",
-        "Faites défiler jusqu'à « Version » et touchez-la 10 fois, puis acceptez : le mode développeur est activé.",
-        "Menu ⋮ en haut à droite › Paramètres pour les développeurs › cochez « Sources inconnues ».",
-        "Débranchez puis rebranchez le téléphone (ou relancez Android Auto) : Roadly apparaît dans le lanceur. S'il n'y est pas, Android Auto › Personnaliser le lanceur › affichez Roadly.",
+        "Installez Shizuku depuis le Play Store, puis démarrez-le par « Débogage sans fil » en suivant ses explications (le téléphone doit être en Wi-Fi ; aucun ordinateur).",
+        "Installez UnknownAuto (application libre, GitHub GitMag/UnknownAuto) et autorisez-le dans Shizuku.",
+        "Téléchargez l'APK de Roadly (GitHub, dernière version) et installez-le avec UnknownAuto : la mise à jour garde vos favoris et votre historique.",
+        "Débranchez puis rebranchez le téléphone : Roadly apparaît dans la voiture (sinon Android Auto › Personnaliser le lanceur › cochez Roadly).",
+        "Pour les mises à jour suivantes, passez aussi par UnknownAuto : le bouton « Installer » de Roadly retirerait la marque et Roadly disparaîtrait d'Android Auto.",
     )
 }

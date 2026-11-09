@@ -85,15 +85,24 @@ internal fun AndroidAutoGroup() {
                 check.title, subtitle = check.detail,
                 icon = when (check.status) { CheckStatus.OK -> Icons.Default.CheckCircle; CheckStatus.ACTION -> Icons.Default.Warning; CheckStatus.BLOCKING -> Icons.Default.ErrorOutline },
                 iconStyle = when (check.status) { CheckStatus.OK -> IconTileStyle.Brand; CheckStatus.ACTION -> IconTileStyle.Warning; CheckStatus.BLOCKING -> IconTileStyle.Danger },
-                onClick = if (check.status == CheckStatus.ACTION) ({ showSteps = !showSteps }) else null,
+                onClick = if (check.status != CheckStatus.OK) ({ showSteps = !showSteps }) else null,
             )
         }
-        ListRow("Faire apparaître Roadly dans la voiture", subtitle = "Marche à suivre (4 étapes)", icon = Icons.Default.DirectionsCar, onClick = { showSteps = !showSteps }, chevron = false, trailing = { ExpandArrow(showSteps) }, divider = false)
+        ListRow("Faire apparaître Roadly dans la voiture", subtitle = "Marche à suivre (${AndroidAutoReadiness.steps.size} étapes)", icon = Icons.Default.DirectionsCar, onClick = { showSteps = !showSteps }, chevron = false, trailing = { ExpandArrow(showSteps) }, divider = false)
         ExpandableContent(showSteps) {
             Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                 AndroidAutoReadiness.steps.forEachIndexed { i, s -> Text("${i + 1}. $s", style = MaterialTheme.typography.bodySmall, color = c.textSecondary) }
-                GlassButton("Ouvrir Android Auto", onClick = { AndroidAutoProbe.open(context) }, style = GlassButtonStyle.Secondary)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
+                    GlassButton("Shizuku", onClick = { openUrl(context, AndroidAutoReadiness.SHIZUKU_PLAY_URL) }, style = GlassButtonStyle.Secondary)
+                    GlassButton("UnknownAuto", onClick = { openUrl(context, AndroidAutoReadiness.UNKNOWN_AUTO_URL) }, style = GlassButtonStyle.Secondary)
+                    GlassButton("APK de Roadly", onClick = { openUrl(context, AndroidAutoReadiness.ROADLY_RELEASES_URL) }, style = GlassButtonStyle.Secondary)
+                    GlassButton("Ouvrir Android Auto", onClick = { AndroidAutoProbe.open(context) }, style = GlassButtonStyle.Secondary)
+                }
             }
         }
     }
+}
+
+private fun openUrl(context: Context, url: String) {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }

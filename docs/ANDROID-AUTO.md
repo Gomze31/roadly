@@ -90,6 +90,12 @@ Les builds débogables acceptent tout hôte. Les builds de version n'acceptent q
 
 ## 3 bis. « Roadly n'apparaît pas dans Android Auto »
 
+**Constat du 2026-11-09 (Android Auto 17.9, Ford EcoSport 2018 / SYNC 3)** : Roadly 0.1.203, installé par APK, reste absent de « Personnaliser le lanceur » même avec le mode développeur et « Sources inconnues » actifs. Le même comportement est décrit pour une autre application Car App Library ([prototux/lapin#1](https://github.com/prototux/lapin/issues/1), Android Auto 17.9.664044, Android 16) : journal `CAR.VALIDATOR: Package DENIED; failed all other checks`. D'après son auteur (lecture non confirmée du code d'Android Auto), « Sources inconnues » ne laisse passer que certaines catégories, pas les applications à gabarits (`template`), celles de la Car App Library. Installer avec `adb install -i com.android.vending` ne suffit pas.
+
+Contournement sans ordinateur ni root : [UnknownAuto](https://github.com/GitMag/UnknownAuto) (libre, MIT) installe un APK par le programme d'installation d'Android en le marquant « installé par le Play Store », grâce à [Shizuku](https://shizuku.rikka.app/) démarré par débogage sans fil. La marque ne se pose qu'à l'installation : chaque mise à jour doit passer par UnknownAuto (le bouton « Installer » de Roadly la retirerait ; Roadly le signale et propose de télécharger l'APK à la place). Solution durable : une publication sur le Play Store (piste de test comprise).
+
+
+
 Réglages › **Android Auto** (sur le téléphone) affiche le diagnostic :
 
 | Vérification | Comment Roadly la fait |
