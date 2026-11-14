@@ -86,7 +86,7 @@ Aucun de ces essais n'a été fait le 2026-11-05 : aucun téléphone n'était br
 
 Les builds débogables acceptent tout hôte. Les builds de version n'acceptent que les hôtes de la liste fournie par la bibliothèque (Android Auto, Android Automotive).
 
-**En voiture** : même réglage « Sources inconnues ». Sans lui, Android Auto masque les applications qui ne viennent pas du Play Store.
+**En voiture** : « Sources inconnues » ne suffit pas. Selon la documentation Google (developer.android.com/training/cars/testing, « Test in real vehicles » et « Allow unknown sources »), ce réglage ne s'applique pas aux applications construites avec la Car App Library : sur une vraie voiture, Roadly doit être installé depuis une source de confiance, c'est-à-dire Google Play (piste de test interne ou Internal App Sharing, sans revue). Constaté le 2026-11-14 : 0.1.204 installée par la mise à jour intégrée (installateur `fr.roadly`), visible sur la DHU 2.1, absente du lanceur de la voiture.
 
 ## 3 bis. « Roadly n'apparaît pas dans Android Auto »
 
