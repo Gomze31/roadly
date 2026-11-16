@@ -24,6 +24,8 @@ Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (foncti
 | ZFE et Crit'Air | ? | ? | ? | ❌ | ✅ **base nationale**, verdict selon votre vignette, la date et les horaires |
 | Éviter péages, autoroutes, tunnels, ferries | ? | ✅ | ? | ✅ | ✅ les quatre, aussi à la voix |
 | Coût du trajet, prix des carburants | ? | ? | ? | ❌ | ✅ coût selon votre véhicule, **prix officiels** des stations |
+| Voiture électrique : autonomie, bornes sur le trajet | ❌ | ✅ | ? | ❌ | ✅ batterie estimée à l'arrivée, **bornes rapides IRVE** le long du trajet (puissance, prises, tarif, hors service) |
+| Voix « moins bavarde » | ✅ (2026) | ? | ? | ? | ✅ manœuvres proches et sécurité seulement |
 | Recherche le long du trajet | ? | ✅ | ? | ❌ | ✅ **stations les moins chères sur le trajet** (prix officiels), ajoutées comme arrêt |
 | Arrêts multiples, optimisation | 🟡 | 🟡 | ? | 🟡 | ✅ 10 arrêts, ordre optimisé |
 | Partir à / arriver à | ? | ✅ | ? | ❌ | ✅ |
@@ -43,7 +45,7 @@ Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (foncti
 3. **Navigation entièrement hors ligne.** Il faudrait embarquer un moteur d'itinéraires (Valhalla compilé pour Android, tuiles par région) : chantier important.
 4. **Voies et limitations partout.** Le serveur public FOSSGIS renvoie peu de voies ; un Valhalla auto-hébergé récent les fournit (voir [`API-PROVIDERS.md`](API-PROVIDERS.md)).
 5. **Commandes vocales dans Android Auto.** La reconnaissance vocale de la voiture passe par la bibliothèque Car App ; à brancher sur le même interpréteur.
-6. **Bornes de recharge détaillées.** Puissance et connecteurs disponibles dans la base nationale IRVE (transport.data.gouv.fr) ; disponibilité temps réel non publiée librement.
+6. **Disponibilité des bornes en temps réel.** La base nationale publie un état par point de charge, mais les relevés ont souvent plusieurs heures : Roadly montre les points hors service et la date du relevé, et « libres » seulement pour un relevé de moins de 30 min.
 7. **Horaires d'ouverture des lieux.** Présents dans OpenStreetMap (`opening_hours`), pas encore lus.
 
 ## Sources

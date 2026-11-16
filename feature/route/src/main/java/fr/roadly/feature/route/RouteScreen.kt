@@ -121,6 +121,7 @@ fun RouteScreen(
     var detailsOpen by rememberSaveable { mutableStateOf(false) }
     var zfeShown by remember { mutableStateOf<fr.roadly.core.data.zfe.ZfeCrossing?>(null) }
     var trafficShown by remember { mutableStateOf<List<fr.roadly.core.data.traffic.TrafficHit>?>(null) }
+    var batteryDialog by remember { mutableStateOf(false) }
     var panelCollapsed by rememberSaveable { mutableStateOf(false) }
     val myPosition = stringResource(R.string.route_from_my_position)
     val context = LocalContext.current
@@ -259,6 +260,8 @@ fun RouteScreen(
                             onAddStop = onAddStop, onMoveStop = vm::moveStop, onRemoveStop = vm::removeStop, onOptimize = vm::optimizeStops,
                             onZfe = { zfeShown = it },
                             onTraffic = { trafficShown = it },
+                            onBattery = { batteryDialog = true },
+                            onChargers = { if (vm.chargersAvailable) vm.loadChargers() else batteryDialog = true },
                         )
                     }
                     RollButton(onClick = { onStartNavigation(vm::startGuidance) })
@@ -269,6 +272,15 @@ fun RouteScreen(
 
     zfeShown?.let { z -> ZfeDialog(z, onOpenVehicle = onOpenSettings, onDismiss = { zfeShown = null }) }
     trafficShown?.let { hits -> TrafficDialog(hits, onDismiss = { trafficShown = null }) }
+    if (batteryDialog) {
+        val ev = (state.phase as? RouteUiState.Content)?.ev
+        EvBatteryDialog(
+            ev?.batteryKwh, ev?.chargePct, onSave = { kwh, pct -> vm.setEvBattery(kwh, pct); batteryDialog = false }, onDismiss = { batteryDialog = false },
+            onChargers = if (vm.chargersAvailable) ({ batteryDialog = false; vm.loadChargers() }) else null,
+        )
+    }
+    val chargers by vm.chargersUi.collectAsStateWithLifecycle()
+    if (chargers != ChargersUi.Hidden) ChargersSheet(chargers, onPick = vm::addCharger, onRetry = vm::loadChargers, onDismiss = vm::dismissChargers)
 
     if (showTimePicker) {
         val now = Instant.now().atZone(ZoneId.systemDefault())

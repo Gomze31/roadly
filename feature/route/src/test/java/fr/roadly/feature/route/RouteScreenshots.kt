@@ -86,6 +86,7 @@ class RouteScreenshots {
             activeId = "a", hasVehicleProfile = true, departAtEpochMs = System.currentTimeMillis(), dangerZones = mapOf("c" to 1),
             zfe = mapOf("a" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN)), "b" to listOf(zfe(fr.roadly.core.data.zfe.ZfeVerdict.ALLOWED))),
             traffic = mapOf("a" to listOf(jam), "b" to listOf(jam)),
+            ev = EvRouteUi(60.0, 30, mapOf("a" to fr.roadly.core.routing.EvArrival(19.6, -3))),
         )
         val c = LocalRoadlyColors.current
         Box(Modifier.fillMaxSize()) {

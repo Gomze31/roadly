@@ -392,7 +392,7 @@ class FreeDriveSession @Inject constructor(
             for (advice in coach.update(now, current.speedLimitKmh, current.speedKmh)) {
                 when (advice) {
                     is DrivingCoach.Advice.LimitDropped -> if (prefs.limitDropVoice.first()) say(SpokenPhrases.limitDrop(advice.kmh))
-                    DrivingCoach.Advice.TakeABreak -> if (prefs.breakReminder.first()) say(SpokenPhrases.TAKE_A_BREAK)
+                    DrivingCoach.Advice.TakeABreak -> if (prefs.breakReminder.first() && !prefs.voiceBrief.first()) say(SpokenPhrases.TAKE_A_BREAK)
                 }
             }
         }

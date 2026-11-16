@@ -72,6 +72,10 @@
     <string name="fuel_ahead_empty">Aucune station à moins de 1,5 km du trajet sur les 80 prochains km.</string>
     <string name="fuel_ahead_electric">Véhicule électrique : les prix de recharge ne sont pas publiés dans le flux officiel.</string>
     <string name="fuel_ahead_source">Prix officiels (data.economie.gouv.fr), mis à jour en continu. Un appui ajoute la station comme arrêt.</string>
+    <string name="chargers_ahead_title">Bornes rapides sur le trajet</string>
+    <string name="chargers_ahead_loading">Recherche des bornes de 50 kW et plus le long du trajet…</string>
+    <string name="chargers_ahead_empty">Aucune borne de 50 kW ou plus à moins de 2 km du trajet sur les 150 prochains km.</string>
+    <string name="chargers_ahead_source">Base nationale des bornes (IRVE, data.gouv.fr). Disponibilité en temps réel non publiée : vérifiez auprès de l\'opérateur. Un appui ajoute la borne comme arrêt.</string>
     <string name="fuel_sp95">SP95</string>
     <string name="fuel_sp98">SP98</string>
     <string name="fuel_e10">SP95-E10</string>

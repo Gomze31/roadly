@@ -188,6 +188,10 @@ class SettingsViewModel @Inject constructor(
     fun setVigilanceEnabled(value: Boolean) { viewModelScope.launch { prefs.setVigilanceEnabled(value) } }
     fun setVigilanceSound(value: Boolean) { viewModelScope.launch { prefs.setVigilanceSound(value) } }
     /** E2 « Bâtiments 3D » : la vue au départ, qui suivait l'ancien réglage tant qu'elle n'était pas choisie, est d'abord figée (écart 8). */
+    /** Voix « moins bavarde ». */
+    val voiceBrief: StateFlow<Boolean> = prefs.voiceBrief.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setVoiceBrief(value: Boolean) { viewModelScope.launch { prefs.setVoiceBrief(value) } }
+
     /** Fond de carte en photos aériennes IGN. */
     val mapAerial: StateFlow<Boolean> = prefs.mapAerial.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     fun setMapAerial(value: Boolean) { viewModelScope.launch { prefs.setMapAerial(value) } }

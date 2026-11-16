@@ -81,6 +81,8 @@ class RouteViewModel @Inject constructor(
     private val traffic: fr.roadly.core.data.traffic.TrafficSource? = null,
     /** Options « pour ce trajet seulement » choisies dans la recherche ; null (tests existants) = préférences enregistrées. */
     private val tripPreferences: fr.roadly.core.data.repository.TripPreferences? = null,
+    /** Bornes rapides IRVE le long du tracé ; null (tests existants) = fonction absente. */
+    private val chargersAlong: fr.roadly.core.navigation.ChargersAlongRoute? = null,
 ) : ViewModel() {
 
     // Arguments lus par nom de champ de RouteRoute : c'est ce que fait toRoute(), mais sans
@@ -283,11 +285,55 @@ class RouteViewModel @Inject constructor(
         }
     }
 
+    /** Véhicule électrique : charge estimée à l'arrivée de chaque variante, à partir de la batterie saisie. */
+    private val evInfo = combine(computed, vehicleRepo.profile, prefs.evBatteryKwh, prefs.evChargePct) { s, profile, kwh, pct ->
+        if (profile?.fuel != fr.roadly.core.model.FuelType.ELECTRIC) return@combine null
+        val options = (s as? RouteUiState.Content)?.options.orEmpty()
+        val arrivals = if (kwh == null || pct == null) emptyMap() else options.mapNotNull { o ->
+            fr.roadly.core.routing.EvRange.arrival(o.route, profile.consumptionPer100, kwh, pct)?.let { o.route.id to it }
+        }.toMap()
+        EvRouteUi(kwh, pct, arrivals)
+    }
+
+    /** Capacité utile (kWh) et charge actuelle (%) saisies dans la fenêtre « Batterie ». */
+    fun setEvBattery(capacityKwh: Double?, chargePct: Int) {
+        viewModelScope.launch { prefs.setEvBatteryKwh(capacityKwh); prefs.setEvChargePct(chargePct) }
+    }
+
+    private val _chargers = MutableStateFlow<ChargersUi>(ChargersUi.Hidden)
+    val chargersUi: StateFlow<ChargersUi> = _chargers
+    private var chargersJob: kotlinx.coroutines.Job? = null
+    val chargersAvailable: Boolean get() = chargersAlong != null
+
+    /** Bornes rapides le long de la variante active, du départ à l'arrivée (150 km au plus). */
+    fun loadChargers() {
+        val finder = chargersAlong ?: return
+        val s = computed.value as? RouteUiState.Content ?: return
+        val route = s.options.firstOrNull { it.route.id == (activeId.value ?: s.activeId) }?.route ?: return
+        chargersJob?.cancel()
+        _chargers.value = ChargersUi.Loading
+        chargersJob = viewModelScope.launch {
+            _chargers.value = when (val r = finder.ahead(route.geometry, 0.0)) {
+                is Outcome.Success -> ChargersUi.Content(r.value)
+                is Outcome.Failure -> ChargersUi.Error(r.error)
+            }
+        }
+    }
+
+    fun dismissChargers() { chargersJob?.cancel(); _chargers.value = ChargersUi.Hidden }
+
+    /** La borne choisie devient un arrêt : les variantes sont recalculées en passant par elle. */
+    fun addCharger(c: fr.roadly.core.navigation.ChargerAhead) {
+        dismissChargers()
+        addStop(c.station.toPlace())
+    }
+
     val uiState: StateFlow<RouteScreenState> = combine(combine(computed, activeId, isDark, config.config, optimizing) { s, id, dark, cfg, opt ->
         val phase = if (s is RouteUiState.Content) s.copy(activeId = id ?: s.activeId, optimizing = opt) else s
         RouteScreenState(styleUrl = if (dark) cfg.mapStyleDarkUrl else cfg.mapStyleLightUrl, phase = phase)
-    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings, trafficHits) { d, z, t -> Triple(d, z, t) }, identities) { st, mode, reply, zones, ids ->
-        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, traffic = zones.third, identities = ids) ?: st.phase
+    }, travelMode, assistantReply, combine(dangerZoneCounts, zfeCrossings, trafficHits) { d, z, t -> Triple(d, z, t) }, combine(identities, evInfo) { i, e -> i to e }) { st, mode, reply, zones, idsEv ->
+        val (ids, ev) = idsEv
+        val phase = (st.phase as? RouteUiState.Content)?.copy(dangerZones = zones.first, zfe = zones.second, traffic = zones.third, identities = ids, ev = ev) ?: st.phase
         st.copy(phase = phase, travelMode = mode, scooterAvailable = scooter != null, assistantReply = reply)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RouteScreenState())

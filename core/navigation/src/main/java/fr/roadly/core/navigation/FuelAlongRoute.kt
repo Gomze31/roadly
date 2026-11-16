@@ -50,7 +50,7 @@ class FuelAlongRoute @Inject constructor(private val stations: FuelStationProvid
             val ahead = proj.alongM - fromAlongM
             if (proj.offsetM > MAX_OFFSET_M || ahead < MIN_AHEAD_M || ahead > rangeM) return@mapNotNull null
             // Station d'autoroute à gauche du sens de marche : elle dessert l'autre chaussée (circulation à droite).
-            if (s.onMotorway && isLeftOf(geometry, proj.segmentIndex, s.point)) return@mapNotNull null
+            if (s.onMotorway && geo.isLeftOf(proj.segmentIndex, s.point)) return@mapNotNull null
             StationAhead(s, ahead, proj.offsetM, s.price(fuel)?.eurPerLitre)
         }
         // Prix connus d'abord (du moins cher au plus cher, puis le plus proche), stations sans ce carburant à la fin.
@@ -61,15 +61,6 @@ class FuelAlongRoute @Inject constructor(private val stations: FuelStationProvid
         try { stations.nearby(p, radiusKm = SAMPLE_RADIUS_KM, limit = PER_SAMPLE) } catch (e: CancellationException) { throw e } catch (e: Exception) {
             Outcome.Failure(AppError.Unknown(e.message))
         }
-
-    /** Le point est-il à gauche du segment [i] parcouru dans le sens du tracé ? (repère local en mètres, x = est, y = nord) */
-    private fun isLeftOf(g: List<GeoPoint>, i: Int, p: GeoPoint): Boolean {
-        val a = g[i]; val b = g[minOf(i + 1, g.lastIndex)]
-        val k = kotlin.math.cos(Math.toRadians(a.lat))
-        val sx = (b.lon - a.lon) * k; val sy = b.lat - a.lat
-        val px = (p.lon - a.lon) * k; val py = p.lat - a.lat
-        return sx * py - sy * px > 0
-    }
 
     companion object {
         const val RANGE_M = 80_000.0

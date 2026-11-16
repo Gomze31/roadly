@@ -463,7 +463,7 @@ class NavigationSession @Inject constructor(
                         if (voice) say(SpokenPhrases.vigilanceZone(e.speedLimitKmh), routeId = progress.routeId, priority = SpeechPriority.LOW)
                         if (prefs.vigilanceSound.first() && !_muted.value && prefs.voiceEnabled.first()) speech.beep()
                     }
-                    is RadarAlertEvent.Exited -> if (voice && settings.announceExit) say(SpokenPhrases.DANGER_ZONE_END, routeId = progress.routeId, priority = SpeechPriority.LOW)
+                    is RadarAlertEvent.Exited -> if (voice && settings.announceExit) say(SpokenPhrases.DANGER_ZONE_END, routeId = progress.routeId, priority = SpeechPriority.LOW, essential = false)
                     // Le dépassement est déjà signalé par le bip général (checkOverSpeed) : pas de second son.
                     is RadarAlertEvent.OverSpeed -> Unit
                 }
@@ -575,14 +575,14 @@ class NavigationSession @Inject constructor(
         private suspend fun announceTollBooth(a: RouteAttributes, progress: RouteProgress) {
             val booth = a.tollBooths.firstOrNull { it - progress.distanceAlongM in TOLL_BOOTH_MIN_M..TOLL_BOOTH_ANNOUNCE_M } ?: return
             if (!announcedBooths.add(booth)) return
-            say(SpokenPhrases.tollBooth(booth - progress.distanceAlongM), routeId = progress.routeId, priority = SpeechPriority.LOW)
+            say(SpokenPhrases.tollBooth(booth - progress.distanceAlongM), routeId = progress.routeId, priority = SpeechPriority.LOW, essential = false)
         }
 
         private suspend fun passGantry(g: TollGantry, routeId: String) {
             val previous = tollTrip
             val base = previous ?: FreeFlowTollTrip(0, emptyList(), g.countryCode, clock.nowMs())
             tollTrip = base.copy(gantries = base.gantries + 1, roads = (base.roads + listOfNotNull(g.roadName)).distinct())
-            if (previous == null) say(SpokenPhrases.freeFlowToll(g.countryCode), routeId = routeId, priority = SpeechPriority.LOW)
+            if (previous == null) say(SpokenPhrases.freeFlowToll(g.countryCode), routeId = routeId, priority = SpeechPriority.LOW, essential = false)
         }
 
         /** Pluie : au plus une requête toutes les 10 min, sur la dernière position connue ; échec = inconnue. */
@@ -633,7 +633,9 @@ class NavigationSession @Inject constructor(
             )
             if (a != null) {
                 announced += a.maneuverIndex to a.tier
-                say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
+                // Voix « moins bavarde » : l'annonce anticipée ne reste que sur voie rapide (sorties) ; « dans … » et « maintenant » restent.
+                val skipFar = a.tier == Tier.FAR && SpeedClass.of(speedKmh, scooter != null) != SpeedClass.HIGHWAY && prefs.voiceBrief.first()
+                if (!skipFar) say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
             }
             if (c != null) scooterTick(c, progress) else { announceCurve(progress); announceBump(progress) }
         }
@@ -822,7 +824,7 @@ class NavigationSession @Inject constructor(
             for (advice in coach.update(now, effectiveLimit().first, speedKmh)) {
                 when (advice) {
                     is DrivingCoach.Advice.LimitDropped -> if (prefs.limitDropVoice.first()) say(SpokenPhrases.limitDrop(advice.kmh), routeId = route.id)
-                    DrivingCoach.Advice.TakeABreak -> if (prefs.breakReminder.first()) say(SpokenPhrases.TAKE_A_BREAK, routeId = route.id, priority = SpeechPriority.LOW)
+                    DrivingCoach.Advice.TakeABreak -> if (prefs.breakReminder.first()) say(SpokenPhrases.TAKE_A_BREAK, routeId = route.id, priority = SpeechPriority.LOW, essential = false)
                 }
             }
         }
@@ -840,7 +842,9 @@ class NavigationSession @Inject constructor(
         }
 
         /** [priority] : NOW et arrivée URGENT, NEAR / départ / recalcul NORMAL, FAR / vigilance LOW (B5). */
-        private suspend fun say(text: String, routeId: String? = null, priority: SpeechPriority = SpeechPriority.NORMAL) {
+        /** [essential] = false : message d'information, passé sous silence en voix « moins bavarde ». */
+        private suspend fun say(text: String, routeId: String? = null, priority: SpeechPriority = SpeechPriority.NORMAL, essential: Boolean = true) {
+            if (!essential && prefs.voiceBrief.first()) return
             if (text.isBlank() || _muted.value || !prefs.voiceEnabled.first()) return
             // Revérifié après la suspension : un arrêt ou un nouveau départ a pu survenir entre-temps.
             if (gen != generation) return

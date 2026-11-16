@@ -51,6 +51,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - Voies conseillées, ronds-points avec le numéro de sortie, panneaux de sortie d'autoroute, **vue 3D des carrefours**.
 - **Horizon** : la route à venir en un coup d'œil (manœuvres, virages serrés, zones de vigilance, signalements).
 - Limitation de vitesse de la route (OpenStreetMap) et alerte de dépassement, annonce des baisses de limitation, limitation abaissée par temps de pluie.
+- **Voix « moins bavarde »** au choix : seulement l'essentiel (manœuvres proches, sécurité).
 - **Repères « au feu »** : « Au feu, tournez à droite… » quand le carrefour a des feux (OpenStreetMap), avec un badge sur le bandeau.
 - **Virages serrés et ralentisseurs annoncés** (« Attention, virage serré à gauche », « Attention, ralentisseurs »), d'après OpenStreetMap ; désactivables dans les réglages.
 - **Péage annoncé** à l'approche (« Péage dans 1 kilomètre, préparez votre moyen de paiement »), feux tricolores dans l'Horizon.
@@ -65,6 +66,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - Envoyez votre heure d'arrivée en un geste.
 
 ### 🛣️ Itinéraires
+- **Voiture électrique** : batterie estimée à l'arrivée selon votre consommation et la vitesse de chaque tronçon ; sous 10 %, Roadly propose les **bornes rapides du trajet** (base nationale IRVE : puissance, prises, tarif, points hors service).
 - **Le plus économe** : consommation estimée selon la vitesse de chaque tronçon, badge et litres économisés quand une variante consomme au moins 5 % de moins que la plus rapide.
 - Jusqu'à trois variantes distinctes (rapide, court, sans péage) avec l'**écart de durée**, l'heure d'arrivée et la distance ; les tracés identiques sont fusionnés.
 - Éviter **péages, autoroutes, tunnels, ferries, chemins non revêtus** sur toutes les variantes, choisis **dès la recherche** pour ce trajet seulement ou mémorisés ; les options actives restent affichées sur le choix d'itinéraire.
@@ -80,6 +82,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 
 ### ⛽ Autour de vous
 - **Stations-service avec les prix officiels** (flux de l'État, mis à jour en continu), tri par prix ou par distance.
+- **Bornes rapides sur votre trajet** (50 kW et plus, base nationale des points de recharge) pendant le guidage pour une voiture électrique, avec le dernier état publié (hors service, libres si le relevé est récent).
 - **Les stations les moins chères sur votre trajet**, pendant le guidage : à moins de 1,5 km de la route sur les 80 prochains km, avec le détour ; un appui en fait un arrêt.
 - Bornes de recharge, parkings, aires de repos à proximité.
 - **Voiture garée** mémorisée à l'arrivée, avec le trajet à pied pour la retrouver.
@@ -168,6 +171,7 @@ Roadly existe grâce aux données ouvertes et aux projets libres :
 - Incidents de circulation : [Bison Futé](https://www.bison-fute.gouv.fr) (DATEX II, données publiques).
 - [Base nationale consolidée des ZFE](https://transport.data.gouv.fr/datasets/base-nationale-consolidee-des-zones-a-faibles-emissions), [prix des carburants](https://data.economie.gouv.fr), liste des équipements de contrôle routier : données publiques sous Licence Ouverte.
 - Météo : [Open-Meteo](https://open-meteo.com) (CC BY 4.0).
+- Bornes de recharge : [base nationale consolidée des points de recharge](https://transport.data.gouv.fr/datasets/beta-bases-nationales-des-points-de-recharge-pour-vehicules-electriques-en-france-irve) (Point d'Accès National, Licence Ouverte).
 - Photos aériennes : [IGN – Géoplateforme](https://geoservices.ign.fr) (orthophotographies, Licence Ouverte 2.0).
 - Polices [Nunito](https://github.com/googlefonts/nunito) et [Inter](https://rsms.me/inter/) (SIL Open Font License 1.1).
 

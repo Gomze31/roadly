@@ -52,6 +52,15 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val roadHazards = MutableStateFlow(true)
     override val roadHazardVoice: kotlinx.coroutines.flow.Flow<Boolean> = roadHazards
     override suspend fun setRoadHazardVoice(value: Boolean) { roadHazards.value = value }
+    val evBattery = MutableStateFlow<Double?>(null)
+    override val evBatteryKwh: kotlinx.coroutines.flow.Flow<Double?> = evBattery
+    override suspend fun setEvBatteryKwh(value: Double?) { evBattery.value = value }
+    val evCharge = MutableStateFlow<Int?>(null)
+    override val evChargePct: kotlinx.coroutines.flow.Flow<Int?> = evCharge
+    override suspend fun setEvChargePct(value: Int?) { evCharge.value = value }
+    val brief = MutableStateFlow(false)
+    override val voiceBrief: kotlinx.coroutines.flow.Flow<Boolean> = brief
+    override suspend fun setVoiceBrief(value: Boolean) { brief.value = value }
     val aerial = MutableStateFlow(false)
     override val mapAerial: kotlinx.coroutines.flow.Flow<Boolean> = aerial
     override suspend fun setMapAerial(value: Boolean) { aerial.value = value }

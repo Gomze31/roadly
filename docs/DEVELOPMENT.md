@@ -188,6 +188,7 @@ La position ne part que vers les services nécessaires à une fonction, au momen
 | Overpass (OpenStreetMap) | identifiants des voies lentes du tracé | ralentisseurs ; mode trottinette |
 | Open-Meteo | dernière position connue | pluie (limitation abaissée), température (trottinette) |
 | Prix des carburants (data.economie.gouv.fr) | centres de cercles autour de soi ou le long du tracé | stations, stations sur le trajet |
+| Base nationale des points de recharge (API tabulaire data.gouv.fr) | zones carrées le long du tracé ; identifiants des points de charge affichés | bornes rapides sur le trajet (voiture électrique) |
 | Bison Futé, base ZFE (transport.data.gouv.fr) | rien : fichiers nationaux téléchargés | incidents, ZFE |
 | Service communautaire (Supabase de l'exploitant) | position d'un signalement ou d'un vote, boîte de 0,1° autour de soi, identifiant d'appareil aléatoire | seulement s'il est configuré |
 | GitHub | rien de la position | mises à jour |

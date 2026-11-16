@@ -22,6 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.EvStation
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryUnknown
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AltRoute
@@ -165,6 +168,8 @@ internal fun RouteChoicePanel(
     modifier: Modifier = Modifier,
     onZfe: (fr.roadly.core.data.zfe.ZfeCrossing) -> Unit = {},
     onTraffic: (List<fr.roadly.core.data.traffic.TrafficHit>) -> Unit = {},
+    onBattery: () -> Unit = {},
+    onChargers: () -> Unit = {},
 ) {
     val c = LocalRoadlyColors.current
     val active = s.options.firstOrNull { it.route.id == s.activeId } ?: s.options.first()
@@ -193,6 +198,21 @@ internal fun RouteChoicePanel(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Véhicule électrique, en tête : charge estimée à l'arrivée ; sous 10 %, la pastille propose les bornes rapides du trajet.
+                    s.ev?.let { ev ->
+                        val arrival = ev.arrivals[active.route.id]
+                        when {
+                            ev.batteryKwh == null || ev.chargePct == null ->
+                                StatusPill(stringResource(R.string.route_ev_set_battery), Icons.Default.BatteryUnknown, c.textSecondary, onClick = onBattery)
+                            arrival == null -> Unit
+                            arrival.level == fr.roadly.core.routing.EvArrival.Level.CRITICAL ->
+                                StatusPill(stringResource(R.string.route_ev_needs_charge, arrival.arrivalPct), Icons.Default.EvStation, c.danger, onClick = onChargers)
+                            else -> StatusPill(
+                                stringResource(R.string.route_ev_arrival, arrival.arrivalPct), Icons.Default.BatteryChargingFull,
+                                if (arrival.level == fr.roadly.core.routing.EvArrival.Level.LOW) c.warning else c.success, onClick = onBattery,
+                            )
+                        }
+                    }
                     // Incidents officiels en premier (comme « Incident détecté » de la référence), puis la ZFE.
                     s.traffic[active.route.id]?.filter { it.event.kind.notable }?.takeIf { it.isNotEmpty() }?.let { hits ->
                         StatusPill(
