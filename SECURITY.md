@@ -4,7 +4,7 @@
 
 Merci de ne pas ouvrir d'*issue* publique pour une faille. Utilisez le signalement privé de GitHub : onglet **Security › Report a vulnerability** du dépôt. Décrivez la version de Roadly, les étapes pour reproduire et l'impact. Une réponse est donnée dès que possible ; la correction est publiée dans une release, puis la faille est décrite ici.
 
-## Audit du 2026-11-16 (version 0.1.205)
+## Audit du 2026-11-16 (corrections publiées dans la version 0.1.206)
 
 Audit de l'ensemble de l'application : mise à jour intégrée, composants exposés aux autres applications, réseau, stockage local, service communautaire, chaîne de publication, dépendances et données envoyées. Les failles du service communautaire ont été reproduites sur PostgreSQL 16 avec le rôle `anon` de Supabase, avant et après correction.
 
