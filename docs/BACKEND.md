@@ -12,7 +12,7 @@ Roadly n'embarque aucun backend : le service communautaire est un projet **Supab
 
 ## Mettre à jour une installation existante
 
-Ré-exécuter `backend/supabase/schema.sql` dans le SQL Editor : le script est ré-exécutable, garde les données et remplace les fonctions. Les versions de Roadly antérieures à 0.1.205 restent compatibles (elles comparent l'auteur elles-mêmes tant que le serveur le renvoie ; le nouveau schéma ne le renvoie plus, leurs propres signalements ne sont alors plus marqués comme tels).
+Ré-exécuter `backend/supabase/schema.sql` dans le SQL Editor : le script est ré-exécutable, garde les données et remplace les fonctions. Les versions de Roadly antérieures à 0.1.206 restent compatibles (elles comparent l'auteur elles-mêmes tant que le serveur le renvoie ; le nouveau schéma ne le renvoie plus, leurs propres signalements ne sont alors plus marqués comme tels).
 
 ## Sécurité (audit du 2026-11-16)
 
