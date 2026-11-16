@@ -5,10 +5,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidAutoReadinessTest {
-    @Test fun sideloadedBuildWithCarServiceNeedsUnknownSources() {
-        val c = AndroidAutoReadiness.checks(AndroidAutoFacts(true, "14.2", "com.google.android.packageinstaller", "0.1.177"))
-        assertEquals(listOf(CheckStatus.OK, CheckStatus.OK, CheckStatus.ACTION), c.map { it.status })
-        assertTrue(c.last().title.contains("Sources inconnues"))
+    @Test fun sideloadedBuildIsRefusedByAndroidAutoAndPointsToUnknownAuto() {
+        // Android Auto 17.9 : « Package DENIED » pour une appli Car App Library installée hors Play Store, même avec « Sources inconnues ».
+        val c = AndroidAutoReadiness.checks(AndroidAutoFacts(true, "17.9", "com.google.android.packageinstaller", "0.1.203"))
+        assertEquals(listOf(CheckStatus.OK, CheckStatus.OK, CheckStatus.BLOCKING), c.map { it.status })
+        assertTrue(c.last().detail.contains("UnknownAuto"))
+        assertTrue(AndroidAutoReadiness.steps.any { "Shizuku" in it } && AndroidAutoReadiness.steps.any { "UnknownAuto" in it })
+        // Les mises à jour suivantes doivent garder la marque.
+        assertTrue(AndroidAutoReadiness.steps.last().contains("UnknownAuto"))
     }
 
     @Test fun oldBuildWithoutCarServiceIsBlocking() {
@@ -16,8 +20,8 @@ class AndroidAutoReadinessTest {
         assertEquals(CheckStatus.BLOCKING, c.first().status)
     }
 
-    @Test fun playStoreInstallNeedsNoUnknownSources() {
-        val c = AndroidAutoReadiness.checks(AndroidAutoFacts(true, null, AndroidAutoReadiness.PLAY_STORE, "1.0"))
-        assertEquals(listOf(CheckStatus.OK, CheckStatus.BLOCKING), c.map { it.status })
+    @Test fun playMarkedInstallIsAccepted() {
+        val c = AndroidAutoReadiness.checks(AndroidAutoFacts(true, "17.9", AndroidAutoReadiness.PLAY_STORE, "0.1.204"))
+        assertEquals(listOf(CheckStatus.OK, CheckStatus.OK, CheckStatus.OK), c.map { it.status })
     }
 }
