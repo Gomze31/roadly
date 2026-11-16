@@ -2,6 +2,7 @@ package fr.roadly.feature.navigation
 
 import fr.roadly.core.designsystem.theme.LocalUiScale
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Search
 
 import android.content.Intent
@@ -106,6 +107,7 @@ fun NavigationBottomPanel(
     compact: Boolean = false,
     onChangeDestination: (() -> Unit)? = null,
     onFuelAhead: (() -> Unit)? = null,
+    fuelAheadElectric: Boolean = false,
 ) {
     val c = LocalRoadlyColors.current
     val threshold = with(LocalDensity.current) { DRAG_THRESHOLD.toPx() }
@@ -178,7 +180,8 @@ fun NavigationBottomPanel(
                     }
                     // Stations les moins chères sur le trajet (prix officiels).
                     if (onFuelAhead != null) GlassButton(
-                        stringResource(R.string.fuel_ahead_title), onClick = onFuelAhead, icon = Icons.Default.LocalGasStation,
+                        stringResource(if (fuelAheadElectric) R.string.chargers_ahead_title else R.string.fuel_ahead_title), onClick = onFuelAhead,
+                        icon = if (fuelAheadElectric) Icons.Default.EvStation else Icons.Default.LocalGasStation,
                         style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth(),
                     )
                     // Voix et changement de destination (déplacés de la colonne d'actions).

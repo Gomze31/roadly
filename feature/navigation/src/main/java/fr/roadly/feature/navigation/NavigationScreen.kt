@@ -288,7 +288,11 @@ private fun NavigationContent(
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
     if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives, onAddStop = { vm.dismissAlternatives(); onAddStop() })
     val fuelAhead by vm.fuelAheadUi.collectAsStateWithLifecycle()
-    if (fuelAhead != FuelAheadUi.Hidden) FuelAheadSheet(fuelAhead, onPick = vm::addFuelStop, onRetry = vm::loadFuelAhead, onDismiss = vm::dismissFuelAhead)
+    val electric by vm.isElectric.collectAsStateWithLifecycle()
+    if (fuelAhead != FuelAheadUi.Hidden) FuelAheadSheet(
+        fuelAhead, onPick = vm::addFuelStop, onRetry = vm::loadFuelAhead, onDismiss = vm::dismissFuelAhead,
+        electric = electric, onPickCharger = vm::addChargerStop,
+    )
     GuidanceSheets(state, vm)
 }
 
@@ -522,6 +526,7 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
                     onChangeDestination = onChangeDestination,
                     // Pas en trottinette : les stations-service ne la concernent pas.
                     onFuelAhead = if (vm.fuelAheadAvailable && !vm.scooterMode) vm::loadFuelAhead else null,
+                    fuelAheadElectric = vm.isElectric.collectAsStateWithLifecycle().value,
                 )
             }
         }

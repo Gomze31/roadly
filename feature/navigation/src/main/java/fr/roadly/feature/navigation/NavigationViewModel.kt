@@ -62,7 +62,9 @@ sealed interface FuelAheadUi {
     data object Hidden : FuelAheadUi
     data object Loading : FuelAheadUi
     data class Content(val stations: List<fr.roadly.core.navigation.StationAhead>, val fuel: fr.roadly.core.model.FuelType) : FuelAheadUi
-    /** Véhicule électrique : pas de prix de recharge publiés dans ce flux. */
+    /** Véhicule électrique : bornes rapides (50 kW et plus, base IRVE) dans l'ordre du trajet. */
+    data class Chargers(val chargers: List<fr.roadly.core.navigation.ChargerAhead>) : FuelAheadUi
+    /** Véhicule électrique sans source de bornes (tests). */
     data object Electric : FuelAheadUi
     data class Error(val error: AppError) : FuelAheadUi
 }
@@ -90,21 +92,35 @@ class NavigationViewModel @Inject constructor(
     /** Stations sur le trajet (prix officiels) et carburant du véhicule ; null (tests existants) = fonction absente. */
     private val fuelAlong: fr.roadly.core.navigation.FuelAlongRoute? = null,
     private val vehicles: fr.roadly.core.data.repository.VehicleProfileRepository? = null,
+    /** Bornes rapides IRVE le long du tracé (véhicule électrique) ; null (tests existants) = message seulement. */
+    private val chargersAlong: fr.roadly.core.navigation.ChargersAlongRoute? = null,
 ) : ViewModel() {
+    /** Véhicule électrique : le bouton du panneau propose les bornes rapides plutôt que les stations-service. */
+    val isElectric: StateFlow<Boolean> = (vehicles?.profile ?: kotlinx.coroutines.flow.flowOf(null))
+        .map { it?.fuel == fr.roadly.core.model.FuelType.ELECTRIC }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val _fuelAhead = MutableStateFlow<FuelAheadUi>(FuelAheadUi.Hidden)
     val fuelAheadUi: StateFlow<FuelAheadUi> = _fuelAhead
     private var fuelJob: kotlinx.coroutines.Job? = null
-    val fuelAheadAvailable: Boolean get() = fuelAlong != null
+    val fuelAheadAvailable: Boolean get() = fuelAlong != null || chargersAlong != null
 
     /** Stations à moins de 1,5 km du tracé sur les 80 prochains km, triées par prix du carburant du véhicule (gazole sans profil). */
     fun loadFuelAhead() {
-        val finder = fuelAlong ?: return
+        if (!fuelAheadAvailable) return
         val g = session.state.value as? NavigationState.Guiding ?: return
         fuelJob?.cancel()
         _fuelAhead.value = FuelAheadUi.Loading
         fuelJob = viewModelScope.launch {
             val profileFuel = vehicles?.profile?.first()?.fuel
-            if (profileFuel == fr.roadly.core.model.FuelType.ELECTRIC) { _fuelAhead.value = FuelAheadUi.Electric; return@launch }
+            if (profileFuel == fr.roadly.core.model.FuelType.ELECTRIC) {
+                val ev = chargersAlong ?: run { _fuelAhead.value = FuelAheadUi.Electric; return@launch }
+                _fuelAhead.value = when (val r = ev.ahead(g.route.geometry, g.progress.distanceAlongM)) {
+                    is Outcome.Success -> FuelAheadUi.Chargers(r.value)
+                    is Outcome.Failure -> FuelAheadUi.Error(r.error)
+                }
+                return@launch
+            }
+            val finder = fuelAlong ?: run { _fuelAhead.value = FuelAheadUi.Hidden; return@launch }
             val fuel = profileFuel ?: fr.roadly.core.model.FuelType.DIESEL
             _fuelAhead.value = when (val r = finder.ahead(g.route.geometry, g.progress.distanceAlongM, fuel)) {
                 is Outcome.Success -> FuelAheadUi.Content(r.value, fuel)
@@ -114,6 +130,12 @@ class NavigationViewModel @Inject constructor(
     }
 
     fun dismissFuelAhead() { fuelJob?.cancel(); _fuelAhead.value = FuelAheadUi.Hidden }
+
+    /** La borne choisie devient un arrêt : le guidage repart par elle. */
+    fun addChargerStop(c: fr.roadly.core.navigation.ChargerAhead) {
+        dismissFuelAhead()
+        addStop(c.station.toPlace())
+    }
 
     /** La station choisie devient un arrêt : le guidage repart par elle. */
     fun addFuelStop(s: fr.roadly.core.navigation.StationAhead) {

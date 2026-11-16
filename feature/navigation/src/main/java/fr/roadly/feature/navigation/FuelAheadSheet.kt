@@ -45,17 +45,32 @@ import java.util.Locale
  * (flux officiel des prix), distance devant et détour estimé ; un appui ajoute la station comme arrêt.
  */
 @Composable
-fun FuelAheadSheet(ui: FuelAheadUi, onPick: (StationAhead) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit) {
+fun FuelAheadSheet(
+    ui: FuelAheadUi, onPick: (StationAhead) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit,
+    electric: Boolean = false, onPickCharger: (fr.roadly.core.navigation.ChargerAhead) -> Unit = {},
+) {
     val c = LocalRoadlyColors.current
     GlassBottomSheet(onDismiss = onDismiss) {
         Column(Modifier.padding(horizontal = RoadlySpacing.l).padding(bottom = RoadlySpacing.l).navigationBarsPadding()) {
             OverlineText(stringResource(R.string.fuel_ahead_overline))
             Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.fuel_ahead_title), style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
+            Text(stringResource(if (electric) R.string.chargers_ahead_title else R.string.fuel_ahead_title), style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
             Spacer(Modifier.height(RoadlySpacing.s))
             when (ui) {
                 FuelAheadUi.Hidden -> Unit
-                FuelAheadUi.Loading -> LoadingRow(stringResource(R.string.fuel_ahead_loading))
+                FuelAheadUi.Loading -> LoadingRow(stringResource(if (electric) R.string.chargers_ahead_loading else R.string.fuel_ahead_loading))
+                is FuelAheadUi.Chargers -> if (ui.chargers.isEmpty()) {
+                    EmptyState(Icons.Default.EvStation, stringResource(R.string.chargers_ahead_empty))
+                } else {
+                    Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                        ui.chargers.forEachIndexed { i, ch ->
+                            if (i > 0) RowDivider(inset = 0.dp)
+                            ChargerRow(ch, onClick = { onPickCharger(ch) })
+                        }
+                    }
+                    Spacer(Modifier.height(RoadlySpacing.s))
+                    Text(stringResource(R.string.chargers_ahead_source), style = MaterialTheme.typography.labelSmall, color = c.textTertiary)
+                }
                 FuelAheadUi.Electric -> EmptyState(Icons.Default.EvStation, stringResource(R.string.fuel_ahead_electric))
                 is FuelAheadUi.Error -> ErrorState(ui.error.userMessage(), onRetry = onRetry)
                 is FuelAheadUi.Content -> if (ui.stations.isEmpty()) {
@@ -122,3 +137,34 @@ private fun fuelName(f: FuelType): String = stringResource(
         FuelType.ELECTRIC -> R.string.fuel_electric
     },
 )
+
+@Composable
+private fun ChargerRow(ch: fr.roadly.core.navigation.ChargerAhead, onClick: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    val s = ch.station
+    val connectors = s.connectors.joinToString(" · ") {
+        when (it) { fr.roadly.core.data.charging.Connector.CCS -> "CCS"; fr.roadly.core.data.charging.Connector.CHADEMO -> "CHAdeMO"; fr.roadly.core.data.charging.Connector.TYPE2 -> "Type 2" }
+    }
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = RoadlySpacing.touchTargetDriving)
+            .clickable(onClickLabel = stringResource(R.string.fuel_ahead_add), role = Role.Button, onClick = onClick).padding(vertical = RoadlySpacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTile(Icons.Default.EvStation, style = if (s.maxKw >= 150) IconTileStyle.Brand else IconTileStyle.Neutral, size = 40.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(s.name, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOfNotNull(stringResource(R.string.fuel_ahead_where, Formatters.distance(ch.aheadM), Formatters.distance(ch.detourM)), connectors.ifEmpty { null }).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            // Dernier état publié (base dynamique nationale) : hors service en évidence, sinon libres si le relevé est récent.
+            ch.status?.describe(System.currentTimeMillis())?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall, color = if ((ch.status?.outOfService ?: 0) > 0) c.warning else c.success, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            (s.price ?: s.operator)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        }
+        Spacer(Modifier.width(8.dp))
+        Text("${s.maxKw} kW", style = MaterialTheme.typography.titleMedium, color = if (s.maxKw >= 150) c.brandBright else c.textPrimary)
+    }
+}

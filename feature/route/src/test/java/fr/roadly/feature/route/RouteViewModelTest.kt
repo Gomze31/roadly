@@ -88,13 +88,46 @@ class RouteViewModelTest {
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun TestScope.vm(): RouteViewModel {
+    private fun TestScope.vm(chargers: fr.roadly.core.navigation.ChargersAlongRoute? = null): RouteViewModel {
         val d = StandardTestDispatcher(testScheduler)
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
         session = NavigationSession(location, routing, NoopSpeedLimitProvider(), FakeSpeechService(), prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
-        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing)
+        return RouteViewModel(handle, RouteAlternativesUseCase(routing), vehicle, location, config, prefs, GuidanceActions(session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicle, NavigationClock { testScheduler.currentTime }), routing, chargersAlong = chargers)
+    }
+
+    @Test fun `electric car - battery to enter, then charge at arrival per route, and a charger becomes a stop`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        vehicle.p.value = VehicleProfile(fr.roadly.core.model.VehicleType.SEDAN, fr.roadly.core.model.FuelType.ELECTRIC, 18.0, null)
+        val charger = fr.roadly.core.data.charging.ChargingStation("c1", "Ionity", null, null, GeoPoint(48.85, 2.32), 350, 6, emptySet(), false, null, null, null)
+        val provider = object : fr.roadly.core.data.charging.ChargingStationProvider {
+            override suspend fun fastIn(box: fr.roadly.core.model.BoundingBox, minKw: Int) = Outcome.Success(listOf(charger))
+        }
+        val vm = vm(fr.roadly.core.navigation.ChargersAlongRoute(provider))
+        vm.uiState.test {
+            advanceUntilIdle()
+            val first = expectMostRecentItem().phase as RouteUiState.Content
+            assertNull("capacité et charge pas encore saisies", first.ev!!.batteryKwh)
+            vm.setEvBattery(60.0, 50); advanceUntilIdle()
+            val s = expectMostRecentItem().phase as RouteUiState.Content
+            // 10 km à 18 kWh/100 km ≈ 1,8 kWh sur 60 : 50 % → environ 47 %.
+            val arrival = s.ev!!.arrivals.getValue(s.activeId)
+            assertTrue(arrival.arrivalPct in 45..48)
+            assertEquals(fr.roadly.core.routing.EvArrival.Level.OK, arrival.level)
+            vm.loadChargers(); advanceUntilIdle()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun `a combustion car has no battery estimate`() = runTest {
+        location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
+        vehicle.p.value = VehicleProfile(fr.roadly.core.model.VehicleType.SEDAN, fr.roadly.core.model.FuelType.DIESEL, 6.0, 1.7)
+        vm().uiState.test {
+            advanceUntilIdle()
+            assertNull((expectMostRecentItem().phase as RouteUiState.Content).ev)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test fun `without known position state is NoOrigin`() = runTest {

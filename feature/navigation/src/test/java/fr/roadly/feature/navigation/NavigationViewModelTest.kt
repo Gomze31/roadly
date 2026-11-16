@@ -158,6 +158,39 @@ class NavigationViewModelTest {
         }
     }
 
+    @Test fun `electric car - the panel offers fast chargers along the route and a pick becomes a stop`() = runTest {
+        val vehicles = object : fr.roadly.core.data.repository.VehicleProfileRepository {
+            val p = kotlinx.coroutines.flow.MutableStateFlow<fr.roadly.core.model.VehicleProfile?>(
+                fr.roadly.core.model.VehicleProfile(fr.roadly.core.model.VehicleType.SEDAN, fr.roadly.core.model.FuelType.ELECTRIC, 18.0, null),
+            )
+            override val profile = p
+            override suspend fun save(profile: fr.roadly.core.model.VehicleProfile) { p.value = profile }
+            override suspend fun clear() { p.value = null }
+        }
+        val near = tracker.pointAt(900.0)
+        val provider = object : fr.roadly.core.data.charging.ChargingStationProvider {
+            override suspend fun fastIn(box: fr.roadly.core.model.BoundingBox, minKw: Int) = Outcome.Success(listOf(
+                fr.roadly.core.data.charging.ChargingStation("c1", "Ionity", null, null, near, 350, 6, emptySet(), false, null, null, null),
+            ))
+        }
+        val s = session()
+        val vm = NavigationViewModel(
+            s, prefs, config, GuidanceActions(s, RouteAlternativesUseCase(routing), routing, location, prefs, fakeVehicle, NavigationClock { testScheduler.currentTime }), NoopCommunity,
+            vehicles = vehicles, chargersAlong = fr.roadly.core.navigation.ChargersAlongRoute(provider),
+        )
+        vm.uiState.test {
+            s.start(option, RoutePreferences()); runCurrent()
+            location.emit(fixAt(100.0)); runCurrent()
+            assertTrue(vm.isElectric.value)
+            vm.loadFuelAhead(); runCurrent()
+            val ui = vm.fuelAheadUi.value as FuelAheadUi.Chargers
+            assertEquals(listOf("c1"), ui.chargers.map { it.station.id })
+            vm.addChargerStop(ui.chargers.single()); runCurrent()
+            assertEquals(FuelAheadUi.Hidden, vm.fuelAheadUi.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test fun `guiding state is formatted for the banner, the upcoming strip and the ETA`() = runTest {
         val s = session()
         val vm = NavigationViewModel(s, prefs, config)

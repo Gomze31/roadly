@@ -12,6 +12,15 @@ class RouteGeometry(val points: List<GeoPoint>) {
     }
     val totalM: Double get() = if (cumulative.isEmpty()) 0.0 else cumulative.last()
 
+    /** [p] est-il à gauche du segment [i] parcouru dans le sens du tracé ? (repère local, x = est, y = nord) */
+    fun isLeftOf(i: Int, p: GeoPoint): Boolean {
+        val a = points[i.coerceIn(0, points.lastIndex)]; val b = points[(i + 1).coerceIn(0, points.lastIndex)]
+        val k = cos(Math.toRadians(a.lat))
+        val sx = (b.lon - a.lon) * k; val sy = b.lat - a.lat
+        val px = (p.lon - a.lon) * k; val py = p.lat - a.lat
+        return sx * py - sy * px > 0
+    }
+
     /** Point à l'abscisse [alongM] (bornée au tracé), par interpolation sur le segment qui la contient. */
     fun pointAt(alongM: Double): GeoPoint {
         if (points.size < 2) return points.first()

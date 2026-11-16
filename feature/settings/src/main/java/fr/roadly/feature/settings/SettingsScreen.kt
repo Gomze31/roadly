@@ -31,6 +31,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Check
@@ -339,7 +340,11 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
                 roadHazardVoice = roadHazards, onRoadHazardVoice = vm::setRoadHazardVoice,
             )
         }
-        SettingsPage.VOICE -> VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
+        SettingsPage.VOICE -> {
+            val brief by vm.voiceBrief.collectAsStateWithLifecycle()
+            VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice,
+                brief = brief, onBrief = vm::setVoiceBrief)
+        }
         SettingsPage.AI -> VoiceCommandsGroup()
         SettingsPage.DISPLAY -> {
             val tint by vm.tint.collectAsStateWithLifecycle()
@@ -532,13 +537,20 @@ private fun AppearanceGroup(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
 // ── Voix et sons ────────────────────────────────────────────────────────────
 
 @Composable
-private fun VoiceGroup(voice: VoiceSettings, onEnabled: (Boolean) -> Unit, onVolume: (Int) -> Unit, onOverSpeedSound: (Boolean) -> Unit, onTest: (String) -> Unit) {
+private fun VoiceGroup(
+    voice: VoiceSettings, onEnabled: (Boolean) -> Unit, onVolume: (Int) -> Unit, onOverSpeedSound: (Boolean) -> Unit, onTest: (String) -> Unit,
+    brief: Boolean = false, onBrief: (Boolean) -> Unit = {},
+) {
     val c = LocalRoadlyColors.current
     // Valeur locale pendant le glissement ; enregistrée au relâchement.
     var volume by remember(voice.volume) { mutableFloatStateOf(voice.volume.toFloat()) }
     val phrase = stringResource(R.string.settings_voice_test_phrase)
     SettingsGroup(stringResource(R.string.settings_voice)) {
         ToggleRow(stringResource(R.string.settings_voice_enabled), checked = voice.enabled, onCheckedChange = onEnabled, icon = Icons.Default.RecordVoiceOver)
+        ToggleRow(
+            stringResource(R.string.settings_voice_brief), checked = brief, onCheckedChange = onBrief, icon = Icons.AutoMirrored.Filled.VolumeDown,
+            subtitle = stringResource(R.string.settings_voice_brief_subtitle),
+        )
         ListRow(
             stringResource(R.string.settings_voice_volume),
             icon = Icons.Default.GraphicEq,

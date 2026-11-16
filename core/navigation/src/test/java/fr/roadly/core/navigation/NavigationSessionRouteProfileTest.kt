@@ -227,6 +227,20 @@ class NavigationSessionRouteProfileTest {
         assertEquals(0, speech.spoken.count { it.startsWith("Attention, ralentisseur") })
     }
 
+    @Test fun `less chatty voice skips the early turn announcement off motorways and information messages, keeps the rest`() = runTest {
+        prefs.setVoiceBrief(true)
+        val turnAt = RouteGeometry(route.geometry).cumulative[route.maneuvers[1].beginShapeIndex]
+        val s = session(profile.copy(tollGantries = emptyList(), tollBooths = listOf(total - 50.0)))
+        s.start(option, RoutePreferences()); runCurrent()
+        val before = speech.spoken.size
+        location.emit(fixAt(turnAt - 500.0)); runCurrent()   // 15 m/s : palier FAR (route), passé sous silence
+        assertTrue(speech.spoken.drop(before).none { "Rue d'Essai" in it })
+        location.emit(fixAt(turnAt - 120.0)); runCurrent()   // palier NEAR : dit
+        assertTrue(speech.spoken.any { it.startsWith("Dans") && "Rue d'Essai" in it })
+        location.emit(fixAt(total - 1_000.0)); runCurrent()  // péage à 950 m : information, passée sous silence
+        assertEquals(0, speech.spoken.count { it.startsWith("Péage dans") })
+    }
+
     @Test fun `stopping after a gantry still records the reminder, but parks nothing`() = runTest {
         val s = session()
         s.start(option, RoutePreferences()); runCurrent()
