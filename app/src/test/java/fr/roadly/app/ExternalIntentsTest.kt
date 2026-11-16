@@ -31,4 +31,14 @@ class ExternalIntentsTest {
         assertNull(view("geo:0,0"))
         assertNull(ExternalIntents.parse(ExternalIntents.ACTION_VIEW, null))
     }
+
+    @Test fun `out of range coordinates and oversized text from a web page are refused or trimmed`() {
+        assertNull(ExternalIntents.parse(ExternalIntents.ACTION_VIEW, "geo:95.0,1.44"))
+        assertNull(ExternalIntents.parse(ExternalIntents.ACTION_VIEW, "geo:0,0?q=43.6,999(Ici)"))
+        assertNull(ExternalIntents.parse(ExternalIntents.ACTION_VIEW, "geo:0,0?q=" + "a".repeat(3_000)))
+        val long = ExternalIntents.parse(ExternalIntents.ACTION_VIEW, "geo:43.6,1.44?q=" + "b".repeat(500)) as ExternalRequest.Destination
+        assertEquals(ExternalIntents.MAX_TEXT, long.label!!.length)
+        val search = ExternalIntents.parse(ExternalIntents.ACTION_VIEW, "google.navigation:q=" + "c".repeat(500)) as ExternalRequest.Search
+        assertEquals(ExternalIntents.MAX_TEXT, search.query!!.length)
+    }
 }

@@ -174,6 +174,17 @@ class GitHubReleaseSourceTest {
         assertFalse(req.path!!.contains("github_pat"))
     }
 
+    @Test fun tokenIsNeverSentToAnAssetUrlOnAnotherHost() = runTest {
+        // Adresse de fichier qui ne serait pas celle de l'API (réponse altérée) : le jeton ne part pas.
+        val other = server.url("/assets/1").let { it.newBuilder().host(if (it.host == "localhost") "127.0.0.1" else "localhost").build() }
+        server.enqueue(MockResponse().setBody("{}"))
+        source.text(ReleaseAsset(1, "update.json", 2, apiUrl = other.toString()), "github_pat_abc")
+        assertNull(server.takeRequest().getHeader("Authorization"))
+        server.enqueue(MockResponse().setBody("{}"))
+        source.text(ReleaseAsset(1, "update.json", 2, apiUrl = server.url("/assets/1").toString()), "github_pat_abc")
+        assertEquals("Bearer github_pat_abc", server.takeRequest().getHeader("Authorization"))
+    }
+
     @Test fun anonymousRequestHasNoAuthorization() = runTest {
         server.enqueue(MockResponse().setResponseCode(404).setBody("""{"message":"Not Found"}"""))
         val r = source.latest("Gomze31", "roadly", null)

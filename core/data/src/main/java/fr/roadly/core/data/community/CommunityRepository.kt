@@ -71,8 +71,13 @@ class SupabaseCommunityRepository @Inject constructor(
 
     override suspend fun nearby(box: BoundingBox): Outcome<List<CommunityReport>> {
         val device = configRepo.deviceId()
-        val body = buildJsonObject { put("south", box.south); put("west", box.west); put("north", box.north); put("east", box.east) }
-        return when (val r = rpc("reports_in_box", body)) {
+        val base = buildJsonObject { put("south", box.south); put("west", box.west); put("north", box.north); put("east", box.east) }
+        // Schéma du 2026-11-16 : p_device marque ses propres signalements (« mine ») sans que le serveur renvoie l'identifiant des
+        // auteurs. Un serveur plus ancien ne connaît pas ce paramètre (PostgREST : 404, fonction introuvable) : appel sans lui.
+        val withDevice = buildJsonObject { base.forEach { (k, v) -> put(k, v) }; put("p_device", device) }
+        val first = rpc("reports_in_box", withDevice)
+        val result = if (first is Outcome.Failure && (first.error as? AppError.Http)?.code == 404) rpc("reports_in_box", base) else first
+        return when (val r = result) {
             is Outcome.Failure -> Outcome.Failure(mapError(r.error))
             is Outcome.Success -> try {
                 Outcome.Success(json.parseToJsonElement(r.value).jsonArray.mapNotNull { it.jsonObject.toReport(device) })
@@ -145,7 +150,8 @@ class SupabaseCommunityRepository @Inject constructor(
                 expiresAtEpochMs = parseDate(this["expires_at"]?.jsonPrimitive?.contentOrNull) ?: 0L,
                 confirmations = this["confirmations"]?.jsonPrimitive?.intOrNull ?: 0,
                 denials = this["denials"]?.jsonPrimitive?.intOrNull ?: 0,
-                mine = this["device_id"]?.jsonPrimitive?.contentOrNull == device,
+                // « mine » calculé par le serveur ; ancien schéma : comparaison avec l'identifiant de l'auteur, s'il est renvoyé.
+                mine = this["mine"]?.jsonPrimitive?.booleanOrNull ?: (this["device_id"]?.jsonPrimitive?.contentOrNull == device),
             ).takeIf { this["active"]?.jsonPrimitive?.booleanOrNull != false }
         }
 

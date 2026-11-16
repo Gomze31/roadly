@@ -28,9 +28,15 @@ object ExternalIntents {
         else -> null
     }
 
+    /** Libellé ou recherche venant d'une autre application (ou d'une page web, `geo:` étant BROWSABLE) : longueur bornée. */
+    const val MAX_TEXT = 200
+    /** Une URI plus longue n'est pas une adresse : ignorée (pas d'analyse coûteuse d'une chaîne arbitraire). */
+    const val MAX_URI = 2_000
+
     private val coords = Regex("""^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*(?:\((.*)\))?\s*$""")
 
     private fun parseUri(uri: String): ExternalRequest? {
+        if (uri.length > MAX_URI) return null
         val (scheme, rest) = uri.split(":", limit = 2).let { if (it.size == 2) it[0].lowercase() to it[1] else return null }
         if (scheme != "geo" && scheme != "google.navigation") return null
         // geo:PATH?PARAMS ; google.navigation:PARAMS (pas de chemin, « ? » facultatif).
@@ -38,15 +44,25 @@ object ExternalIntents {
         val paramString = if (scheme == "geo") rest.substringAfter('?', "") else rest.removePrefix("?")
         val params = paramString.split('&').filter { it.isNotBlank() }
             .associate { p -> p.substringBefore('=') to decode(p.substringAfter('=', "")) }
-        val q = params["q"]?.trim()?.takeIf { it.isNotEmpty() }
-        val pathCoords = coords.find(path)?.let { it.groupValues[1].toDouble() to it.groupValues[2].toDouble() }?.takeIf { it.first != 0.0 || it.second != 0.0 }
-        val qCoords = q?.let { coords.find(it) }
+        val q = params["q"]?.trim()?.takeIf { it.isNotEmpty() }?.take(MAX_TEXT)
+        val pathCoords = coords.find(path)?.let { valid(it.groupValues[1], it.groupValues[2]) }?.takeIf { it.first != 0.0 || it.second != 0.0 }
+        val qMatch = q?.let { coords.find(it) }
+        val qCoords = qMatch?.let { valid(it.groupValues[1], it.groupValues[2]) }
         return when {
-            qCoords != null -> ExternalRequest.Destination(qCoords.groupValues[1].toDouble(), qCoords.groupValues[2].toDouble(), qCoords.groupValues[3].takeIf { it.isNotBlank() })
+            qCoords != null -> ExternalRequest.Destination(qCoords.first, qCoords.second, qMatch.groupValues[3].trim().takeIf { it.isNotBlank() }?.take(MAX_TEXT))
             pathCoords != null -> ExternalRequest.Destination(pathCoords.first, pathCoords.second, q)
+            // Des coordonnées hors limites ne deviennent pas une recherche : rien n'est ouvert.
+            qMatch != null -> null
             q != null -> ExternalRequest.Search(q)
             else -> null
         }
+    }
+
+    /** Latitude et longitude dans leurs bornes, sinon null (une destination impossible n'est jamais proposée). */
+    private fun valid(lat: String, lon: String): Pair<Double, Double>? {
+        val la = lat.toDoubleOrNull() ?: return null
+        val lo = lon.toDoubleOrNull() ?: return null
+        return if (la in -90.0..90.0 && lo in -180.0..180.0) la to lo else null
     }
 
     private fun decode(s: String): String = try { URLDecoder.decode(s, "UTF-8") } catch (_: Exception) { s }

@@ -175,7 +175,24 @@ La réponse contient `edges[].speed_limit` (km/h) quand OpenStreetMap renseigne 
 
 ## Confidentialité
 
-La position ne quitte l'appareil que vers les fournisseurs listés ci-dessus, et seulement pour les fonctions qui en ont besoin : requêtes de géocodage et de routage, ainsi que les tuiles de carte demandées à OpenFreeMap. Rien n'est stocké sur un serveur appartenant à Roadly, et l'application n'embarque aucun outil d'analyse. Favoris, récents et profil véhicule restent dans la base locale de l'appareil. La sauvegarde Android est désactivée (`allowBackup=false`) : favoris et historique ne quittent pas l'appareil.
+Rien n'est stocké sur un serveur appartenant à Roadly, et l'application n'embarque aucun outil d'analyse ni publicité. Favoris, récents, trajets, véhicule et réglages restent dans la base locale de l'appareil : sauvegarde Android désactivée (`allowBackup=false`) et transfert d'appareil à appareil exclu (`data_extraction_rules.xml`, Android 12+).
+
+La position ne part que vers les services nécessaires à une fonction, au moment où elle sert (relevé du 2026-11-16) :
+
+| Service | Ce qu'il reçoit | Quand |
+|---|---|---|
+| Valhalla (FOSSGIS) | départ, arrivée, arrêts ; puis la géométrie du tracé (`trace_attributes`) | calcul et recalcul d'itinéraire, profil du tracé |
+| Base Adresse Nationale, Photon (Komoot) | texte recherché, position approximative pour trier | recherche, lieux autour de soi |
+| OpenFreeMap | tuiles de la zone affichée | carte |
+| IGN Géoplateforme | tuiles de la zone affichée | vue photos aériennes, si activée |
+| Overpass (OpenStreetMap) | identifiants des voies lentes du tracé | ralentisseurs ; mode trottinette |
+| Open-Meteo | dernière position connue | pluie (limitation abaissée), température (trottinette) |
+| Prix des carburants (data.economie.gouv.fr) | centres de cercles autour de soi ou le long du tracé | stations, stations sur le trajet |
+| Bison Futé, base ZFE (transport.data.gouv.fr) | rien : fichiers nationaux téléchargés | incidents, ZFE |
+| Service communautaire (Supabase de l'exploitant) | position d'un signalement ou d'un vote, boîte de 0,1° autour de soi, identifiant d'appareil aléatoire | seulement s'il est configuré |
+| GitHub | rien de la position | mises à jour |
+
+Chaque adresse de service se change dans Réglages › Fournisseurs (auto-hébergement possible, voir [`API-PROVIDERS.md`](API-PROVIDERS.md)).
 
 ## Écarts assumés par rapport à la spec
 

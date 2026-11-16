@@ -31,10 +31,19 @@ class GitHubReleaseSource(
     // Sans cache HTTP (réponse toujours fraîche) et avec des délais adaptés au téléchargement d'un APK.
     private val client = baseClient.newBuilder().cache(null).readTimeout(60, TimeUnit.SECONDS).build()
 
+    private val api = apiBase.toHttpUrlOrNull()
+
+    /**
+     * Le jeton n'accompagne que les appels à l'API GitHub elle-même : une adresse de fichier venue de la réponse (`assets[].url`)
+     * qui pointerait ailleurs part sans lui.
+     */
     private fun request(url: String, token: String?, accept: String) = Request.Builder().url(url)
         .header("Accept", accept)
         .header("X-GitHub-Api-Version", "2022-11-28")
-        .apply { if (!token.isNullOrBlank()) header("Authorization", "Bearer ${token.trim()}") }
+        .apply {
+            val sameHost = api != null && url.toHttpUrlOrNull()?.let { it.host == api.host && it.scheme == api.scheme && it.port == api.port } == true
+            if (!token.isNullOrBlank() && sameHost) header("Authorization", "Bearer ${token.trim()}")
+        }
         .build()
 
     override suspend fun latest(owner: String, repo: String, token: String?): Outcome<GitHubRelease> {

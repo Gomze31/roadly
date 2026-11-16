@@ -152,6 +152,8 @@ Les contributions sont bienvenues : signalement de bug, idée, correction, nouve
 2. Créez une branche, ajoutez des tests, vérifiez que `./gradlew testDebugUnitTest` passe.
 3. Proposez une *pull request*.
 
+Une faille de sécurité ? Ne l'ouvrez pas en *issue* publique : voir [`SECURITY.md`](SECURITY.md) (signalement privé et dernier audit).
+
 Une règle guide le projet : **aucune fonction fictive**. Une fonction n'existe que si elle repose sur une source réelle ; sinon, l'interface le dit.
 
 L'état de chaque fonction est suivi dans [`FEATURES.md`](FEATURES.md) et la suite prévue dans [`docs/ROADMAP.md`](docs/ROADMAP.md).
