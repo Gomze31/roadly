@@ -43,13 +43,16 @@ internal object AndroidAutoProbe {
         }.getOrDefault(false)
         @Suppress("DEPRECATION")
         val autoVersion = try { pm.getPackageInfo(AndroidAutoReadiness.ANDROID_AUTO_PACKAGE, 0).versionName ?: "?" } catch (e: PackageManager.NameNotFoundException) { null }
+        val source = runCatching { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) pm.getInstallSourceInfo(context.packageName) else null }.getOrNull()
         val installer = runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) pm.getInstallSourceInfo(context.packageName).installingPackageName
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) source?.installingPackageName
             else @Suppress("DEPRECATION") pm.getInstallerPackageName(context.packageName)
         }.getOrNull()
+        // Android 10 : pas de paquet « initiateur », Android Auto lit l'installateur.
+        val initiating = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) source?.initiatingPackageName else installer
         @Suppress("DEPRECATION")
         val version = runCatching { pm.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
-        return AndroidAutoFacts(carService, autoVersion, installer, version)
+        return AndroidAutoFacts(carService, autoVersion, installer, version, initiating)
     }
 
     /**

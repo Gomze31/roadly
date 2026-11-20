@@ -24,4 +24,16 @@ class AndroidAutoReadinessTest {
         val c = AndroidAutoReadiness.checks(AndroidAutoFacts(true, "17.9", AndroidAutoReadiness.PLAY_STORE, "0.1.204"))
         assertEquals(listOf(CheckStatus.OK, CheckStatus.OK, CheckStatus.OK), c.map { it.status })
     }
+
+    @Test fun playInstallerNameWithShellInitiatorIsNotEnough() {
+        // adb install -i com.android.vending : l'installateur est marqué, mais Android Auto regarde le paquet qui a lancé l'installation.
+        val c = AndroidAutoReadiness.checks(AndroidAutoFacts(true, "17.9", AndroidAutoReadiness.PLAY_STORE, "0.1.210", initiatingPackage = "com.android.shell"))
+        assertEquals(CheckStatus.ACTION, c.last().status)
+        assertTrue(c.last().detail.contains("com.android.shell"))
+    }
+
+    @Test fun systemInstallerAsInitiatorFallsBackToInstallerName() {
+        val f = AndroidAutoFacts(true, "17.9", AndroidAutoReadiness.PLAY_STORE, "0.1.210", initiatingPackage = AndroidAutoReadiness.SYSTEM_INSTALLER)
+        assertEquals(CheckStatus.OK, AndroidAutoReadiness.checks(f).last().status)
+    }
 }

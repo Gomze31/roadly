@@ -9,6 +9,8 @@ data class AndroidAutoFacts(
     /** Paquet qui a installé Roadly (com.android.vending = Play Store), null si inconnu. */
     val installerPackage: String?,
     val roadlyVersion: String,
+    /** Paquet qui a lancé l'installation (Android 11+), null si inconnu. C'est lui qu'Android Auto regarde en premier. */
+    val initiatingPackage: String? = installerPackage,
 )
 
 enum class CheckStatus { OK, ACTION, BLOCKING }
@@ -19,6 +21,15 @@ data class AutoCheck(val title: String, val detail: String, val status: CheckSta
 object AndroidAutoReadiness {
     const val ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead"
     const val PLAY_STORE = "com.android.vending"
+    const val SYSTEM_INSTALLER = "com.google.android.packageinstaller"
+
+    /**
+     * Source d'installation retenue par Android Auto (analyse de la version 17.7, AndreyPavlenko/Fermata#846, non confirmée par
+     * Google) : le paquet qui a lancé l'installation ; l'installateur enregistré seulement si ce paquet est le programme
+     * d'installation du système. Une installation par `adb install -i com.android.vending` échoue pour cette raison.
+     */
+    fun sourceSeenByAndroidAuto(f: AndroidAutoFacts): String? =
+        if (f.initiatingPackage == SYSTEM_INSTALLER) f.installerPackage else f.initiatingPackage
 
     fun checks(f: AndroidAutoFacts): List<AutoCheck> = buildList {
         add(
@@ -30,7 +41,12 @@ object AndroidAutoReadiness {
             else AutoCheck("Android Auto introuvable", "Installez ou mettez à jour « Android Auto » depuis le Play Store.", CheckStatus.BLOCKING),
         )
         add(
-            if (f.installerPackage == PLAY_STORE) AutoCheck(
+            if (f.installerPackage == PLAY_STORE && sourceSeenByAndroidAuto(f) != PLAY_STORE) AutoCheck(
+                "Marque « Play Store » incomplète",
+                "Roadly est marqué « installé par le Play Store », mais l'installation a été lancée par « ${f.initiatingPackage ?: "inconnu"} » : " +
+                    "Android Auto regarde d'abord ce paquet et peut encore masquer Roadly. Si Roadly manque dans la voiture, réinstallez-le avec UnknownAuto.",
+                CheckStatus.ACTION,
+            ) else if (f.installerPackage == PLAY_STORE) AutoCheck(
                 "Roadly est marqué « installé par le Play Store »",
                 "Android Auto l'accepte. Pour garder cette marque, installez les mises à jour avec UnknownAuto, pas avec le bouton « Installer » de Roadly.",
                 CheckStatus.OK,

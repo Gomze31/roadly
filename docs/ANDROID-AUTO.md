@@ -92,6 +92,13 @@ Les builds débogables acceptent tout hôte. Les builds de version n'acceptent q
 
 **Constat du 2026-11-09 (Android Auto 17.9, Ford EcoSport 2018 / SYNC 3)** : Roadly 0.1.203, installé par APK, reste absent de « Personnaliser le lanceur » même avec le mode développeur et « Sources inconnues » actifs. Le même comportement est décrit pour une autre application Car App Library ([prototux/lapin#1](https://github.com/prototux/lapin/issues/1), Android Auto 17.9.664044, Android 16) : journal `CAR.VALIDATOR: Package DENIED; failed all other checks`. D'après son auteur (lecture non confirmée du code d'Android Auto), « Sources inconnues » ne laisse passer que certaines catégories, pas les applications à gabarits (`template`), celles de la Car App Library. Installer avec `adb install -i com.android.vending` ne suffit pas.
 
+**Précisions du 2026-11-20** (analyse d'Android Auto 17.7 dans [AndreyPavlenko/Fermata#846](https://github.com/AndreyPavlenko/Fermata/issues/846), non confirmée par Google ; essai en voiture de 6 h sans Roadly, « Sources inconnues » actif) :
+
+- « Sources inconnues » n'admet que certains types (multimédia, notifications, SMS, navigation « historique » réservée à Google) ; les applications à gabarits (`<uses name="template"/>`, toute la Car App Library, Roadly compris) n'en font pas partie. **Aucune déclaration du manifeste de Roadly ne change ce résultat.**
+- La DHU est reconnue comme unité de développement et saute ces contrôles : Roadly y apparaît, pas dans une vraie voiture.
+- Sur Android 11+, Android Auto lit le paquet qui a **lancé** l'installation (`initiatingPackageName`), et l'installateur enregistré seulement si ce paquet est le programme d'installation du système. D'où l'échec d'`adb install -i com.android.vending` (initiateur : le shell). Réglages › Android Auto signale ce cas (« Marque Play Store incomplète »).
+- Autre voie acceptée : le Play Store confirme que le compte du téléphone possède l'application (piste de **test interne** comprise) avec la même signature.
+
 Contournement sans ordinateur ni root : [UnknownAuto](https://github.com/GitMag/UnknownAuto) (libre, MIT) installe un APK par le programme d'installation d'Android en le marquant « installé par le Play Store », grâce à [Shizuku](https://shizuku.rikka.app/) démarré par débogage sans fil. La marque ne se pose qu'à l'installation : chaque mise à jour doit passer par UnknownAuto (le bouton « Installer » de Roadly la retirerait ; Roadly le signale et propose de télécharger l'APK à la place). Solution durable : une publication sur le Play Store (piste de test comprise).
 
 
