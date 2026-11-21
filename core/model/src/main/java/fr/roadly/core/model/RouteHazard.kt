@@ -6,6 +6,12 @@ enum class HazardKind {
     CURVE,
     /** Zone de vigilance (France : jamais un point exact, une zone de plusieurs centaines de mètres à quelques kilomètres). */
     VIGILANCE_ZONE,
+    /** Gare de péage à barrières (OSM `barrier=toll_booth`, via Valhalla) : point du tracé. */
+    TOLL_BOOTH,
+    /** Feu tricolore (OSM `highway=traffic_signals`, via Valhalla) : point du tracé. */
+    TRAFFIC_LIGHT,
+    /** Ralentisseur (dos-d'âne, plateau, coussin ; OSM `traffic_calming`) : point du tracé. */
+    SPEED_BUMP,
 }
 
 /**
@@ -22,6 +28,8 @@ data class RouteHazard(
     val key: String? = null,
     /** Zone de danger : score de confiance 0–100 des données ; null = non évalué (traité comme fiable). */
     val confidence: Int? = null,
+    /** Virage : true = vers la droite, false = vers la gauche ; null = sans objet. */
+    val rightHand: Boolean? = null,
 ) {
     fun contains(alongM: Double): Boolean = alongM in startAlongM..endAlongM
 }

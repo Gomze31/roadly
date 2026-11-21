@@ -9,13 +9,8 @@ import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.last
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Un itinéraire proposé à l'utilisateur, avec son libellé, son heure d'arrivée estimée et son coût (si estimable). */
@@ -27,20 +22,22 @@ data class RouteOption(
     val sameAsFastest: Boolean,
     /** Mode trottinette : analyse des voies, autonomie et classement ; null pour un itinéraire motorisé. */
     val scooter: ScooterOptionInfo? = null,
+    /** Variante la plus économe (≠ la plus rapide) : économie de carburant estimée (%) par rapport à la plus rapide ; null sinon. */
+    val ecoSavingPct: Int? = null,
+    /** Litres économisés par rapport à la plus rapide, si le profil véhicule donne la consommation. */
+    val ecoSavedLitres: Double? = null,
 )
 
 /**
- * Calcule les trois variantes (rapide, court, sans péage) et signale celles qui reprennent le tracé du plus rapide.
- *
- * Les trois demandes sont déposées dans l'ordre (rapide d'abord) ; c'est le limiteur de débit d'`ApiClient` qui décide du
- * rythme réel : sur l'instance publique FOSSGIS elles partent une par une, espacées d'une seconde (plus de rafale de trois
- * requêtes simultanées, le résultat complet arrive donc environ 2 s plus tard) ; sur un serveur auto-hébergé elles restent
- * simultanées. [progressive] livre chaque variante dès qu'elle est prête pour ne pas faire attendre l'écran.
+ * Calcule en parallèle les variantes (rapide, court, sans péage) et ne garde que des tracés distincts : une variante qui reprend
+ * le tracé d'une précédente est retirée. « Sans péage » n'est pas calculée quand les péages sont déjà évités (elle doublerait
+ * « Le plus rapide »).
  */
 class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingProvider) {
-    private val order = listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST, RouteCosting.NO_TOLL)
+    private fun order(preferences: RoutePreferences) =
+        if (preferences.avoidTolls) listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST)
+        else listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST, RouteCosting.NO_TOLL)
 
-    /** Résultat complet : les variantes obtenues, ou la première erreur si aucune n'a abouti. */
     suspend operator fun invoke(
         origin: GeoPoint,
         destination: GeoPoint,
@@ -48,55 +45,41 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         departAtEpochMs: Long,
         preferences: RoutePreferences = RoutePreferences(),
         waypoints: List<GeoPoint> = emptyList(),
-    ): Outcome<List<RouteOption>> = progressive(origin, destination, vehicle, departAtEpochMs, preferences, waypoints).last()
-
-    /**
-     * Même calcul, au fil de l'eau : une émission `Success` (liste partielle, dans l'ordre rapide / court / sans péage) à
-     * chaque variante obtenue, puis une dernière émission identique au résultat d'[invoke] (liste complète ou erreur).
-     */
-    fun progressive(
-        origin: GeoPoint,
-        destination: GeoPoint,
-        vehicle: VehicleProfile?,
-        departAtEpochMs: Long,
-        preferences: RoutePreferences = RoutePreferences(),
-        waypoints: List<GeoPoint> = emptyList(),
-    ): Flow<Outcome<List<RouteOption>>> = flow {
-        coroutineScope {
-            val arrivals = Channel<Pair<Int, Outcome<List<Route>>>>(order.size)
-            order.forEachIndexed { i, c ->
-                // UNDISPATCHED : chaque demande atteint la file du limiteur avant le lancement de la suivante (ordre garanti).
-                launch(start = CoroutineStart.UNDISPATCHED) {
-                    arrivals.send(i to safely { routing.route(RouteRequest(origin, destination, waypoints = waypoints, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) })
-                }
-            }
-            val results = arrayOfNulls<Outcome<List<Route>>>(order.size)
-            repeat(order.size) { n ->
-                val (i, r) = arrivals.receive()
-                results[i] = r
-                val options = options(results, vehicle, departAtEpochMs)
-                val last = n == order.lastIndex
-                if (options.isNotEmpty()) {
-                    if (last || r is Outcome.Success) emit(Outcome.Success(options))
-                } else if (last) {
-                    emit(Outcome.Failure(results.firstNotNullOfOrNull { (it as? Outcome.Failure)?.error } ?: AppError.NoResult))
-                }
-            }
+    ): Outcome<List<RouteOption>> {
+        val results = coroutineScope {
+            order(preferences).map { c ->
+                async { c to safely { routing.route(RouteRequest(origin, destination, waypoints = waypoints, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) } }
+            }.map { it.await() }
         }
-    }
-
-    private fun options(results: Array<Outcome<List<Route>>?>, vehicle: VehicleProfile?, departAtEpochMs: Long): List<RouteOption> {
-        val routes = results.mapIndexedNotNull { i, r -> (r as? Outcome.Success)?.value?.firstOrNull()?.copy(costing = order[i]) }
+        val routes = results.mapNotNull { (c, r) -> (r as? Outcome.Success)?.value?.firstOrNull()?.copy(costing = c) }
+            .distinctBy { it.geometry }
+        if (routes.isEmpty()) {
+            val firstError = results.firstNotNullOfOrNull { (_, r) -> (r as? Outcome.Failure)?.error } ?: AppError.NoResult
+            return Outcome.Failure(firstError)
+        }
         val fastest = routes.firstOrNull { it.costing == RouteCosting.FASTEST }
-        return routes.map { r ->
+        // Le plus économe : consommation estimée selon la vitesse des tronçons ; signalé s'il économise ≥ 5 % sur le plus rapide.
+        val fuel = vehicle?.fuel
+        val use = routes.associate { it.costing to FuelSpeedModel.equivalentMeters(it, fuel) }
+        val eco = routes.filter { it.costing != RouteCosting.FASTEST }.minByOrNull { use.getValue(it.costing) }
+        val ecoPct = if (fastest == null || eco == null) null else {
+            val f = use.getValue(fastest.costing); val e = use.getValue(eco.costing)
+            if (f <= 0.0 || e > f * (1 - ECO_MIN_SAVING)) null else ((f - e) / f * 100).toInt()
+        }
+        val ecoLitres = if (ecoPct == null || vehicle == null || vehicle.consumptionPer100 <= 0.0) null
+            else (use.getValue(fastest!!.costing) - use.getValue(eco!!.costing)) / 100_000.0 * vehicle.consumptionPer100
+        return Outcome.Success(routes.map { r ->
+            val isEco = ecoPct != null && r.costing == eco?.costing
             RouteOption(
                 route = r,
                 label = r.costing.label(),
                 arrivalEpochMs = departAtEpochMs + (r.durationSeconds * 1000).toLong(),
-                cost = vehicle?.let { FuelCostCalculator.estimate(r.distanceMeters, it) },
+                cost = vehicle?.let { FuelCostCalculator.estimate(r, it) },
                 sameAsFastest = fastest != null && r.costing != RouteCosting.FASTEST && r.geometry == fastest.geometry,
+                ecoSavingPct = if (isEco) ecoPct else null,
+                ecoSavedLitres = if (isEco) ecoLitres else null,
             )
-        }
+        })
     }
 
     /** Une exception d'un fournisseur devient un échec : elle ne doit pas annuler les autres variantes. */
@@ -108,6 +91,8 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         } catch (e: Exception) {
             Outcome.Failure(AppError.Unknown(e.message))
         }
+
+    private companion object { const val ECO_MIN_SAVING = 0.05 }
 
     private fun RouteCosting.label() = when (this) {
         RouteCosting.FASTEST -> "Le plus rapide"

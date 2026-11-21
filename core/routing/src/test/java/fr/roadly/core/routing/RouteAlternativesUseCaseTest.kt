@@ -7,10 +7,6 @@ import fr.roadly.core.model.Route
 import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
-import fr.roadly.core.data.network.ApiPriority
-import fr.roadly.core.data.network.ValhallaRateLimiter
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -49,13 +45,28 @@ class RouteAlternativesUseCaseTest {
         assertTrue(r.none { it.sameAsFastest })
     }
 
-    @Test fun `identical geometry flagged sameAsFastest`() = runTest {
+    @Test fun `variant repeating an earlier geometry is dropped`() = runTest {
         val uc = RouteAlternativesUseCase(FakeRouting(mapOf(
             RouteCosting.FASTEST to Outcome.Success(listOf(route(RouteCosting.FASTEST, 100.0, 60.0, g1))),
+            RouteCosting.SHORTEST to Outcome.Success(listOf(route(RouteCosting.SHORTEST, 90.0, 80.0, g2))),
             RouteCosting.NO_TOLL to Outcome.Success(listOf(route(RouteCosting.NO_TOLL, 100.0, 60.0, g1))),
         )))
         val r = (uc(o, d, null, 0L) as Outcome.Success).value
-        assertTrue(r.first { it.route.costing == RouteCosting.NO_TOLL }.sameAsFastest)
+        assertEquals(listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST), r.map { it.route.costing })
+    }
+
+    @Test fun `no toll variant is not computed when tolls are already avoided`() = runTest {
+        val seen = mutableListOf<RouteCosting>()
+        val routing = object : RoutingProvider {
+            override val id = "fake"
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
+                synchronized(seen) { seen += request.costing }
+                return Outcome.Success(listOf(route(request.costing, 100.0, 60.0, if (request.costing == RouteCosting.FASTEST) g1 else g2)))
+            }
+        }
+        val r = (RouteAlternativesUseCase(routing)(o, d, null, 0L, RoutePreferences(avoidTolls = true)) as Outcome.Success).value
+        assertEquals(setOf(RouteCosting.FASTEST, RouteCosting.SHORTEST), seen.toSet())
+        assertEquals(listOf("Le plus rapide", "Le plus court"), r.map { it.label })
     }
 
     @Test fun `all failures propagate first error`() = runTest {
@@ -85,67 +96,5 @@ class RouteAlternativesUseCaseTest {
         RouteAlternativesUseCase(routing)(o, d, null, 0L, prefs)
         assertEquals(3, seen.size)
         assertTrue(seen.all { it.preferences == prefs })
-    }
-
-    /** Fournisseur dont chaque appel passe par le limiteur de débit, comme `ApiClient` sur l'instance publique. */
-    private class ThrottledRouting(val limiter: ValhallaRateLimiter, val now: () -> Long, val geometry: List<GeoPoint>) : RoutingProvider {
-        override val id = "fake"
-        val starts = mutableListOf<Pair<RouteCosting, Long>>()
-        var maxInFlight = 0
-        private var inFlight = 0
-        override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
-            val permit = limiter.withPermit(ApiPriority.INTERACTIVE) {
-                inFlight++; maxInFlight = maxOf(maxInFlight, inFlight)
-                starts += request.costing to now()
-                delay(300) // durée de la requête
-                inFlight--
-                route(request.costing, 100.0, 60.0, geometry)
-            }
-            return Outcome.Success(listOf((permit as ValhallaRateLimiter.Permit.Ran).value))
-        }
-    }
-
-    @Test fun `on a throttled host the three variants leave one per second, fastest first, never in parallel`() = runTest {
-        val routing = ThrottledRouting(ValhallaRateLimiter(throttledHost = { true }, nowMs = { testScheduler.currentTime }), { testScheduler.currentTime }, g1)
-        val r = (RouteAlternativesUseCase(routing)(o, d, null, 0L) as Outcome.Success).value
-        assertEquals(listOf(RouteCosting.FASTEST to 0L, RouteCosting.SHORTEST to 1_000L, RouteCosting.NO_TOLL to 2_000L), routing.starts)
-        assertEquals(1, routing.maxInFlight)
-        assertEquals(listOf("Le plus rapide", "Le plus court", "Sans péage"), r.map { it.label })
-        assertEquals(2_300L, testScheduler.currentTime)
-    }
-
-    @Test fun `progressive delivers each variant as soon as it is ready, then the full result`() = runTest {
-        val routing = ThrottledRouting(ValhallaRateLimiter(throttledHost = { true }, nowMs = { testScheduler.currentTime }), { testScheduler.currentTime }, g1)
-        val seen = mutableListOf<Pair<Long, List<RouteCosting>>>()
-        RouteAlternativesUseCase(routing).progressive(o, d, null, 0L).collect { out ->
-            seen += testScheduler.currentTime to (out as Outcome.Success).value.map { it.route.costing }
-        }
-        assertEquals(
-            listOf(
-                300L to listOf(RouteCosting.FASTEST),
-                1_300L to listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST),
-                2_300L to listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST, RouteCosting.NO_TOLL),
-            ),
-            seen,
-        )
-    }
-
-    @Test fun `progressive skips failed variants and ends with the same result as invoke`() = runTest {
-        val routing = FakeRouting(mapOf(
-            RouteCosting.FASTEST to Outcome.Success(listOf(route(RouteCosting.FASTEST, 100.0, 60.0, g1))),
-            RouteCosting.SHORTEST to Outcome.Failure(AppError.Timeout),
-            RouteCosting.NO_TOLL to Outcome.Success(listOf(route(RouteCosting.NO_TOLL, 100.0, 60.0, g1))),
-        ))
-        val uc = RouteAlternativesUseCase(routing)
-        val emissions = uc.progressive(o, d, null, 0L).toList()
-        assertEquals(listOf(1, 2), emissions.map { (it as Outcome.Success).value.size })
-        assertEquals(uc(o, d, null, 0L), emissions.last())
-        assertTrue((emissions.last() as Outcome.Success).value.last().sameAsFastest)
-    }
-
-    @Test fun `progressive emits a single failure when nothing succeeds`() = runTest {
-        val uc = RouteAlternativesUseCase(FakeRouting(mapOf(RouteCosting.SHORTEST to Outcome.Failure(AppError.RateLimited))))
-        // Première erreur dans l'ordre des variantes : « rapide » n'a pas de résultat.
-        assertEquals(listOf<Outcome<List<RouteOption>>>(Outcome.Failure(AppError.NoResult)), uc.progressive(o, d, null, 0L).toList())
     }
 }

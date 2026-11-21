@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 enum class SpeechPriority { URGENT, NORMAL, LOW }
 
 /**
- * Canal d'une annonce (E1) : le guidage (session) ou l'assistant (Roadly AI, essai de voix des Réglages). Un seul moteur de parole :
+ * Canal d'une annonce (E1) : le guidage (session) ou l'assistant (l'assistant vocal, essai de voix des Réglages). Un seul moteur de parole :
  * urgence GPS > guidage > assistant ; l'arrêt et la sourdine de la session ne touchent que [GUIDANCE].
  */
 enum class VoiceChannel { GUIDANCE, ASSISTANT }

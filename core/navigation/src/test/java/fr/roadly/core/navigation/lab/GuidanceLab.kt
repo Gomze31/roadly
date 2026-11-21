@@ -402,7 +402,11 @@ internal object GuidanceLab {
 
     // --- Lecture de la voix ---
 
-    enum class Spoken { DEPART, DISTANCE, POSITIONING, NOW, CONFIRMATION, REROUTING, REROUTE_FAILED, GPS_LOST, ARRIVAL }
+    private val ADVISORIES = setOf(
+        SpokenPhrases.sharpCurve(true), SpokenPhrases.sharpCurve(false), SpokenPhrases.speedBump(true), SpokenPhrases.speedBump(false),
+    )
+
+    enum class Spoken { DEPART, DISTANCE, POSITIONING, NOW, CONFIRMATION, REROUTING, REROUTE_FAILED, GPS_LOST, ADVISORY, ARRIVAL }
 
     /** Début de la phrase « maintenant » de [m] (sans le point final : elle peut être suivie de « , puis … »). */
     fun nowStem(m: Maneuver): String = (m.verbalPre ?: m.instruction).trimEnd().removeSuffix(".")
@@ -424,6 +428,8 @@ internal object GuidanceLab {
             text == SpokenPhrases.REROUTING -> Spoken.REROUTING
             text == SpokenPhrases.REROUTE_FAILED -> Spoken.REROUTE_FAILED
             text == SpokenPhrases.GPS_LOST -> Spoken.GPS_LOST
+            // Alertes de la route (virage serré, ralentisseur) : elles ne se rapportent à aucune manœuvre.
+            text in ADVISORIES -> Spoken.ADVISORY
             text == PositioningPolicy.phrase(m) -> Spoken.POSITIONING
             isDistance(text, m) -> Spoken.DISTANCE
             isNow(text, m) -> if (m.type == ManeuverType.ARRIVE) Spoken.ARRIVAL else Spoken.NOW
@@ -470,6 +476,10 @@ internal object GuidanceLab {
                 continue
             }
             if (kind == Spoken.CONFIRMATION) continue
+            if (kind == Spoken.ADVISORY) {
+                if (g.rerouting) bad("alerte de la route pendant le recalcul")
+                continue
+            }
             if (!g.progress.extrapolated && g.progress.offRouteM > GuidanceConstants.OFF_ROUTE_HARD_M) {
                 bad("manœuvre annoncée à ${g.progress.offRouteM.toInt()} m du tracé")
             }

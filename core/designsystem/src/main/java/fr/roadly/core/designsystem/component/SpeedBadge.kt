@@ -1,5 +1,14 @@
 package fr.roadly.core.designsystem.component
 
+import fr.roadly.core.designsystem.theme.LocalUiScale
+import fr.roadly.core.designsystem.theme.softShadow
+
+import fr.roadly.core.designsystem.theme.Display
+
+import fr.roadly.core.designsystem.theme.ButtonLabel
+
+import androidx.compose.ui.draw.clip
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,15 +51,22 @@ fun SpeedBadge(speedKmh: Double?, limitKmh: Int?, modifier: Modifier = Modifier,
     val over = speedKmh != null && limitKmh != null && speedKmh > limitKmh + toleranceKmh
     val digitsColor by animateColorAsState(if (over) c.danger else c.textPrimary, label = "speedColor")
     val description = "Vitesse ${speedKmh?.roundToInt() ?: "inconnue"} km/h, limitation ${limitKmh ?: "inconnue"}"
-    GlassPanel(modifier.semantics { contentDescription = description }, shape = RoadlyShapes.Panel, contentPadding = 0.dp) {
-        Row(Modifier.padding(start = 16.dp, end = 10.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    // Bulle ronde ; le panneau de limitation la chevauche en haut à droite (absent si la limitation est inconnue).
+    val s = LocalUiScale.current
+    val bubble = 88.dp * s
+    val sign = 50.dp * s
+    Box(modifier.semantics { contentDescription = description }.size(width = if (limitKmh != null) bubble + sign * 0.55f else bubble, height = if (limitKmh != null) bubble + sign * 0.45f else bubble)) {
+        Box(
+            Modifier.align(Alignment.BottomStart).size(bubble).softShadow(CircleShape, Color.Black, 10.dp).clip(CircleShape)
+                .background(c.glass).border(1.dp, c.glassBorder, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(speedKmh?.roundToInt()?.toString() ?: "–", style = NavDigits.copy(fontSize = 40.sp, lineHeight = 42.sp), color = digitsColor)
-                Text("KM/H", style = Overline, color = c.textTertiary)
+                Text(speedKmh?.roundToInt()?.toString() ?: "–", style = NavDigits.copy(fontSize = 36.sp * s, lineHeight = 38.sp * s), color = digitsColor)
+                Text("km/h", style = ButtonLabel.copy(fontSize = 13.sp * s), color = c.textSecondary)
             }
-            Spacer(Modifier.width(12.dp))
-            SpeedLimitSign(limitKmh, size = 48.dp)
         }
+        if (limitKmh != null) SpeedLimitSign(limitKmh, Modifier.align(Alignment.TopEnd), size = sign)
     }
 }
 
@@ -59,12 +75,12 @@ fun SpeedBadge(speedKmh: Double?, limitKmh: Int?, modifier: Modifier = Modifier,
 fun SpeedLimitSign(limitKmh: Int?, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 48.dp) {
     val c = LocalRoadlyColors.current
     Box(
-        modifier.size(size).background(Color.White, CircleShape).border(size * 0.11f, c.speedRing, CircleShape),
+        modifier.size(size).softShadow(CircleShape, Color.Black, 6.dp).background(Color.White, CircleShape).border(size * 0.12f, c.speedRing, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             limitKmh?.toString() ?: "—",
-            fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.38f).sp, color = Color.Black,
+            fontFamily = Display, fontWeight = FontWeight.Black, fontSize = (size.value * 0.38f).sp, color = Color.Black,
             maxLines = 1,
         )
     }

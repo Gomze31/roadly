@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,7 +46,7 @@ internal fun TollReminderCard(reminder: TollReminder, others: Int, overdue: Bool
     val c = LocalRoadlyColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(Icons.Default.Toll, style = IconTileStyle.Warning, size = 36.dp)
+            IconTile(Icons.Default.Euro, style = IconTileStyle.Warning, size = 36.dp)
             Spacer(Modifier.width(RoadlySpacing.s))
             Column(Modifier.weight(1f)) {
                 Text(

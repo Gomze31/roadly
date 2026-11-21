@@ -9,6 +9,6 @@ rootProject.name = "Roadly"
 include(
     ":app",
     ":core:model", ":core:common", ":core:designsystem", ":core:data",
-    ":core:location", ":core:map", ":core:geocoding", ":core:routing", ":core:navigation", ":core:scooter", ":core:assistant", ":core:radar",
-    ":feature:home", ":feature:search", ":feature:route", ":feature:settings", ":feature:navigation", ":feature:assistant", ":feature:trips", ":feature:car",
+    ":core:location", ":core:map", ":core:geocoding", ":core:routing", ":core:navigation", ":core:scooter", ":core:radar",
+    ":feature:home", ":feature:search", ":feature:route", ":feature:settings", ":feature:navigation", ":feature:trips", ":feature:car", ":feature:onboarding", ":feature:voice",
 )

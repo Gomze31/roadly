@@ -59,4 +59,12 @@
     <string name="car_kmh">km/h</string>
     <string name="car_zone_false_alarm">Fausse alerte</string>
     <string name="car_ok">OK</string>
+    <string name="car_zfe_forbidden">⚠ ZFE %1$s interdite</string>
+    <string name="car_zfe_hours">ZFE %1$s : certaines heures</string>
+    <string name="car_zfe_unknown">ZFE %1$s : Crit\'Air ?</string>
+    <string name="car_zfe_allowed">ZFE %1$s autorisée</string>
+    <plurals name="car_incidents">
+        <item quantity="one">⚠ %1$d incident</item>
+        <item quantity="other">⚠ %1$d incidents</item>
+    </plurals>
 </resources>

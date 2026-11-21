@@ -72,8 +72,7 @@ dependencies {
     implementation(project(":core:geocoding"))
     implementation(project(":core:routing"))
     implementation(project(":core:navigation"))
-    implementation(project(":core:assistant"))
-    implementation(project(":feature:assistant"))
+    implementation(project(":feature:voice"))
     implementation(libs.androidx.lifecycle.process)
     implementation(project(":feature:home"))
     implementation(project(":feature:search"))
@@ -82,6 +81,7 @@ dependencies {
     implementation(project(":feature:navigation"))
     implementation(project(":feature:trips"))
     implementation(project(":feature:car"))
+    implementation(project(":feature:onboarding"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

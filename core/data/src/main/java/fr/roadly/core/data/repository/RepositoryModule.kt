@@ -32,6 +32,7 @@ abstract class RepositoryModule {
     @Binds abstract fun connectivity(impl: AndroidConnectivityObserver): ConnectivityObserver
     @Binds abstract fun vigilance(impl: RoomVigilanceRepository): VigilanceRepository
     @Binds abstract fun fuel(impl: OpenDataFuelStationProvider): FuelStationProvider
+    @Binds abstract fun charging(impl: fr.roadly.core.data.charging.IrveChargingStationProvider): fr.roadly.core.data.charging.ChargingStationProvider
     @Binds abstract fun communityConfig(impl: DataStoreCommunityConfigRepository): CommunityConfigRepository
     @Binds abstract fun community(impl: SupabaseCommunityRepository): CommunityRepository
     @Binds abstract fun trips(impl: RoomTripRepository): TripRepository
@@ -41,4 +42,6 @@ abstract class RepositoryModule {
     @Binds abstract fun entitlements(impl: DefaultEntitlementsRepository): EntitlementsRepository
     @Binds abstract fun driveMemory(impl: DataStoreDriveMemoryRepository): DriveMemoryRepository
     @Binds abstract fun radarSettings(impl: DataStoreRadarSettingsRepository): RadarSettingsRepository
+    @Binds abstract fun zfe(impl: fr.roadly.core.data.zfe.ZfeRepository): fr.roadly.core.data.zfe.ZfeSource
+    @Binds abstract fun traffic(impl: fr.roadly.core.data.traffic.TrafficRepository): fr.roadly.core.data.traffic.TrafficSource
 }

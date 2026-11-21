@@ -42,6 +42,8 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
     private var visible: SurfaceArea? = null
 
     private var styleUrl = ""
+    private var aerial = false
+    private var aerialNight = false
     private var routes: List<Route> = emptyList()
     private var activeRouteId: String? = null
     private var traversed: Pair<Int, GeoPoint?>? = null
@@ -66,6 +68,13 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         if (url.isEmpty() || url == styleUrl) return
         styleUrl = url
         host?.controller?.setStyle(url)
+    }
+
+    /** Photos aériennes IGN (assombries de nuit), comme sur le téléphone. */
+    fun setAerial(enabled: Boolean, night: Boolean) {
+        if (enabled == aerial && night == aerialNight) return
+        aerial = enabled; aerialNight = night
+        host?.controller?.setAerial(enabled, night)
     }
 
     fun setRoutes(routes: List<Route>, activeId: String?) {
@@ -208,6 +217,7 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         h.controller.setOverlayScale(OVERLAY_SCALE)
         applyPalette(h.controller)
         h.controller.applyDetail(detail)
+        h.controller.setAerial(aerial, aerialNight)
         if (styleUrl.isNotEmpty()) h.controller.setStyle(styleUrl)
         h.controller.setRoutes(routes, activeRouteId)
         h.controller.setMarkers(destinationMarkers())

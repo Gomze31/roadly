@@ -39,6 +39,10 @@ internal class CarRoutePreviewScreen(
     private var error: AppError? = null
     /** Zones de danger par variante (même calcul que le guidage). */
     private var zones: Map<String, Int> = emptyMap()
+    /** ZFE la plus contraignante traversée par chaque variante (réglage « Zones à faibles émissions » actif). */
+    private var zfe: Map<String, fr.roadly.core.data.zfe.ZfeCrossing> = emptyMap()
+    /** Incidents officiels notables par variante. */
+    private var incidents: Map<String, Int> = emptyMap()
     /** Variante choisie dans l'aperçu des hôtes de niveau 1 à 6. */
     private var selected = 0
 
@@ -84,6 +88,27 @@ internal class CarRoutePreviewScreen(
                 zones = counted
                 invalidate()
             }
+            val opts = options.orEmpty()
+            if (opts.isNotEmpty()) {
+                val events = try { deps.traffic.events() } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                if (events.isNotEmpty()) {
+                    val counts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        opts.associate { o -> o.route.id to fr.roadly.core.data.traffic.TrafficOnRoute.along(o.route.geometry, events).count { it.event.kind.notable } }
+                    }
+                    if (counts.values.any { it > 0 }) { incidents = counts; invalidate() }
+                }
+            }
+            if (opts.isNotEmpty() && deps.prefs.zfeEnabled.first()) {
+                val rules = try { deps.zfe.rules() } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                if (rules.isNotEmpty()) {
+                    val at = java.time.LocalDateTime.now()
+                    val cls = fr.roadly.core.data.zfe.ZfeVehicleClass.of(vehicle?.type)
+                    val found = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        opts.mapNotNull { o -> fr.roadly.core.data.zfe.ZfeRules.crossings(o.route.geometry, rules, cls, vehicle?.critAir, at).firstOrNull()?.let { o.route.id to it } }.toMap()
+                    }
+                    if (found.isNotEmpty()) { zfe = found; invalidate() }
+                }
+            }
         }
     }
 
@@ -126,6 +151,8 @@ internal class CarRoutePreviewScreen(
             carContext.getString(R.string.car_route_arrival, Formatters.clockTime(o.arrivalEpochMs)),
             carContext.getString(R.string.car_route_toll).takeIf { r.hasToll },
             zones[r.id]?.let { n -> if (n == 0) carContext.getString(R.string.car_danger_zones_none) else carContext.resources.getQuantityString(R.plurals.car_danger_zones, n, n) },
+            incidents[r.id]?.takeIf { it > 0 }?.let { n -> carContext.resources.getQuantityString(R.plurals.car_incidents, n, n) },
+            zfe[r.id]?.let { z -> carContext.getString(carZfeText(z.verdict), z.rule.name) },
         ).joinToString(" · ")
         return Row.Builder()
             .setTitle(o.label)
@@ -169,4 +196,12 @@ internal class CarRoutePreviewScreen(
             deps.guidance.start(option, prefs, vehicle, emptyList(), place.name)
         }
     }
+}
+
+/** Texte de la ligne de variante pour une ZFE traversée (Android Auto : texte seul, sans couleur garantie par l'hôte). */
+internal fun carZfeText(v: fr.roadly.core.data.zfe.ZfeVerdict): Int = when (v) {
+    fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN -> R.string.car_zfe_forbidden
+    fr.roadly.core.data.zfe.ZfeVerdict.FORBIDDEN_OTHER_HOURS -> R.string.car_zfe_hours
+    fr.roadly.core.data.zfe.ZfeVerdict.CRITAIR_UNKNOWN -> R.string.car_zfe_unknown
+    else -> R.string.car_zfe_allowed
 }

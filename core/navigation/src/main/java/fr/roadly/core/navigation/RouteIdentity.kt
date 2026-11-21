@@ -11,13 +11,19 @@ import kotlin.math.roundToInt
  *   pas plus vite). Null si aucune limitation n'est connue (on ne sait pas), 0 si toutes les limitations connues sont ≤ 90.
  * - [fastRoadShare] : part de la distance totale sur ces tronçons.
  * - [tollGantries] : portiques de péage en flux libre (OSM `highway=toll_gantry`) franchis.
+ * - [tollBooths] : gares de péage à barrières (OSM `barrier=toll_booth`) ; [trafficSignals] : carrefours à feux.
  */
 data class RouteIdentity(
     val knownLimitShare: Double,
     val fastRoadSeconds: Double?,
     val fastRoadShare: Double,
     val tollGantries: Int,
+    val tollBooths: Int = 0,
+    val trafficSignals: Int = 0,
 ) {
+    /** Péages du tracé : gares à barrières et portiques en flux libre. */
+    val tolls: Int get() = tollGantries + tollBooths
+
     /** Pourcentage entier de distance à limitation connue. */
     val knownLimitPercent: Int get() = (knownLimitShare * 100).roundToInt().coerceIn(0, 100)
 
@@ -43,6 +49,8 @@ data class RouteIdentity(
                 fastRoadSeconds = if (a.speedLimits.isEmpty()) null else fastSeconds,
                 fastRoadShare = if (a.totalM <= 0.0) 0.0 else (fastMeters / a.totalM).coerceIn(0.0, 1.0),
                 tollGantries = a.tollGantries.size,
+                tollBooths = a.tollBooths.size,
+                trafficSignals = a.trafficSignals.size,
             )
         }
     }

@@ -187,7 +187,7 @@ internal fun ScooterPoiSheet(state: PoisUi, onSelect: (PoiUi) -> Unit, onDismiss
     }
 }
 
-/** Réponse de Roadly AI. */
+/** Réponse de l'assistant vocal. */
 @Composable
 internal fun AssistantReplyPill(text: String, modifier: Modifier = Modifier) {
     val c = LocalRoadlyColors.current

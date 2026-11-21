@@ -5368,8 +5368,8 @@ Demander à l'utilisateur d'ajouter lui-même `GEMINI_API_KEY=…` dans `local.p
 
 ```powershell
 .\gradlew.bat :app:assembleDebug --offline -q
-adb -s AREE026226000174 install -r app\build\outputs\apk\debug\app-debug.apk
-adb -s AREE026226000174 logcat -c
+adb -s (numéro de série retiré) install -r app\build\outputs\apk\debug\app-debug.apk
+adb -s (numéro de série retiré) logcat -c
 ```
 
 Sur l'appareil, avec l'utilisateur :
@@ -5385,7 +5385,7 @@ Sur l'appareil, avec l'utilisateur :
 10. « Merci, c'est tout » → réponse brève puis fermeture ; sinon fermeture après 15 s de silence.
 
 ```powershell
-adb -s AREE026226000174 logcat -d | Select-String "FATAL EXCEPTION"
+adb -s (numéro de série retiré) logcat -d | Select-String "FATAL EXCEPTION"
 ```
 
 Expected: aucune ligne.
@@ -5393,9 +5393,9 @@ Expected: aucune ligne.
 - [ ] **Step 3: Battery**
 
 ```powershell
-adb -s AREE026226000174 shell dumpsys batterystats --reset
+adb -s (numéro de série retiré) shell dumpsys batterystats --reset
 # 5 minutes de session Roadly AI en guidage
-adb -s AREE026226000174 shell dumpsys batterystats fr.roadly | Select-String "Estimated power use|Wake lock|Audio|Mobile radio"
+adb -s (numéro de série retiré) shell dumpsys batterystats fr.roadly | Select-String "Estimated power use|Wake lock|Audio|Mobile radio"
 ```
 
 Noter les valeurs dans le journal ; micro et WebSocket doivent être inactifs hors session (`dumpsys audio` : aucun enregistreur `fr.roadly` après fermeture).

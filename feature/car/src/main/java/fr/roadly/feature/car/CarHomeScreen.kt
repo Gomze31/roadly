@@ -57,10 +57,15 @@ internal class CarHomeScreen(
     private var guiding = false
     private var permission = deps.location.permissionState.value
     private var lastFix: LocationFix? = deps.location.lastKnown
+    /** Fond de carte en photos aériennes IGN (même réglage que sur le téléphone). */
+    private var aerial = false
     /** Localisation du téléphone coupée (réglages rapides) : aucune position n'arrivera, on le dit dans la liste. */
     private var locationOff = !CarLocationSwitch.isOn(carContext)
 
     init {
+        lifecycleScope.launch(Dispatchers.Main) {
+            deps.prefs.mapAerial.distinctUntilChanged().collect { if (it != aerial) { aerial = it; invalidate() } }
+        }
         lifecycleScope.launch(Dispatchers.Main) {
             combine(
                 deps.favorites.observeHome(), deps.favorites.observeWork(), deps.favorites.observeAll(), deps.recents.observe(),
@@ -100,6 +105,11 @@ internal class CarHomeScreen(
         if (lastFix != null) return
         val p = places ?: return
         (p.home ?: p.work)?.let { renderer.follow(it.point, null, FollowProfile.BROWSE) }
+    }
+
+    /** Recherche, et bascule plan / photos aériennes (l'icône montre la vue vers laquelle on bascule). */
+    private fun homeActions(): ActionStrip = CarActions.homeStrip(aerial, onSearch = ::openSearch) {
+        lifecycleScope.launch { deps.prefs.setMapAerial(!aerial) }
     }
 
     override fun onGetTemplate(): Template {
@@ -196,12 +206,6 @@ internal class CarHomeScreen(
         val home = places?.home
         if (home != null) screenManager.push(CarRoutePreviewScreen(carContext, deps, renderer, home)) else openSearch(CarSearchAssign.HOME)
     }
-
-    /** Bandeau d'actions de l'accueil : domicile en un appui, recherche. */
-    private fun homeActions(): ActionStrip = ActionStrip.Builder()
-        .addAction(CarActions.icon(Icons.Default.Home) { goHome() })
-        .addAction(CarActions.icon(Icons.Default.Search) { openSearch() })
-        .build()
 
     private fun openSearch(assign: CarSearchAssign? = null) =
         screenManager.push(CarSearchScreen(carContext, deps, renderer, initialQuery = null, assign = assign))

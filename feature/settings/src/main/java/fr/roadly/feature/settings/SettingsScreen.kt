@@ -31,11 +31,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DirectionsBoat
+import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.filled.Subway
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.ElectricScooter
@@ -61,7 +66,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -136,6 +141,7 @@ enum class SettingsPage(val title: Int, val subtitle: Int, val icon: ImageVector
     ROUTES(R.string.settings_page_routes, R.string.settings_page_routes_sub, Icons.Default.Route),
     SPEED(R.string.settings_page_speed, R.string.settings_page_speed_sub, Icons.Default.Speed),
     VOICE(R.string.settings_page_voice, R.string.settings_page_voice_sub, Icons.Default.RecordVoiceOver),
+    /** Commandes vocales intégrées (aide : phrases comprises). */
     AI(R.string.settings_page_ai, R.string.settings_page_ai_sub, Icons.Default.Mic),
     DISPLAY(R.string.settings_section_display, R.string.settings_section_display_sub, Icons.Default.Palette),
     ANDROID_AUTO(R.string.settings_section_android_auto, R.string.settings_section_android_auto_sub, Icons.Default.Dashboard),
@@ -317,17 +323,29 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
             val navigation by vm.navigation.collectAsStateWithLifecycle()
             NavigationGroup(navigation, vm)
         }
-        SettingsPage.ROUTES -> RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries)
+        SettingsPage.ROUTES -> {
+            RoutePreferencesGroup(state.routePreferences, onTolls = vm::setAvoidTolls, onHighways = vm::setAvoidHighways, onFerries = vm::setAvoidFerries, onTunnels = vm::setAvoidTunnels, onUnpaved = vm::setAvoidUnpaved)
+            val zfe by vm.zfeEnabled.collectAsStateWithLifecycle()
+            SettingsGroup(stringResource(R.string.settings_group_local_rules), footer = stringResource(R.string.settings_zfe_footer)) {
+                ToggleRow(stringResource(R.string.settings_zfe), checked = zfe, onCheckedChange = vm::setZfeEnabled, icon = Icons.Default.Eco, subtitle = stringResource(R.string.settings_zfe_sub), divider = false)
+            }
+        }
         SettingsPage.SPEED -> {
             val coach by vm.coach.collectAsStateWithLifecycle()
+            val roadHazards by vm.roadHazardVoice.collectAsStateWithLifecycle()
             SpeedAlertGroup(state.voice.toleranceKmh, onSelect = vm::setSpeedTolerance)
             DriverAidGroup(
                 state.alerts, onRain = vm::setRainLowersLimit,
                 limitDropVoice = coach.first, onLimitDropVoice = vm::setLimitDropVoice, breakReminder = coach.second, onBreakReminder = vm::setBreakReminder,
+                roadHazardVoice = roadHazards, onRoadHazardVoice = vm::setRoadHazardVoice,
             )
         }
-        SettingsPage.VOICE -> VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice)
-        SettingsPage.AI -> AssistantGroup()
+        SettingsPage.VOICE -> {
+            val brief by vm.voiceBrief.collectAsStateWithLifecycle()
+            VoiceGroup(state.voice, onEnabled = vm::setVoiceEnabled, onVolume = vm::setVoiceVolume, onOverSpeedSound = vm::setOverSpeedSound, onTest = vm::testVoice,
+                brief = brief, onBrief = vm::setVoiceBrief)
+        }
+        SettingsPage.AI -> VoiceCommandsGroup()
         SettingsPage.DISPLAY -> {
             val tint by vm.tint.collectAsStateWithLifecycle()
             AppearanceGroup(state.themeMode, onSelect = vm::setTheme)
@@ -519,13 +537,20 @@ private fun AppearanceGroup(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
 // ── Voix et sons ────────────────────────────────────────────────────────────
 
 @Composable
-private fun VoiceGroup(voice: VoiceSettings, onEnabled: (Boolean) -> Unit, onVolume: (Int) -> Unit, onOverSpeedSound: (Boolean) -> Unit, onTest: (String) -> Unit) {
+private fun VoiceGroup(
+    voice: VoiceSettings, onEnabled: (Boolean) -> Unit, onVolume: (Int) -> Unit, onOverSpeedSound: (Boolean) -> Unit, onTest: (String) -> Unit,
+    brief: Boolean = false, onBrief: (Boolean) -> Unit = {},
+) {
     val c = LocalRoadlyColors.current
     // Valeur locale pendant le glissement ; enregistrée au relâchement.
     var volume by remember(voice.volume) { mutableFloatStateOf(voice.volume.toFloat()) }
     val phrase = stringResource(R.string.settings_voice_test_phrase)
     SettingsGroup(stringResource(R.string.settings_voice)) {
         ToggleRow(stringResource(R.string.settings_voice_enabled), checked = voice.enabled, onCheckedChange = onEnabled, icon = Icons.Default.RecordVoiceOver)
+        ToggleRow(
+            stringResource(R.string.settings_voice_brief), checked = brief, onCheckedChange = onBrief, icon = Icons.AutoMirrored.Filled.VolumeDown,
+            subtitle = stringResource(R.string.settings_voice_brief_subtitle),
+        )
         ListRow(
             stringResource(R.string.settings_voice_volume),
             icon = Icons.Default.GraphicEq,
@@ -585,10 +610,12 @@ private fun vigilanceSummary(alerts: AlertSettings, refresh: RefreshState): Stri
 private fun DriverAidGroup(
     alerts: AlertSettings, onRain: (Boolean) -> Unit,
     limitDropVoice: Boolean = true, onLimitDropVoice: (Boolean) -> Unit = {}, breakReminder: Boolean = true, onBreakReminder: (Boolean) -> Unit = {},
+    roadHazardVoice: Boolean = true, onRoadHazardVoice: (Boolean) -> Unit = {},
 ) {
     SettingsGroup(stringResource(R.string.settings_group_driver_aids)) {
         ToggleRow(stringResource(R.string.settings_rain_limit), checked = alerts.rainLowersLimit, onCheckedChange = onRain, icon = Icons.Default.WaterDrop, subtitle = stringResource(R.string.settings_rain_limit_subtitle))
         ToggleRow(stringResource(R.string.settings_limit_drop), checked = limitDropVoice, onCheckedChange = onLimitDropVoice, icon = Icons.Default.Speed, subtitle = stringResource(R.string.settings_limit_drop_subtitle))
+        ToggleRow(stringResource(R.string.settings_road_hazard_voice), checked = roadHazardVoice, onCheckedChange = onRoadHazardVoice, icon = Icons.Default.Warning, subtitle = stringResource(R.string.settings_road_hazard_voice_subtitle))
         ToggleRow(stringResource(R.string.settings_break_reminder), checked = breakReminder, onCheckedChange = onBreakReminder, icon = Icons.Default.LocalCafe, subtitle = stringResource(R.string.settings_break_reminder_subtitle), divider = false)
     }
 }
@@ -596,11 +623,13 @@ private fun DriverAidGroup(
 // ── Itinéraires ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit) {
+private fun RoutePreferencesGroup(prefs: RoutePreferences, onTolls: (Boolean) -> Unit, onHighways: (Boolean) -> Unit, onFerries: (Boolean) -> Unit, onTunnels: (Boolean) -> Unit, onUnpaved: (Boolean) -> Unit = {}) {
     SettingsGroup(stringResource(R.string.settings_group_routes)) {
-        ToggleRow(stringResource(R.string.settings_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = onTolls, icon = Icons.Default.Toll)
+        ToggleRow(stringResource(R.string.settings_avoid_tolls), checked = prefs.avoidTolls, onCheckedChange = onTolls, icon = Icons.Default.Euro)
         ToggleRow(stringResource(R.string.settings_avoid_highways), checked = prefs.avoidHighways, onCheckedChange = onHighways, icon = Icons.Default.Route)
-        ToggleRow(stringResource(R.string.settings_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = onFerries, icon = Icons.Default.DirectionsBoat, divider = false)
+        ToggleRow(stringResource(R.string.settings_avoid_tunnels), checked = prefs.avoidTunnels, onCheckedChange = onTunnels, icon = Icons.Default.Subway)
+        ToggleRow(stringResource(R.string.settings_avoid_ferries), checked = prefs.avoidFerries, onCheckedChange = onFerries, icon = Icons.Default.DirectionsBoat)
+        ToggleRow(stringResource(R.string.settings_avoid_unpaved), checked = prefs.avoidUnpaved, onCheckedChange = onUnpaved, icon = Icons.Default.Terrain, divider = false)
     }
 }
 
@@ -661,11 +690,11 @@ private fun TintGroup(current: String?, onSelect: (String?) -> Unit) {
         Row(Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
             CockpitTint.entries.forEach { t ->
                 val color = if (c.isDark) t.night.second else t.day.first
-                val selected = (current ?: CockpitTint.VIOLET.name) == t.name
+                val selected = (current ?: CockpitTint.MAGENTA.name) == t.name
                 Box(
                     Modifier.size(44.dp).clip(RoadlyShapes.Pill).background(color)
                         .border(if (selected) 3.dp else 0.dp, if (selected) c.textPrimary else androidx.compose.ui.graphics.Color.Transparent, RoadlyShapes.Pill)
-                        .clickable(role = Role.RadioButton) { onSelect(if (t == CockpitTint.VIOLET) null else t.name) },
+                        .clickable(role = Role.RadioButton) { onSelect(if (t == CockpitTint.MAGENTA) null else t.name) },
                     contentAlignment = Alignment.Center,
                 ) { if (selected) Icon(Icons.Default.Check, contentDescription = t.name, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp)) }
             }
@@ -825,3 +854,18 @@ internal fun CritAir.label(): String = when (this) {
 }
 
 internal fun String.toFrDoubleOrNull(): Double? = trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
+
+// ── Commandes vocales ───────────────────────────────────────────────────────
+
+/** Phrases comprises par le bouton micro (interprétées sur le téléphone, sans service d'IA ni clé). */
+@Composable
+private fun VoiceCommandsGroup() {
+    val examples = listOf(
+        R.string.settings_voice_ex_home, R.string.settings_voice_ex_go, R.string.settings_voice_ex_avoid, R.string.settings_voice_ex_report,
+        R.string.settings_voice_ex_arrival, R.string.settings_voice_ex_remaining, R.string.settings_voice_ex_limit, R.string.settings_voice_ex_fuel,
+        R.string.settings_voice_ex_mute, R.string.settings_voice_ex_stop,
+    )
+    SettingsGroup(stringResource(R.string.settings_voice_commands_group), footer = stringResource(R.string.settings_voice_commands_footer)) {
+        examples.forEachIndexed { i, res -> ListRow(stringResource(res), icon = Icons.Default.Mic, divider = i < examples.lastIndex) }
+    }
+}

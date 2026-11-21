@@ -26,7 +26,7 @@ sealed interface ScooterCommand {
 
 /**
  * Compréhension par mots-clés (français), sans service distant. Prévue pour être remplacée ou complétée par le
- * copilote conversationnel (spec Roadly AI) : les mêmes intentions sont exposées comme outils ([ScooterAssistantTools]).
+ * copilote conversationnel (spec l'assistant vocal) : les mêmes intentions sont exposées comme outils ([ScooterAssistantTools]).
  */
 object ScooterCommandParser {
     fun normalize(text: String): String =

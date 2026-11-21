@@ -90,6 +90,12 @@ Les builds débogables acceptent tout hôte. Les builds de version n'acceptent q
 
 ## 3 bis. « Roadly n'apparaît pas dans Android Auto »
 
+**Constat du 2026-11-09 (Android Auto 17.9, Ford EcoSport 2018 / SYNC 3)** : Roadly 0.1.203, installé par APK, reste absent de « Personnaliser le lanceur » même avec le mode développeur et « Sources inconnues » actifs. Le même comportement est décrit pour une autre application Car App Library ([prototux/lapin#1](https://github.com/prototux/lapin/issues/1), Android Auto 17.9.664044, Android 16) : journal `CAR.VALIDATOR: Package DENIED; failed all other checks`. D'après son auteur (lecture non confirmée du code d'Android Auto), « Sources inconnues » ne laisse passer que certaines catégories, pas les applications à gabarits (`template`), celles de la Car App Library. Installer avec `adb install -i com.android.vending` ne suffit pas.
+
+Contournement sans ordinateur ni root : [UnknownAuto](https://github.com/GitMag/UnknownAuto) (libre, MIT) installe un APK par le programme d'installation d'Android en le marquant « installé par le Play Store », grâce à [Shizuku](https://shizuku.rikka.app/) démarré par débogage sans fil. La marque ne se pose qu'à l'installation : chaque mise à jour doit passer par UnknownAuto (le bouton « Installer » de Roadly la retirerait ; Roadly le signale et propose de télécharger l'APK à la place). Solution durable : une publication sur le Play Store (piste de test comprise).
+
+
+
 Réglages › **Android Auto** (sur le téléphone) affiche le diagnostic :
 
 | Vérification | Comment Roadly la fait |
@@ -167,3 +173,6 @@ Les bandes courbes multicolores visibles sur une photo de l'essai n'ont pas de c
 **Non vérifié** (aucun téléphone en adb ce jour-là) : tout ce qui se voit ou s'entend sur l'hôte — animation de caméra, images de carrefour et de voies (l'hôte peut les réduire ou les ignorer), bandeau à trois actions en guidage, dictée dans la recherche, voix retenue par le moteur. Trace à lire : `RoadlySpeech` « Voix : … ».
 
 **Limite de la voix** : la qualité dépend des voix installées dans « Synthèse vocale Google » sur le téléphone. Une voix neuronale embarquée dans l'application (hors moteur du système) ou une voix en ligne restent à décider : poids de l'APK pour l'une, délai et zones blanches pour l'autre.
+## Photos aériennes
+
+Le bouton à côté de « Rechercher », sur l'accueil de la voiture, bascule la carte entre le plan et les photos aériennes de l'IGN (même réglage que sur le téléphone, Réglages › Navigation). Les photos sont assombries quand l'écran de la voiture passe en mode nuit. Hors de France, le plan reste affiché.

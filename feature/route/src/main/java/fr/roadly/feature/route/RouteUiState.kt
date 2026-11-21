@@ -36,6 +36,12 @@ sealed interface RouteUiState {
         val dangerZones: Map<String, Int> = emptyMap(),
         /** S5 : carte d'identité par itinéraire (profil réel) ; absent = pas encore obtenue ou indisponible (hors ligne, échec). */
         val identities: Map<String, RouteIdentity> = emptyMap(),
+        /** ZFE traversées par itinéraire (verdict selon la vignette Crit'Air du véhicule) ; absent = pas de ZFE ou pas encore calculé. */
+        val zfe: Map<String, List<fr.roadly.core.data.zfe.ZfeCrossing>> = emptyMap(),
+        /** Incidents officiels (Bison Futé) par itinéraire, dans l'ordre du trajet. */
+        val traffic: Map<String, List<fr.roadly.core.data.traffic.TrafficHit>> = emptyMap(),
+        /** Véhicule électrique : batterie saisie et charge estimée à l'arrivée par itinéraire ; null = véhicule thermique ou sans profil. */
+        val ev: EvRouteUi? = null,
     ) : RouteUiState
 }
 
@@ -57,6 +63,21 @@ data class RouteScreenState(
     /** Mode de déplacement actif (sélecteur) ; [scooterAvailable] = services trottinette présents. */
     val travelMode: TravelMode = TravelMode.CAR,
     val scooterAvailable: Boolean = false,
-    /** Dernière réponse de Roadly AI (affichée quelques secondes). */
+    /** Dernière réponse de l'assistant vocal (affichée quelques secondes). */
     val assistantReply: String? = null,
 )
+
+/** Autonomie d'un véhicule électrique : [batteryKwh] et [chargePct] saisis (null = à renseigner), [arrivals] par identifiant de tracé. */
+data class EvRouteUi(
+    val batteryKwh: Double?,
+    val chargePct: Int?,
+    val arrivals: Map<String, fr.roadly.core.routing.EvArrival> = emptyMap(),
+)
+
+/** Feuille « Bornes rapides sur le trajet » de l'écran d'itinéraires. */
+sealed interface ChargersUi {
+    data object Hidden : ChargersUi
+    data object Loading : ChargersUi
+    data class Content(val chargers: List<fr.roadly.core.navigation.ChargerAhead>) : ChargersUi
+    data class Error(val error: fr.roadly.core.common.AppError) : ChargersUi
+}

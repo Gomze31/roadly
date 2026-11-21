@@ -113,9 +113,11 @@ private const val FREE_DRIVE_TILT = 45.0
  */
 @Composable
 fun FreeDriveScreen(isDark: Boolean, onExit: () -> Unit, vm: FreeDriveViewModel = hiltViewModel()) {
+    // Interface : même clair / sombre que l'app (sombre en permanence sauf choix « Clair ») ; la carte suit [isDark].
+    val uiDark = LocalRoadlyColors.current.isDark
     val tint = LocalRoadlyColors.current.brand
-    val cockpit = CockpitTint.entries.firstOrNull { (if (isDark) it.night else it.day).first == tint } ?: CockpitTint.VIOLET
-    RoadlyTheme(darkTheme = isDark, drivingMode = true, tint = cockpit) { FreeDriveContent(isDark, onExit, vm) }
+    val cockpit = CockpitTint.entries.firstOrNull { (if (uiDark) it.night else it.day).first == tint } ?: CockpitTint.MAGENTA
+    RoadlyTheme(darkTheme = uiDark, drivingMode = true, tint = cockpit) { FreeDriveContent(isDark, onExit, vm) }
 }
 
 @Composable

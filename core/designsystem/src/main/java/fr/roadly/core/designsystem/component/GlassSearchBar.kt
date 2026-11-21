@@ -1,5 +1,6 @@
 package fr.roadly.core.designsystem.component
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,7 +50,7 @@ fun GlassSearchBar(
 ) {
     val c = LocalRoadlyColors.current
     GlassPanel(
-        modifier = modifier.fillMaxWidth().height(56.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
         shape = RoadlyShapes.Panel,
         contentPadding = 0.dp,
         onClick = if (readOnly) onClick else null,

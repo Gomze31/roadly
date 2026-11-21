@@ -81,6 +81,26 @@ class SupabaseCommunityRepositoryTest {
         assertEquals("/rest/v1/rpc/reports_in_box", server.takeRequest().path)
     }
 
+    @Test fun `secured schema - author ids are never returned, mine comes from the server and the device is sent only to compute it`() = runTest {
+        configure()
+        val secured = """{"id":"r9","kind":"ACCIDENT","lat":43.6,"lon":1.44,"created_at":"2026-11-16T01:00:00+00:00","expires_at":"2026-11-16T02:00:00+00:00","confirmations":0,"denials":0,"active":true,"mine":true}"""
+        server.enqueue(MockResponse().setBody("[$secured,${secured.replace("\"mine\":true", "\"mine\":false").replace("r9", "r10")}]"))
+        val r = (repo.nearby(BoundingBox(43.55, 1.39, 43.65, 1.49)) as Outcome.Success).value
+        assertEquals(listOf(true, false), r.map { it.mine })
+        val body = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals(device, body["p_device"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun `older server without p_device - the read is retried without it and mine falls back to the author id`() = runTest {
+        configure()
+        server.enqueue(MockResponse().setResponseCode(404).setBody("""{"code":"PGRST202","message":"Could not find the function public.reports_in_box(east, north, p_device, south, west)"}"""))
+        server.enqueue(MockResponse().setBody("[$row]"))
+        val r = (repo.nearby(BoundingBox(43.55, 1.39, 43.65, 1.49)) as Outcome.Success).value
+        assertTrue(r.single().mine)
+        assertTrue(server.takeRequest().body.readUtf8().contains("p_device"))
+        assertTrue(!server.takeRequest().body.readUtf8().contains("p_device"))
+    }
+
     @Test fun `business errors from the database are mapped`() = runTest {
         configure()
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"code":"P0003","message":"own_report"}"""))

@@ -48,7 +48,7 @@ fun OverlineText(text: String, modifier: Modifier = Modifier, color: Color = Loc
             Box(Modifier.width(14.dp).height(2.dp).background(color, RoundedCornerShape(1.dp)))
             Spacer(Modifier.width(8.dp))
         }
-        Text(text.uppercase(), style = Overline, color = color)
+        Text(text.uppercase(), style = Overline, color = color, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 

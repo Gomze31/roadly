@@ -37,6 +37,13 @@ import org.maplibre.android.style.expressions.Expression.toColor
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
+import org.maplibre.android.style.layers.PropertyFactory.fillColor
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.RasterLayer
+import org.maplibre.android.style.layers.PropertyFactory.rasterBrightnessMax
+import org.maplibre.android.style.sources.RasterSource
+import org.maplibre.android.style.sources.TileSet
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
@@ -84,16 +91,21 @@ class MapController(internal val context: Context) {
     private var lastScooter: String = ScooterRouteFeatures.EMPTY
     private var lastTraversedTail: String = TraversedFeatureBuilder.EMPTY
     private val traversed = TraversedLine()
-    private var routeColorActive = "#B794FF"
-    private var routeColorInactive = "#5A5470"
-    private var routeColorCasing = "#0E0B14"
+    // Valeurs par défaut = palette de l'app (Android Auto n'appelle pas setRouteColors).
+    private var routeColorActive = "#D08CFF"
+    private var routeColorInactive = "#6A5A78"
+    private var routeColorCasing = "#140A1A"
     private var arrowColorBody = "#FFFFFF"
-    private var arrowColorCasing = "#8B5CF6"
+    private var arrowColorCasing = "#F03CDC"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
     private var lastDanger: String = DangerZoneFeatures.EMPTY
     private var overlayScale = 1f
+    private var lastZfe: String = ZfeFeatures.EMPTY
     private var buildings3d = false
     private var buildingsColor = "#2A2236"
+    /** Photos aériennes IGN sous les routes et les étiquettes ([AerialImagery]) ; [aerialNight] = assombries. */
+    private var aerial = false
+    private var aerialNight = false
 
     /** Commande caméra reçue avant que la carte et son style soient prêts ; la dernière l'emporte, rejouée en fin de `replayState`. */
     private var pendingCamera: ((MapLibreMap) -> Unit)? = null
@@ -112,6 +124,14 @@ class MapController(internal val context: Context) {
     private val baseNameFilters = mutableMapOf<String, Expression?>()
 
     var onRouteClick: ((String) -> Unit)? = null
+
+    /** Incrémenté à chaque mouvement de caméra : les étiquettes Compose posées sur la carte se recalculent. */
+    private val _cameraTick = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val cameraTick: kotlinx.coroutines.flow.StateFlow<Int> = _cameraTick
+
+    /** Position à l'écran (px, dans la vue de la carte) d'un point ; null tant que la carte n'est pas attachée. */
+    fun toScreen(point: GeoPoint): android.graphics.PointF? =
+        map?.projection?.toScreenLocation(org.maplibre.android.geometry.LatLng(point.lat, point.lon))
 
     /** D5 : coin et marges (px) de l'icône d'attribution, appliqués à l'attache et à chaque changement. */
     private var attributionTop = false
@@ -142,6 +162,8 @@ class MapController(internal val context: Context) {
                 window.add(fps, SystemClock.elapsedRealtime())?.let { Log.d(FPS_TAG, String.format(Locale.ROOT, "carte %.1f i/s (moyenne 5 s)", it)) }
             }
         }
+        map.addOnCameraMoveListener { _cameraTick.value++ }
+        map.addOnCameraIdleListener { _cameraTick.value++ }
         map.addOnMapClickListener { latLng ->
             val m = this.map ?: return@addOnMapClickListener false
             val pt = m.projection.toScreenLocation(latLng)
@@ -209,6 +231,7 @@ class MapController(internal val context: Context) {
         style.addImage(MapIds.IMG_ARROW_HEAD, drawableToBitmap(R.drawable.ic_arrow_head))
         style.addSource(GeoJsonSource(MapIds.SRC_ARROW))
         style.addSource(GeoJsonSource(MapIds.SRC_DANGER))
+        style.addSource(GeoJsonSource(MapIds.SRC_ZFE))
         style.addSource(GeoJsonSource(MapIds.SRC_REPORTS))
         style.addSource(GeoJsonSource(MapIds.SRC_ROUTES))
         style.addSource(GeoJsonSource(MapIds.SRC_TRAVERSED))
@@ -219,6 +242,12 @@ class MapController(internal val context: Context) {
         // Bâtiments d'abord : leur ancrage ne voit que les calques du style, et le repli `addLayer` reste sous ceux de Roadly.
         installBuildings(style)
 
+        // Zones à faibles émissions : remplissage translucide et contour pointillé, sous les tracés.
+        val zfeColor = toColor(match(get("state"), literal(ZfeFeatures.OK_COLOR), stop("forbidden", ZfeFeatures.FORBIDDEN_COLOR), stop("caution", ZfeFeatures.CAUTION_COLOR)))
+        style.addLayer(FillLayer(MapIds.LYR_ZFE_FILL, MapIds.SRC_ZFE).withProperties(fillColor(zfeColor), fillOpacity(0.10f)))
+        style.addLayer(LineLayer(MapIds.LYR_ZFE_LINE, MapIds.SRC_ZFE).withProperties(
+            lineColor(zfeColor), lineWidth(2.5f), lineOpacity(0.9f), lineDasharray(arrayOf(2f, 1.2f)), lineJoin(Property.LINE_JOIN_ROUND),
+        ))
         // Halo lumineux large et translucide sous le tracé actif (lueur), puis liseré, puis trait.
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_GLOW, MapIds.SRC_ROUTES).withProperties(
             lineColor(routeColorActive), lineWidth(18f * s), lineOpacity(0.22f), lineBlur(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
@@ -319,10 +348,12 @@ class MapController(internal val context: Context) {
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_REPORTS)?.setGeoJson(PointFeatureBuilder.reports(lastReports))
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_ARROW)?.setGeoJson(lastArrow)
         style.getSourceAs<GeoJsonSource>(MapIds.SRC_DANGER)?.setGeoJson(lastDanger)
+        style.getSourceAs<GeoJsonSource>(MapIds.SRC_ZFE)?.setGeoJson(lastZfe)
         applyRouteColors(style)
         applyArrowColors(style)
         applyBuildings(style)
         applyDetailTo(style)
+        applyAerial(style)
         map?.let { m -> pendingCamera?.let { it(m); pendingCamera = null } }
     }
 
@@ -342,8 +373,49 @@ class MapController(internal val context: Context) {
 
     private fun applyBuildings(style: Style) {
         (style.getLayer(MapIds.LYR_BUILDINGS_3D) as? FillExtrusionLayer)?.setProperties(
-            fillExtrusionColor(buildingsColor), visibility(if (buildings3d) Property.VISIBLE else Property.NONE),
+            // Sur les photos aériennes, les toits réels sont visibles : des volumes gris par-dessus brouilleraient l'image.
+            fillExtrusionColor(buildingsColor), visibility(if (buildings3d && !aerial) Property.VISIBLE else Property.NONE),
         )
+    }
+
+    /**
+     * Vue « photos aériennes » : active ou non, assombrie la nuit. La désactivation recharge le style (retour exact aux réglages du
+     * style, sans mémoriser chaque propriété modifiée) ; l'état de Roadly est rejoué comme après tout changement de style.
+     */
+    fun setAerial(enabled: Boolean, night: Boolean) {
+        val turnedOff = aerial && !enabled
+        aerial = enabled
+        aerialNight = night
+        if (!styleReady) return
+        if (turnedOff) { currentStyleUrl?.let { loadStyle(it) }; return }
+        map?.style?.let { applyAerial(it); applyBuildings(it) }
+    }
+
+    /** Photo sous la première ligne de route du style : les routes, les étiquettes et les calques de Roadly restent au-dessus. */
+    private fun applyAerial(style: Style) {
+        if (!aerial) return
+        if (style.getSource(MapIds.SRC_AERIAL) == null) {
+            val tiles = TileSet("2.1.0", AerialImagery.TILE_URL).apply {
+                attribution = AerialImagery.ATTRIBUTION
+                maxZoom = AerialImagery.MAX_ZOOM.toFloat()
+            }
+            style.addSource(RasterSource(MapIds.SRC_AERIAL, tiles, 256))
+            val layer = RasterLayer(MapIds.LYR_AERIAL, MapIds.SRC_AERIAL)
+            val anchor = style.layers.firstOrNull { (it as? LineLayer)?.sourceLayer == MapIds.STYLE_LYR_TRANSPORTATION }?.id
+                ?: style.layers.firstOrNull { it is SymbolLayer }?.id
+            if (anchor != null) style.addLayerBelow(layer, anchor) else style.addLayer(layer)
+        }
+        (style.getLayer(MapIds.LYR_AERIAL) as? RasterLayer)?.setProperties(
+            rasterBrightnessMax(if (aerialNight) AerialImagery.NIGHT_BRIGHTNESS_MAX else 1f),
+        )
+        for (layer in style.layers) {
+            when {
+                // Bâtiments plats du style : ils cacheraient les toits de la photo.
+                layer is FillLayer && layer.sourceLayer == MapIds.STYLE_LYR_BUILDING -> layer.setProperties(visibility(Property.NONE))
+                // Routes du style allégées : la photo montre déjà la chaussée, le tracé de Roadly reste opaque.
+                layer is LineLayer && layer.sourceLayer == MapIds.STYLE_LYR_TRANSPORTATION -> layer.setProperties(lineOpacity(0.55f))
+            }
+        }
     }
 
     /**
@@ -448,6 +520,13 @@ class MapController(internal val context: Context) {
         if (geoJson == lastDanger) return
         lastDanger = geoJson
         if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_DANGER)?.setGeoJson(geoJson)
+    }
+
+    /** Périmètres ZFE (GeoJSON de [ZfeFeatures.build]) ; [ZfeFeatures.EMPTY] pour les effacer. */
+    fun setZfeZones(geoJson: String) {
+        if (geoJson == lastZfe) return
+        lastZfe = geoJson
+        if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_ZFE)?.setGeoJson(geoJson)
     }
 
     /** Couleurs CSS de la flèche : trait et liseré propres, contrastés quel que soit le thème du fond de carte. */

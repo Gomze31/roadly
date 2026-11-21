@@ -42,6 +42,10 @@ internal object MapIds {
     const val SRC_DANGER = "roadly-danger"
     const val LYR_DANGER_CASING = "roadly-danger-casing"
     const val LYR_DANGER = "roadly-danger-line"
+    /** Périmètres des zones à faibles émissions. */
+    const val SRC_ZFE = "roadly-zfe"
+    const val LYR_ZFE_FILL = "roadly-zfe-fill"
+    const val LYR_ZFE_LINE = "roadly-zfe-line"
     const val LYR_ARROW_CASING = "roadly-arrow-casing"
     const val LYR_ARROW = "roadly-arrow-line"
     const val LYR_ARROW_HEAD = "roadly-arrow-head"
@@ -50,6 +54,9 @@ internal object MapIds {
     /** Source vecteur OpenMapTiles des styles OpenFreeMap ; absente = pas de bâtiments 3D. */
     const val STYLE_SRC_OPENMAPTILES = "openmaptiles"
     const val STYLE_LYR_BUILDING = "building"
+    /** Photos aériennes IGN : la photo passe sous les routes (`transportation`) ; les bâtiments plats sont masqués dessus. */
+    const val SRC_AERIAL = "roadly-aerial"
+    const val LYR_AERIAL = "roadly-aerial"
     /** Calques de points d'intérêt et de noms de rues des tuiles OpenMapTiles (niveau de détail, C2). */
     const val STYLE_LYR_POI = "poi"
     /** Routes (lignes) ; ses calques de symboles sont les flèches de sens unique. */

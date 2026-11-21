@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_button">Commande vocale</string>
+    <string name="voice_prompt">Que voulez-vous faire ?</string>
+    <string name="voice_working">Je m\'en occupe…</string>
+</resources>

@@ -26,4 +26,6 @@ abstract class NavigationModule {
     /** Outil de test : trajet simulé ou trace GPX rejouée au départ d'un guidage (réglage « Simulation de trajet »). */
     @Binds abstract fun driveSimulation(impl: ReplayDriveSimulation): DriveSimulation
     @Binds abstract fun roadSnapshots(impl: ValhallaRoadSnapshotProvider): RoadSnapshotProvider
+    /** Ralentisseurs OSM des voies lentes du tracé, une requête Overpass par tracé. */
+    @Binds abstract fun speedBumps(impl: OverpassSpeedBumpProvider): SpeedBumpProvider
 }

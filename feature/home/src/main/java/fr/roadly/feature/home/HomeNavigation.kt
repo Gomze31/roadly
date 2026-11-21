@@ -23,8 +23,9 @@ fun NavGraphBuilder.homeScreen(
     assistantButton: @Composable () -> Unit = {},
     assistantPanel: @Composable () -> Unit = {},
     onFreeDrive: () -> Unit = {},
+    onSearchText: (String) -> Unit = {},
 ) {
     composable<HomeRoute> {
-        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance, onSearchCategory, onOpenProfile, assistantButton, assistantPanel, onFreeDrive = onFreeDrive)
+        HomeScreen(isDark, onSearch, onSettings, onNavigateToRoute, onRequestLocationPermission, onOpenAppSettings, onResumeGuidance, onSearchCategory, onOpenProfile, assistantButton, assistantPanel, onFreeDrive = onFreeDrive, onSearchText = onSearchText)
     }
 }

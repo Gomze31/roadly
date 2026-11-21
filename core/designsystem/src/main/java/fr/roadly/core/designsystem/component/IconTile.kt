@@ -35,14 +35,15 @@ fun IconTile(
 ) {
     val c = LocalRoadlyColors.current
     val (bg, fg) = when (style) {
-        IconTileStyle.Brand -> c.brandSoft to c.brandBright
-        IconTileStyle.BrandFilled -> c.brand to c.onBrand
+        IconTileStyle.Brand -> c.surfaceElevated to c.brand
+        IconTileStyle.BrandFilled -> c.brand to c.onBrandAuto
         IconTileStyle.Accent -> c.accentSoft to c.accent
         IconTileStyle.Warning -> c.warning.copy(alpha = 0.18f) to c.warning
         IconTileStyle.Danger -> c.dangerSoft to c.danger
         IconTileStyle.Neutral -> c.glassBorder to c.textSecondary
     }
-    Box(modifier.size(size).background(bg, RoadlyShapes.Tile), contentAlignment = Alignment.Center) {
+    // Pastilles rondes (référence visuelle) ; l'icône garde sa taille relative.
+    Box(modifier.size(size).background(bg, RoadlyShapes.Pill), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = contentDescription, tint = fg, modifier = Modifier.size(size * 0.55f))
     }
 }

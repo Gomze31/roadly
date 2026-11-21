@@ -1,5 +1,9 @@
 package fr.roadly.feature.navigation
 
+import androidx.compose.ui.draw.rotate
+
+import androidx.compose.animation.core.animateFloatAsState
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -42,7 +46,7 @@ import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material.icons.filled.Toll
+import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -148,9 +152,11 @@ fun NavigationScreen(
 ) {
     // Mode conduite (spec §2) : typographie ×1,3 et cibles 56 dp via LocalDrivingMode = true.
     // Même teinte que le reste de l'app : le thème conduite est recomposé avec la teinte courante.
+    // Interface : même clair / sombre que l'app (sombre en permanence sauf choix « Clair ») ; la carte suit [isDark].
+    val uiDark = LocalRoadlyColors.current.isDark
     val tint = LocalRoadlyColors.current.brand
-    val cockpit = CockpitTint.entries.firstOrNull { (if (isDark) it.night else it.day).first == tint } ?: CockpitTint.VIOLET
-    RoadlyTheme(darkTheme = isDark, drivingMode = true, tint = cockpit) {
+    val cockpit = CockpitTint.entries.firstOrNull { (if (uiDark) it.night else it.day).first == tint } ?: CockpitTint.MAGENTA
+    RoadlyTheme(darkTheme = uiDark, drivingMode = true, tint = cockpit) {
         NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm, assistantButton, assistantPanel)
     }
 }
@@ -196,10 +202,12 @@ private fun NavigationContent(
     val powerSave = remember { derivedStateOf { powerSaveSetting.value.effective(systemSaver.value) } }
     // E2 « Bâtiments 3D » : en mode 3D seulement, et jamais en économie d'énergie.
     val buildings3d = vm.map3d.collectAsStateWithLifecycle()
-    LaunchedEffect(cameraMode.value, powerSave.value, buildings3d.value, c.buildings3d) {
-        map.setBuildings3d(buildings3d.value && cameraMode.value == CameraMode3D.FOLLOW_3D && !powerSave.value, c.buildings3d.toHex())
+    // Bâtiments : couleur de la carte (jour / nuit), l'interface restant sombre en permanence.
+    val buildingsColor = (if (isDark) fr.roadly.core.designsystem.theme.RoadlyColors.Night else fr.roadly.core.designsystem.theme.RoadlyColors.Day).buildings3d
+    LaunchedEffect(cameraMode.value, powerSave.value, buildings3d.value, buildingsColor) {
+        map.setBuildings3d(buildings3d.value && cameraMode.value == CameraMode3D.FOLLOW_3D && !powerSave.value, buildingsColor.toHex())
     }
-    LaunchedEffect(c.onBrand, c.brand) { map.setArrowColor(c.onBrand.toHex(), c.brand.toHex()) }
+    LaunchedEffect(c.brand) { map.setArrowColor("#FFFFFF", c.brand.toHex()) }
     val approach = state.approach
     LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
         if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
@@ -266,6 +274,8 @@ private fun NavigationContent(
             PortraitOverlay(full, bannerExpanded, { bannerExpanded = !bannerExpanded }, { showReport = true }, onChangeDestination, vm, assistantButton, assistantPanel, junctionSlot)
         }
         ReportResultPillNav(reportMessage, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp))
+        // Image dans l'image : la carte continue sous une carte opaque lisible à petite taille (manœuvre, distance, rue, arrivée).
+        if (fr.roadly.core.designsystem.theme.LocalPictureInPicture.current) PipGuidance(full, Modifier.fillMaxSize())
     }
 
     val communityEnabled by vm.communityEnabled.collectAsStateWithLifecycle()
@@ -278,6 +288,12 @@ private fun NavigationContent(
     if (pois != PoisUi.Hidden) ScooterPoiSheet(pois, onSelect = vm::navigateToPoi, onDismiss = vm::dismissPois)
     val alternatives by vm.alternativesUi.collectAsStateWithLifecycle()
     if (alternatives != AlternativesUi.Hidden) AlternativesSheet(alternatives, onSelect = vm::switchTo, onRetry = vm::loadAlternatives, onDismiss = vm::dismissAlternatives, onAddStop = { vm.dismissAlternatives(); onAddStop() })
+    val fuelAhead by vm.fuelAheadUi.collectAsStateWithLifecycle()
+    val electric by vm.isElectric.collectAsStateWithLifecycle()
+    if (fuelAhead != FuelAheadUi.Hidden) FuelAheadSheet(
+        fuelAhead, onPick = vm::addFuelStop, onRetry = vm::loadFuelAhead, onDismiss = vm::dismissFuelAhead,
+        electric = electric, onPickCharger = vm::addChargerStop,
+    )
     GuidanceSheets(state, vm)
 }
 
@@ -304,25 +320,23 @@ internal fun PortraitOverlay(
             },
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s),
         ) {
+            // Bandeau pleine largeur ; le bouton « replier » est dessous, à droite (référence visuelle).
+            BannerStack(
+                state, bannerExpanded, onOpenPreview = vm::openManeuverPreview,
+                junction = junction?.let { slot -> { slot(Modifier.fillMaxWidth().height(junctionHeight)) } },
+            )
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                    BannerStack(
-                        state, bannerExpanded, onOpenPreview = vm::openManeuverPreview,
-                        junction = junction?.let { slot -> { slot(Modifier.fillMaxWidth().height(junctionHeight)) } },
-                    )
                     if (state.rerouting) ReroutingPill()
                     ScooterExtras(state, vm)
                 }
-                // 16 dp : la pile s'arrête 4 dp avant la colonne d'actions (56 dp), qui peut monter à sa hauteur sans la chevaucher.
-                Spacer(Modifier.width(RoadlySpacing.m))
-                // Sans bandeau (arrivée, échec, chargement), le bouton « replier » n'a rien à replier.
-                if (state.banner != null) Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s), horizontalAlignment = Alignment.End) {
-                    RoundIconButton(
-                        if (bannerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        stringResource(if (bannerExpanded) R.string.nav_collapse_banner else R.string.nav_expand_banner),
-                        onClick = onToggleBanner, size = BANNER_TOGGLE_SIZE,
-                    )
-                }
+                Spacer(Modifier.width(RoadlySpacing.s))
+                val angle by animateFloatAsState(if (bannerExpanded) 0f else 180f, label = "bannerChevron")
+                RoundIconButton(
+                    Icons.Default.KeyboardArrowDown,
+                    stringResource(if (bannerExpanded) R.string.nav_collapse_banner else R.string.nav_expand_banner),
+                    onClick = onToggleBanner, size = 52.dp, iconTint = c.brand, iconModifier = Modifier.rotate(angle),
+                )
             }
         }
 
@@ -340,7 +354,8 @@ internal fun PortraitOverlay(
             horizontalAlignment = Alignment.End,
         ) {
             assistantButton()
-            for (button in buttons) when (button) {
+            // Voix, changer de destination et itinéraires sont dans le panneau du bas déplié (référence : seul « Signaler » ici).
+            for (button in buttons.filter { it == ActionButton.REPORT || it == ActionButton.CAMERA }) when (button) {
                 ActionButton.REPORT -> ReportButton(onReport)
                 ActionButton.VOICE -> RoundIconButton(
                     if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
@@ -363,15 +378,13 @@ internal fun PortraitOverlay(
             Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
                 if (state.gpsLost) GpsLostPill() else if (gpsUncertainVisible(state)) GpsUncertainPill()
                 StatusPills(state, onZoneClick = vm::askHideZone)
-                // Hors guidage (arrivée, échec) : pas de compteur ni de panneau de limitation vide à côté du panneau d'arrivée.
-                if (state.phase == NavigationPhase.GUIDING) SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
             }
-            BottomBlock(state, vm, onChangeDestination)
+            BottomBlock(state, vm, onChangeDestination, speed = { SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh) })
         }
     }
 }
 
-/** Panneau trottinette (voie, transitions, alertes, autonomie) et réponse de Roadly AI, sous le bandeau. */
+/** Panneau trottinette (voie, transitions, alertes, autonomie) et réponse de l'assistant vocal, sous le bandeau. */
 @Composable
 private fun ScooterExtras(state: NavigationUiState, vm: NavigationViewModel) {
     val scooter = state.scooter ?: return
@@ -382,11 +395,11 @@ private fun ScooterExtras(state: NavigationUiState, vm: NavigationViewModel) {
     if (batteryDialog) BatteryDialog(scooter.range?.batteryNowPct?.roundToInt(), onDismiss = { batteryDialog = false }, onSave = { vm.setBattery(it); batteryDialog = false })
 }
 
-/** Actions trottinette : Roadly AI (voix), stationnement près de l'arrivée, recharge à proximité. */
+/** Actions trottinette : l'assistant vocal (voix), stationnement près de l'arrivée, recharge à proximité. */
 @Composable
 private fun ScooterActions(vm: NavigationViewModel) {
-    val listen = rememberVoiceInput("Roadly AI — votre demande", onText = vm::onAssistantText)
-    RoundIconButton(Icons.Default.Mic, "Roadly AI", onClick = listen)
+    val listen = rememberVoiceInput("Votre question", onText = vm::onAssistantText)
+    RoundIconButton(Icons.Default.Mic, "Question vocale", onClick = listen)
     RoundIconButton(Icons.Default.LocalParking, "Stationnement trottinettes", onClick = { vm.searchPois(ScooterPoiKind.PARKING) })
     RoundIconButton(Icons.Default.EvStation, "Recharge", onClick = { vm.searchPois(ScooterPoiKind.CHARGING) })
 }
@@ -477,7 +490,7 @@ internal fun LandscapeOverlay(
 
 /** Horizon + barre d'information (guidage), ou panneau d'arrivée / d'échec / de chargement. */
 @Composable
-private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onChangeDestination: () -> Unit) {
+private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onChangeDestination: () -> Unit, speed: (@Composable () -> Unit)? = null) {
     val c = LocalRoadlyColors.current
     val density = LocalDensity.current
     // D5 : haut du bloc (Horizon + panneau, ou panneau d'arrivée / d'échec / de chargement) mesuré → marge basse de la caméra
@@ -499,14 +512,22 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
             val configuration = LocalConfiguration.current
             val landscape = configuration.screenWidthDp > configuration.screenHeightDp
             Column(measured) {
-                AnimatedVisibility(horizonVisible(state, landscape, expanded)) {
-                    HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title), modifier = Modifier.padding(bottom = RoadlySpacing.s))
+                // Compteur et Horizon sur la même ligne (portrait), comme la référence.
+                Row(Modifier.fillMaxWidth().padding(bottom = RoadlySpacing.s), verticalAlignment = Alignment.Bottom) {
+                    speed?.let { it(); Spacer(Modifier.width(RoadlySpacing.s)) }
+                    AnimatedVisibility(horizonVisible(state, landscape, expanded), modifier = Modifier.weight(1f)) {
+                        HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title))
+                    }
                 }
                 recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }
                 NavigationBottomPanel(
                     state = state, expanded = expanded, destinationName = destination,
                     onToggleExpanded = vm::toggleBottomPanel, onToggleMute = vm::toggleMute, onRecenter = vm::recenter, onStop = vm::stop,
                     onTripDetails = vm::openTripDetails, onAlternatives = vm::loadAlternatives, compact = landscape,
+                    onChangeDestination = onChangeDestination,
+                    // Pas en trottinette : les stations-service ne la concernent pas.
+                    onFuelAhead = if (vm.fuelAheadAvailable && !vm.scooterMode) vm::loadFuelAhead else null,
+                    fuelAheadElectric = vm.isElectric.collectAsStateWithLifecycle().value,
                 )
             }
         }
@@ -545,8 +566,25 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
         val what = stringResource(r.report.kind.labelRes())
         HorizonItem(r.report.kind.horizonKind(), r.distanceM, "${r.distanceText} · $what", "$what dans ${r.distanceText}")
     }
-    val hazards = state.hazards.map { h ->
+    // Feux : seul le prochain, à moins d'1 km (en ville, la liste entière noierait le ruban).
+    val firstLight = state.hazards.firstOrNull { it.kind == HazardKind.TRAFFIC_LIGHT && it.distanceM <= TRAFFIC_LIGHT_HORIZON_M }
+    val firstBump = state.hazards.firstOrNull { it.kind == HazardKind.SPEED_BUMP && it.distanceM <= TRAFFIC_LIGHT_HORIZON_M }
+    val hazards = state.hazards.filter {
+        (it.kind != HazardKind.TRAFFIC_LIGHT || it === firstLight) && (it.kind != HazardKind.SPEED_BUMP || it === firstBump)
+    }.map { h ->
         when (h.kind) {
+            HazardKind.SPEED_BUMP -> {
+                val what = stringResource(R.string.nav_horizon_bump)
+                HorizonItem(HorizonKind.SPEED_BUMP, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
+            }
+            HazardKind.TOLL_BOOTH -> {
+                val what = stringResource(R.string.nav_horizon_toll)
+                HorizonItem(HorizonKind.TOLL, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
+            }
+            HazardKind.TRAFFIC_LIGHT -> {
+                val what = stringResource(R.string.nav_horizon_light)
+                HorizonItem(HorizonKind.TRAFFIC_LIGHT, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
+            }
             HazardKind.CURVE -> {
                 val what = stringResource(R.string.nav_horizon_curve)
                 HorizonItem(HorizonKind.CURVE, h.distanceM, "${h.distanceText} · $what", "$what dans ${h.distanceText}")
@@ -559,6 +597,9 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
     }
     return (maneuvers + hazards + community).sortedBy { it.distanceM }
 }
+
+/** Portée des feux tricolores dans l'Horizon (m). */
+private const val TRAFFIC_LIGHT_HORIZON_M = 1_000.0
 
 /** Zone de danger (Radar Intelligence), prochaine limitation, péage en flux libre et pluie, au-dessus du compteur. */
 @Composable
@@ -589,7 +630,7 @@ private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}) 
     state.freeFlowToll?.let { toll ->
         GlassPanel(contentPadding = 8.dp, shape = RoadlyShapes.Chip) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconTile(Icons.Default.Toll, style = IconTileStyle.Warning, size = 28.dp)
+                IconTile(Icons.Default.Euro, style = IconTileStyle.Warning, size = 28.dp)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.nav_free_flow_passed), style = MaterialTheme.typography.labelLarge, color = c.warning)
             }
@@ -608,7 +649,8 @@ private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}) 
 
 @Composable
 private fun ReportButton(onClick: () -> Unit) {
-    RoundIconButton(Icons.Default.Warning, stringResource(R.string.nav_report), onClick = onClick, style = RoundButtonStyle.Accent)
+    val c = LocalRoadlyColors.current
+    RoundIconButton(Icons.Default.Warning, stringResource(R.string.nav_report), onClick = onClick, size = 60.dp, iconTint = c.accent)
 }
 
 @Composable
@@ -659,7 +701,7 @@ private fun ArrivedPanel(toll: FreeFlowTollUi?, onFinish: () -> Unit) {
             }
             if (toll != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconTile(Icons.Default.Toll, style = IconTileStyle.Warning, size = 36.dp)
+                    IconTile(Icons.Default.Euro, style = IconTileStyle.Warning, size = 36.dp)
                     Spacer(Modifier.width(RoadlySpacing.sm))
                     Column {
                         Text(

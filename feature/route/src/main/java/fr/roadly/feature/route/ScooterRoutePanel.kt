@@ -101,7 +101,7 @@ internal fun ScooterChoicePanel(
                             onClick = { batteryDialog = true }, icon = Icons.Default.BatteryStd, compact = true, selected = b != null,
                         )
                         sc.temperatureC?.let { GlassChip(String.format(Locale.FRANCE, "%.0f °C", it), onClick = {}, icon = Icons.Default.Thermostat, compact = true, enabled = false) }
-                        GlassChip("Roadly AI", onClick = onAssistant, icon = Icons.Default.Mic, compact = true)
+                        GlassChip("Question vocale", onClick = onAssistant, icon = Icons.Default.Mic, compact = true)
                     }
                 },
             )

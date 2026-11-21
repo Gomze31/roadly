@@ -12,10 +12,14 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.navigation.compose.currentBackStackEntryAsState
+import fr.roadly.feature.onboarding.OnboardingScreen
 import androidx.compose.ui.Modifier
-import fr.roadly.feature.assistant.AssistantMicButton
-import fr.roadly.feature.assistant.AssistantOverlay
+import fr.roadly.feature.voice.VoiceCommandButton
+import fr.roadly.feature.voice.VoiceReplyOverlay
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
@@ -67,6 +71,8 @@ fun RoadlyNavHost(
 ) {
     val nav = rememberNavController()
     val context = LocalContext.current
+    val backStackEntry by nav.currentBackStackEntryAsState()
+    Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = HomeRoute) {
         homeScreen(
             isDark = isDark,
@@ -78,10 +84,12 @@ fun RoadlyNavHost(
             onResumeGuidance = { nav.navigate(NavigationRoute) { launchSingleTop = true } },
             onSearchCategory = { cat -> nav.navigate(SearchRoute(category = cat.name)) },
             onOpenProfile = { nav.navigate(ProfileRoute) },
-            assistantButton = { AssistantMicButton() },
-            assistantPanel = { AssistantOverlay(Modifier.fillMaxWidth()) },
+            assistantButton = { VoiceCommandButton() },
+            assistantPanel = { VoiceReplyOverlay(Modifier.fillMaxWidth()) },
             // API 33+ : notification du service demandée comme pour le guidage ; un refus masque seulement la notification.
             onFreeDrive = { withNotificationPermission { nav.navigate(FreeDriveRoute) { launchSingleTop = true } } },
+            // Dictée depuis la barre de recherche de l'accueil : recherche pré-remplie.
+            onSearchText = { text -> nav.navigate(SearchRoute(query = text)) },
         )
         searchScreen(
             onBack = { nav.popBackStack() },
@@ -111,6 +119,9 @@ fun RoadlyNavHost(
                 }
             },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
+            // Inversion départ / arrivée : nouvel écran d'itinéraires à la place du courant.
+            onSwap = { r -> nav.navigate(r) { popUpTo<RouteRoute> { inclusive = true } } },
+            onSearchFuel = { nav.navigate(SearchRoute(category = fr.roadly.core.geocoding.PoiCategory.FUEL.name)) },
         )
         settingsScreen(onBack = { nav.popBackStack() }, onOpenTrips = { nav.navigate(TripsRoute) }, onOpenProfile = { nav.navigate(ProfileRoute) }, onOpenPremium = { nav.navigate(PremiumRoute) }, onOpenAssistance = { nav.navigate(AssistanceRoute) }, onOpenRadar = { nav.navigate(RadarSettingsRoute) })
         radarSettingsScreen(onBack = { nav.popBackStack() })
@@ -125,9 +136,19 @@ fun RoadlyNavHost(
             onExit = { if (!nav.popBackStack(HomeRoute, inclusive = false)) nav.navigate(HomeRoute) },
             onChangeDestination = { nav.navigate(SearchRoute()) },
             onAddStop = { nav.navigate(SearchRoute(pick = true)) },
-            assistantButton = { AssistantMicButton() },
-            assistantPanel = { AssistantOverlay(Modifier.fillMaxWidth()) },
+            assistantButton = { VoiceCommandButton() },
+            assistantPanel = { VoiceReplyOverlay(Modifier.fillMaxWidth()) },
         )
+    }
+    // Accueil du premier lancement, posé sur la carte de l'écran d'accueil (jamais par-dessus un guidage ouvert par la notification).
+    if (backStackEntry?.destination?.hasRoute(HomeRoute::class) == true) {
+        OnboardingScreen(
+            onRequestLocationPermission = onRequestLocationPermission,
+            onOpenAppSettings = onOpenAppSettings,
+            withNotificationPermission = withNotificationPermission,
+            onOpenProfile = { nav.navigate(ProfileRoute) { launchSingleTop = true } },
+        )
+    }
     }
     // Mise à jour disponible (release GitHub) : proposée au lancement ; le suivi détaillé est dans Réglages › Mises à jour.
     LifecycleEventEffect(Lifecycle.Event.ON_START) { launch.onForeground() }

@@ -2,7 +2,7 @@
 
 Référentiel : `docs/SILLAXE-ANALYSE.md` (fonctions vérifiées sur les pages publiques de Sillaxe) et `docs/BENCHMARK-SILLAXE.md` (sources de données et contraintes). Statuts : **non commencée** · **en cours** · **fonctionnelle** · **bloquée** (dépend d'une source externe non configurée). « Palier Sillaxe » = gratuit (G) ou Sillaxe+ (+) chez Sillaxe ; Roadly ne reproduit pas le modèle économique, l'information sert à prioriser.
 
-Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage en flux libre, véhicule garé — voir `docs/ROADLY-1.0.md`). Auparavant : 2026-10-31 (LOT 1 design system). La matrice de parité complète avec Sillaxe est dans `SILLAXE_PARITY.md` (référence pour les lots suivants) ; le design system est décrit dans `docs/DESIGN-SYSTEM.md`.
+Mise à jour : 2026-11-16 (voiture électrique : autonomie et bornes rapides, voix moins bavarde). Auparavant : 2026-11-09 (photos aériennes IGN, ralentisseurs, le plus économe, repères « au feu », virages serrés annoncés, péage annoncé, feux, routes fermées contournées). Auparavant : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage en flux libre, véhicule garé — voir `docs/ROADLY-1.0.md`). Auparavant : 2026-10-31 (LOT 1 design system). La matrice de parité complète avec Sillaxe est dans `SILLAXE_PARITY.md` (référence pour les lots suivants) ; le design system est décrit dans `docs/DESIGN-SYSTEM.md`.
 
 État de la Phase 2 : code livré, 224 tests unitaires (JVM) et 3 tests instrumentés passent. Vérifié sur HONOR Magic 8 Pro (Android 17) **à l'arrêt** : démarrage du guidage, service de premier plan, notification et son action « Arrêter », voix et focus audio, écran maintenu allumé, refus de `POST_NOTIFICATIONS` sans plantage. **Non vérifié en conduite** : recalcul, paliers d'annonces, arrivée, « GPS perdu ».
 
@@ -29,13 +29,18 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Départ planifié (heure de départ) | G | fonctionnelle | 1 | Décale seulement l'heure d'arrivée |
 | « Arriver à l'heure » | G | fonctionnelle | 1 | Départ déduit de la durée du plus rapide, sans trafic (LOT 3) ; rappel avant départ : Phase 4 |
 | Itinéraire alternatif en cours de guidage | G | fonctionnelle | 2 | Feuille « Changer d'itinéraire » depuis la position projetée (LOT 3) |
-| Options d'itinéraire sur l'écran de choix | G | fonctionnelle | 1 | Puces éviter péages / autoroutes / ferries (LOT 3) |
+| Options d'itinéraire sur l'écran de choix | G | fonctionnelle | 1 | Puces éviter péages / autoroutes / tunnels / ferries (LOT 3, tunnels 2026-11-09) ; aussi depuis l'accueil (bouton réglages de la barre Domicile / Travail) |
+| Options du trajet dans la recherche | G | fonctionnelle | 2026-11-09 | Départ, sans péage / autoroute / tunnel / ferry / chemin non revêtu choisis avant la destination ; pour ce trajet seulement (`TripPreferences`) ou « Mémoriser » ; rappel des options actives sur le choix d'itinéraire ; « Y aller » sur chaque résultat ; micro. Tests JVM |
+| Éviter les chemins non revêtus | G | fonctionnelle | 2026-11-09 | Valhalla `exclude_unpaved`, repli sans exclusion si aucun chemin |
+| Éviter les tunnels | G | fonctionnelle | 1 | Exclusion stricte Valhalla `exclude_tunnels` ; sans chemin possible, recalcul sans l'exclusion (tunnel inévitable). Testé JVM ; non vérifié sur l'instance FOSSGIS depuis le conteneur de développement |
+| Accueil du premier lancement | G | fonctionnelle | 1 | `feature:onboarding` (2026-11-09) : 7 étapes (bienvenue, position, notifications, véhicule, voix et alertes, « Votre route », classement), barre segmentée, « Ignorer » / « Continuer » ; chaque interrupteur écrit le réglage réel. Non vérifié sur appareil |
+| Carte « Départ » de l'accueil | G | fonctionnelle | 1 | Partir maintenant / partir à / arriver à, repris par l'écran d'itinéraires (`DeparturePlanner`, en mémoire), effacé au démarrage du guidage |
 | Mode paysage | G | en cours | 1 | Accueil, itinéraires et guidage en deux colonnes (LOT 1) ; non vérifié sur appareil |
 | Thème clair / sombre / automatique | G | fonctionnelle | 1 | Auto solaire (position) + système |
 | Mode Silence | G | fonctionnelle | 2 | Bouton voix de l'écran de guidage |
 | Import GPX | ? | non commencée | 5 | |
 | Guidage allégé hors connexion | G | non commencée | 5 | Cache tuiles MapLibre + itinéraire mémorisé |
-| ZFE / Crit'Air | ? | non commencée | 3 | Source à identifier |
+| ZFE / Crit'Air | ? | fonctionnelle | 3 | Base nationale consolidée des ZFE (transport.data.gouv.fr, `aires.geojson`, cache 7 j) : verdict selon la catégorie, la vignette Crit'Air, la date et les horaires (`opening_hours`) ; pastille sur l'écran d'itinéraires + détail (arrêté), feuille sur les alternatives, périmètre sur la carte, ligne sur Android Auto ; réglage « Zones à faibles émissions ». 10 tests JVM, dont un sur le vrai fichier national (`-PzfeFile`) |
 | Tunnels (perte GPS) | G | fonctionnelle | 2 | Extrapolation sur la polyligne après 3 s sans fix, plafonnée à 150 m / 10 s ; badge « GPS perdu » après 10 s |
 
 ## 2. Horizon (route à venir)
@@ -46,6 +51,18 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Ralentissements, bouchons, incidents dans le bandeau | G | bloquée | 3 | Dépend trafic |
 | Services (stations, aires) dans le bandeau | G | bloquée | 3 | Dépend POI |
 | Zones de vigilance dans le bandeau | G | fonctionnelle | Radar | Zones de danger dans l'Horizon, la pastille et sur le tracé ; jamais de point d'équipement |
+
+## 2 ter. Image dans l'image
+
+| Fonction | Palier | Statut | Phase | Notes |
+|---|---|---|---|---|
+| Guidage en image dans l'image | G | fonctionnelle | 2026-11-09 | Automatique pendant un guidage (Android 12+), à la sortie de l'app sinon : manœuvre, distance, rue, arrivée. Non vérifié sur appareil |
+
+## 2 bis. Commandes vocales
+
+| Fonction | Palier | Statut | Phase | Notes |
+|---|---|---|---|---|
+| Commandes vocales intégrées | G | fonctionnelle | 2026-11-09 | Bouton micro (accueil, guidage) : reconnaissance du téléphone (hors ligne si possible), interprétation locale `VoiceCommandParser` (aucun service d'IA, aucune clé) ; domicile / travail / adresse, éviter péages / autoroutes / tunnels / ferries avec l'écart d'arrivée, signalements, heure d'arrivée, reste, prochaine manœuvre, limitation, stations / parkings / bornes / aires / restaurants, couper la voix, recalcul, arrêt, aide. Réponse affichée et prononcée (canal assistant). Remplace le copilote Roadly AI (Gemini), retiré. 12 tests JVM |
 
 ## 3. Recherche, lieux, favoris
 
@@ -80,7 +97,7 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 
 | Fonction | Palier | Statut | Phase | Notes |
 |---|---|---|---|---|
-| Bouchons, accidents, travaux, fermetures (sources officielles) | G | bloquée | 3 | Bison Futé DATEX II, Autoroutes.fr ; aucun trafic simulé |
+| Bouchons, accidents, travaux, fermetures (sources officielles) | G | fonctionnelle | 3 | Bison Futé DATEX II (routes nationales, DIR), 5 min, filtré dans le sens de circulation : pastille et détail sur l'écran d'itinéraires, carte, Horizon du guidage, Android Auto. Autoroutes concédées : non couvertes. Tests sur un extrait réel |
 | Routes coupées évitées | G | bloquée | 3 | `exclude_polygons` Valhalla |
 | Re-routage sur bouchon | G | bloquée | 3 | |
 | Météo sur la carte | G | bloquée | 3 | Météo-France / Open-Meteo |
@@ -150,6 +167,16 @@ Mise à jour : 2026-11-05 (passe 1.0 : profil de route, conduite libre, péage e
 | Profils véhicule PL / taxi / dimensions | + | fonctionnelle | 4 | LOT 7 ; un seul profil enregistré |
 | Partage de trajet en direct | + | non commencée | 4 | Supabase + page web |
 | Rappel péage flux libre | + | fonctionnelle | 1.0 | Portiques OSM `toll_gantry` du profil du tracé ; annonce au premier passage, rappel sur l'accueil (France : échéance 72 h) jusqu'à « C'est payé » ; aucun montant ; testé JVM |
+| Alerte gare de péage, feux tricolores | + | fonctionnelle | 1.1 | Nœuds OSM `toll_booth` et `traffic_signal` du profil `trace_attributes` ; gares voisines fusionnées (400 m) ; annonce « Péage dans 1 km » une fois par gare (1,2 km → 300 m), Horizon (prochain feu à moins d'1 km), carte d'identité du trajet ; contrôle réel Toulouse → Carcassonne : 2 gares |
+| Contournement des routes fermées | + | fonctionnelle | 1.1 | Fermetures Bison Futé en cours dans le sens du trajet : nouveau calcul avec `exclude_polygons` (carrés de 80 m), deux passes au plus, tracé d'origine gardé sans autre chemin ; pastille « Route fermée évitée » ; s'applique aussi au recalcul en guidage et à Android Auto ; contrôle réel sur les fermetures du 2026-11-09 (D8, N122) |
+| Stations les moins chères sur le trajet | + | fonctionnelle | 1.1 | Guidage › panneau déplié : flux officiel des prix interrogé par cercles de 9 km tous les 15 km sur les 80 prochains km ; stations à moins de 1,5 km du tracé, devant soi, triées par prix du carburant du véhicule (gazole sans profil), détour ≈ 2 × l'écart ; un appui ajoute l'arrêt ; véhicule électrique : message (pas de prix de recharge publiés) ; contrôle réel Toulouse → Carcassonne : 12 stations, l'aire d'autoroute de l'autre sens (Port Lauragais Nord) écartée |
+| Repères « au feu » | + | fonctionnelle | 1.2 | Manœuvre de changement de direction dont le point a un feu OSM (`edge.traffic_signal` / `node.traffic_signal`, 40 m avant → 8 m après) : « Au feu, tournez… » aux trois paliers, badge « au feu » sur le bandeau ; contrôle réel Toulouse (Capitole → Purpan : 12 feux, « Au feu, tournez à droite dans Place du Pont Neuf ») |
+| Alerte vocale virage serré | + | fonctionnelle | 1.2 | Virages ≥ 60° hors carrefour (`CurveDetector`, côté du virage) annoncés une fois ~8 s avant (120–350 m), seulement au-dessus de 50 km/h ; testé JVM |
+| Ralentisseurs sur le trajet | + | fonctionnelle | 1.2 | Voies OSM du tracé (`edge.way_id`) dont la limitation est inconnue ou ≤ 70 km/h → une requête Overpass `node(w)[traffic_calming~bump|hump|table|cushion|yes]` par tracé ; nœuds à ≤ 15 m du tracé, fusionnés à 20 m ; Horizon (prochain à moins d'1 km), voix une fois par série (≤ 250 m) au-dessus de 30 km/h ; réglage « Ralentisseurs et virages serrés » ; testé JVM (Overpass injoignable depuis l'environnement de développement) |
+| Le plus économe | + | fonctionnelle | 1.2 | `FuelSpeedModel` : facteur de consommation selon la vitesse moyenne de chaque manœuvre (ville 1,25–1,45, 70–90 km/h 0,95, 130 km/h 1,30 ; ADEME : 110 au lieu de 130 ≈ −20 %) ; coût du trajet calculé ainsi ; badge sur la variante ≠ la plus rapide qui économise ≥ 5 %, litres si consommation connue ; Toulouse → Carcassonne : écart 1 % → pas de badge |
+| Vue photos aériennes (IGN) | + | fonctionnelle | 1.2 | Orthophotos IGN (Géoplateforme WMTS `ORTHOIMAGERY.ORTHOPHOTOS`, PM, sans clé, Licence Ouverte) insérées sous la première ligne `transportation` du style : routes allégées (opacité 0,55), bâtiments plats et 3D masqués, luminosité ≤ 0,55 la nuit ; hors France, tuiles absentes → plan visible ; bouton sur l'accueil + Réglages › Navigation ; rendu vérifié avec MapLibre GL sur les styles de l'app (Toulouse) ; Android Auto : même vue (bouton plan / photos sur l'accueil de la voiture, assombrie quand l'écran de la voiture passe en mode nuit) |
+| Voiture électrique : batterie à l'arrivée, bornes rapides sur le trajet | + | fonctionnelle | 1.3 | Capacité (kWh) et charge (%) saisies (préférences) ; arrivée estimée = consommation du profil × `FuelSpeedModel` (courbe électrique) ; pastille verte / orange (< 20 %) / rouge (< 10 %, propose les bornes). Bornes ≥ 50 kW : base nationale consolidée des points de recharge (PAN, API tabulaire data.gouv.fr), zones de 24 km tous les 20 km, ≤ 2 km du tracé, 2 plus puissantes par tranche de 15 km ; aires d'autoroute de l'autre sens écartées (indice « Aire / A61 » + côté) ; dernier état publié (base dynamique) : hors service et date du relevé, « libres » si < 30 min. Écran d'itinéraires et guidage, ajout comme arrêt. Contrôle réel Toulouse → Carcassonne : bornes réparties de 9 à 91 km (IONITY Lauragais, Arzens Aire Sud…) |
+| Voix « moins bavarde » | + | fonctionnelle | 1.3 | Réglages › Voix : palier FAR des manœuvres omis hors voies rapides, messages d'information omis (péage, flux libre, fin de zone, pause) ; sécurité inchangée ; testé JVM |
 | Replay des trajets | + | fonctionnelle | 4 | LOT 9 |
 | Historique des dépenses | + | non commencée | 4 | |
 | Personnalisation (teintes, icône, silhouettes) | + | en cours | 5 | 5 teintes de cockpit (LOT 10) ; icône, silhouettes : non commencées |
@@ -207,7 +234,7 @@ Détail, sources et limites : `docs/SCOOTER.md`. « Code livré » = compilé et
 | Stationnement / recharge trottinette | en cours | Overpass ; uniquement les lieux présents dans OSM |
 | Récapitulatif de trajet, bilan semaine / mois | en cours | Dénivelé et énergie estimés |
 | Carte hors connexion du trajet | en cours | Tuiles seulement ; calcul et recalcul en ligne |
-| Roadly AI en mode trottinette | en cours | Reconnaissance vocale du système + intentions locales ; copilote Gemini (spec AI-1) non implémenté |
+| Questions vocales en mode trottinette | fonctionnelle | Reconnaissance vocale du système + intentions locales (itinéraire le plus sûr, autonomie) |
 
 ## Mises à jour depuis GitHub (2026-11-01)
 

@@ -49,6 +49,21 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     override suspend fun setVigilanceSound(value: Boolean) { vigilanceBeep.value = value }
     override val rainLowersLimit: Flow<Boolean> = rainLimit
     override suspend fun setRainLowersLimit(value: Boolean) { rainLimit.value = value }
+    val roadHazards = MutableStateFlow(true)
+    override val roadHazardVoice: kotlinx.coroutines.flow.Flow<Boolean> = roadHazards
+    override suspend fun setRoadHazardVoice(value: Boolean) { roadHazards.value = value }
+    val evBattery = MutableStateFlow<Double?>(null)
+    override val evBatteryKwh: kotlinx.coroutines.flow.Flow<Double?> = evBattery
+    override suspend fun setEvBatteryKwh(value: Double?) { evBattery.value = value }
+    val evCharge = MutableStateFlow<Int?>(null)
+    override val evChargePct: kotlinx.coroutines.flow.Flow<Int?> = evCharge
+    override suspend fun setEvChargePct(value: Int?) { evCharge.value = value }
+    val brief = MutableStateFlow(false)
+    override val voiceBrief: kotlinx.coroutines.flow.Flow<Boolean> = brief
+    override suspend fun setVoiceBrief(value: Boolean) { brief.value = value }
+    val aerial = MutableStateFlow(false)
+    override val mapAerial: kotlinx.coroutines.flow.Flow<Boolean> = aerial
+    override suspend fun setMapAerial(value: Boolean) { aerial.value = value }
     val map3d = MutableStateFlow(GuidanceDefaults.MAP_3D)
     override val map3dEnabled: Flow<Boolean> = map3d
     override suspend fun setMap3dEnabled(value: Boolean) { map3d.value = value }
@@ -86,4 +101,13 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val last = MutableStateFlow<LastGuidance?>(null)
     override val lastGuidance: Flow<LastGuidance?> = last
     override suspend fun setLastGuidance(value: LastGuidance?) { last.value = value }
+    val onboarding = MutableStateFlow(false)
+    override val onboardingDone: Flow<Boolean> = onboarding
+    override suspend fun setOnboardingDone(value: Boolean) { onboarding.value = value }
+    val zfe = MutableStateFlow(true)
+    override val zfeEnabled: Flow<Boolean> = zfe
+    override suspend fun setZfeEnabled(value: Boolean) { zfe.value = value }
+    val limitDrop = MutableStateFlow(true)
+    override val limitDropVoice: Flow<Boolean> = limitDrop
+    override suspend fun setLimitDropVoice(value: Boolean) { limitDrop.value = value }
 }

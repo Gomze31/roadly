@@ -12,6 +12,7 @@ android {
     defaultConfig { minSdk = 29; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildFeatures { compose = true }
+    testOptions { unitTests { isIncludeAndroidResources = true } }
     // Vue 3D de carrefour : le test de bout en bout réutilise les itinéraires Valhalla réels enregistrés dans core:navigation.
     sourceSets["test"].resources.srcDir("../../core/navigation/src/test/resources")
     // Captures JVM des composants de guidage (Robolectric + Roborazzi) : ressources Android nécessaires au rendu Compose.
@@ -47,4 +48,5 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.androidx.test.runner)
     debugImplementation(libs.compose.ui.test.manifest)
+    testImplementation(libs.compose.ui.test.junit4)
 }

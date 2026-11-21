@@ -28,6 +28,8 @@ fun rememberVoiceInput(prompt: String, onText: (String) -> Unit, onUnavailable: 
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
             .putExtra(RecognizerIntent.EXTRA_PROMPT, prompt)
+            // Reconnaissance sur l'appareil quand le modèle français est installé (rien n'est envoyé).
+            .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         try { launcher.launch(intent) } catch (e: ActivityNotFoundException) { currentOnUnavailable() }
     }
 }

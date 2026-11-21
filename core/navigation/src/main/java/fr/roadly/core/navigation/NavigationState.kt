@@ -57,6 +57,8 @@ sealed interface NavigationState {
         val branchDiagram: BranchDiagram? = null,
         /** Situation de conduite : mode, densité d'affichage, urgence, côté où se placer. */
         val situation: GuidanceSituation = GuidanceSituation(),
+        /** La prochaine manœuvre a lieu à un feu tricolore (profil OSM du tracé). */
+        val nextAtTrafficLight: Boolean = false,
     ) : NavigationState
 
     data class Arrived(val route: Route, val freeFlowToll: FreeFlowTollTrip? = null) : NavigationState

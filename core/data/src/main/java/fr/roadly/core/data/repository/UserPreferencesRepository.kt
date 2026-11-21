@@ -90,6 +90,20 @@ interface UserPreferencesRepository {
     /** Rappel de pause après deux heures de conduite. */
     val breakReminder: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
     suspend fun setBreakReminder(value: Boolean) = Unit
+    /** Annonce vocale des ralentisseurs (OSM) et des virages serrés sur le trajet. */
+    val roadHazardVoice: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setRoadHazardVoice(value: Boolean) = Unit
+    /** Véhicule électrique : capacité utile de la batterie (kWh) et charge au départ (%), saisies par l'utilisateur ; null = inconnues. */
+    val evBatteryKwh: Flow<Double?> get() = kotlinx.coroutines.flow.flowOf(null)
+    suspend fun setEvBatteryKwh(value: Double?) = Unit
+    val evChargePct: Flow<Int?> get() = kotlinx.coroutines.flow.flowOf(null)
+    suspend fun setEvChargePct(value: Int?) = Unit
+    /** Voix « moins bavarde » : ni annonce anticipée hors voies rapides, ni messages d'information (sécurité inchangée). */
+    val voiceBrief: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
+    suspend fun setVoiceBrief(value: Boolean) = Unit
+    /** Fond de carte en photos aériennes de l'IGN (sinon le plan). */
+    val mapAerial: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
+    suspend fun setMapAerial(value: Boolean) = Unit
     /** Limitation abaissée par temps de pluie (R413-2) quand une limitation est connue. */
     val rainLowersLimit: Flow<Boolean>
     suspend fun setRainLowersLimit(value: Boolean)
@@ -132,6 +146,12 @@ interface UserPreferencesRepository {
     /** B6 : course en cours, mémorisée au démarrage du guidage ; null après un arrêt ou une arrivée. */
     val lastGuidance: Flow<LastGuidance?>
     suspend fun setLastGuidance(value: LastGuidance?)
+    /** Accueil du premier lancement (7 étapes) terminé ou ignoré. */
+    val onboardingDone: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setOnboardingDone(value: Boolean) = Unit
+    /** Zones à faibles émissions : frontière sur la carte et alerte sur l'itinéraire selon la vignette Crit'Air. */
+    val zfeEnabled: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+    suspend fun setZfeEnabled(value: Boolean) = Unit
 }
 
 @Singleton
@@ -142,6 +162,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kAvoidTolls = booleanPreferencesKey("route.avoid.tolls")
     private val kAvoidHighways = booleanPreferencesKey("route.avoid.highways")
     private val kAvoidFerries = booleanPreferencesKey("route.avoid.ferries")
+    private val kAvoidTunnels = booleanPreferencesKey("route.avoid.tunnels")
+    private val kAvoidUnpaved = booleanPreferencesKey("route.avoid.unpaved")
     private val kVoiceEnabled = booleanPreferencesKey("voice.enabled")
     private val kVoiceVolume = intPreferencesKey("voice.volume")
     private val kTolerance = intPreferencesKey("speed.alert.tolerance")
@@ -150,6 +172,11 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kVigilanceSound = booleanPreferencesKey("vigilance.sound")
     private val kLimitDropVoice = booleanPreferencesKey("coach.limit.drop.voice")
     private val kBreakReminder = booleanPreferencesKey("coach.break.reminder")
+    private val kRoadHazardVoice = booleanPreferencesKey("coach.road.hazard.voice")
+    private val kMapAerial = booleanPreferencesKey("map.aerial")
+    private val kVoiceBrief = booleanPreferencesKey("voice.brief")
+    private val kEvBattery = androidx.datastore.preferences.core.doublePreferencesKey("ev.battery.kwh")
+    private val kEvCharge = androidx.datastore.preferences.core.intPreferencesKey("ev.charge.pct")
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
     private val kMap3d = booleanPreferencesKey("map.3d")
     private val kJunction3d = booleanPreferencesKey("map.junction3d")
@@ -168,6 +195,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kLastName = stringPreferencesKey("guidance.last.name")
     private val kLastRoute = stringPreferencesKey("guidance.last.route")
     private val kLastAt = longPreferencesKey("guidance.last.at")
+    private val kOnboarding = booleanPreferencesKey("onboarding.done")
+    private val kZfe = booleanPreferencesKey("zfe.enabled")
 
     override val themeMode: Flow<ThemeMode> = store.data.map { p -> p[kTheme]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.AUTO_SOLAR }
     override suspend fun setThemeMode(mode: ThemeMode) { store.edit { it[kTheme] = mode.name } }
@@ -177,10 +206,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setLocationDeniedForever(value: Boolean) { store.edit { it[kDeniedForever] = value } }
 
     override val routePreferences: Flow<RoutePreferences> = store.data.map { p ->
-        RoutePreferences(avoidTolls = p[kAvoidTolls] ?: false, avoidHighways = p[kAvoidHighways] ?: false, avoidFerries = p[kAvoidFerries] ?: false)
+        RoutePreferences(avoidTolls = p[kAvoidTolls] ?: false, avoidHighways = p[kAvoidHighways] ?: false, avoidFerries = p[kAvoidFerries] ?: false, avoidTunnels = p[kAvoidTunnels] ?: false, avoidUnpaved = p[kAvoidUnpaved] ?: false)
     }
     override suspend fun setRoutePreferences(value: RoutePreferences) {
-        store.edit { it[kAvoidTolls] = value.avoidTolls; it[kAvoidHighways] = value.avoidHighways; it[kAvoidFerries] = value.avoidFerries }
+        store.edit { it[kAvoidTolls] = value.avoidTolls; it[kAvoidHighways] = value.avoidHighways; it[kAvoidFerries] = value.avoidFerries; it[kAvoidTunnels] = value.avoidTunnels; it[kAvoidUnpaved] = value.avoidUnpaved }
     }
     override val voiceEnabled: Flow<Boolean> = store.data.map { it[kVoiceEnabled] ?: GuidanceDefaults.VOICE_ENABLED }
     override suspend fun setVoiceEnabled(value: Boolean) { store.edit { it[kVoiceEnabled] = value } }
@@ -203,6 +232,16 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setLimitDropVoice(value: Boolean) { store.edit { it[kLimitDropVoice] = value } }
     override val breakReminder: Flow<Boolean> = store.data.map { it[kBreakReminder] ?: true }
     override suspend fun setBreakReminder(value: Boolean) { store.edit { it[kBreakReminder] = value } }
+    override val roadHazardVoice: Flow<Boolean> = store.data.map { it[kRoadHazardVoice] ?: true }
+    override suspend fun setRoadHazardVoice(value: Boolean) { store.edit { it[kRoadHazardVoice] = value } }
+    override val voiceBrief: Flow<Boolean> = store.data.map { it[kVoiceBrief] ?: false }
+    override suspend fun setVoiceBrief(value: Boolean) { store.edit { it[kVoiceBrief] = value } }
+    override val mapAerial: Flow<Boolean> = store.data.map { it[kMapAerial] ?: false }
+    override suspend fun setMapAerial(value: Boolean) { store.edit { it[kMapAerial] = value } }
+    override val evBatteryKwh: Flow<Double?> = store.data.map { it[kEvBattery] }
+    override suspend fun setEvBatteryKwh(value: Double?) { store.edit { if (value == null || value <= 0.0) it.remove(kEvBattery) else it[kEvBattery] = value } }
+    override val evChargePct: Flow<Int?> = store.data.map { it[kEvCharge] }
+    override suspend fun setEvChargePct(value: Int?) { store.edit { if (value == null) it.remove(kEvCharge) else it[kEvCharge] = value.coerceIn(0, 100) } }
     override val rainLowersLimit: Flow<Boolean> = store.data.map { it[kRainLimit] ?: GuidanceDefaults.RAIN_LOWERS_LIMIT }
     override suspend fun setRainLowersLimit(value: Boolean) { store.edit { it[kRainLimit] = value } }
     override val map3dEnabled: Flow<Boolean> = store.data.map { it[kMap3d] ?: GuidanceDefaults.MAP_3D }
@@ -234,6 +273,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setPowerSaveMode(value: PowerSaveMode) { store.edit { it[kPowerSave] = value.name } }
     override val cockpitTint: Flow<String?> = store.data.map { it[kTint] }
     override suspend fun setCockpitTint(name: String?) { store.edit { if (name == null) it.remove(kTint) else it[kTint] = name } }
+    override val onboardingDone: Flow<Boolean> = store.data.map { it[kOnboarding] ?: false }
+    override suspend fun setOnboardingDone(value: Boolean) { store.edit { it[kOnboarding] = value } }
+    override val zfeEnabled: Flow<Boolean> = store.data.map { it[kZfe] ?: true }
+    override suspend fun setZfeEnabled(value: Boolean) { store.edit { it[kZfe] = value } }
     override val lastGuidance: Flow<LastGuidance?> = store.data.map { p ->
         val lat = p[kLastLat]; val lon = p[kLastLon]; val routeId = p[kLastRoute]; val at = p[kLastAt]
         if (lat == null || lon == null || routeId == null || at == null) null else LastGuidance(GeoPoint(lat, lon), p[kLastName], routeId, at)

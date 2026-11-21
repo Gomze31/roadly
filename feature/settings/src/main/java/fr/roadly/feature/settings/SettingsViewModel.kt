@@ -112,6 +112,12 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true to true)
     fun setLimitDropVoice(value: Boolean) { viewModelScope.launch { prefs.setLimitDropVoice(value) } }
     fun setBreakReminder(value: Boolean) { viewModelScope.launch { prefs.setBreakReminder(value) } }
+    /** Annonce des ralentisseurs et des virages serrés. */
+    val roadHazardVoice: StateFlow<Boolean> = prefs.roadHazardVoice.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setRoadHazardVoice(value: Boolean) { viewModelScope.launch { prefs.setRoadHazardVoice(value) } }
+    /** Zones à faibles émissions (frontière sur la carte, alerte selon la vignette Crit'Air). */
+    val zfeEnabled: StateFlow<Boolean> = prefs.zfeEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setZfeEnabled(value: Boolean) { viewModelScope.launch { prefs.setZfeEnabled(value) } }
     /** E2 : réglages du groupe « Navigation », appliqués immédiatement au guidage en cours (flux `Eagerly` du guidage). */
     val navigation: StateFlow<NavigationSettings> = combine(
         prefs.defaultCameraMode, prefs.zoomOffset, prefs.pitchPreset, prefs.autoRotate,
@@ -156,7 +162,7 @@ class SettingsViewModel @Inject constructor(
 
     fun clearVehicle() { viewModelScope.launch { vehicleRepo.clear() } }
     fun setTheme(mode: ThemeMode) { viewModelScope.launch { prefs.setThemeMode(mode) } }
-    /** Teinte du cockpit (personnalisation) ; VIOLET = défaut (clé retirée). */
+    /** Teinte du cockpit (personnalisation) ; MAGENTA = défaut (clé retirée). */
     val tint: StateFlow<String?> = prefs.cockpitTint.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun setTint(name: String?) { viewModelScope.launch { prefs.setCockpitTint(name) } }
     fun clearHistory() { viewModelScope.launch { recents.clear() } }
@@ -186,6 +192,14 @@ class SettingsViewModel @Inject constructor(
     fun setVigilanceEnabled(value: Boolean) { viewModelScope.launch { prefs.setVigilanceEnabled(value) } }
     fun setVigilanceSound(value: Boolean) { viewModelScope.launch { prefs.setVigilanceSound(value) } }
     /** E2 « Bâtiments 3D » : la vue au départ, qui suivait l'ancien réglage tant qu'elle n'était pas choisie, est d'abord figée (écart 8). */
+    /** Voix « moins bavarde ». */
+    val voiceBrief: StateFlow<Boolean> = prefs.voiceBrief.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setVoiceBrief(value: Boolean) { viewModelScope.launch { prefs.setVoiceBrief(value) } }
+
+    /** Fond de carte en photos aériennes IGN. */
+    val mapAerial: StateFlow<Boolean> = prefs.mapAerial.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    fun setMapAerial(value: Boolean) { viewModelScope.launch { prefs.setMapAerial(value) } }
+
     fun setMap3d(value: Boolean) {
         viewModelScope.launch {
             prefs.setDefaultCameraMode(prefs.defaultCameraMode.first())
@@ -209,6 +223,8 @@ class SettingsViewModel @Inject constructor(
     fun setAvoidTolls(value: Boolean) = updateRoutePreferences { it.copy(avoidTolls = value) }
     fun setAvoidHighways(value: Boolean) = updateRoutePreferences { it.copy(avoidHighways = value) }
     fun setAvoidFerries(value: Boolean) = updateRoutePreferences { it.copy(avoidFerries = value) }
+    fun setAvoidTunnels(value: Boolean) = updateRoutePreferences { it.copy(avoidTunnels = value) }
+    fun setAvoidUnpaved(value: Boolean) = updateRoutePreferences { it.copy(avoidUnpaved = value) }
 
     private fun updateRoutePreferences(change: (RoutePreferences) -> RoutePreferences) {
         viewModelScope.launch { prefs.setRoutePreferences(change(prefs.routePreferences.first())) }

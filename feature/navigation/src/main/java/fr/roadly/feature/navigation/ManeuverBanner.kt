@@ -1,5 +1,12 @@
 package fr.roadly.feature.navigation
 
+import fr.roadly.core.designsystem.theme.LocalUiScale
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Traffic
+
+import androidx.compose.foundation.layout.size
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -68,7 +75,6 @@ fun ManeuverBanner(
 ) {
     val c = LocalRoadlyColors.current
     val street = bannerStreet(banner, roundabout)
-    val towardExit = roundabout?.exitStreet != null
     // La barre glisse entre deux positions (1 Hz) ; lue au dessin seulement.
     val fill by animateFloatAsState(urgency.coerceIn(0f, 1f), tween(900, easing = LinearEasing), label = "bannerUrgency")
     val track = c.textSecondary.copy(alpha = 0.22f)
@@ -89,40 +95,51 @@ fun ManeuverBanner(
         contentPadding = 12.dp, onClick = onClick,
         onClickLabel = stringResource(R.string.nav_preview_title), role = Role.Button,
     ) {
-        Row(Modifier.padding(bottom = if (urgency > 0f) 8.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (roundabout != null) {
-                RoundaboutManeuverView(roundabout, banner.roundaboutExit ?: roundabout.exitNumber, compact = true)
-            } else {
-                IconTile(banner.type.icon(), style = IconTileStyle.BrandFilled, size = 48.dp)
+        val s = LocalUiScale.current
+        // Barre d'urgence dessinée au bas du panneau : le contenu lui laisse sa place.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp).padding(bottom = if (urgency > 0f) 8.dp else 0.dp)) {
+            // Pictogramme posé sur le panneau, en couleur de marque (référence visuelle), sans tuile.
+            Box(Modifier.size(58.dp * s), contentAlignment = Alignment.Center) {
+                if (roundabout != null) {
+                    RoundaboutManeuverView(roundabout, banner.roundaboutExit ?: roundabout.exitNumber, compact = true)
+                } else {
+                    Icon(banner.type.icon(), contentDescription = null, tint = c.brand, modifier = Modifier.size(50.dp * s))
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(banner.distanceText, style = NavDigits.copy(fontSize = 28.sp, lineHeight = 32.sp, textAlign = TextAlign.Start), color = if (distanceUncertain) c.textSecondary.copy(alpha = 0.6f) else c.textPrimary, maxLines = 1)
-                    if (!signShownBelow) {
-                        exitLabel(banner)?.let { label ->
-                            Spacer(Modifier.width(8.dp))
-                            ExitPill(label)
+                    Text(banner.distanceText, style = NavDigits.copy(fontSize = 34.sp * s, lineHeight = 38.sp * s, textAlign = TextAlign.Start), color = if (distanceUncertain) c.textSecondary.copy(alpha = 0.6f) else c.brand, maxLines = 1)
+                    // Repère « au feu » (feu OSM au point de manœuvre), comme les directions par repère de Google Maps.
+                    if (banner.atTrafficLight) {
+                        Spacer(Modifier.width(10.dp))
+                        Row(
+                            Modifier.background(c.success.copy(alpha = 0.16f), RoadlyShapes.Pill).padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Default.Traffic, contentDescription = null, tint = c.success, modifier = Modifier.size(18.dp * s))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.nav_at_light), style = MaterialTheme.typography.labelLarge, color = c.success, maxLines = 1)
                         }
                     }
+                }
+                // Ligne principale : « 2e sortie · rue » (ou « Sortie 12 · rue »), en gras ; l'instruction complète si rien d'autre.
+                val exit = if (signShownBelow) null else exitLabel(banner)
+                val mainLine = listOfNotNull(exit, street).joinToString(" · ").ifEmpty { null }
+                if (mainLine != null) {
+                    Text(
+                        mainLine, style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp * s, lineHeight = 23.sp * s), color = c.textPrimary,
+                        maxLines = if (expanded) 2 else 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 // Direction de sortie visible, bandeau replié ou non (spec §3) ; à l'approche, le panneau D3 la reprend.
                 if (!signShownBelow) {
                     banner.exitToward?.let {
-                        Text(stringResource(R.string.nav_exit_toward, it), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(R.string.nav_exit_toward, it), style = MaterialTheme.typography.bodyMedium, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                // D2 : au rond-point, la rue de sortie, bandeau replié ou non (l'instruction sur 2 lignes la coupait).
-                if (towardExit && street != null) {
-                    Text(stringResource(R.string.nav_roundabout_toward, street), style = MaterialTheme.typography.bodyMedium, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-                AnimatedVisibility(expanded) {
-                    Column {
-                        if (!signShownBelow) {
-                            Text(banner.instruction, style = MaterialTheme.typography.titleSmall, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                        if (!towardExit) street?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    }
+                AnimatedVisibility(expanded && mainLine == null && !signShownBelow) {
+                    Text(banner.instruction, style = MaterialTheme.typography.titleMedium, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -138,14 +155,6 @@ private fun exitLabel(b: BannerUi): String? {
         roundabout == 1 -> stringResource(R.string.nav_roundabout_exit_first)
         roundabout != null -> stringResource(R.string.nav_roundabout_exit_n, roundabout)
         else -> null
-    }
-}
-
-@Composable
-private fun ExitPill(label: String) {
-    val c = LocalRoadlyColors.current
-    Box(Modifier.background(c.accent, RoadlyShapes.Chip).padding(horizontal = 10.dp, vertical = 4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = c.onAccent)
     }
 }
 

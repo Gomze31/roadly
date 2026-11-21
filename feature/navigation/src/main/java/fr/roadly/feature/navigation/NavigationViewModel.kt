@@ -7,6 +7,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.community.CommunityRepository
 import fr.roadly.core.data.community.pollNearby
+import fr.roadly.core.data.traffic.asReport
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.repository.GuidanceDefaults
 import fr.roadly.core.data.repository.UserPreferencesRepository
@@ -56,6 +57,18 @@ import java.time.ZoneId
 import javax.inject.Inject
 
 /** Itinéraires alternatifs calculés en cours de trajet (depuis la position projetée vers la destination). */
+/** Feuille « Carburant sur le trajet » : stations devant soi, de la moins chère à la plus chère (prix officiels). */
+sealed interface FuelAheadUi {
+    data object Hidden : FuelAheadUi
+    data object Loading : FuelAheadUi
+    data class Content(val stations: List<fr.roadly.core.navigation.StationAhead>, val fuel: fr.roadly.core.model.FuelType) : FuelAheadUi
+    /** Véhicule électrique : bornes rapides (50 kW et plus, base IRVE) dans l'ordre du trajet. */
+    data class Chargers(val chargers: List<fr.roadly.core.navigation.ChargerAhead>) : FuelAheadUi
+    /** Véhicule électrique sans source de bornes (tests). */
+    data object Electric : FuelAheadUi
+    data class Error(val error: AppError) : FuelAheadUi
+}
+
 sealed interface AlternativesUi {
     data object Hidden : AlternativesUi
     data object Loading : AlternativesUi
@@ -74,7 +87,62 @@ class NavigationViewModel @Inject constructor(
     private val scooter: ScooterServices? = null,
     /** Fausses alertes (zones masquées) ; défaut immuable pour les tests existants. */
     private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
+    /** Incidents officiels Bison Futé ; null (tests existants) = aucun. */
+    private val traffic: fr.roadly.core.data.traffic.TrafficSource? = null,
+    /** Stations sur le trajet (prix officiels) et carburant du véhicule ; null (tests existants) = fonction absente. */
+    private val fuelAlong: fr.roadly.core.navigation.FuelAlongRoute? = null,
+    private val vehicles: fr.roadly.core.data.repository.VehicleProfileRepository? = null,
+    /** Bornes rapides IRVE le long du tracé (véhicule électrique) ; null (tests existants) = message seulement. */
+    private val chargersAlong: fr.roadly.core.navigation.ChargersAlongRoute? = null,
 ) : ViewModel() {
+    /** Véhicule électrique : le bouton du panneau propose les bornes rapides plutôt que les stations-service. */
+    val isElectric: StateFlow<Boolean> = (vehicles?.profile ?: kotlinx.coroutines.flow.flowOf(null))
+        .map { it?.fuel == fr.roadly.core.model.FuelType.ELECTRIC }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val _fuelAhead = MutableStateFlow<FuelAheadUi>(FuelAheadUi.Hidden)
+    val fuelAheadUi: StateFlow<FuelAheadUi> = _fuelAhead
+    private var fuelJob: kotlinx.coroutines.Job? = null
+    val fuelAheadAvailable: Boolean get() = fuelAlong != null || chargersAlong != null
+
+    /** Stations à moins de 1,5 km du tracé sur les 80 prochains km, triées par prix du carburant du véhicule (gazole sans profil). */
+    fun loadFuelAhead() {
+        if (!fuelAheadAvailable) return
+        val g = session.state.value as? NavigationState.Guiding ?: return
+        fuelJob?.cancel()
+        _fuelAhead.value = FuelAheadUi.Loading
+        fuelJob = viewModelScope.launch {
+            val profileFuel = vehicles?.profile?.first()?.fuel
+            if (profileFuel == fr.roadly.core.model.FuelType.ELECTRIC) {
+                val ev = chargersAlong ?: run { _fuelAhead.value = FuelAheadUi.Electric; return@launch }
+                _fuelAhead.value = when (val r = ev.ahead(g.route.geometry, g.progress.distanceAlongM)) {
+                    is Outcome.Success -> FuelAheadUi.Chargers(r.value)
+                    is Outcome.Failure -> FuelAheadUi.Error(r.error)
+                }
+                return@launch
+            }
+            val finder = fuelAlong ?: run { _fuelAhead.value = FuelAheadUi.Hidden; return@launch }
+            val fuel = profileFuel ?: fr.roadly.core.model.FuelType.DIESEL
+            _fuelAhead.value = when (val r = finder.ahead(g.route.geometry, g.progress.distanceAlongM, fuel)) {
+                is Outcome.Success -> FuelAheadUi.Content(r.value, fuel)
+                is Outcome.Failure -> FuelAheadUi.Error(r.error)
+            }
+        }
+    }
+
+    fun dismissFuelAhead() { fuelJob?.cancel(); _fuelAhead.value = FuelAheadUi.Hidden }
+
+    /** La borne choisie devient un arrêt : le guidage repart par elle. */
+    fun addChargerStop(c: fr.roadly.core.navigation.ChargerAhead) {
+        dismissFuelAhead()
+        addStop(c.station.toPlace())
+    }
+
+    /** La station choisie devient un arrêt : le guidage repart par elle. */
+    fun addFuelStop(s: fr.roadly.core.navigation.StationAhead) {
+        dismissFuelAhead()
+        addStop(s.station.toPlace())
+    }
+
     /** Zone de danger dont l'utilisateur veut signaler une fausse alerte (confirmation affichée) ; null = aucune. */
     private val _zoneToHide = MutableStateFlow<String?>(null)
     val zoneToHide: StateFlow<String?> = _zoneToHide
@@ -94,7 +162,30 @@ class NavigationViewModel @Inject constructor(
     fun cancelHideZone() { _zoneToHide.value = null }
     val communityEnabled: StateFlow<Boolean> = community.isConfigured.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     /** Signalements autour de la position projetée (toutes les 60 s), affichés sur la carte. */
-    val reports: StateFlow<List<CommunityReport>> = community.pollNearby({ (session.state.value as? NavigationState.Guiding)?.progress?.snapped }).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val communityReports = community.pollNearby({ (session.state.value as? NavigationState.Guiding)?.progress?.snapped })
+
+    /**
+     * Incidents officiels (Bison Futé) sur le tracé courant, dans le sens de circulation, rafraîchis toutes les 5 minutes
+     * pendant le guidage ; montrés comme des signalements (carte, Horizon).
+     */
+    private val officialReports: kotlinx.coroutines.flow.Flow<List<CommunityReport>> = traffic?.let { src ->
+        kotlinx.coroutines.flow.flow {
+            while (true) {
+                val g = session.state.value as? NavigationState.Guiding
+                if (g != null) {
+                    val events = try { src.events() } catch (e: kotlin.coroutines.cancellation.CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                    val now = System.currentTimeMillis()
+                    emit(kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        fr.roadly.core.data.traffic.TrafficOnRoute.along(g.route.geometry, events).map { it.asReport(now) }
+                    })
+                } else emit(emptyList())
+                kotlinx.coroutines.delay(fr.roadly.core.data.traffic.TrafficRepository.MAX_AGE_MS)
+            }
+        }
+    } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    val reports: StateFlow<List<CommunityReport>> = combine(communityReports, officialReports) { a, b -> a + b }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val _reportMessage = MutableStateFlow<String?>(null)
     val reportMessage: StateFlow<String?> = _reportMessage
 
@@ -326,7 +417,7 @@ class NavigationViewModel @Inject constructor(
     private val _assistantReply = MutableStateFlow<String?>(null)
     val assistantReply: StateFlow<String?> = _assistantReply
 
-    /** Roadly AI : réponse calculée sur l'état réel du guidage et du profil, prononcée puis affichée 8 s. */
+    /** l'assistant vocal : réponse calculée sur l'état réel du guidage et du profil, prononcée puis affichée 8 s. */
     fun onAssistantText(text: String) {
         val sc = scooter ?: return
         val g = session.state.value as? NavigationState.Guiding

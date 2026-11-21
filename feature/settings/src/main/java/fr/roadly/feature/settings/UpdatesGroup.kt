@@ -46,6 +46,8 @@ internal fun UpdatesGroup(vm: UpdatesViewModel) {
     var token by remember { mutableStateOf("") }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.onPermissionScreenClosed() }
 
+    // Roadly installé avec la marque « Play Store » (UnknownAuto) : une installation par Roadly la retirerait, et Android Auto le masquerait.
+    val playMarked = remember { AndroidAutoProbe.facts(context).installerPackage == AndroidAutoReadiness.PLAY_STORE }
     SettingsGroup("Mises à jour") {
         val st = ui.state
         val status = when (st) {
@@ -72,9 +74,21 @@ internal fun UpdatesGroup(vm: UpdatesViewModel) {
         if (st is UpdateState.Available && st.update.notes.isNotBlank()) {
             Text(st.update.notes.take(800), style = MaterialTheme.typography.bodySmall, color = c.textSecondary)
         }
+        if (playMarked && (st is UpdateState.Available || st is UpdateState.ReadyToInstall)) {
+            Text(
+                "Android Auto : Roadly est marqué « installé par le Play Store ». Installez cette version avec UnknownAuto pour le garder dans la voiture ; " +
+                    "« Installer quand même » le retirerait d'Android Auto.",
+                style = MaterialTheme.typography.bodySmall, color = c.warning,
+            )
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
             when (st) {
-                is UpdateState.Available, is UpdateState.ReadyToInstall -> GlassButton("Installer", onClick = vm::install)
+                is UpdateState.Available, is UpdateState.ReadyToInstall -> if (playMarked) {
+                    GlassButton("Télécharger l'APK", onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AndroidAutoReadiness.ROADLY_RELEASES_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    })
+                    GlassButton("Installer quand même", onClick = vm::install, style = GlassButtonStyle.Secondary)
+                } else GlassButton("Installer", onClick = vm::install)
                 is UpdateState.NeedsPermission -> GlassButton("Autoriser l'installation", onClick = {
                     permissionLauncher.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
                 })

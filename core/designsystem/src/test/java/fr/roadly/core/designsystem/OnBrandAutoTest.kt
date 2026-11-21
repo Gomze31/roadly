@@ -22,6 +22,11 @@ class OnBrandAutoTest {
         assertEquals(night.onBrand, night.onBrandAuto)
     }
 
+    @Test fun `texte sombre sur le magenta par défaut de nuit, comme les boutons de référence`() {
+        assertTrue(RoadlyColors.Night.onBrandAuto.luminance() < 0.05f)
+        assertEquals(RoadlyColors.Night.onBrandAuto, RoadlyColors.Night.withTint(CockpitTint.MAGENTA).onBrandAuto)
+    }
+
     @Test fun `texte sombre sur l'ambre de nuit`() {
         val night = RoadlyColors.Night.withTint(CockpitTint.AMBER)
         assertNotEquals(night.onBrand, night.onBrandAuto)

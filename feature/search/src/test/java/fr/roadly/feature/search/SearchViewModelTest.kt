@@ -27,6 +27,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModelTest {
@@ -195,5 +197,26 @@ class SearchViewModelTest {
             vm.onToggleFavorite(); advanceTimeBy(10)
             assertTrue(expectMostRecentItem().selectedIsFavorite)
         }
+    }
+
+    @Test fun `trip options apply to this trip only, until remembered`() = runTest {
+        val prefs = fr.roadly.core.data.testing.FakeUserPreferencesRepository()
+        val trip = fr.roadly.core.data.repository.TripPreferences()
+        val v = SearchViewModel(geocoder, recents, favorites, location, connectivity, nearby, fuel, vehicle, SavedStateHandle(), prefs, trip, fr.roadly.core.data.repository.DeparturePlanner())
+        val job = backgroundScope.launch { v.tripOptions.collect {} }
+        advanceUntilIdle()
+        v.onToggleAvoid(fr.roadly.core.model.RouteAvoid.TOLLS); advanceUntilIdle()
+        assertEquals(fr.roadly.core.model.RoutePreferences(avoidTolls = true), trip.override.value)
+        assertEquals("rien d'enregistré", fr.roadly.core.model.RoutePreferences(), prefs.route.value)
+        assertTrue(v.tripOptions.value.tripOnly)
+        assertTrue(v.tripOptions.value.preferences.avoidTolls)
+
+        v.onRememberOptions(true); advanceUntilIdle()
+        assertEquals("« Mémoriser » enregistre les options du trajet", fr.roadly.core.model.RoutePreferences(avoidTolls = true), prefs.route.value)
+        assertEquals(null, trip.override.value)
+
+        v.onToggleAvoid(fr.roadly.core.model.RouteAvoid.UNPAVED); advanceUntilIdle()
+        assertEquals(fr.roadly.core.model.RoutePreferences(avoidTolls = true, avoidUnpaved = true), prefs.route.value)
+        job.cancel()
     }
 }
