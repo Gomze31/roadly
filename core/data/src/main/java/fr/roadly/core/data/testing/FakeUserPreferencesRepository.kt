@@ -55,6 +55,9 @@ class FakeUserPreferencesRepository : UserPreferencesRepository {
     val junction3d = MutableStateFlow(GuidanceDefaults.JUNCTION_3D)
     override val junction3dEnabled: Flow<Boolean> = junction3d
     override suspend fun setJunction3dEnabled(value: Boolean) { junction3d.value = value }
+    val simulate = MutableStateFlow(false)
+    override val simulateDrive: Flow<Boolean> = simulate
+    override suspend fun setSimulateDrive(value: Boolean) { simulate.value = value }
     val detail = MutableStateFlow(GuidanceDefaults.MAP_DETAIL)
     override val mapDetail: Flow<MapDetail> = detail
     override suspend fun setMapDetail(value: MapDetail) { detail.value = value }

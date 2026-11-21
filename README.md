@@ -1,8 +1,8 @@
 # Roadly
 
-Roadly est une application GPS Android native, écrite en Kotlin avec Jetpack Compose. Elle affiche une carte, suit la position de l'utilisateur, recherche des adresses et des lieux, et compare trois itinéraires en voiture (rapide, court, sans péage). La version actuelle est la **v0.1.0** : elle livre la Phase 1 de la feuille de route et le guidage pas à pas de la Phase 2 (testé en JVM et vérifié à l'arrêt sur appareil, voir « Vérification sur appareil »). Pas de trafic.
+Roadly est une application GPS Android native, écrite en Kotlin avec Jetpack Compose. Elle affiche une carte, suit la position de l'utilisateur, recherche des adresses et des lieux, et compare trois itinéraires en voiture (rapide, court, sans péage). Les versions sont numérotées **0.1.N** (N = nombre de commits ; dernière release étiquetée : v0.1.204) : l'application livre la Phase 1 de la feuille de route et le guidage pas à pas de la Phase 2 (testé en JVM et vérifié à l'arrêt sur appareil, voir « Vérification sur appareil »), puis les lots suivis dans `SILLAXE_PARITY.md` (stations et prix des carburants, arrêts, historique et Replay, trottinette, Android Auto sur DHU). Pas de trafic. Rien n'a été validé en roulant.
 
-Le nom « Roadly » est provisoire. Tous les fournisseurs de données de la v1 sont gratuits et sans clé d'API.
+Le nom « Roadly » est provisoire. Tous les fournisseurs de données nécessaires sont gratuits et sans clé d'API ; trois fonctions optionnelles demandent une clé ou un jeton saisi par l'utilisateur (clé Gemini pour Roadly AI, URL + clé anon Supabase pour la communauté, jeton GitHub à portée fine pour les mises à jour d'un dépôt privé).
 
 Objectif du projet : une alternative Android à parité fonctionnelle et visuelle avec Sillaxe (iPhone). L'état de chaque fonction et de chaque écran par rapport à cette référence est tenu dans `SILLAXE_PARITY.md` ; le design system dans `docs/DESIGN-SYSTEM.md`.
 
@@ -32,7 +32,7 @@ Depuis la racine du dépôt (PowerShell sous Windows) :
 .\gradlew.bat connectedDebugAndroidTest
 ```
 
-État de la vérification : **224 tests unitaires passent** (`testDebugUnitTest :core:model:test :core:common:test`, 0 échec). Les **3 tests instrumentés passent** sur le HONOR Magic 8 Pro (Android 17) : `FavoriteDaoTest` (2) et `GlassSearchBarTest` (1). Deux correctifs de configuration ont été nécessaires : `core:navigation` déclarait `AndroidJUnitRunner` sans la dépendance `androidx.test:runner` (plantage du processus de test), et `core:designsystem` héritait d'`espresso-core 3.5.0` via Compose, dont `InputManager.getInstance` n'existe plus sur Android 16+ (`espresso-core 3.7.0` forcé).
+État de la vérification : le dépôt compte **927 tests unitaires JVM** (`testDebugUnitTest :core:model:test :core:common:test` ; 224 à la v0.1.0). Les **3 tests instrumentés** de la v0.1.0 passaient sur le HONOR Magic 8 Pro (Android 17) : `FavoriteDaoTest` (2) et `GlassSearchBarTest` (1) ; d'autres ont été ajoutés depuis (guidage). Deux correctifs de configuration ont été nécessaires : `core:navigation` déclarait `AndroidJUnitRunner` sans la dépendance `androidx.test:runner` (plantage du processus de test), et `core:designsystem` héritait d'`espresso-core 3.5.0` via Compose, dont `InputManager.getInstance` n'existe plus sur Android 16+ (`espresso-core 3.7.0` forcé).
 
 L'APK de debug pèse environ 116 Mo (121 596 756 octets), car MapLibre embarque ses bibliothèques natives pour toutes les architectures. Un App Bundle ou des découpages par ABI réduiraient fortement cette taille ; ce n'est pas fait.
 
@@ -81,20 +81,23 @@ feature:settings       Profil véhicule, thème, voix et sons, alertes de vitess
 feature:navigation     Écran de guidage en mode conduite : bandeau de manœuvre, voies, « à venir », ETA, vitesse, arrivée
 ```
 
+Modules ajoutés depuis la v0.1.0, absents de la liste ci-dessus : `core:radar`, `core:scooter`, `core:assistant`, `feature:trips` (Mes trajets, Replay, profil), `feature:car` (Android Auto), `feature:assistant`.
+
 Règles de dépendance : un module `feature:*` ne dépend que de modules `core:*`, jamais d'un autre `feature:*`. `core:model` et `core:common` sont des modules JVM purs, sans dépendance Android. `app` est le seul module qui connaît tous les features. Chaque fournisseur de données est derrière une interface Kotlin d'un module `core:*`, liée par Hilt, donc remplaçable sans toucher aux features.
 
 ## Fournisseurs de données et limites
 
 | Besoin | Fournisseur v1 | Licence / limites | Remplaçable par |
 |---|---|---|---|
-| Tuiles vectorielles | OpenFreeMap, styles `positron` (clair) et `dark` (sombre) sous `https://tiles.openfreemap.org/styles/` | Gratuit, sans clé, usage commercial autorisé, pas de quota publié | MapTiler, Protomaps auto-hébergé |
+| Tuiles vectorielles | OpenFreeMap (`https://tiles.openfreemap.org/planet`, polices et sprites), avec les styles embarqués `roadly-light.json` (clair) et `roadly-dark.json` (sombre) de `core/map/src/main/assets/styles/` | Gratuit, sans clé, usage commercial autorisé, pas de quota publié | MapTiler, Protomaps auto-hébergé |
 | Rendu carte | MapLibre Android 11.13.5 | BSD-2 | — |
 | Géocodage adresses France | Base Adresse Nationale : `https://api-adresse.data.gouv.fr/search/` et `/reverse/` | Licence Ouverte 2.0, environ 50 req/s/IP, sans clé | Nominatim, Pelias |
 | Géocodage POI, villes, Europe | Photon : `https://photon.komoot.io/api/` et `/reverse` | Fair-use, aucune garantie de production | Photon auto-hébergé |
 | Coordonnées saisies | Parseur local (décimal `48.85, 2.35`, DMS `48°51'N 2°21'E`) | — | — |
 | Routage | Valhalla FOSSGIS : `https://valhalla1.openstreetmap.de/route` | Fair-use, développement uniquement ; en production, Valhalla Docker sur VPS | GraphHopper, OSRM |
 | Position | `play-services-location` (FusedLocationProviderClient) | — | — |
-| Limitation de vitesse | Valhalla `trace_attributes`, **uniquement** sur une instance auto-hébergée (jamais sur FOSSGIS : « — ») | Au plus une requête toutes les 5 s pendant le guidage | — |
+| Limitation de vitesse | Valhalla `trace_attributes` : profil du tracé en **une requête par itinéraire** (`RouteAttributes.kt`), y compris sur FOSSGIS ; le suivi fix par fix (`ValhallaTraceSpeedLimitProvider`) reste réservé à une instance auto-hébergée | Une requête par tracé ; auto-hébergé : en plus, au plus une toutes les 5 s pendant le guidage ; « — » là où OpenStreetMap n'a pas de `maxspeed` | — |
+| Prix des carburants | data.economie.gouv.fr, flux instantané (`FuelStationProvider.kt`) | Licence Ouverte, sans clé | — |
 
 **Avertissement.** Le serveur Valhalla de FOSSGIS et le serveur Photon de Komoot sont des services publics offerts à titre de fair-use. Ils n'offrent aucune garantie de disponibilité ni de débit et ne conviennent pas à une application distribuée à grande échelle. Pour une mise en production, il faut auto-héberger Valhalla (voir `docs/API-PROVIDERS.md`) et idéalement Photon. Roadly limite sa charge : en-tête `User-Agent: Roadly/<version> (+https://roadly.example)`, cache HTTP OkHttp de 10 Mo, debounce de 300 ms sur la recherche, une requête en vol par type.
 
@@ -106,12 +109,12 @@ Détails par fournisseur : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 
 - `local.properties` (à la racine, hors suivi de version) : contient `sdk.dir=<chemin du SDK Android>`. Aucune clé d'API n'est nécessaire.
 - Les URL des fournisseurs ont des valeurs par défaut dans `core/data/src/main/java/fr/roadly/core/data/config/ProviderConfig.kt`. Elles sont modifiables à l'exécution dans **Réglages › Fournisseurs** (stockées dans DataStore) : style de carte clair, style sombre, BAN, Photon, Valhalla. C'est ce qui permet de pointer l'application vers un Valhalla auto-hébergé sans recompiler. Utiliser une URL `https://` (reverse proxy avec TLS, par exemple Caddy) : une URL `http://` en clair est refusée par la politique réseau d'Android (cleartext).
-- Si une clé devenait nécessaire plus tard, elle serait lue depuis `local.properties` à la compilation, jamais écrite dans le code.
+- Clés optionnelles, jamais écrites dans le code : la clé Gemini de Roadly AI se saisit dans les Réglages (stockée chiffrée) ou se lit à la compilation dans `local.properties` (`GEMINI_API_KEY`) ; l'URL et la clé anon Supabase se saisissent dans Réglages › Communauté ; le jeton GitHub des mises à jour dans Réglages › Mises à jour (`docs/UPDATES.md`).
 
 ## Ce qui fonctionne (Phase 1)
 
 - Carte vectorielle clair/sombre, thème automatique selon le lever et le coucher du soleil calculés localement.
-- Position de l'utilisateur et cap, badge de vitesse (la limitation de vitesse affiche « — » sans Valhalla auto-hébergé), bouton de recentrage à trois états (libre, centré, suivi).
+- Position de l'utilisateur et cap, badge de vitesse (la limitation de vitesse affiche « — » quand elle est inconnue), bouton de recentrage à trois états (libre, centré, suivi).
 - Adresse courante obtenue par géocodage inverse.
 - Recherche : adresses (BAN), lieux et POI (Photon), coordonnées GPS en décimal ou DMS ; récents (50 maximum) ; favoris ; domicile et travail ; fiche lieu avec distance.
 - Appui long sur la carte pour choisir une destination.
@@ -130,7 +133,7 @@ Détails par fournisseur : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 - Service de premier plan avec notification persistante (instruction, distance, arrivée, « Arrêter ») ; arrêt automatique à l'arrivée.
 - Réglages : Voix et sons, Alertes de vitesse (tolérance 0/5/10 km/h), Préférences d'itinéraire (éviter péages, autoroutes, ferries).
 
-Limites : pas de trafic ; limitation de vitesse (et donc alerte de dépassement) seulement avec un Valhalla auto-hébergé ; les voies ne s'affichent que si la réponse Valhalla en contient (aucune dans les réponses FOSSGIS observées) ; changer de destination est possible, ajouter un arrêt pas encore (Phase 4) ; voix muette si aucune voix française n'est installée sur l'appareil.
+Limites : pas de trafic ; limitation de vitesse (et donc alerte de dépassement) seulement là où le profil du tracé la connaît (`maxspeed` OpenStreetMap ; l'instance publique FOSSGIS est en fair-use, réservée au développement) ; les voies ne s'affichent que si la réponse Valhalla en contient (aucune dans les réponses FOSSGIS observées) ; changer de destination et ajouter un arrêt sont possibles (jusqu'à 10 arrêts) ; rien de tout cela n'a été validé en roulant ; voix muette si aucune voix française n'est installée sur l'appareil.
 
 ## Mode trottinette électrique (LOT 13)
 
@@ -152,7 +155,7 @@ Roadly ne demande pas `ACCESS_BACKGROUND_LOCATION` : aucune localisation en arri
 
 ## Limitation de vitesse : Valhalla auto-hébergé
 
-L'instance publique FOSSGIS n'est jamais interrogée pour la limitation (fair-use). Pour l'activer :
+Sur l'instance publique FOSSGIS (fair-use, développement uniquement), la limitation vient du profil du tracé : une requête `trace_attributes` par itinéraire, jamais une par position pendant le guidage. Le suivi fix par fix (toutes les 5 s) n'est émis que vers une instance auto-hébergée. Pour l'installer :
 
 ```powershell
 mkdir valhalla_tiles
@@ -169,14 +172,15 @@ La réponse contient `edges[].speed_limit` (km/h) quand OpenStreetMap renseigne 
 
 ## Marqué « Bientôt » ou désactivé
 
-- Pastilles Stations, Bornes, Parkings, Incidents de l'écran d'accueil.
-- Péages : le montant affiche « Phase 3 ».
+- Pastille Incidents de l'écran d'accueil (Stations, Bornes et Parkings sont actives : recherche à proximité).
+- Péages : aucun montant (pas de source). Sont affichés la présence d'un péage (« Avec péage » / « Sans péage ») et le nombre de portiques en flux libre du tracé, avec un rappel de paiement sur l'accueil après passage.
 - Trafic : aucun, ni dans le calcul d'itinéraire ni pendant le guidage.
-- Limitation de vitesse : « — » tant qu'aucun Valhalla auto-hébergé n'est configuré (voir « Limitation de vitesse : Valhalla auto-hébergé »).
+- Limitation de vitesse : « — » sur les portions où le profil du tracé ne la connaît pas (voir « Limitation de vitesse : Valhalla auto-hébergé »).
+- Android Auto : exécuté sur l'unité de bureau (DHU) seulement ; sur une vraie voiture, l'application doit être installée depuis Google Play (`docs/ANDROID-AUTO.md`).
 
 ## Confidentialité
 
-La position ne quitte l'appareil que vers les fournisseurs listés ci-dessus, et seulement pour les fonctions qui en ont besoin : requêtes de géocodage et de routage, ainsi que les tuiles de carte demandées à OpenFreeMap. Rien n'est stocké sur un serveur appartenant à Roadly, et l'application n'embarque aucun outil d'analyse. Favoris, récents et profil véhicule restent dans la base locale de l'appareil. La sauvegarde Android est désactivée (`allowBackup=false`) : favoris et historique ne quittent pas l'appareil.
+La position ne quitte l'appareil que vers les fournisseurs listés ci-dessus, et seulement pour les fonctions qui en ont besoin : requêtes de géocodage et de routage, ainsi que les tuiles de carte demandées à OpenFreeMap. Les fonctions optionnelles, une fois configurées par l'utilisateur, envoient leurs données à leur propre service (Gemini pour Roadly AI, projet Supabase de l'exploitant pour les signalements). Rien n'est stocké sur un serveur appartenant à Roadly, et l'application n'embarque aucun outil d'analyse. Favoris, récents et profil véhicule restent dans la base locale de l'appareil. La sauvegarde Android est désactivée (`allowBackup=false`) : favoris et historique ne quittent pas l'appareil.
 
 ## Écarts assumés par rapport à la spec
 
@@ -189,7 +193,7 @@ La spec est [`docs/superpowers/specs/2026-10-30-roadly-v1-design.md`](docs/super
 - `TimePickerDialog` remplacé par un `AlertDialog` contenant un `TimePicker`.
 - Les arguments de navigation sont lus depuis `SavedStateHandle` par clé, et non via `toRoute`, pour que les ViewModels restent testables sur JVM.
 - Pas de repli `LocationManager` : sans services Google Play, aucune position (prévu Phase 5).
-- Styles de carte `positron` et `dark` d'OpenFreeMap, au lieu du style `liberty` et du style sombre dérivé embarqué envisagés dans la spec.
+- Styles de carte `positron` et `dark` d'OpenFreeMap à la v0.1.0, au lieu du style `liberty` et du style sombre dérivé embarqué envisagés dans la spec ; remplacés depuis par les styles embarqués `roadly-light.json` / `roadly-dark.json` (tuiles OpenFreeMap).
 
 ## Licences
 
@@ -206,6 +210,7 @@ L'écran Réglages › À propos reproduit ces mentions. Le projet lui-même n'a
 
 - `docs/UPDATES.md` : mises à jour depuis les releases GitHub (signature, secrets, jeton, publication).
 - `docs/SCOOTER.md` : mode trottinette (audit, architecture, sources, réglementation, autonomie, limites, essais).
+- `docs/GUIDAGE-INTELLIGENT.md` : moteur de situation, rond-point en direct, voix progressive ; benchmark des concurrents dans `docs/BENCHMARK-GPS.md`.
 
 - [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md) : chaque API, ses endpoints, ses limites, le passage en production.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) : Phase 2 livrée, Phases 3 à 5.

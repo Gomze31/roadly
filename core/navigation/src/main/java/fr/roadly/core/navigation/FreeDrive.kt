@@ -358,7 +358,7 @@ class FreeDriveSession @Inject constructor(
                 .filter { it.key !in settings.hiddenZones }
             val out = radarEngine.update(now, observations, current.speedKmh, prefs.speedAlertToleranceKmh.first())
             current = current.copy(
-                zone = out.active?.let { FreeDriveZone(it.key, it.speedLimitKmh, it.distanceM, it.confidence) },
+                zone = out.active?.let { FreeDriveZone(it.key, ZoneLimits.inside(it.speedLimitKmh, current.speedLimitKmh), it.distanceM, it.confidence) },
                 nextZone = out.next,
             )
             for (e in out.events) {
@@ -366,7 +366,7 @@ class FreeDriveSession @Inject constructor(
                 when (e) {
                     is RadarAlertEvent.PreWarning -> if (voice) say(SpokenPhrases.dangerZoneAhead(e.distanceM))
                     is RadarAlertEvent.Entered -> {
-                        if (voice) say(SpokenPhrases.vigilanceZone(e.speedLimitKmh))
+                        if (voice) say(SpokenPhrases.vigilanceZone(ZoneLimits.inside(e.speedLimitKmh, current.speedLimitKmh)))
                         if (prefs.vigilanceSound.first() && prefs.voiceEnabled.first()) speech.beep()
                     }
                     is RadarAlertEvent.Exited -> if (voice && settings.announceExit) say(SpokenPhrases.DANGER_ZONE_END)

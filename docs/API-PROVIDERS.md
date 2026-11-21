@@ -4,12 +4,12 @@ Ce document décrit chaque service externe utilisé par la v1 (v0.1.0), ce que l
 
 Tous les appels HTTP passent par un client OkHttp unique (cache de 10 Mo) qui envoie l'en-tête `User-Agent: Roadly/<version> (+https://roadly.example)`. L'adresse de contact `roadly.example` est un exemple à remplacer par un vrai contact avant toute distribution : les opérateurs de services gratuits s'en servent pour joindre les applications qui chargent leurs serveurs.
 
-Aucune clé d'API n'est utilisée. Les fournisseurs étaient joignables le 2026-10-30 (HTTP 200) lors de la rédaction de la spec ; leur disponibilité n'est garantie par personne.
+Aucune clé d'API n'est nécessaire pour les fournisseurs de ce document. Trois fonctions optionnelles utilisent une clé ou un jeton saisi par l'utilisateur : la clé Gemini de Roadly AI (Réglages, stockée chiffrée, ou `GEMINI_API_KEY` dans `local.properties`), l'URL et la clé anon Supabase de la communauté (`docs/BACKEND.md`), le jeton GitHub à portée fine des mises à jour d'un dépôt privé (`docs/UPDATES.md`). Les fournisseurs étaient joignables le 2026-10-30 (HTTP 200) lors de la rédaction de la spec ; leur disponibilité n'est garantie par personne.
 
 ## 1. OpenFreeMap (tuiles vectorielles)
 
-- **Endpoints (par défaut)** : styles `https://tiles.openfreemap.org/styles/positron` (thème clair) et `https://tiles.openfreemap.org/styles/dark` (thème sombre). Le style est un JSON MapLibre qui référence lui-même les tuiles, les polices et les sprites.
-- **Appelé par** : MapLibre Android (pas par le client OkHttp de l'application). L'application ne fournit que l'URL du style.
+- **Endpoints (par défaut)** : les styles sont embarqués dans l'application, `asset://styles/roadly-light.json` (thème clair) et `asset://styles/roadly-dark.json` (thème sombre), fichiers de `core/map/src/main/assets/styles/`. Chaque style est un JSON MapLibre qui référence les tuiles (`https://tiles.openfreemap.org/planet`), les polices et les sprites d'OpenFreeMap. Une URL `https://` de style externe reste possible dans Réglages › Fournisseurs.
+- **Appelé par** : MapLibre Android (pas par le client OkHttp de l'application). L'application ne fournit que l'URI du style.
 - **Paramètres** : aucun.
 - **Réponse** : style JSON MapLibre/Mapbox GL, puis tuiles vectorielles.
 - **Licence** : service gratuit, sans clé, usage commercial autorisé. Données : contributeurs OpenStreetMap, ODbL. L'attribution « © OpenFreeMap © contributeurs OpenStreetMap » doit rester visible (elle figure dans Réglages › À propos).
@@ -64,10 +64,18 @@ Pas de service : le parseur local (`CoordinateParser`, module `core:geocoding`) 
 - **Erreurs** : une réponse 400 avec un code Valhalla 170, 171 ou 442 (pas d'arête proche, pas de chemin) est traitée comme « aucun résultat » et non comme une panne.
 - **Licence** : moteur sous licence MIT ; données OpenStreetMap sous ODbL.
 - **Limites** : l'instance FOSSGIS est un service public en fair-use, destiné au développement. Elle ne garantit ni disponibilité ni débit. La v1 envoie trois requêtes en parallèle (une par itinéraire : rapide, court, sans péage) à chaque comparaison.
-- **Prérequis de production** : Valhalla auto-hébergé (section suivante). Cette étape est aussi nécessaire pour la limitation de vitesse (`trace_attributes`, voir plus bas).
+- **Prérequis de production** : Valhalla auto-hébergé (section suivante). Cette étape est aussi nécessaire pour le suivi de la limitation fix par fix (`trace_attributes`, voir plus bas) ; le profil du tracé, lui, fonctionne aussi sur l'instance publique.
+
+### Valhalla `/trace_attributes` : profil du tracé (limitations, portiques en flux libre)
+
+- **Endpoint** : `POST <base Valhalla>/trace_attributes`, corps JSON ; implémenté par `ValhallaRouteAttributesProvider` (`core/navigation/.../RouteAttributes.kt`).
+- **Corps de requête** : `encoded_polyline` (tracé, précision 6), `shape_match` : `edge_walk`, `costing` : `auto`, filtre sur `edge.length`, `edge.speed_limit`, `edge.names`, `edge.end_node`, `node.type`, `admin.country_code`.
+- **Débit** : une requête par tracé motorisé, y compris sur l'instance publique FOSSGIS (même volume qu'un calcul d'itinéraire) ; les 6 derniers profils sont gardés en mémoire. Aucune requête à chaque position.
+- **Résultat** : tronçons à limitation connue et portiques de péage en flux libre (OSM `highway=toll_gantry`). Le profil est rejeté si la longueur des arêtes s'écarte de plus de 5 % de celle du tracé. Sans `maxspeed` OpenStreetMap, la limitation reste « — ».
+- **Limite** : l'instance publique reste un service en fair-use, pour le développement ; non vérifié en roulant.
 - **Alternative** : GraphHopper, OSRM.
 
-### Valhalla `/trace_attributes` : limitation de vitesse (guidage)
+### Valhalla `/trace_attributes` : limitation de vitesse fix par fix (guidage, auto-hébergé)
 
 - **Endpoint** : `POST <base Valhalla>/trace_attributes`, corps JSON ; implémenté par `ValhallaTraceSpeedLimitProvider` (`core:navigation`).
 - **Corps de requête** :
@@ -75,7 +83,7 @@ Pas de service : le parseur local (`CoordinateParser`, module `core:geocoding`) 
   - `costing` : `auto` ; `shape_match` : `map_snap` ; `units` : `kilometers` ;
   - `filters` : `{ "attributes": ["edge.speed_limit", "edge.names", "edge.road_class"], "action": "include" }`.
 - **Réponse** : la limitation est lue dans `edges[].speed_limit` (km/h), pour l'arête désignée par le dernier `matched_points[].edge_index` (à défaut, la dernière arête). Une valeur absente ou hors de 1..254 donne « inconnue » : l'interface affiche « — », jamais une valeur devinée.
-- **Règle de blocage** : l'appel n'est jamais émis si l'hôte configuré est `openstreetmap.de` ou un sous-domaine (instance publique FOSSGIS, fair-use). La limitation n'existe donc qu'avec un Valhalla auto-hébergé, configuré dans Réglages › Fournisseurs.
+- **Règle de blocage** : cet appel fix par fix n'est jamais émis si l'hôte configuré est `openstreetmap.de` ou un sous-domaine (instance publique FOSSGIS, fair-use). Sur l'instance publique, la limitation vient donc du seul profil du tracé (section précédente) ; le suivi fix par fix demande un Valhalla auto-hébergé, configuré dans Réglages › Fournisseurs.
 - **Débit** : au plus une requête toutes les 5 s pendant le guidage ; entre deux appels, la dernière valeur est conservée. En cas d'échec, la valeur est effacée (« — »).
 - **Limite** : `speed_limit` n'est renseigné que si OpenStreetMap porte `maxspeed` sur la route. Le format exact de la réponse n'a pas été vérifié sur une instance réelle (les tests utilisent des réponses JSON écrites à la main).
 - **Alerte de dépassement** : se déclenche seulement quand une limitation est connue (tolérance 0/5/10 km/h réglable).
@@ -112,14 +120,14 @@ La même méthode vaut pour BAN, Photon et les styles de carte.
 
 `play-services-location` (FusedLocationProviderClient). Ce n'est pas un service réseau de Roadly. Prérequis : les Google Play Services doivent être présents sur l'appareil ; il n'y a pas de repli `LocationManager` en v1 (prévu Phase 5), donc sans eux aucune position n'est disponible.
 
-## 8. Sources étudiées pour la Phase 3 (non intégrées)
+## 8. Sources étudiées pour la Phase 3
 
-Aucune de ces sources n'est utilisée par la v1. Leur licence, leur format et leurs conditions doivent être vérifiés avant tout développement.
+Hors les prix des carburants et les signalements (intégrés depuis), aucune de ces sources n'est utilisée. Leur licence, leur format et leurs conditions doivent être vérifiés avant tout développement.
 
 | Besoin | Source | Remarques |
 |---|---|---|
-| Prix des carburants | `https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/` | Données ouvertes du ministère de l'Économie, flux quasi instantané. À évaluer : format, fréquence, volume, mise en cache locale. |
+| Prix des carburants | `https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/` | **Intégré** : `OpenDataFuelStationProvider` (`core/data/.../fuel/FuelStationProvider.kt`), requête de proximité sur l'API `explore/v2.1`, Licence Ouverte, sans clé ; repli sur les lieux OSM si le flux échoue. |
 | Bornes de recharge (IRVE) | `https://transport.data.gouv.fr/datasets/fichier-consolide-des-bornes-de-recharge-pour-vehicules-electriques` | Fichier consolidé des bornes, données ouvertes. Fichier volumineux à traiter hors de l'appareil ou par extraction régionale. |
 | Trafic et incidents | Bison Futé / Autoroutes.fr | Conventionnement requis. Jamais de trafic simulé : sans contrat, la fonction reste « Bientôt ». |
 | Péages | Données ASFA | Pas d'API publique officielle. À contractualiser avant d'afficher un montant. |
-| Signalements communautaires | Supabase (backend à créer) | Modération, expiration, et zones de danger conformes à la loi française. |
+| Signalements communautaires | Supabase (projet à créer par l'exploitant) | **Client intégré**, inactif tant que l'URL et la clé anon ne sont pas saisies (Réglages › Communauté) ; schéma dans `backend/supabase/schema.sql`, `docs/BACKEND.md`. Modération, expiration, et zones de danger conformes à la loi française. |

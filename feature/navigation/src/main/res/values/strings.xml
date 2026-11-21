@@ -93,4 +93,20 @@
     <string name="nav_zone_false_alarm">Fausse alerte ?</string>
     <string name="nav_zone_false_alarm_text">Cette zone ne sera plus annoncée ni affichée sur ce téléphone. Vous pourrez la réafficher dans Réglages › Radars et zones de danger.</string>
     <string name="nav_zone_hide">Masquer la zone</string>
+    <plurals name="nav_roundabout_let_pass">
+        <item quantity="one">%1$d sortie à passer</item>
+        <item quantity="other">%1$d sorties à passer</item>
+    </plurals>
+    <string name="nav_roundabout_next_exit">Première sortie rencontrée</string>
+    <string name="nav_roundabout_next_exit_now">Prochaine sortie</string>
+    <string name="nav_roundabout_done">Sortie prise</string>
+    <string name="nav_roundabout_unsure">Position imprécise</string>
+    <string name="nav_roundabout_in">dans %1$s</string>
+    <string name="nav_gps_uncertain">GPS imprécis</string>
+    <plurals name="nav_branch_diagram_desc">
+        <item quantity="one">Bifurcation : prenez la branche %1$d sur %2$d</item>
+        <item quantity="other">Bifurcation : prenez la branche %1$d sur %2$d</item>
+    </plurals>
+    <string name="nav_side_right">Serrez à droite</string>
+    <string name="nav_side_left">Serrez à gauche</string>
 </resources>

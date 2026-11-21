@@ -19,6 +19,7 @@ import androidx.car.app.navigation.model.Trip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Home
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -51,8 +52,19 @@ internal class CarGuidanceScreen(
     /** Contenu du gabarit au dernier rafraîchissement : l'hôte n'est sollicité que si l'affichage change. */
     private var shownKey: Any? = null
     private val alerts = CarZoneAlerts(carContext, deps, lifecycleScope)
+    /** Domicile enregistré ; le bouton n'est proposé que s'il diffère de la destination en cours. */
+    private var home: fr.roadly.core.model.Place? = null
+    private val homeKnown: Boolean
+        get() {
+            val h = home ?: return false
+            val end = (state as? NavigationState.Guiding)?.route?.geometry?.lastOrNull() ?: return true
+            return end.distanceTo(h.point) > HOME_SAME_DESTINATION_M
+        }
 
     init {
+        lifecycleScope.launch(Dispatchers.Main) {
+            deps.favorites.observeHome().collect { home = it; update(state, muted, toleranceKmh) }
+        }
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 shownRouteId = null
@@ -111,7 +123,11 @@ internal class CarGuidanceScreen(
         val bearing = p.bearingDeg?.toDouble()
         // Position projetée sur le tracé (celle du guidage), pas un fix inventé : même point que la caméra.
         renderer.setUser(LocationFix(point = p.snapped, bearingDeg = p.bearingDeg, speedMps = g.speedKmh?.let { (it / 3.6).toFloat() }, accuracyM = SNAPPED_ACCURACY_M, timestampMs = deps.clock.nowMs()))
-        renderer.follow(p.snapped, bearing, FollowProfile.GUIDANCE)
+        // Caméra : croisière selon la vitesse, puis glissement vers le cadrage de la manœuvre à son approche (rond-point, sortie).
+        val type = route.maneuvers.getOrNull(next)?.type ?: fr.roadly.core.model.ManeuverType.CONTINUE
+        val camera = CarCameraPolicy.guidance(g.speedKmh, p.distanceToNextManeuverM, type, renderer.currentCamera)
+        renderer.setSpeed(g.speedKmh)
+        renderer.follow(p.snapped, bearing, FollowProfile.GUIDANCE, camera)
         renderer.setHud(hud)
     }
 
@@ -120,7 +136,7 @@ internal class CarGuidanceScreen(
         is NavigationState.Guiding -> {
             val model = CarGuidanceMapper.map(s)
             listOf(
-                "g", m, model?.current, model?.next, model?.rerouting,
+                "g", m, model?.current, model?.next, model?.rerouting, model?.lanes, model?.junction, homeKnown,
                 model?.let { CarDistances.maneuver(it.distanceToCurrentM) }, model?.let { CarDistances.remaining(it.remainingDistanceM) },
                 model?.let { it.etaEpochMs / 60_000 }, model?.let { (it.remainingDurationS / 60).toLong() },
             )
@@ -167,24 +183,45 @@ internal class CarGuidanceScreen(
         return builder.build()
     }
 
+    /** Voix, retour au domicile en un appui (s'il est défini et n'est pas déjà la destination), arrêt. */
     private fun guidanceActions(): ActionStrip = ActionStrip.Builder()
         .addAction(CarActions.icon(if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp) { deps.navigation.setMuted(!muted) })
+        .apply { if (homeKnown) addAction(CarActions.icon(Icons.Default.Home) { goHome() }) }
         .addAction(CarActions.text(carContext, R.string.car_stop) { deps.guidance.stop() })
         .build()
 
-    private fun step(s: CarStep): Step {
+    private fun goHome() {
+        val place = home ?: return
+        lifecycleScope.launch {
+            val r = deps.guidance.startTo(place)
+            if (r is fr.roadly.core.common.Outcome.Failure) androidx.car.app.CarToast.makeText(carContext, r.error.userMessage(), androidx.car.app.CarToast.LENGTH_LONG).show()
+        }
+    }
+
+    /** [lanes] : voies à l'approche (étape courante seulement) — la bibliothèque exige les voies et leur image ensemble. */
+    private fun step(s: CarStep, lanes: List<fr.roadly.core.model.Lane> = emptyList()): Step {
         val maneuver = Maneuver.Builder(s.maneuverCode).setIcon(CarIcons.maneuver(s.type)).apply {
             s.roundaboutExit?.let { setRoundaboutExitNumber(it) }
         }.build()
         val cue = s.cue.ifBlank { s.road.orEmpty() }
-        return Step.Builder(cue).setManeuver(maneuver).apply { s.road?.let { setRoad(it) } }.build()
+        return Step.Builder(cue).setManeuver(maneuver).apply {
+            s.road?.let { setRoad(it) }
+            if (lanes.isNotEmpty()) {
+                CarLanes.toCar(lanes).forEach(::addLane)
+                setLanesImage(CarVisuals.lanes(lanes))
+            }
+        }.build()
     }
 
     private fun distance(v: CarDistanceValue): Distance = Distance.create(v.value, v.unit)
 
     private fun routingInfo(model: CarGuidanceModel): RoutingInfo = RoutingInfo.Builder()
-        .setCurrentStep(step(model.current), distance(CarDistances.maneuver(model.distanceToCurrentM)))
-        .apply { model.next?.let { setNextStep(step(it)) } }
+        .setCurrentStep(step(model.current, model.lanes), distance(CarDistances.maneuver(model.distanceToCurrentM)))
+        .apply {
+            model.next?.let { setNextStep(step(it)) }
+            // Rond-point avec la sortie à prendre, ou panneau de sortie : montré par l'hôte dans la carte de guidage.
+            model.junction?.let { setJunctionImage(CarVisuals.junction(it)) }
+        }
         .build()
 
     private fun destinationEstimate(model: CarGuidanceModel): TravelEstimate =
@@ -221,5 +258,6 @@ internal class CarGuidanceScreen(
         const val CARD_NIGHT = 0xFF1E1B2E.toInt()
         const val SNAPPED_ACCURACY_M = 5f
         const val MIN_STEP_SPEED_MPS = 5.0
+        const val HOME_SAME_DESTINATION_M = 150.0
     }
 }

@@ -71,9 +71,9 @@ internal class RoadlyCarSession(private val deps: CarDependencies) : Session() {
         })
         // Après le retour de l'écran racine (Dispatchers.Main, pas immediate) : un guidage en cours est poussé par-dessus l'accueil.
         lifecycleScope.launch(Dispatchers.Main) {
-            combine(deps.config.config, dark) { c, d -> if (d) c.mapStyleDarkUrl else c.mapStyleLightUrl }
+            combine(deps.config.config, dark) { c, d -> d to CarStyles.forCar(if (d) c.mapStyleDarkUrl else c.mapStyleLightUrl) }
                 .distinctUntilChanged()
-                .collect { renderer.setStyle(it) }
+                .collect { (night, url) -> renderer.setNight(night); renderer.setStyle(url) }
         }
         lifecycleScope.launch(Dispatchers.Main) { deps.navigation.state.collect(::onNavigationState) }
         lifecycleScope.launch(Dispatchers.Main) { deps.freeDrive.state.collect(::onFreeDriveState) }

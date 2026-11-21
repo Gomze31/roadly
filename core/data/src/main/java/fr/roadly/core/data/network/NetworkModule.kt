@@ -21,6 +21,10 @@ object NetworkModule {
     @Provides @Singleton
     fun json(): Json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
+    /** Un seul limiteur pour tout le processus : tous les appels FOSSGIS partagent la même file (1 requête par seconde). */
+    @Provides @Singleton
+    fun valhallaRateLimiter(): ValhallaRateLimiter = ValhallaRateLimiter()
+
     @Provides @Singleton
     fun okHttp(@ApplicationContext ctx: Context): OkHttpClient {
         val version = ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "dev"
@@ -28,7 +32,7 @@ object NetworkModule {
             .cache(Cache(File(ctx.cacheDir, "http"), 10L * 1024 * 1024))
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
-            .addInterceptor(UserAgentInterceptor("Roadly/$version (+https://roadly.example)"))
+            .addInterceptor(UserAgentInterceptor(UserAgentInterceptor.userAgent(version, BuildConfig.CONTACT)))
             .apply { if (BuildConfig.DEBUG) addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC)) }
             .build()
     }

@@ -70,6 +70,7 @@ import fr.roadly.core.navigation.junction.JunctionInput
 import fr.roadly.core.navigation.junction.JunctionTopologyProvider
 import fr.roadly.core.navigation.junction.JunctionWindow
 import fr.roadly.core.navigation.junction.NoJunctionTopologyProvider
+import fr.roadly.core.navigation.junction.RoundaboutExitCounter
 
 /**
  * Session de guidage unique de l'application (spec §2, §4). Logique pure Kotlin testée sur JVM ;
@@ -100,6 +101,8 @@ class NavigationSession @Inject constructor(
     private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
     /** Vue 3D de carrefour : topologie réelle (`trace_attributes`) de chaque carrefour retenu, demandée pendant sa préparation. */
     private val junctionTopology: JunctionTopologyProvider = NoJunctionTopologyProvider,
+    /** Outil de test : positions simulées ou rejouées à la place du GPS pendant la course. */
+    private val simulation: DriveSimulation = NoDriveSimulation,
 ) {
     private val _state = MutableStateFlow<NavigationState>(NavigationState.Idle)
     val state: StateFlow<NavigationState> = _state.asStateFlow()
@@ -214,6 +217,7 @@ class NavigationSession @Inject constructor(
         location.setGuidanceActive(true)
         serviceController.start()
         job = scope.launch(confined) { current = run; run.execute() }
+        scope.launch { try { simulation.start(option.route) } catch (e: CancellationException) { throw e } catch (e: Exception) { /* pas de simulation : GPS réel */ } }
         // B6 : course mémorisée pour être proposée à la reprise après la mort du processus (bouton : Étape E3).
         persistLastGuidance(LastGuidance(option.route.geometry.last(), name, option.route.id, clock.nowMs()))
     }
@@ -274,6 +278,7 @@ class NavigationSession @Inject constructor(
         }
         job?.cancel()
         job = null
+        simulation.stop()
         location.setGuidanceActive(false)
         speech.stop(VoiceChannel.GUIDANCE)
         // La sourdine appartient à la course : le canal du guidage est rendu tel quel, celui de l'assistant n'est pas touché (E1).
@@ -323,6 +328,10 @@ class NavigationSession @Inject constructor(
         private var rerouting = false
         /** « Recalcul de l'itinéraire. » n'est dit qu'une fois par épisode hors itinéraire. */
         private var rerouteAnnounced = false
+        /** Recalculs échoués d'affilée : espace les essais (10, 20, 40, 60 s) et garde l'écran en « recalcul » entre deux essais. */
+        private var rerouteFailures = 0
+        /** « Signal GPS perdu » déjà dit pour la coupure en cours. */
+        private var gpsLostSaid = false
         private var overSpeedAlerted = false
         private var limitJob: Job? = null
         /** Virages + zones de vigilance du tracé courant (recalculés après un recalcul d'itinéraire). */
@@ -340,7 +349,29 @@ class NavigationSession @Inject constructor(
         private val topologies = HashMap<Int, JunctionTopology>()
         private val topologyAttempts = HashMap<Int, Pair<Int, Long>>()
         private var junction: JunctionGuidance? = null
+        private var branchDiagram: BranchDiagram? = null
         private var junctionEnabled = true
+        /** Mode rond-point : schéma du rond-point visé (reconstruit quand sa topologie arrive), suivi dans l'anneau, sortie récente. */
+        private val roundaboutTracker = RoundaboutProgressTracker()
+        private var roundaboutLayout: CachedLayout? = null
+        private var roundaboutLive: RoundaboutLive? = null
+        private var exitedRoundabout: ExitedRoundabout? = null
+        /** Situation de conduite publiée avec l'état (mode, densité, urgence). */
+        private val situations = SituationEngine()
+        private var situation = GuidanceSituation()
+        /** Voix progressive : manœuvres dont la consigne de placement a été dite, confirmation en attente, dernière parole. */
+        private val positioned = mutableSetOf<Int>()
+        private var pendingConfirmation: PendingConfirmation? = null
+        private var lastSpeechAtMs: Long? = null
+        /** Manœuvre manquée : écart au tracé qui grandit après un point de décision (recalcul sans attendre la règle générale). */
+        private val missedManeuver = MissedManeuverDetector()
+        /**
+         * Le véhicule a quitté le tracé (manœuvre manquée détectée) et ne l'a pas encore rejoint : tant que c'est vrai, plus aucune
+         * manœuvre du tracé abandonné n'est annoncée et « Recalcul » n'est pas redit, même si le routeur ne répond pas.
+         */
+        private var strayed = false
+        /** Dernière phrase dite : la même phrase n'est jamais redite dans les [REPEAT_GUARD_MS] qui suivent. */
+        private var lastSpokenText: String? = null
         private var lastNextIndex: Int? = null
         private var indexChangedAtMs: Long? = null
         private var vigilanceOn = GuidanceDefaults.VIGILANCE_ENABLED
@@ -392,7 +423,7 @@ class NavigationSession @Inject constructor(
             val afterLongGap = hadFix && now - lastFixAtMs > GuidanceConstants.REROUTE_MIN_INTERVAL_MS
             hadFix = true
             tripRecorder.onFix(fix, now)
-            lastFixAtMs = now
+            lastFixAtMs = now; gpsLostSaid = false
             lastAdvanceAtMs = now
             recent.addLast(fix)
             while (recent.size > GuidanceConstants.RECENT_FIXES) recent.removeFirst()
@@ -400,8 +431,13 @@ class NavigationSession @Inject constructor(
             speedKmh = smoother.update(rawSpeedKmh)
             val progress = tracker.update(fix)
             if (tracker.hasArrived) { arrive(); return }
-            if (!tracker.isOffRoute) rerouteAnnounced = false
-            if (tracker.isOffRoute && !afterLongGap) maybeReroute(fix, now)
+            // Nouvel épisode seulement une fois le tracé vraiment rejoint (pas au premier fix un peu moins écarté).
+            if (!tracker.isOffRoute && progress.offRouteM <= REJOINED_M) { rerouteAnnounced = false; strayed = false; rerouteFailures = 0 }
+            // Sortie ou branche manquée : l'écart grandit régulièrement après la manœuvre, bien avant les seuils de la règle générale.
+            val missed = !tracker.isOffRoute && !afterLongGap && !rerouting && missedManeuver.update(missedSample(progress))
+            if (missed) strayed = true
+            if ((tracker.isOffRoute && !afterLongGap) || missed || strayed) maybeReroute(fix, now)
+            updateRoundabout(progress)
             announce(progress)
             updateRouteProfile(progress)
             if (routeLimitKmh == null) refreshSpeedLimit()
@@ -409,6 +445,7 @@ class NavigationSession @Inject constructor(
             coachTick(now)
             updateZone(progress)
             updateJunction(progress, now, gpsLost = false)
+            updateSituation(progress, gpsLost = false)
             // Un recalcul a pu aboutir pendant une suspension : ne jamais associer l'ancienne progression au nouveau tracé.
             if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = false))
         }
@@ -420,7 +457,7 @@ class NavigationSession @Inject constructor(
             val zones = if (vigilanceOn) {
                 try { vigilance.zonesAlong(r) } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
             } else emptyList()
-            if (r.id == route.id) hazards = (curves + zones).sortedBy { it.startAlongM }
+            if (r.id == route.id) hazards = ZoneLimits.reconcile((curves + zones).sortedBy { it.startAlongM }, attributes?.takeIf { it.routeId == r.id })
         }
 
         /**
@@ -468,7 +505,8 @@ class NavigationSession @Inject constructor(
          * GPS perdu, aucune vue n'est publiée.
          */
         private fun updateJunction(progress: RouteProgress, now: Long, gpsLost: Boolean) {
-            if (!junctionEnabled || route.scooterGoal != null || progress.routeId != route.id) { junction = null; return }
+            // La topologie sert aussi au mode rond-point : elle est chargée même quand la vue 3D est désactivée (seule sa publication dépend du réglage).
+            if (route.scooterGoal != null || progress.routeId != route.id) { junction = null; branchDiagram = null; return }
             val r = route
             val g = junctions.update(
                 JunctionInput(
@@ -476,7 +514,10 @@ class NavigationSession @Inject constructor(
                     rerouting = rerouting, offRoute = tracker.isOffRoute, topology = { topologies[it] },
                 ),
             )
-            junction = g
+            junction = g.takeIf { junctionEnabled }
+            // Schéma de bifurcation : branches réelles du nœud de la manœuvre, dès que la vue du carrefour est due et la topologie chargée.
+            branchDiagram = g?.takeIf { it.phase.visible && it.phase != JunctionPhase.RECOVER && it.kind != fr.roadly.core.model.junction.JunctionKind.ROUNDABOUT }
+                ?.let { BranchDiagrams.build(r, it.maneuverIndex, it.topology) }
             if (g == null || g.topology != null || g.phase == JunctionPhase.RECOVER) return
             val idx = g.maneuverIndex
             val (attempts, lastAt) = topologyAttempts[idx] ?: (0 to 0L)
@@ -492,6 +533,76 @@ class NavigationSession @Inject constructor(
             }
         }
 
+        /**
+         * Mode rond-point : schéma vivant du rond-point visé, de l'approche à quelques dizaines de mètres après la sortie.
+         * Hors itinéraire ou en recalcul, rien n'est montré (la position projetée ne dit plus où est le véhicule).
+         */
+        private fun updateRoundabout(progress: RouteProgress) {
+            if (progress.routeId != route.id || tracker.isOffRoute || rerouting) { roundaboutLive = null; return }
+            val ms = route.maneuvers
+            val next = progress.nextManeuverIndex.coerceIn(0, ms.lastIndex)
+            val enter = when {
+                ms[next].type == ManeuverType.ROUNDABOUT_ENTER -> next
+                ms[next].type == ManeuverType.ROUNDABOUT_EXIT && ms.getOrNull(next - 1)?.type == ManeuverType.ROUNDABOUT_ENTER -> next - 1
+                else -> -1
+            }
+            val info = roundabouts[enter]
+            if (info != null) {
+                val topology = topologies[enter]
+                val cached = roundaboutLayout?.takeIf { it.enterIndex == enter && it.withTopology == (topology != null) }
+                val layout = cached?.layout ?: RoundaboutLayouts.build(info, RoundaboutExitCounter.count(route, enter, topology))
+                    .also { roundaboutLayout = CachedLayout(enter, topology != null, it) }
+                val inside = next != enter
+                roundaboutLive = roundaboutTracker.update(route.id, enter, layout, inside, progress.distanceToNextManeuverM, roundaboutFix(progress))
+                exitedRoundabout = if (inside) ExitedRoundabout(enter, layout, progress.distanceAlongM + progress.distanceToNextManeuverM) else null
+                return
+            }
+            val e = exitedRoundabout
+            val travelled = e?.let { progress.distanceAlongM - it.exitAlongM }
+            if (e != null && travelled != null && next == e.enterIndex + 2 && travelled < ROUNDABOUT_EXITED_M) {
+                // « Sortie prise » demande des preuves : position mesurée, sur le tracé, nettement après le nœud de sortie. Sinon le
+                // schéma reste sur « Prochaine sortie » (anneau parcouru) : l'indice de manœuvre a basculé, la sortie n'est pas acquise.
+                val proven = !progress.extrapolated && progress.offRouteM <= ROUNDABOUT_EXIT_MAX_OFFSET_M &&
+                    travelled >= maxOf(ROUNDABOUT_EXIT_CONFIRM_M, progress.accuracyM * 0.5)
+                roundaboutLive = if (proven || e.confirmed) {
+                    e.confirmed = true
+                    roundaboutTracker.exited(e.layout, travelled)
+                } else {
+                    roundaboutTracker.update(route.id, e.enterIndex, e.layout, inside = true, distanceToNextM = 0.0, fix = roundaboutFix(progress))
+                }
+            } else {
+                exitedRoundabout = null
+                roundaboutLive = null
+            }
+        }
+
+        private fun missedSample(progress: RouteProgress): MissedManeuverDetector.Sample {
+            val passed = progress.nextManeuverIndex - 1
+            val since = tracker.maneuverStartM.getOrNull(passed)?.takeIf { passed > 0 }?.let { progress.distanceAlongM - it }
+            return MissedManeuverDetector.Sample(
+                routeId = progress.routeId, offRouteM = progress.offRouteM, accuracyM = progress.accuracyM, extrapolated = progress.extrapolated,
+                sinceManeuverM = since, toNextManeuverM = progress.distanceToNextManeuverM,
+            )
+        }
+
+        private fun roundaboutFix(progress: RouteProgress) =
+            RoundaboutFix(accuracyM = progress.accuracyM, extrapolated = progress.extrapolated, speedKmh = speedKmh, nowMs = clock.nowMs())
+
+        private fun updateSituation(progress: RouteProgress, gpsLost: Boolean) {
+            if (progress.routeId != route.id) return
+            val ms = route.maneuvers
+            val next = progress.nextManeuverIndex.coerceIn(0, ms.lastIndex)
+            situation = situations.update(
+                SituationInput(
+                    routeId = route.id, nextIndex = next, next = ms[next], following = ms.getOrNull(next + 1),
+                    distanceToNextM = progress.distanceToNextManeuverM,
+                    gapToFollowingM = progress.distancesToManeuversM.firstOrNull()?.let { it - progress.distanceToNextManeuverM },
+                    speedKmh = speedKmh, rerouting = rerouting, gpsLost = gpsLost, extrapolated = progress.extrapolated,
+                    accuracyM = progress.accuracyM, roundabout = roundaboutLive,
+                ),
+            )
+        }
+
         /** 1.0 : profil du tracé [r] (une requête) ; ignoré s'il arrive après un recalcul vers un autre tracé. */
         private suspend fun loadAttributes(r: Route) {
             val result = try {
@@ -500,6 +611,8 @@ class NavigationSession @Inject constructor(
             val a = (result as? Outcome.Success)?.value ?: return
             if (r.id != route.id || a.routeId != r.id) return
             attributes = a
+            // Zones déjà chargées : leur limitation s'aligne sur celle de la route (une seule valeur à l'écran et à la voix).
+            hazards = ZoneLimits.reconcile(hazards, a)
             // Un tracé recalculé commence à la position du recalcul : aucun de ses portiques n'est derrière nous.
             gantryCursorM = 0.0
         }
@@ -558,9 +671,14 @@ class NavigationSession @Inject constructor(
 
         private suspend fun announce(progress: RouteProgress) {
             if (rerouting || progress.routeId != route.id) return
+            // Hors du tracé : la position projetée n'est plus celle du véhicule, les manœuvres du tracé abandonné ne le concernent plus.
+            if (strayed || tracker.isOffRoute) return
             val now = clock.nowMs()
             if (progress.nextManeuverIndex != lastNextIndex) {
-                if (lastNextIndex != null) indexChangedAtMs = now
+                val previous = lastNextIndex
+                if (previous != null) indexChangedAtMs = now
+                // Manœuvre passée dans l'ordre : sa confirmation est candidate (dite plus bas, après un délai, si le tronçon est long).
+                pendingConfirmation = if (previous != null && progress.nextManeuverIndex == previous + 1) PendingConfirmation(previous, now) else null
                 lastNextIndex = progress.nextManeuverIndex
             }
             val c = coordinator
@@ -568,12 +686,32 @@ class NavigationSession @Inject constructor(
             val a = AnnouncementPolicy.next(
                 progress, route.maneuvers, speedKmh, announced,
                 scooter = scooter != null, textOverride = override, sincePreviousManeuverMs = indexChangedAtMs?.let { now - it },
+                roundaboutExitGate = route.maneuvers.getOrNull(progress.nextManeuverIndex)?.let { RoundaboutVoice.exitGate(it.type, roundaboutLive) },
             )
             if (a != null) {
                 announced += a.maneuverIndex to a.tier
+                pendingConfirmation = null
                 say(a.text, routeId = progress.routeId, priority = a.tier.speechPriority())
+            } else if (scooter == null && !tracker.isOffRoute) {
+                progressiveVoice(progress, now)
             }
             if (c != null) scooterTick(c, progress)
+        }
+
+        /** Voix progressive hors paliers : consigne de placement avant la manœuvre (temps 2), confirmation après (temps 4). */
+        private suspend fun progressiveVoice(progress: RouteProgress, now: Long) {
+            val k = progress.nextManeuverIndex
+            val m = route.maneuvers.getOrNull(k) ?: return
+            val pending = pendingConfirmation
+            if (pending != null && pending.passedIndex == k - 1 && now - pending.atMs >= ConfirmationPolicy.DELAY_MS) {
+                pendingConfirmation = null
+                ConfirmationPolicy.text(route.maneuvers[pending.passedIndex], progress.distanceToNextManeuverM, speedKmh, scooter = false)
+                    ?.let { say(it, routeId = progress.routeId, priority = SpeechPriority.LOW); return }
+            }
+            if (k in positioned || progress.extrapolated) return
+            val text = PositioningPolicy.next(m, progress.distanceToNextManeuverM, speedKmh, scooter = false, sinceLastSpeechMs = lastSpeechAtMs?.let { now - it }) ?: return
+            positioned += k
+            say(text, routeId = progress.routeId)
         }
 
         /** Transitions de voie, avertissements anticipés et autonomie (trottinette). */
@@ -621,6 +759,7 @@ class NavigationSession @Inject constructor(
             }
             val tolls = tollTrip
             publish(NavigationState.Arrived(route, tolls))
+            simulation.stop()
             tripRecorder.end(arrived = true, nowMs = clock.nowMs())
             if (gen == generation) {
                 persistTollReminder()
@@ -644,7 +783,9 @@ class NavigationSession @Inject constructor(
         private suspend fun maybeReroute(fix: LocationFix, now: Long) {
             if (rerouting) return
             val last = lastRerouteAtMs
-            if (last != null && now - last < GuidanceConstants.REROUTE_MIN_INTERVAL_MS) return
+            // Après deux échecs, l'intervalle double (10, 10, 20, 40, 60 s) : un serveur lent ou absent n'est pas relancé toutes les 10 s sans fin.
+            val interval = (GuidanceConstants.REROUTE_MIN_INTERVAL_MS shl (rerouteFailures - 2).coerceIn(0, 3)).coerceAtMost(REROUTE_MAX_INTERVAL_MS)
+            if (last != null && now - last < interval) return
             lastRerouteAtMs = now
             rerouting = true
             if (!rerouteAnnounced) {
@@ -661,7 +802,7 @@ class NavigationSession @Inject constructor(
                             RouteRequest(
                                 origin = fix.point, destination = destination, costing = costing,
                                 preferences = routePreferences, originHeadingDeg = heading, vehicle = vehicle,
-                                scooter = scooter?.request,
+                                scooter = scooter?.request, reroute = true,
                             ),
                         )
                     }
@@ -679,12 +820,17 @@ class NavigationSession @Inject constructor(
                     route = fresh
                     tracker = freshTracker
                     roundabouts = RoundaboutResolver.resolveAll(fresh)
-                    junctions.reset(); topologies.clear(); topologyAttempts.clear(); junction = null
+                    junctions.reset(); topologies.clear(); topologyAttempts.clear(); junction = null; branchDiagram = null
                     announced.clear()
                     announced += 0 to Tier.NOW
                     lastNextIndex = null; indexChangedAtMs = null
+                    positioned.clear(); pendingConfirmation = null
+                    roundaboutTracker.reset(); roundaboutLayout = null; roundaboutLive = null; exitedRoundabout = null
+                    situations.reset()
+                    missedManeuver.reset(); strayed = false
                     freshTracker.update(fix)
                     rerouteAnnounced = false
+                    rerouteFailures = 0
                     // Nouveau tracé : nouvelles abscisses, virages et zones à recalculer.
                     // Nouvelles abscisses : les zones déjà annoncées gardent leur clé (équipement), donc pas de seconde annonce.
                     hazards = emptyList(); activeZone = null; radarActive = null; radarNext = null
@@ -693,7 +839,12 @@ class NavigationSession @Inject constructor(
                     runScope.launch { loadAttributes(fresh) }
                     loadHazards()
                 }
-                // Échec : on continue sur l'ancien tracé ; un nouveau recalcul sera tenté après 10 s.
+                // Échec : on continue sur l'ancien tracé ; l'intervalle avant le nouvel essai court depuis la fin de celui-ci.
+                if (fresh == null || freshTracker == null) {
+                    rerouteFailures++
+                    lastRerouteAtMs = clock.nowMs()
+                    if (rerouteFailures == 1) say(SpokenPhrases.REROUTE_FAILED)
+                }
                 rerouting = false
                 publish(guiding(tracker.lastProgress ?: tracker.initialProgress(), clock.nowMs(), gpsLost = false))
             }
@@ -706,13 +857,19 @@ class NavigationSession @Inject constructor(
                 val now = clock.nowMs()
                 val silentMs = now - lastFixAtMs
                 if (silentMs <= GuidanceConstants.GPS_EXTRAPOLATE_AFTER_MS) continue
+                if (silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS && !gpsLostSaid) {
+                    gpsLostSaid = true
+                    say(SpokenPhrases.GPS_LOST, routeId = route.id)
+                }
                 val mps = (speedKmh ?: 0.0) / 3.6
                 val progress = tracker.extrapolate(mps * (now - lastAdvanceAtMs) / 1000.0, silentMs)
                 lastAdvanceAtMs = now
+                updateRoundabout(progress)
                 announce(progress)
                 updateRouteProfile(progress)
                 updateZone(progress)
                 updateJunction(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS)
+                updateSituation(progress, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS)
                 // Un recalcul a pu aboutir pendant la suspension de l'annonce : on abandonne la progression périmée.
                 if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
             }
@@ -767,12 +924,23 @@ class NavigationSession @Inject constructor(
             if (gen != generation) return
             // Idem pour un recalcul abouti entre-temps : une annonce issue de l'ancien tracé serait fausse.
             if (routeId != null && routeId != route.id) return
+            // Jamais la même phrase deux fois de suite à quelques secondes d'écart (deux paliers franchis d'un coup au départ).
+            val at = clock.nowMs()
+            if (text == lastSpokenText && lastSpeechAtMs?.let { at - it < REPEAT_GUARD_MS } == true) return
+            lastSpokenText = text
+            lastSpeechAtMs = at
             speech.speak(text, priority = priority, channel = VoiceChannel.GUIDANCE)
         }
 
         private fun publish(s: NavigationState) {
             synchronized(stateLock) { if (gen == generation) _state.value = s }
         }
+
+        /**
+         * Recalcul en cours **ou** en attente d'un nouvel essai après un échec : entre deux essais, le téléphone et la voiture
+         * montraient de nouveau l'ancienne manœuvre et sa distance, comme si le véhicule suivait encore le tracé abandonné.
+         */
+        private val rerouteShown: Boolean get() = rerouting || rerouteFailures > 0
 
         fun guiding(progress: RouteProgress, now: Long, gpsLost: Boolean): NavigationState.Guiding {
             val ms = route.maneuvers
@@ -793,15 +961,23 @@ class NavigationSession @Inject constructor(
                 lanes = ms[next].lanes,
                 etaEpochMs = now + (progress.remainingDurationS * 1000).roundToLong(),
                 gpsLost = gpsLost,
-                rerouting = rerouting,
+                rerouting = rerouteShown,
                 scooter = scooterUi,
                 roundabout = RoundaboutResolver.current(roundabouts, next),
                 nextSpeedLimit = nextLimit,
                 freeFlowToll = tollTrip,
                 junction = junction,
+                roundaboutLive = roundaboutLive,
+                branchDiagram = branchDiagram.takeUnless { rerouteShown },
+                // En recalcul, l'état est publié hors du tic de position : le mode suit sans attendre le fix suivant.
+                situation = if (rerouteShown) GuidanceSituation(GuidanceMode.REROUTING, GuidanceDensity.STANDARD) else situation,
             )
         }
     }
+
+    private class CachedLayout(val enterIndex: Int, val withTopology: Boolean, val layout: RoundaboutLayout)
+    private class ExitedRoundabout(val enterIndex: Int, val layout: RoundaboutLayout, val exitAlongM: Double, var confirmed: Boolean = false)
+    private class PendingConfirmation(val passedIndex: Int, val atMs: Long)
 
     /** Mémorise la position du véhicule à l'arrivée ; une erreur de stockage est sans effet sur le guidage. */
     private fun rememberParking(point: GeoPoint) {
@@ -823,6 +999,15 @@ class NavigationSession @Inject constructor(
         /** Zones observées : de 500 m derrière (sortie) à 6 km devant (préavis et affichage). */
         const val RADAR_BEHIND_M = 500.0
         const val RADAR_AHEAD_M = 6_000.0
+        /** Mode rond-point : la confirmation de sortie reste affichée sur cette distance après la sortie. */
+        const val ROUNDABOUT_EXITED_M = 60.0
+        /** Le tracé est rejoint quand l'écart repasse sous ceci (m). */
+        const val REJOINED_M = 15.0
+        const val REPEAT_GUARD_MS = 10_000L
+        const val REROUTE_MAX_INTERVAL_MS = 60_000L
+        /** « Sortie prise » : au moins cette distance après le nœud de sortie, et pas plus loin que ceci du tracé. */
+        const val ROUNDABOUT_EXIT_CONFIRM_M = 8.0
+        const val ROUNDABOUT_EXIT_MAX_OFFSET_M = 20.0
     }
 }
 

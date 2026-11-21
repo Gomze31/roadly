@@ -120,7 +120,8 @@ object RoadlyColors {
         routeCasing = Color(0xFFFFFFFF),
         buildings3d = Color(0xFFD9D4E3),
         danger = Color(0xFFE0304F),
-        warning = Color(0xFFD99A00),
+        // Ambre foncé : texte et icônes sur fond clair (contraste 5,1:1 sur blanc ; 0xFFD99A00 ne donnait que 2,4:1).
+        warning = Color(0xFF9A6200),
         success = Color(0xFF13A070),
         speedRing = Color(0xFFD7263D),
         isDark = false,

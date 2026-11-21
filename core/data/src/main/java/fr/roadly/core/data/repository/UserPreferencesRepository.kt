@@ -99,6 +99,12 @@ interface UserPreferencesRepository {
     /** Vue 3D des carrefours (sorties, bifurcations, ronds-points) pendant le guidage. */
     val junction3dEnabled: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(GuidanceDefaults.JUNCTION_3D)
     suspend fun setJunction3dEnabled(value: Boolean) = Unit
+    /** Outil de test : au départ d'un guidage, les positions viennent d'un trajet simulé ou d'une trace rejouée, pas du GPS. */
+    val simulateDrive: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
+    suspend fun setSimulateDrive(value: Boolean) = Unit
+    /** Vitesse du rejeu (1 = temps réel). */
+    val simulationSpeed: Flow<Int> get() = kotlinx.coroutines.flow.flowOf(1)
+    suspend fun setSimulationSpeed(value: Int) = Unit
     /** C2 : niveau de détail de la carte en guidage (REDUCED : sans points d'intérêt ni noms des petites rues). */
     val mapDetail: Flow<MapDetail>
     suspend fun setMapDetail(value: MapDetail)
@@ -147,6 +153,8 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     private val kRainLimit = booleanPreferencesKey("rain.lowers.limit")
     private val kMap3d = booleanPreferencesKey("map.3d")
     private val kJunction3d = booleanPreferencesKey("map.junction3d")
+    private val kSimulateDrive = booleanPreferencesKey("test.simulateDrive")
+    private val kSimulationSpeed = androidx.datastore.preferences.core.intPreferencesKey("test.simulationSpeed")
     private val kMapDetail = stringPreferencesKey("map.detail")
     private val kTint = stringPreferencesKey("cockpit.tint")
     private val kCameraDefault = stringPreferencesKey("map.camera.default")
@@ -201,6 +209,10 @@ class DataStoreUserPreferencesRepository @Inject constructor(private val store: 
     override suspend fun setMap3dEnabled(value: Boolean) { store.edit { it[kMap3d] = value } }
     override val junction3dEnabled: Flow<Boolean> = store.data.map { it[kJunction3d] ?: GuidanceDefaults.JUNCTION_3D }
     override suspend fun setJunction3dEnabled(value: Boolean) { store.edit { it[kJunction3d] = value } }
+    override val simulateDrive: Flow<Boolean> = store.data.map { it[kSimulateDrive] ?: false }
+    override suspend fun setSimulateDrive(value: Boolean) { store.edit { it[kSimulateDrive] = value } }
+    override val simulationSpeed: Flow<Int> = store.data.map { (it[kSimulationSpeed] ?: 1).coerceIn(1, 4) }
+    override suspend fun setSimulationSpeed(value: Int) { store.edit { it[kSimulationSpeed] = value.coerceIn(1, 4) } }
     override val mapDetail: Flow<MapDetail> = store.data.map { p -> p[kMapDetail]?.let { runCatching { MapDetail.valueOf(it) }.getOrNull() } ?: GuidanceDefaults.MAP_DETAIL }
     override suspend fun setMapDetail(value: MapDetail) { store.edit { it[kMapDetail] = value.name } }
     override val defaultCameraMode: Flow<CameraMode3D> = store.data.map { p ->

@@ -71,9 +71,12 @@ fun ExitSignPanel(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(signOverline(type, isNext)).uppercase(), style = Overline, color = ink.copy(alpha = 0.85f))
-                Spacer(Modifier.weight(1f))
-                Text(distanceText, style = NavDigits.copy(fontSize = 24.sp, lineHeight = 28.sp, textAlign = TextAlign.End), color = ink, maxLines = 1)
+                // Le libellé cède la place : la distance n'est jamais coupée (« 350 » sans son « m » quand le panneau est étroit).
+                Text(
+                    stringResource(signOverline(type, isNext)).uppercase(), style = Overline, color = ink.copy(alpha = 0.85f),
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                Text(distanceText, style = NavDigits.copy(fontSize = 24.sp, lineHeight = 28.sp, textAlign = TextAlign.End), color = ink, maxLines = 1, softWrap = false)
             }
             if (exitNumber != null || branch != null) {
                 Spacer(Modifier.height(6.dp))

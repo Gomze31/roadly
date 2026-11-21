@@ -45,9 +45,10 @@ class PremiumUiStateTest {
     }
 
     @Test fun `the following maneuver is shown under the banner when it comes within 500 m`() {
-        val then = ui(guiding(TestRoutes.twoRoundabouts(), 120.0)).then!!   // entrée à 200 m, sortie 30 m plus loin
-        assertEquals(ManeuverType.ROUNDABOUT_EXIT, then.type)
-        assertEquals("Rue Médiane", then.label)
+        // Entrée de rond-point à 200 m : « puis » ne répète plus la sortie de l'anneau (déjà dans le bandeau et le schéma), il montre
+        // ce qui suit la sortie de près — ici le second rond-point.
+        val then = ui(guiding(TestRoutes.twoRoundabouts(), 120.0)).then!!
+        assertEquals(ManeuverType.ROUNDABOUT_ENTER, then.type)
         val straight = TestRoutes.straight()
         val t = RouteTracker(straight)
         assertTrue(t.maneuverStartM[2] - t.maneuverStartM[1] >= THEN_WITHIN_M)

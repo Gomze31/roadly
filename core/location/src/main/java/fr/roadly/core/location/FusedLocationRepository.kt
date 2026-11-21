@@ -39,6 +39,8 @@ class FusedLocationRepository @Inject constructor(
     @param:ApplicationContext private val ctx: Context,
     @param:ApplicationScope private val scope: CoroutineScope,
     private val prefs: UserPreferencesRepository,
+    /** Outil de test : positions rejouées à la place du GPS tant qu'un rejeu est actif. */
+    private val replay: LocationReplay,
 ) : LocationRepository {
     private val fused = LocationServices.getFusedLocationProviderClient(ctx)
     private val mode = MutableStateFlow(LocationMode.OFF)
@@ -61,8 +63,8 @@ class FusedLocationRepository @Inject constructor(
     @Volatile override var lastKnown: LocationFix? = null
         private set
 
-    override val fixes: Flow<LocationFix> = combine(mode, guidance, car, _permission) { m, g, c, p -> effectiveMode(m, g, p, c) }
-        .flatMapLatest { m -> if (m == LocationMode.OFF) emptyFlow() else updates(m) }
+    override val fixes: Flow<LocationFix> = combine(mode, guidance, car, _permission, replay.active) { m, g, c, p, replaying -> if (replaying) null else effectiveMode(m, g, p, c) }
+        .flatMapLatest { m -> if (m == null) replay.fixes else if (m == LocationMode.OFF) emptyFlow() else updates(m) }
         .onEach { lastKnown = it }
         .shareIn(scope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), replay = 1)
 

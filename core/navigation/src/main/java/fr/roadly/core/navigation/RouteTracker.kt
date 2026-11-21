@@ -71,6 +71,9 @@ class RouteTracker(private val route: Route) {
     private var backtrackFixes = 0
     /** Précision du dernier fix réel : marge de passage reprise par l'extrapolation. */
     private var lastAccuracyM = 0f
+    /** Horodatage et vitesse du dernier fix réel : bornent l'avance plausible du fix suivant (voir [maxForwardAlong]). */
+    private var lastFixTimeMs = 0L
+    private var lastSpeedMps = 0f
 
     var isOffRoute: Boolean = false
         private set
@@ -85,25 +88,29 @@ class RouteTracker(private val route: Route) {
         val prev = lastProgress
         val lastAlong = prev?.distanceAlongM
         val gpsHeading = fix.bearingDeg?.takeIf { (fix.speedMps ?: 0f) >= GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS }
+        val maxAlong = if (lastAlong == null) Double.MAX_VALUE else maxForwardAlong(lastAlong, fix)
         var best = if (lastAlong == null) {
-            search(fix.point, 0, segCount - 1, gpsHeading, null)
+            acquire(fix.point, gpsHeading)
         } else {
-            searchWindow(fix.point, lastAlong, gpsHeading)
+            searchWindow(fix.point, lastAlong, gpsHeading, maxAlong)
         }
+        // Position gardée en attente d'un second fix concordant : elle ne dit rien de l'écart réel au tracé.
+        var held = false
         if (lastAlong != null && best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M) {
-            val global = search(fix.point, 0, segCount - 1, gpsHeading, lastAlong)
+            val global = search(fix.point, 0, segCount - 1, gpsHeading, lastAlong, maxAlong)
             val pending = pendingGlobal
             best = when {
                 global.offM >= best.offM -> { pendingGlobal = null; best }
                 abs(global.alongM - lastAlong) <= GuidanceConstants.GLOBAL_JUMP_M -> { pendingGlobal = null; global }
                 pending != null && abs(global.alongM - pending) <= GuidanceConstants.GLOBAL_CONFIRM_RADIUS_M -> { pendingGlobal = null; global }
-                else -> { pendingGlobal = global.alongM; hold(fix.point, lastAlong) }
+                else -> { pendingGlobal = global.alongM; held = true; hold(fix.point, lastAlong) }
             }
         } else {
             pendingGlobal = null
         }
-        // B6 : un fix imprécis (> 30 m) ne change aucune décision « hors itinéraire ».
-        if (fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M) updateOffRoute(best, gpsHeading)
+        // B6 : un fix imprécis (> 30 m) ne change aucune décision « hors itinéraire » ; une position en attente de confirmation non plus
+        // (sortie d'un long tunnel : le premier fix est loin du dernier point connu, mais sur le tracé).
+        if (fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M && !held) updateOffRoute(best, gpsHeading)
         val moving = (fix.speedMps ?: 0f) >= 1f
         val heading = fix.bearingDeg?.takeIf { moving } ?: bearing(pts[best.segment], pts[best.segment + 1]).toFloat()
         lastAccuracyM = fix.accuracyM
@@ -112,10 +119,31 @@ class RouteTracker(private val route: Route) {
         val nearDestination = fix.point.distanceTo(pts[segCount]) < GuidanceConstants.ARRIVAL_RADIUS_M
         val alongTheEnd = p.distanceAlongM >= totalGeometryM - GuidanceConstants.ARRIVAL_RADIUS_M &&
             p.offRouteM <= GuidanceConstants.OFF_ROUTE_SOFT_M
-        if (!hasArrived && onLast && (nearDestination || alongTheEnd)) hasArrived = true
+        // Un fix imprécis (> 30 m) posé près de la destination ne prouve pas qu'on y est : avec 120 m de précision, l'arrivée était
+        // déclarée 290 m trop tôt et le guidage s'arrêtait. L'arrivée attend un fix exploitable, comme la décision « hors itinéraire ».
+        val trusted = fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M
+        if (!hasArrived && trusted && onLast && (nearDestination || alongTheEnd)) hasArrived = true
         lastRealAlong = p.distanceAlongM
+        lastFixTimeMs = fix.timestampMs
+        lastSpeedMps = fix.speedMps ?: 0f
         lastProgress = p
         return p
+    }
+
+    /**
+     * Abscisse maximale plausible pour [fix] : la distance que le véhicule a pu parcourir depuis le dernier fix réel (2 × la plus
+     * grande des deux vitesses, au moins le pas), plus la précision et une marge. Au-delà, un candidat n'est pas « un peu plus loin » :
+     * c'est un autre passage du tracé (retour d'un demi-tour, chaussée d'en face, boucle) qu'une dérive GPS a rapproché. Sans cette
+     * borne, un véhicule arrêté en face de sa destination, de l'autre côté d'un terre-plein, était déclaré arrivé sur 18 m de dérive.
+     * La borne ne joue qu'au pas ou à l'arrêt : dès que le véhicule roule, le cap GPS écarte déjà les passages en sens inverse, et un
+     * vrai saut vers l'avant (raccourci, reprise) doit rester possible. Sans vitesse connue, pas de borne.
+     */
+    private fun maxForwardAlong(lastAlong: Double, fix: LocationFix): Double {
+        val speed = fix.speedMps ?: return Double.MAX_VALUE
+        if (max(speed, lastSpeedMps) >= GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS) return Double.MAX_VALUE
+        val dtS = ((fix.timestampMs - lastFixTimeMs) / 1000.0).coerceAtLeast(1.0)
+        val v = max(max(speed, lastSpeedMps), GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS).toDouble()
+        return lastAlong + v * dtS * FORWARD_SPEED_FACTOR + fix.accuracyM + FORWARD_MARGIN_M
     }
 
     /**
@@ -216,6 +244,14 @@ class RouteTracker(private val route: Route) {
     private fun distanceTo(k: Int, along: Double): Double = (maneuverStartM[k] - along).coerceAtLeast(0.0) * distScale
 
     /** [interior] = projection strictement à l'intérieur du segment (pas sur une extrémité). */
+    private companion object {
+        /** Portée (m) de l'origine du tracé à la première position : au-delà, le véhicule n'est pas au départ. */
+        const val ACQUIRE_ORIGIN_M = 60.0
+        /** Avance plausible entre deux fixes : vitesse × durée × ce facteur + précision + [FORWARD_MARGIN_M]. */
+        const val FORWARD_SPEED_FACTOR = 2.0
+        const val FORWARD_MARGIN_M = 30.0
+    }
+
     private class Hit(val segment: Int, val alongM: Double, val offM: Double, val snapped: GeoPoint, val interior: Boolean = false)
 
     /**
@@ -237,6 +273,25 @@ class RouteTracker(private val route: Route) {
     }
 
     /** Garde la position [lastAlong] (candidat global non confirmé) ; l'écart est mesuré à ce point. */
+    /**
+     * Première position sur le tracé. Un tracé commence là où se trouve le véhicule (départ, recalcul) : si l'**origine** du tracé
+     * est à portée, c'est elle qui est retenue, quel que soit le cap. Sans cela, une recherche sur tout le tracé filtrée par le
+     * cap accrochait le passage de retour d'un demi-tour ou la fin d'une boucle — des centaines de mètres plus loin, avec la
+     * manœuvre suivante annoncée aussitôt, voire l'arrivée déclarée au départ. Le cap n'écarte pas l'origine : après un recalcul,
+     * le véhicule roule souvent encore dans l'ancien sens.
+     *
+     * Reprise en cours de trajet (processus relancé) : l'origine est loin, la recherche globale garde la main — y compris quand
+     * le véhicule longe le début du tracé en sens inverse (retour d'un aller-retour).
+     */
+    private fun acquire(p: GeoPoint, gpsHeading: Float?): Hit {
+        val global = search(p, 0, segCount - 1, gpsHeading, null)
+        if (global.alongM <= ACQUIRE_ORIGIN_M) return global
+        val origin = search(p, 0, segmentAt(min(ACQUIRE_ORIGIN_M, totalGeometryM)), null, null)
+        val atOrigin = origin.alongM <= ACQUIRE_ORIGIN_M && origin.offM <= GuidanceConstants.OFF_ROUTE_SOFT_M &&
+            origin.offM <= global.offM + GuidanceConstants.CONTINUITY_TIE_M
+        return if (atOrigin) origin else global
+    }
+
     private fun hold(p: GeoPoint, lastAlong: Double): Hit {
         val snapped = pointAt(lastAlong)
         return Hit(segmentAt(lastAlong), lastAlong.coerceIn(0.0, totalGeometryM), p.distanceTo(snapped), snapped)
@@ -257,10 +312,11 @@ class RouteTracker(private val route: Route) {
      * À distance perpendiculaire quasi égale (≤ 15 m), on préfère, pour un candidat d'un autre passage (> 50 m le long du tracé,
      * projection intérieure, recul ≤ 30 m), celui dont `along` est le plus proche de [lastAlong] (B6).
      */
-    private fun search(p: GeoPoint, from: Int, to: Int, headingDeg: Float?, lastAlong: Double?): Hit {
+    private fun search(p: GeoPoint, from: Int, to: Int, headingDeg: Float?, lastAlong: Double?, maxAlong: Double = Double.MAX_VALUE): Hit {
         val all = ArrayList<Hit>(to - from + 1)
         for (i in from..to) all += project(p, i)
-        val pool = if (headingDeg == null) all else all.filter { headingOk(it.segment, headingDeg) }.ifEmpty { all }
+        val reachable = if (maxAlong == Double.MAX_VALUE) all else all.filter { it.alongM <= maxAlong }.ifEmpty { all }
+        val pool = if (headingDeg == null) reachable else reachable.filter { headingOk(it.segment, headingDeg) }.ifEmpty { reachable }
         var best = pool.minBy { it.offM }
         if (lastAlong != null) {
             // B6 : continuité plutôt que distance brute (pont, échangeur, chaussées séparées) ; une extrémité de segment voisin n'est pas
@@ -277,13 +333,13 @@ class RouteTracker(private val route: Route) {
         return best
     }
 
-    private fun searchWindow(p: GeoPoint, lastAlong: Double, headingDeg: Float?): Hit {
+    private fun searchWindow(p: GeoPoint, lastAlong: Double, headingDeg: Float?, maxAlong: Double): Hit {
         val center = segmentAt(lastAlong)
         var from = center
         while (from > 0 && cumDistM[from] > lastAlong - GuidanceConstants.SEARCH_BACK_M) from--
         var to = center
         while (to < segCount - 1 && cumDistM[to + 1] < lastAlong + GuidanceConstants.SEARCH_AHEAD_M) to++
-        return search(p, from, to, headingDeg, lastAlong)
+        return search(p, from, to, headingDeg, lastAlong, maxAlong)
     }
 
     /** Projection orthogonale dans le plan équirectangulaire local centré sur [p]. */

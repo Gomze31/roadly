@@ -23,5 +23,7 @@ abstract class NavigationModule {
     /** 1.0 : route sous la position en conduite libre (map matching espacé, voir `RoadQueryPolicy`). */
     /** Vue 3D de carrefour : une petite requête `trace_attributes` par carrefour retenu. */
     @Binds abstract fun junctionTopology(impl: fr.roadly.core.navigation.junction.ValhallaJunctionTopologyProvider): fr.roadly.core.navigation.junction.JunctionTopologyProvider
+    /** Outil de test : trajet simulé ou trace GPX rejouée au départ d'un guidage (réglage « Simulation de trajet »). */
+    @Binds abstract fun driveSimulation(impl: ReplayDriveSimulation): DriveSimulation
     @Binds abstract fun roadSnapshots(impl: ValhallaRoadSnapshotProvider): RoadSnapshotProvider
 }

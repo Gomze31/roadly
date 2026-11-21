@@ -266,4 +266,24 @@ class ValhallaRoutingProviderTest {
         assertEquals(StreetSide.LEFT, r.maneuvers.last().sideOfStreet)
         assertNull(r.maneuvers[5].sideOfStreet)
     }
+
+    /**
+     * Réponse réelle de l'instance publique FOSSGIS du 2026-11-21 (Toulouse centre → A61) demandée avec `turn_lanes` : les voies
+     * existent bien dans la réponse et sont lues par le modèle. Sans l'option, la même requête n'en renvoyait aucune.
+     */
+    @Test fun `real response with turn lanes - lanes are requested and parsed`() = runTest {
+        server.enqueue(MockResponse().setBody(javaClass.classLoader!!.getResource("fixtures/valhalla_lanes_toulouse.json")!!.readText()))
+        val r = (provider.route(RouteRequest(GeoPoint(43.6045, 1.4440), GeoPoint(43.5450, 1.5120), costing = RouteCosting.FASTEST)) as Outcome.Success).value.single()
+        val body = json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+        assertEquals("true", body["turn_lanes"].toString())
+        val withLanes = r.maneuvers.filter { it.lanes.isNotEmpty() }
+        assertTrue("au moins une manœuvre avec des voies réelles", withLanes.isNotEmpty())
+        val lanes = withLanes.first().lanes
+        assertEquals(2, lanes.size)
+        // Voie de gauche conseillée pour la manœuvre, voie de droite pour une autre direction : rien d'inventé, c'est la carte.
+        assertTrue(lanes[0].active && lanes[0].directions.isNotEmpty())
+        assertTrue(!lanes[1].active && lanes[1].directions.isNotEmpty())
+        // Les manœuvres sans voies cartographiées restent sans voies.
+        assertTrue(r.maneuvers.count { it.lanes.isEmpty() } > r.maneuvers.size / 2)
+    }
 }

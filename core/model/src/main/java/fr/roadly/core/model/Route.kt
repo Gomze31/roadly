@@ -109,4 +109,6 @@ data class RouteRequest(
     val excludePolygons: List<List<GeoPoint>> = emptyList(),
     /** Trajet à pied (costing Valhalla `pedestrian`) : retour vers la voiture garée ; prioritaire sur le véhicule et la trottinette. */
     val pedestrian: Boolean = false,
+    /** Recalcul en cours de guidage : jamais servi par le cache, prioritaire dans la file du limiteur — même sans cap (à l'arrêt). */
+    val reroute: Boolean = false,
 )

@@ -125,7 +125,44 @@ data class NavigationUiState(
     val junction: fr.roadly.core.model.junction.JunctionGuidance? = null,
     /** Textes de la vue 3D (titre et distance), sur la même base que le bandeau ; null hors vue visible. */
     val junctionUi: JunctionUi? = null,
+    /** Mode rond-point : schéma vivant (sorties, position, décompte) publié par le guidage ; null hors rond-point. */
+    val roundaboutLive: fr.roadly.core.navigation.RoundaboutLive? = null,
+    /** Schéma de bifurcation de la prochaine manœuvre (branches réelles) ; null sans topologie ou hors sortie / fourche / intersection chargée. */
+    val branchDiagram: fr.roadly.core.navigation.BranchDiagram? = null,
+    /** Situation de conduite : mode, densité d'affichage, urgence, côté où se placer. */
+    val situation: fr.roadly.core.navigation.GuidanceSituation = fr.roadly.core.navigation.GuidanceSituation(),
 )
+
+/**
+ * Le mode rond-point est montré : dans l'anneau et juste après la sortie toujours, à l'approche seulement une fois la fenêtre de
+ * préparation ouverte (plus tôt, le bandeau et son schéma compact suffisent). Jamais sans donnée d'angle : un schéma faux serait pire que rien.
+ */
+internal fun roundaboutModeVisible(state: NavigationUiState): Boolean {
+    val live = state.roundaboutLive ?: return false
+    if (state.phase != NavigationPhase.GUIDING || live.layout.sweepDeg == null) return false
+    return live.phase != fr.roadly.core.navigation.RoundaboutPhase.APPROACH ||
+        state.situation.mode == fr.roadly.core.navigation.GuidanceMode.ROUNDABOUT_APPROACH
+}
+
+/**
+ * Densité adaptative : en situation complexe (sortie, bifurcation, rond-point, enchaînement), le secondaire s'efface — ruban Horizon,
+ * prochaine limitation, pluie, rappel de péage. Restent la manœuvre, la vitesse, la limitation courante et les zones de danger.
+ */
+internal fun secondaryInfoVisible(state: NavigationUiState): Boolean = state.situation.density != fr.roadly.core.navigation.GuidanceDensity.REINFORCED
+
+/** Pastille « GPS imprécis » : position douteuse mais pas encore perdue (« GPS perdu » a sa propre pastille). */
+internal fun gpsUncertainVisible(state: NavigationUiState): Boolean =
+    state.situation.mode == fr.roadly.core.navigation.GuidanceMode.GPS_UNCERTAIN && !state.gpsLost
+
+/**
+ * Avancement de la préparation montré sous le bandeau (0 = rien) : seulement quand une manœuvre se prépare, pas en croisière,
+ * pas en recalcul ni GPS incertain (la barre affirmerait une distance qu'on ne connaît plus).
+ */
+internal fun bannerUrgency(state: NavigationUiState): Float = when (state.situation.mode) {
+    fr.roadly.core.navigation.GuidanceMode.CRUISE, fr.roadly.core.navigation.GuidanceMode.REROUTING,
+    fr.roadly.core.navigation.GuidanceMode.GPS_UNCERTAIN, fr.roadly.core.navigation.GuidanceMode.ROUNDABOUT_EXITED -> 0f
+    else -> state.situation.urgency
+}
 
 /** Titre de la vue 3D (« SORTIE 31b », « 2e SORTIE », « BIFURCATION ») et distance au point de manœuvre. */
 data class JunctionUi(val title: String?, val distanceText: String, val targetExit: Int?)
@@ -218,7 +255,7 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 banner = BannerUi(m.type, Formatters.maneuverDistance(p.distanceToNextManeuverM), m.instruction, m.streetName, m.exitNumber, m.roundaboutExit, m.exitToward),
                 approach = if (approaching) ApproachUi(m.type, m.exitNumber, m.exitToward, m.beginShapeIndex) else null,
                 roundabout = s.roundabout?.takeIf { m.type == ManeuverType.ROUNDABOUT_ENTER || m.type == ManeuverType.ROUNDABOUT_EXIT },
-                then = thenFor(s.upcoming.firstOrNull(), p.distancesToManeuversM.firstOrNull()?.let { it - p.distanceToNextManeuverM }),
+                then = thenAfter(m, s.upcoming, p.distancesToManeuversM, p.distanceToNextManeuverM),
                 sign = exitSignFor(m),
                 showLanes = lanesVisible(s.lanes, p.distanceToNextManeuverM, approaching),
                 lanes = s.lanes,
@@ -241,12 +278,34 @@ internal fun buildUiState(s: NavigationState, muted: Boolean, following: Boolean
                 nextLimit = s.nextSpeedLimit?.let { NextLimitUi(it.kmh, Formatters.maneuverDistance(it.distanceM)) },
                 freeFlowToll = freeFlowTollUi(s.freeFlowToll, zone),
                 radar = radarUi(s.radarActive, s.radarNext),
+                roundaboutLive = s.roundaboutLive,
+                branchDiagram = s.branchDiagram?.takeIf { it.maneuverIndex == p.nextManeuverIndex },
+                situation = s.situation,
                 junction = s.junction,
-                junctionUi = junctionUi(s.junction, ms[s.junction?.maneuverIndex?.coerceIn(0, ms.lastIndex) ?: next]),
+                junctionUi =junctionUi(s.junction, ms[s.junction?.maneuverIndex?.coerceIn(0, ms.lastIndex) ?: next]),
             )
         }
     }
 }
+
+/**
+ * Manœuvre « puis … » de la prochaine manœuvre [next]. À l'entrée d'un rond-point, la manœuvre suivante est sa propre sortie
+ * (déjà dite par le bandeau et le schéma) : ce qui compte est ce qui vient juste après l'anneau, et seulement si c'est assez
+ * près de la sortie pour devoir s'y préparer dès maintenant ([THEN_AFTER_ROUNDABOUT_M]).
+ */
+internal fun thenAfter(next: Maneuver, upcoming: List<Maneuver>, distancesM: List<Double>, distanceToNextM: Double): ThenUi? {
+    val exit = upcoming.firstOrNull()
+    if (next.type == ManeuverType.ROUNDABOUT_ENTER && exit?.type == ManeuverType.ROUNDABOUT_EXIT) {
+        val after = upcoming.getOrNull(1) ?: return null
+        val gap = (distancesM.getOrNull(1) ?: return null) - (distancesM.getOrNull(0) ?: return null)
+        if (gap >= THEN_AFTER_ROUNDABOUT_M || after.type == ManeuverType.ARRIVE) return null
+        return ThenUi(after.type, after.streetName ?: after.instruction)
+    }
+    return thenFor(exit, distancesM.firstOrNull()?.let { it - distanceToNextM })
+}
+
+/** Après un rond-point, la manœuvre suivante n'est annoncée d'avance que si elle suit la sortie de moins de 250 m. */
+internal const val THEN_AFTER_ROUNDABOUT_M = 250.0
 
 /** D1 : la manœuvre d'après est montrée sous le bandeau quand elle suit la prochaine de moins de 500 m. */
 internal const val THEN_WITHIN_M = 500.0

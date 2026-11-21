@@ -56,6 +56,11 @@ class NavigationService : Service() {
             return START_NOT_STICKY
         }
         if (collector == null) collector = scope.launch {
+            // Journal du guidage (validation sur téléphone) : une ligne par changement de manœuvre, de situation ou de décompte.
+            launch {
+                var previous: NavigationState? = null
+                session.state.collect { s -> GuidanceTrace.line(previous, s)?.let { Log.i(GuidanceTrace.TAG, it) }; previous = s }
+            }
             combine(session.state, freeDrive.state, carScreen.active, ::Triple).collect { (nav, free, car) -> render(nav, free, car) }
         }
         return START_NOT_STICKY

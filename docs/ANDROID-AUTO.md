@@ -139,8 +139,31 @@ Pour la DHU : Android Auto › ⋮ › « Démarrer serveur unité princ. », `a
 ## 5. Limites et suite
 
 - **Pas de publication Play Store** : la catégorie navigation exige la revue de qualité de Google ; Roadly est distribué par GitHub.
-- **Pas d'images de voies** : les voies de Valhalla sont rares sur l'instance publique (voir `FEATURES.md`).
+- **Images de voies rares** : envoyées à l'hôte depuis le 2026-11-21 (§6), mais les voies de Valhalla sont rares sur l'instance publique (voir `FEATURES.md`).
 - **Pas de combiné d'instruments dédié** : il n'y a pas de session `DISPLAY_TYPE_CLUSTER`, seulement le `Trip` envoyé à l'hôte.
 - **Suite** :
   - P0 : passe DHU puis voiture (affichage, défilement, verrouillage du téléphone, appel entrant).
   - P1 : alerte de l'hôte (`Alert`) à l'entrée d'une zone de danger ; arrêts et alternatives depuis la voiture ; rappel de péage à l'arrivée.
+
+## 6. Premier essai en voiture réelle (2026-11-21) : constats et corrections
+
+Essai sur un écran Ford SYNC 3. Verdict de l'utilisateur : « simpliste ». Chaque constat, sa cause et ce qui a changé :
+
+| Constat | Cause | Correction |
+|---|---|---|
+| Carte presque blanche, rien à lire | Styles du téléphone trop pâles pour un écran de tableau de bord (rue `#E6E4EA` sur fond `#F2F3F0`) | Styles `roadly-car-light.json` / `roadly-car-dark.json` générés par `tools/car-styles.mjs` : fond soutenu, routes hiérarchisées par couleur, liseré des petites rues, étiquettes × 1,35 ; tracé et flèches × 1,5 (`MapController.setOverlayScale`) ; bâtiments 3D |
+| Aucun mouvement à l'approche d'un rond-point ou d'une sortie | Cadrage fixe (zoom 16,5, 45°) | `CarCameraPolicy` : zoom de croisière selon la vitesse, glissement vers le cadrage de la manœuvre (rond-point presque à plat, sortie préparée à 900 m), retour par paliers |
+| Pas de vue du carrefour | Rien n'était envoyé à l'hôte | `RoutingInfo.setJunctionImage` : rond-point avec la sortie à prendre, panneau de sortie (numéro, directions) ; voies (`Step.addLane` + image) quand Valhalla les fournit (`CarVisuals`) |
+| Textes coupés (« Tournez à gauche da… ») | Phrase complète de Valhalla dans la carte | `CarCues` : « Sortie 16 · Les Argoulets », « 2e sortie · Route de Castres », sinon la rue seule |
+| Zone de danger à 80 km/h sur une route à 90 | Limitation de la zone lue dans le jeu des équipements, celle de la route dans le profil du tracé | `ZoneLimits` : la zone prend la limitation de la route à l'endroit contrôlé quand elle est connue |
+| Pas d'accès au domicile | La ligne n'existait que si le domicile était défini | « Domicile » et « Travail » toujours en tête de l'accueil (non défini : la recherche l'enregistre) ; bouton domicile dans les bandeaux de l'accueil, du guidage et de la conduite libre |
+| Recherche au micro : le champ se vide | Gabarit renvoyé à chaque texte partiel avec un texte initial et un clavier différents | `CarSearchModel` : texte initial et clavier constants, aucun rafraîchissement tant que la liste affichée ne change pas |
+| Voix robotique, noms mal dits | Moteur par défaut du téléphone, voix par défaut, écritures de panneau lues telles quelles | Moteur Google préféré s'il est installé (repli sur le moteur par défaut), meilleure voix française embarquée (`VoiceRanking`), `SpeechText` (« A61 » → « A 61 », « Av. du Gal » → « Avenue du Général », « Henri IV » → « Henri 4 ») |
+
+Les bandes courbes multicolores visibles sur une photo de l'essai n'ont pas de cause dans le style (aucun motif de remplissage) : très probablement un moiré entre l'appareil photo et la dalle. À revoir sur l'écran lui-même.
+
+**Vérifié** : tests JVM (`CarDrivePassTest`, `ZoneLimitsTest`, `SpeechTextTest`), `:app:assembleDebug`, rendu des deux styles voiture dans MapLibre GL JS (navigateur) à côté des styles du téléphone.
+
+**Non vérifié** (aucun téléphone en adb ce jour-là) : tout ce qui se voit ou s'entend sur l'hôte — animation de caméra, images de carrefour et de voies (l'hôte peut les réduire ou les ignorer), bandeau à trois actions en guidage, dictée dans la recherche, voix retenue par le moteur. Trace à lire : `RoadlySpeech` « Voix : … ».
+
+**Limite de la voix** : la qualité dépend des voix installées dans « Synthèse vocale Google » sur le téléphone. Une voix neuronale embarquée dans l'application (hors moteur du système) ou une voix en ligne restent à décider : poids de l'APK pour l'une, délai et zones blanches pour l'autre.

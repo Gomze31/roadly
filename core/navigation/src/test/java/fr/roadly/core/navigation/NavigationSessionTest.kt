@@ -376,11 +376,19 @@ class NavigationSessionTest {
         assertEquals(1, requests.size)
         assertTrue(guiding(s).rerouting)
         advanceTimeBy(10_001); runCurrent()
-        assertFalse(guiding(s).rerouting)
+        // L'essai a échoué mais le véhicule est toujours hors tracé : l'état reste en recalcul (l'ancienne manœuvre n'est pas remontrée).
+        assertTrue(guiding(s).rerouting)
         assertEquals("straight", guiding(s).route.id)
+        assertEquals(listOf(SpokenPhrases.REROUTING, SpokenPhrases.REROUTE_FAILED), speech.spoken.takeLast(2))
         location.emit(fixAt(300.0, northM = 60.0, timestampMs = 10_001L)); runCurrent() // 1er fix après 10 s de silence : on attend le suivant
         advanceTimeBy(1_000); runCurrent()
         location.emit(fixAt(300.0, northM = 60.0, timestampMs = 11_001L)); runCurrent()
+        // L'intervalle court depuis la fin de l'essai : pas de nouvelle demande dans la seconde qui suit un délai dépassé.
+        assertEquals(1, requests.size)
+        advanceTimeBy(9_000); runCurrent()
+        location.emit(fixAt(300.0, northM = 60.0, timestampMs = 20_001L)); runCurrent()
+        advanceTimeBy(1_000); runCurrent()
+        location.emit(fixAt(300.0, northM = 60.0, timestampMs = 21_001L)); runCurrent()
         assertEquals(2, requests.size)
     }
 

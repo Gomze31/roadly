@@ -91,6 +91,7 @@ class MapController(internal val context: Context) {
     private var arrowColorCasing = "#8B5CF6"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
     private var lastDanger: String = DangerZoneFeatures.EMPTY
+    private var overlayScale = 1f
     private var buildings3d = false
     private var buildingsColor = "#2A2236"
 
@@ -157,6 +158,17 @@ class MapController(internal val context: Context) {
         if (styleReady) map?.style?.let { applyRouteColors(it) }
     }
 
+    /**
+     * Échelle des tracés, flèches et repères dessinés par Roadly (1 = téléphone). Écran de voiture : plus épais, lus à bout de bras.
+     * Les calques sont recréés avec le style : un changement recharge le style courant.
+     */
+    fun setOverlayScale(scale: Float) {
+        val v = scale.coerceIn(0.5f, 3f)
+        if (v == overlayScale) return
+        overlayScale = v
+        if (styleReady) currentStyleUrl?.let { loadStyle(it) }
+    }
+
     /** C3 : plafond d'images par seconde du rendu (posé avec `MapView.setMaximumFps`) ; le marqueur animé n'écrit pas plus souvent. */
     fun setMaximumFps(fps: Int) {
         markerGate.minIntervalMs = FrameGate.intervalFor(fps)
@@ -190,6 +202,7 @@ class MapController(internal val context: Context) {
     }
 
     private fun installLayers(style: Style) {
+        val s = overlayScale
         style.addImage(MapIds.IMG_ARROW, drawableToBitmap(R.drawable.ic_user_arrow))
         style.addImage(MapIds.IMG_PIN, drawableToBitmap(R.drawable.ic_place_pin))
         style.addImage(MapIds.IMG_REPORT, drawableToBitmap(R.drawable.ic_report))
@@ -208,63 +221,63 @@ class MapController(internal val context: Context) {
 
         // Halo lumineux large et translucide sous le tracé actif (lueur), puis liseré, puis trait.
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_GLOW, MapIds.SRC_ROUTES).withProperties(
-            lineColor(routeColorActive), lineWidth(18f), lineOpacity(0.22f), lineBlur(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(routeColorActive), lineWidth(18f * s), lineOpacity(0.22f), lineBlur(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("active"), literal(true))))
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_CASING, MapIds.SRC_ROUTES).withProperties(
-            lineColor(routeColorCasing), lineWidth(10f), lineOpacity(0.7f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(routeColorCasing), lineWidth(10f * s), lineOpacity(0.7f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("active"), literal(true))))
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_INACTIVE, MapIds.SRC_ROUTES).withProperties(
-            lineColor(routeColorInactive), lineWidth(5f), lineOpacity(0.85f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(routeColorInactive), lineWidth(5f * s), lineOpacity(0.85f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("active"), literal(false))))
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_ACTIVE, MapIds.SRC_ROUTES).withProperties(
-            lineColor(routeColorActive), lineWidth(6f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(routeColorActive), lineWidth(6f * s), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("active"), literal(true))))
         // Mode trottinette : tracé coloré par type de voie (piste, bande, voie verte, route partagée, chemin), puis vigilance en pointillés.
         RouteDisplayGroup.entries.filter { it != RouteDisplayGroup.CAUTION }.forEach { g ->
             style.addLayer(LineLayer(MapIds.LYR_SCOOTER_PREFIX + g.key, MapIds.SRC_SCOOTER).withProperties(
-                lineColor(g.colorHex), lineWidth(6.5f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+                lineColor(g.colorHex), lineWidth(6.5f * s), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
             ).withFilter(eq(get("group"), literal(g.key))))
         }
         style.addLayer(LineLayer(MapIds.LYR_SCOOTER_CAUTION, MapIds.SRC_SCOOTER).withProperties(
-            lineColor(RouteDisplayGroup.CAUTION.colorHex), lineWidth(3.5f), lineDasharray(arrayOf(1.2f, 1.2f)), lineCap(Property.LINE_CAP_BUTT),
+            lineColor(RouteDisplayGroup.CAUTION.colorHex), lineWidth(3.5f * s), lineDasharray(arrayOf(1.2f, 1.2f)), lineCap(Property.LINE_CAP_BUTT),
         ).withFilter(eq(get("caution"), literal(true))))
         // Zones de danger sur le tracé : ambre devant, rouge pour celle que l'on traverse (jamais de point d'équipement).
         style.addLayer(LineLayer(MapIds.LYR_DANGER_CASING, MapIds.SRC_DANGER).withProperties(
-            lineColor(DangerZoneFeatures.CASING), lineWidth(11f), lineOpacity(0.85f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(DangerZoneFeatures.CASING), lineWidth(11f * s), lineOpacity(0.85f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
         ))
         style.addLayer(LineLayer(MapIds.LYR_DANGER, MapIds.SRC_DANGER).withProperties(
             lineColor(toColor(match(get("state"), literal(DangerZoneFeatures.AHEAD_COLOR), stop("inside", DangerZoneFeatures.INSIDE_COLOR)))),
-            lineWidth(6.5f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
+            lineWidth(6.5f * s), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
         ))
         // Tronçon déjà parcouru, dessiné par-dessus le tracé actif (spec §5 : « tracé parcouru atténué »).
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED, MapIds.SRC_TRAVERSED).withProperties(
-            lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(routeColorInactive), lineWidth(6.5f * s), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ))
         style.addLayer(LineLayer(MapIds.LYR_ROUTE_TRAVERSED_TAIL, MapIds.SRC_TRAVERSED_TAIL).withProperties(
-            lineColor(routeColorInactive), lineWidth(6.5f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(routeColorInactive), lineWidth(6.5f * s), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ))
         // Flèche de manœuvre (approche d'une intersection) : liseré, trait clair, tête orientée selon le dernier segment.
         style.addLayer(LineLayer(MapIds.LYR_ARROW_CASING, MapIds.SRC_ARROW).withProperties(
-            lineColor(arrowColorCasing), lineWidth(14f), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(arrowColorCasing), lineWidth(14f * s), lineOpacity(0.9f), lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("kind"), literal("arrow"))))
         style.addLayer(LineLayer(MapIds.LYR_ARROW, MapIds.SRC_ARROW).withProperties(
-            lineColor(arrowColorBody), lineWidth(8f), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
+            lineColor(arrowColorBody), lineWidth(8f * s), lineCap(Property.LINE_CAP_BUTT), lineJoin(Property.LINE_JOIN_ROUND),
         ).withFilter(eq(get("kind"), literal("arrow"))))
         style.addLayer(SymbolLayer(MapIds.LYR_ARROW_HEAD, MapIds.SRC_ARROW).withProperties(
             iconImage(MapIds.IMG_ARROW_HEAD), iconRotate(get("bearing")), iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
-            iconAnchor(Property.ICON_ANCHOR_CENTER), iconAllowOverlap(true), iconIgnorePlacement(true), iconSize(1f),
+            iconAnchor(Property.ICON_ANCHOR_CENTER), iconAllowOverlap(true), iconIgnorePlacement(true), iconSize(s),
         ).withFilter(eq(get("kind"), literal("head"))))
         style.addLayer(SymbolLayer(MapIds.LYR_MARKERS, MapIds.SRC_MARKERS).withProperties(
-            iconImage(MapIds.IMG_PIN), iconAnchor(Property.ICON_ANCHOR_BOTTOM), iconAllowOverlap(true), iconSize(1f),
+            iconImage(MapIds.IMG_PIN), iconAnchor(Property.ICON_ANCHOR_BOTTOM), iconAllowOverlap(true), iconSize(s),
         ))
         style.addLayer(SymbolLayer(MapIds.LYR_REPORTS, MapIds.SRC_REPORTS).withProperties(
-            iconImage(MapIds.IMG_REPORT), iconAnchor(Property.ICON_ANCHOR_CENTER), iconAllowOverlap(true), iconSize(1f),
+            iconImage(MapIds.IMG_REPORT), iconAnchor(Property.ICON_ANCHOR_CENTER), iconAllowOverlap(true), iconSize(s),
         ))
         style.addLayer(CircleLayer(MapIds.LYR_ACCURACY, MapIds.SRC_USER).withProperties(
-            circleColor(routeColorActive), circleOpacity(0.15f), circleRadius(18f),
+            circleColor(routeColorActive), circleOpacity(0.15f), circleRadius(18f * s),
         ))
         style.addLayer(SymbolLayer(MapIds.LYR_USER, MapIds.SRC_USER).withProperties(
-            iconImage(MapIds.IMG_ARROW), iconRotate(get("bearing")), iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP), iconAllowOverlap(true), iconSize(1f),
+            iconImage(MapIds.IMG_ARROW), iconRotate(get("bearing")), iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP), iconAllowOverlap(true), iconSize(s),
         ))
     }
 

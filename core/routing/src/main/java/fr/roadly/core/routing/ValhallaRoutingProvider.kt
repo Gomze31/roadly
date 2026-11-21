@@ -4,6 +4,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.network.ApiClient
+import fr.roadly.core.data.network.ApiPriority
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.ManeuverType
@@ -109,14 +110,29 @@ class ValhallaRoutingProvider @Inject constructor(
             }
             put("units", "kilometers")
             put("language", "fr-FR")
+            // Voies à l'approche des manœuvres (`maneuvers[].lanes`, Valhalla ≥ 3.6) : absentes de la réponse sans cette option.
+            // Vérifié le 2026-11-21 sur l'instance publique FOSSGIS : 0 manœuvre avec voies sans l'option, 4 sur 20 avec
+            // (Toulouse → A61). Seules les voies cartographiées dans OpenStreetMap (`turn:lanes`) sont renvoyées.
+            put("turn_lanes", true)
         }
-        return when (val r = api.postJson(url, body.toString())) {
-            is Outcome.Success -> parse(r.value, request.costing).let { out ->
-                if (out is Outcome.Success && request.scooter != null) Outcome.Success(out.value.map { it.copy(scooterGoal = request.scooter!!.goal) }) else out
-            }
-            is Outcome.Failure -> Outcome.Failure(mapError(r.error))
+        val bodyText = body.toString()
+        // Recalcul (cap fourni) : jamais de cache, l'origine est la position du moment ; prioritaire dans la file du limiteur.
+        val urgent = heading != null || request.reroute
+        val cacheKey = if (!urgent) RouteResponseCache.key(url.toString(), bodyText) else null
+        val cached = cacheKey?.let { routeCache.get(it) }
+        val text = cached ?: when (val r = api.postJson(url, bodyText, priority = if (urgent) ApiPriority.GUIDANCE else ApiPriority.INTERACTIVE)) {
+            is Outcome.Success -> r.value
+            is Outcome.Failure -> return Outcome.Failure(mapError(r.error))
         }
+        val out = parse(text, request.costing)
+        if (out !is Outcome.Success) return out
+        // Seule une réponse décodée avec succès est gardée : une erreur n'entre jamais dans le cache.
+        if (cached == null && cacheKey != null) routeCache.put(cacheKey, text)
+        return if (request.scooter != null) Outcome.Success(out.value.map { it.copy(scooterGoal = request.scooter!!.goal) }) else out
     }
+
+    /** Réponses `/route` identiques réutilisées pendant 60 s (voir [RouteResponseCache]). */
+    private val routeCache = RouteResponseCache()
 
     companion object {
         /** Pas du profil d'altitude demandé pour les itinéraires trottinette (valeur recommandée par Valhalla). */
@@ -150,7 +166,7 @@ class ValhallaRoutingProvider @Inject constructor(
             }
             put("units", "kilometers")
         }
-        return when (val r = api.postJson(url, body.toString())) {
+        return when (val r = api.postJson(url, body.toString(), priority = ApiPriority.INTERACTIVE)) {
             is Outcome.Failure -> Outcome.Failure(mapError(r.error))
             is Outcome.Success -> try {
                 val order = json.decodeFromString(ValhallaResponse.serializer(), r.value).trip.locations
