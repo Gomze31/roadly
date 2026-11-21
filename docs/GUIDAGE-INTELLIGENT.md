@@ -520,3 +520,36 @@ Liste complète et état : `PROTOCOLE-TERRAIN-HONOR.md` § 8. Android Auto (`fea
 | Lint | 0 erreur : `core:navigation`, `core:routing`, `core:designsystem`, `feature:navigation` |
 | Captures | 21 plein écran régénérées, une relue (GPS imprécis, jour) |
 | Téléphone, route, DHU, mesures | non faits |
+
+## 12. Intégration d'origin/main et revue avant terrain
+
+Passe du 22 novembre 2026, dans le dossier `GPS-integration` (branche locale `integration/phase5`, non poussée).
+
+### 12.1 Intégration
+
+Le dépôt local était en retard de 27 commits sur `origin/main` (0.1.212). L'arbre de travail a été figé tel quel dans un commit
+(sans y toucher), puis `origin/main` y a été fusionné : 13 fichiers en conflit, résolus. Repris d'origin/main : `README.md`,
+`RouteAlternativesUseCase` et son test, le dessin du bandeau de manœuvre (la barre d'urgence et la distance estompée y sont
+réinsérées), le bouton « replier » (52 dp). Points Android Auto nés de la fusion : `ANDROID-AUTO-REVUE.md`.
+
+### 12.2 Revue avant terrain
+
+| Sujet | Constat | Correction | Preuve |
+|---|---|---|---|
+| Arrière-plan | rien ne signalait des notifications refusées ou une batterie optimisée | `BackgroundReadiness` + dialogue « Guidage écran éteint » avant le premier guidage de chaque lancement (explication MagicOS, boutons vers les réglages système, ne bloque rien) | `BackgroundReadinessTest` ; dialogue jamais vu sur l'appareil |
+| Audio | le résultat de la demande de focus n'était pas lu ; la voix pouvait parler pendant un appel | annonce abandonnée si le focus est refusé ou si un appel est en cours ; énoncé coupé à la perte du focus ; pas de bip pendant un appel | `SpeechFocusTest` (règle seule) ; comportement réel à constater |
+| Valhalla | serveur muet : 3 variantes × 15 s | arrêt à la première panne de serveur : 15 s | `RouteAlternativesUseCaseTest` (3 cas) |
+| GPS | recherche sur tout le tracé : 1 431 µs et 4,5 Mo alloués par position sur 50 000 points | recherche sans allocation : 1 177 µs et 1 Ko | `RouteTrackerScanCostTest`, toute la suite du suivi inchangée |
+| Carte | à l'arrêt, le marqueur était réanimé à chaque position | pas d'animation sous 0,5 m et 1° | `MarkerInterpolationTest` |
+
+Laissé tel quel, en connaissance de cause : le service n'est pas relancé si le système tue le processus (`START_NOT_STICKY`, reprise
+proposée à la réouverture) ; un refus du service de premier plan n'est que journalisé ; la conduite libre interroge le serveur public
+(une requête par 20 s et 250 m au plus) ; notification de guidage réécrite tous les 50–100 m.
+
+### 12.3 Vérifications
+
+| Niveau | Résultat |
+|---|---|
+| Tests JVM | 1099, 1 échec (`CarHomeStripTest`, origin/main : Robolectric et l'espace du dossier utilisateur Windows), 8 ignorés (tests réseau d'origin/main) |
+| Compilation | `:app:assembleDebug` réussie |
+| Appareil | 0.1.214 installée (avant la revue 12.2), lancée, pas de plantage ; rien d'autre |

@@ -48,7 +48,18 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build()
-    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK).setAudioAttributes(attributes).build()
+    /**
+     * Focus perdu pendant une annonce (appel entrant, autre application qui prend la parole) : l'énoncé en cours est coupé.
+     * Une simple atténuation demandée par le système (`CAN_DUCK`) ne coupe rien.
+     */
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+            Log.d(TAG, "Focus audio perdu : annonce coupée")
+            synchronized(lock) { engine }?.stop()
+        }
+    }
+    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(attributes).setOnAudioFocusChangeListener(focusListener).build()
     private val main = Handler(Looper.getMainLooper())
     private val lock = Any()
     /** Annonces en attente, par canal (moteur pas prêt, occupé, ou assistant dans son délai de reprise). */
@@ -140,7 +151,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     private fun isSilenced(channel: VoiceChannel): Boolean = volume == 0f || synchronized(lock) { channel in mutedChannels }
 
     override fun beep() {
-        if (isSilenced(VoiceChannel.GUIDANCE)) return
+        if (isSilenced(VoiceChannel.GUIDANCE) || SpeechFocus.inCall(audio.mode)) return
         try {
             val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
             tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 250)
@@ -342,7 +353,14 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         }
         if (!current || isSilenced(s.channel)) { finished(s.id); return }
         // Redemandé à chaque énoncé (sans effet s'il est déjà tenu) : le démarrage qui l'aurait demandé a pu être jeté comme périmé.
-        audio.requestAudioFocus(focusRequest)
+        val focus = audio.requestAudioFocus(focusRequest)
+        // Appel téléphonique ou focus refusé : l'annonce est abandonnée, pas retardée (dite après l'appel, elle serait fausse).
+        // Le guidage reprend seul à l'annonce suivante.
+        if (focus != AudioManager.AUDIOFOCUS_REQUEST_GRANTED || SpeechFocus.inCall(audio.mode)) {
+            Log.d(TAG, "Non dit (appel en cours ou focus refusé) : ${s.channel} ${s.priority}")
+            finished(s.id)
+            return
+        }
         Log.d(TAG, "Dit : ${s.channel} ${s.priority}")
         val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) }
         // Écritures de panneau (« A61 », « Av. du Gal Leclerc », « Henri IV ») réécrites comme on les dit.

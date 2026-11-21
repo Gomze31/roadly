@@ -3,8 +3,10 @@
 Document unique pour la passe sur appareil et sur route (phase 5, 22 novembre 2026). Il remplace, pour la séance terrain, les
 sections 6, 9 et 10 de `VALIDATION-TELEPHONE.md` ; ce dernier reste la référence des outils (simulation, rejeu GPX, journal).
 
-**État au moment de la rédaction** : rien de ce protocole n'a été exécuté sur un téléphone, une voiture ou le DHU. Le HONOR était
-verrouillé par code et aucune installation n'a été autorisée. Chaque scénario porte la mention de ce qui a déjà été vérifié
+**État au 22 novembre 2026, 00 h 45** : la version de débogage 0.1.214 (branche `integration/phase5` : origin/main + phases 1 à 5)
+est installée sur le HONOR, sur autorisation. C'est une installation **neuve** : `fr.roadly` n'était plus sur le téléphone, l'application
+s'ouvre sur l'écran de bienvenue, sans permission accordée. Vérifié : lancement, aucun plantage au démarrage. Rien d'autre de ce
+protocole n'a été exécuté sur le téléphone, en voiture ou sur le DHU. Chaque scénario porte la mention de ce qui a déjà été vérifié
 **hors appareil** (JVM, laboratoire, captures) ; la colonne « Terrain » est vide partout et se remplit pendant la séance.
 
 Niveaux de preuve utilisés dans ce document :
@@ -19,7 +21,7 @@ Niveaux de preuve utilisés dans ce document :
 
 ## 1. Installation
 
-L'installation remplace la version 0.1.210 du téléphone : **à lancer uniquement sur accord explicite**, téléphone déverrouillé.
+Toute installation se fait **sur accord explicite**, téléphone déverrouillé, depuis le dossier `GPS-integration` :
 
 ```
 adb devices                                   # AREE026226000174 doit apparaître « device »
@@ -27,9 +29,12 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 adb shell dumpsys package fr.roadly | findstr versionName
 ```
 
-La version de débogage est signée avec une autre clé que la version publiée : si `adb install -r` répond
-`INSTALL_FAILED_UPDATE_INCOMPATIBLE`, ne pas désinstaller (les favoris, l'historique et les réglages seraient perdus) ; arrêter
-et décider d'abord.
+La version de débogage est signée avec la clé de débogage générique, pas avec la clé de publication. Conséquences :
+- une version de débogage plus récente s'installe par-dessus sans perte de données ;
+- une version **publiée** ne s'installera pas par-dessus (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) : il faudra désinstaller, donc
+  perdre favoris, historique et réglages saisis pendant les essais. Ne rien saisir d'important dans cette version.
+
+La version installée à 00 h 44 ne contient pas la revue avant terrain (§ 9) : la réinstaller après accord pour en bénéficier.
 
 ## 2. Réglages du téléphone avant la séance
 
@@ -47,8 +52,8 @@ et décider d'abord.
 | Volume média | ≥ 50 % | la voix sort sur le flux de guidage | — |
 | Heure | automatique | un fix plus ancien que l'heure du téléphone de plus de 2 s est écarté au départ | — |
 
-Rien dans l'application n'avertit aujourd'hui que les notifications ou la batterie sont mal réglées : c'est un risque connu
-(§ 8), à contrôler à la main avant chaque séance.
+Depuis la revue avant terrain, un dialogue « Guidage écran éteint » signale ces deux réglages avant le premier guidage de chaque
+lancement de l'application, avec un bouton vers l'écran système concerné. Il ne bloque rien et ne modifie aucun réglage.
 
 ## 3. Journal et preuves
 
@@ -221,11 +226,29 @@ Pièces : seance.log (heure du défaut), trace GPX, capture
 
 | Risque | Origine | État |
 |---|---|---|
-| Notifications refusées ou batterie optimisée, sans avertissement dans l'application | lecture du code et de l'état du téléphone | non corrigé (ajout d'écran, hors périmètre de la stabilisation) |
+| Notifications refusées ou batterie optimisée | lecture du code et de l'état du téléphone | signalé par un dialogue avant le guidage (revue avant terrain) ; le dialogue n'a pas été vu sur l'appareil |
 | Processus tué en arrière-plan : guidage perdu, reprise seulement à la réouverture | lecture du code | non corrigé |
-| La voix peut parler pendant un appel ; le bip d'excès de vitesse ne demande pas le focus audio | lecture du code | à constater |
+| La voix pouvait parler pendant un appel | lecture du code | corrigé : pas d'annonce ni de bip pendant un appel ou si le focus audio est refusé ; à constater sur l'appareil (scénario 6.6) |
 | Android Auto : carte figée après l'arrivée ; pas d'indication GPS perdu ; décompte de rond-point affiché même incertain ; `updateTrip` à chaque seconde ; voie sans direction dessinée « tout droit » ; exception possible si un numéro de sortie accompagne une manœuvre « sortie de rond-point » | lecture du code de `feature/car` | non corrigé (chantier Android Auto séparé) |
-| Hors du tracé de plus de 40 m, recherche sur tout le tracé à chaque fix (coûteux sur 500 km) | lecture du code | non corrigé, à mesurer |
-| Le marqueur de position réécrit sa source à chaque image, même à l'arrêt | lecture du code | non corrigé, à mesurer |
-| La conduite libre interroge le serveur public toutes les 20 s au moins | lecture du code | à arbitrer (conditions d'usage FOSSGIS) |
+| Hors du tracé de plus de 40 m, recherche sur tout le tracé à chaque fix | mesure JVM : 4,5 Mo alloués par position sur 50 000 points | corrigé : 1 Ko par position (`RouteTrackerScanCostTest`) |
+| Le marqueur de position réécrivait sa source à chaque image, même à l'arrêt | lecture du code | corrigé : pas d'animation sous 0,5 m et 1° ; effet réel à mesurer sur l'appareil |
+| La conduite libre interroge le serveur public | lecture du code | laissé tel quel : au plus une requête toutes les 20 s et tous les 250 m, derrière le limiteur ; à arbitrer avec les conditions FOSSGIS |
+| Calcul d'itinéraire, serveur muet : 45 s d'attente | lecture du code | corrigé : 15 s (une seule variante attend son délai) |
 | Aucune trace GPS réelle dans le dépôt | — | à enregistrer pendant la séance |
+
+## 9. Premier essai sur le HONOR — pas à pas
+
+À l'arrêt, sans conduire. Durée : 15 minutes. Journal ouvert (§ 3) pendant tout l'essai.
+
+1. Ouvrir Roadly. Écran de bienvenue : suivre les étapes, accorder la **position exacte** et les **notifications**.
+2. Vérifier que la carte se centre sur la position réelle.
+3. Chercher une destination à 5–10 km, ouvrir l'écran des itinéraires. Noter le temps d'apparition des variantes.
+4. Réglages › Navigation › activer **Simulation de trajet (test)**, vitesse ×1.
+5. Revenir à l'itinéraire, « Démarrer ». Si le dialogue « Guidage écran éteint » apparaît (version réinstallée après la revue) : lire,
+   ne rien changer pour ce premier essai, « Démarrer ».
+6. Regarder 5 minutes de guidage simulé : bandeau, distance qui décroît, annonces, un rond-point si le trajet en contient.
+7. Éteindre l'écran 2 minutes : les annonces doivent continuer. Rallumer : la position doit avoir avancé.
+8. Arrêter le guidage. **Désactiver la simulation** dans les réglages.
+9. Envoyer `seance.log` et, s'il y a un défaut, une fiche (§ 6).
+
+Ce premier essai valide le lancement, l'écran et la voix sur l'appareil. Il ne valide ni le GPS réel, ni la conduite.

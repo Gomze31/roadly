@@ -24,6 +24,15 @@ class MarkerInterpolationTest {
         assertEquals(b.lat, end.lat, 1e-12); assertEquals(b.lon, end.lon, 1e-12); assertEquals(b.bearingDeg, end.bearingDeg, 1e-9)
     }
 
+    @Test fun `a stationary vehicle is not animated - same pose, GPS jitter under half a metre`() {
+        // À l'arrêt, chaque position (1 Hz) relançait 1 s d'animation vers la même pose : la source du marqueur était réécrite à chaque image.
+        assertFalse(MarkerInterpolation.shouldAnimate(a, a, 1_000))
+        assertFalse(MarkerInterpolation.shouldAnimate(a, a.copy(lat = a.lat + 0.000003), 1_000))  // ~0,3 m
+        // Un vrai déplacement (1 m) ou une rotation sur place (demi-tour à l'arrêt, boussole) restent animés.
+        assertTrue(MarkerInterpolation.shouldAnimate(a, a.copy(lat = a.lat + 0.00001), 1_000))  // ~1,1 m
+        assertTrue(MarkerInterpolation.shouldAnimate(a, a.copy(bearingDeg = (a.bearingDeg + 15.0) % 360.0), 1_000))
+    }
+
     @Test fun `a jump of more than 200 m snaps instead of gliding across the map`() {
         assertTrue(MarkerInterpolation.shouldAnimate(a, b, 1_000))
         assertFalse(MarkerInterpolation.shouldAnimate(a, MarkerPose(48.01, 2.0, 0.0), 1_000))  // ~1,1 km

@@ -14,6 +14,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 private const val EARTH_RADIUS_M = 6_371_000.0
+private const val K_LAT = EARTH_RADIUS_M * PI / 180.0
 
 /**
  * Suit la position sur un itinéraire (pur Kotlin, testé sur JVM). Formules : plan Phase 2,
@@ -313,24 +314,53 @@ class RouteTracker(private val route: Route) {
      * projection intérieure, recul ≤ 30 m), celui dont `along` est le plus proche de [lastAlong] (B6).
      */
     private fun search(p: GeoPoint, from: Int, to: Int, headingDeg: Float?, lastAlong: Double?, maxAlong: Double = Double.MAX_VALUE): Hit {
-        val all = ArrayList<Hit>(to - from + 1)
-        for (i in from..to) all += project(p, i)
-        val reachable = if (maxAlong == Double.MAX_VALUE) all else all.filter { it.alongM <= maxAlong }.ifEmpty { all }
-        val pool = if (headingDeg == null) reachable else reachable.filter { headingOk(it.segment, headingDeg) }.ifEmpty { reachable }
-        var best = pool.minBy { it.offM }
+        // Sans allocation par segment : hors du tracé de plus de 40 m, cette recherche parcourt tout le tracé à chaque position
+        // (mesuré sur 50 000 points : 4,5 Mo alloués par position avec une liste de candidats ; voir RouteTrackerScanCostTest).
+        val kLon = K_LAT * cos(p.lat * PI / 180.0)
+        val bounded = maxAlong != Double.MAX_VALUE
+        // Meilleur écart dans chacun des quatre ensembles possibles : tous, atteignables, bon cap, atteignables et bon cap.
+        var iAll = -1; var oAll = Double.MAX_VALUE
+        var iReach = -1; var oReach = Double.MAX_VALUE
+        var iHead = -1; var oHead = Double.MAX_VALUE
+        var iBoth = -1; var oBoth = Double.MAX_VALUE
+        for (i in from..to) {
+            measure(p, i, kLon)
+            val reach = !bounded || mAlong <= maxAlong
+            val ok = headingDeg == null || headingOk(i, headingDeg)
+            if (mOff < oAll) { oAll = mOff; iAll = i }
+            if (reach && mOff < oReach) { oReach = mOff; iReach = i }
+            if (ok && mOff < oHead) { oHead = mOff; iHead = i }
+            if (reach && ok && mOff < oBoth) { oBoth = mOff; iBoth = i }
+        }
+        // Chaque filtre est abandonné s'il écarte tout (aucun candidat atteignable, puis aucun au bon cap parmi ceux retenus).
+        val useReach = bounded && iReach >= 0
+        val useHeading = headingDeg != null && (if (useReach) iBoth >= 0 else iHead >= 0)
+        var bestI = when {
+            useReach && useHeading -> iBoth
+            useReach -> iReach
+            useHeading -> iHead
+            else -> iAll
+        }
         if (lastAlong != null) {
             // B6 : continuité plutôt que distance brute (pont, échangeur, chaussées séparées) ; une extrémité de segment voisin n'est pas
             // un autre passage, et un candidat qui recule de plus de 30 m est écarté.
-            val alt = pool
-                .filter {
-                    it.interior && it.offM <= best.offM + GuidanceConstants.CONTINUITY_TIE_M &&
-                        abs(it.alongM - best.alongM) > GuidanceConstants.CONTINUITY_MIN_GAP_M &&
-                        it.alongM >= lastAlong - GuidanceConstants.CONTINUITY_BACK_M
-                }
-                .minByOrNull { abs(it.alongM - lastAlong) }
-            if (alt != null && abs(alt.alongM - lastAlong) < abs(best.alongM - lastAlong)) best = alt
+            measure(p, bestI, kLon)
+            val bestAlong = mAlong
+            val bestOff = mOff
+            var altI = -1
+            var altGap = Double.MAX_VALUE
+            for (i in from..to) {
+                measure(p, i, kLon)
+                if (useReach && mAlong > maxAlong) continue
+                if (useHeading && !headingOk(i, headingDeg!!)) continue
+                if (!mInterior || mOff > bestOff + GuidanceConstants.CONTINUITY_TIE_M) continue
+                if (abs(mAlong - bestAlong) <= GuidanceConstants.CONTINUITY_MIN_GAP_M || mAlong < lastAlong - GuidanceConstants.CONTINUITY_BACK_M) continue
+                val gap = abs(mAlong - lastAlong)
+                if (gap < altGap) { altGap = gap; altI = i }
+            }
+            if (altI >= 0 && altGap < abs(bestAlong - lastAlong)) bestI = altI
         }
-        return best
+        return project(p, bestI)
     }
 
     private fun searchWindow(p: GeoPoint, lastAlong: Double, headingDeg: Float?, maxAlong: Double): Hit {
@@ -342,21 +372,36 @@ class RouteTracker(private val route: Route) {
         return search(p, from, to, headingDeg, lastAlong, maxAlong)
     }
 
-    /** Projection orthogonale dans le plan équirectangulaire local centré sur [p]. */
-    private fun project(p: GeoPoint, i: Int): Hit {
+    /** Résultat de [measure] (le suivi n'a qu'un appelant à la fois) : abscisse, écart, fraction le long du segment, projection intérieure. */
+    private var mAlong = 0.0
+    private var mOff = 0.0
+    private var mT = 0.0
+    private var mInterior = false
+
+    /** Projection orthogonale de [p] sur le segment [i], plan équirectangulaire local centré sur [p] ; résultat dans `m*`, sans allocation. */
+    private fun measure(p: GeoPoint, i: Int, kLon: Double) {
         val a = pts[i]
         val b = pts[i + 1]
-        val kLat = EARTH_RADIUS_M * PI / 180.0
-        val kLon = kLat * cos(p.lat * PI / 180.0)
         val ax = (a.lon - p.lon) * kLon
-        val ay = (a.lat - p.lat) * kLat
+        val ay = (a.lat - p.lat) * K_LAT
         val dx = (b.lon - a.lon) * kLon
-        val dy = (b.lat - a.lat) * kLat
+        val dy = (b.lat - a.lat) * K_LAT
         val dd = dx * dx + dy * dy
         val t = if (dd == 0.0) 0.0 else (-(ax * dx + ay * dy) / dd).coerceIn(0.0, 1.0)
         val qx = ax + t * dx
         val qy = ay + t * dy
-        return Hit(i, cumDistM[i] + t * segLenM[i], sqrt(qx * qx + qy * qy), GeoPoint(a.lat + t * (b.lat - a.lat), a.lon + t * (b.lon - a.lon)), interior = t > 0.0 && t < 1.0)
+        mT = t
+        mAlong = cumDistM[i] + t * segLenM[i]
+        mOff = sqrt(qx * qx + qy * qy)
+        mInterior = t > 0.0 && t < 1.0
+    }
+
+    /** Candidat complet (avec le point projeté) du segment [i]. */
+    private fun project(p: GeoPoint, i: Int): Hit {
+        measure(p, i, K_LAT * cos(p.lat * PI / 180.0))
+        val a = pts[i]
+        val b = pts[i + 1]
+        return Hit(i, mAlong, mOff, GeoPoint(a.lat + mT * (b.lat - a.lat), a.lon + mT * (b.lon - a.lon)), interior = mInterior)
     }
 }
 

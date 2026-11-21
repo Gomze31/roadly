@@ -4,6 +4,12 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import fr.roadly.core.navigation.BackgroundIssue
+import fr.roadly.core.navigation.BackgroundReadiness
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,6 +78,16 @@ fun RoadlyNavHost(
     val nav = rememberNavController()
     val context = LocalContext.current
     val backStackEntry by nav.currentBackStackEntryAsState()
+    // Avant un guidage : réglages du téléphone qui peuvent le couper écran éteint (notifications refusées, batterie optimisée),
+    // signalés une fois par lancement de l'application. L'avertissement ne bloque rien.
+    var backgroundWarned by rememberSaveable { mutableStateOf(false) }
+    var pendingStart by remember { mutableStateOf<Pair<List<BackgroundIssue>, () -> Unit>?>(null) }
+    val guardedStart: (() -> Unit) -> Unit = { block ->
+        withNotificationPermission {
+            val issues = if (backgroundWarned) emptyList() else BackgroundReadiness.read(context)
+            if (issues.isEmpty()) block() else { backgroundWarned = true; pendingStart = issues to block }
+        }
+    }
     Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = HomeRoute) {
         homeScreen(
@@ -87,7 +103,7 @@ fun RoadlyNavHost(
             assistantButton = { VoiceCommandButton() },
             assistantPanel = { VoiceReplyOverlay(Modifier.fillMaxWidth()) },
             // API 33+ : notification du service demandée comme pour le guidage ; un refus masque seulement la notification.
-            onFreeDrive = { withNotificationPermission { nav.navigate(FreeDriveRoute) { launchSingleTop = true } } },
+            onFreeDrive = { guardedStart { nav.navigate(FreeDriveRoute) { launchSingleTop = true } } },
             // Dictée depuis la barre de recherche de l'accueil : recherche pré-remplie.
             onSearchText = { text -> nav.navigate(SearchRoute(query = text)) },
         )
@@ -114,7 +130,7 @@ fun RoadlyNavHost(
             onOpenSettings = { nav.navigate(SettingsRoute(section = SettingsPage.VEHICLE.name)) },
             onStartNavigation = { begin ->
                 // API 33+ : POST_NOTIFICATIONS demandée avant de démarrer le service (spec §2) ; refus = notification masquée seulement.
-                withNotificationPermission {
+                guardedStart {
                     if (begin()) nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
                 }
             },
@@ -149,6 +165,9 @@ fun RoadlyNavHost(
             onOpenProfile = { nav.navigate(ProfileRoute) { launchSingleTop = true } },
         )
     }
+    }
+    pendingStart?.let { (issues, block) ->
+        BackgroundWarningDialog(issues, onStart = { pendingStart = null; block() }, onDismiss = { pendingStart = null })
     }
     // Mise à jour disponible (release GitHub) : proposée au lancement ; le suivi détaillé est dans Réglages › Mises à jour.
     LifecycleEventEffect(Lifecycle.Event.ON_START) { launch.onForeground() }

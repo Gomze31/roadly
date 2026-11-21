@@ -11,4 +11,16 @@
     <string name="external_home_undefined">Domicile non défini : choisissez un lieu puis « Définir comme domicile ».</string>
     <string name="external_work_undefined">Travail non défini : choisissez un lieu puis « Définir comme travail ».</string>
     <string name="external_destination">Destination</string>
+    <string name="bg_warning_title">Guidage écran éteint</string>
+    <string name="bg_warning_intro">Avec les réglages actuels de ce téléphone, le guidage peut s\'interrompre quand l\'écran s\'éteint ou quand vous ouvrez une autre application.</string>
+    <string name="bg_issue_notifications">Notifications désactivées</string>
+    <string name="bg_issue_notifications_detail">Sans elles, rien n\'indique que le guidage continue et le bouton « Arrêter » de la notification n\'existe pas.</string>
+    <string name="bg_issue_battery">Batterie optimisée pour Roadly</string>
+    <string name="bg_issue_battery_detail">Le téléphone peut arrêter Roadly en arrière-plan. Sur HONOR (MagicOS) : Paramètres › Batterie › Lancement d\'applications › Roadly, désactivez la gestion automatique et autorisez l\'exécution en arrière-plan. Sur les autres téléphones : fiche de l\'application › Batterie › Sans restriction.</string>
+    <string name="bg_issue_restricted">Activité en arrière-plan restreinte</string>
+    <string name="bg_issue_restricted_detail">Roadly n\'a pas le droit de fonctionner en arrière-plan : le guidage s\'arrêtera dès que vous quitterez l\'écran. Fiche de l\'application › Batterie › autorisez l\'activité en arrière-plan.</string>
+    <string name="bg_open_notifications">Ouvrir les notifications</string>
+    <string name="bg_open_app_settings">Ouvrir la fiche de l\'application</string>
+    <string name="bg_warning_start">Démarrer</string>
+    <string name="bg_warning_cancel">Annuler</string>
 </resources>
