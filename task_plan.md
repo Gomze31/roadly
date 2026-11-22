@@ -123,7 +123,7 @@ Commits: the changes are grouped by theme in local commits on `integration/phase
 
 | Step | Status |
 |---|---|
-| Clean checkout builds | see "Clean clone" below |
+| Clean checkout builds | DONE locally: `git clone` of `integration/phase5` (commit `15cb502`, 829 tracked files) into an empty folder, no `local.properties` (SDK through `ANDROID_HOME`): tests, `:app:assembleDebug`, `:app:assembleRelease` and the licence check pass, 1453 tests, 0 failed. Limits: same PC, shared Gradle dependency cache and build cache (649 tasks from cache), so it proves that nothing needed is missing from git, not that a first download works |
 | CI passes | NOT EXECUTED (nothing pushed) |
 | Release APK signed and verified | not possible without the release key |
 | APK published through GitHub Releases | not done (not authorised) |
