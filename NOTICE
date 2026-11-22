@@ -1,0 +1,43 @@
+Roadly
+Copyright 2026 Gomze31 et les contributeurs de Roadly
+
+Ce produit est distribué sous licence Apache, version 2.0 (fichier LICENSE).
+
+Le nom « Roadly » et son logo ne sont pas couverts par cette licence (article 6 de la licence Apache 2.0) : voir
+docs/PUBLICATION.md, section « Nom et logo ».
+
+Composants tiers livrés avec l'application
+------------------------------------------
+
+La liste complète, avec la licence de chaque bibliothèque, est dans THIRD_PARTY_LICENSES.md.
+
+- Bibliothèques AndroidX, Jetpack Compose, Kotlin, kotlinx.coroutines, kotlinx.serialization, Dagger/Hilt, OkHttp, Okio :
+  licence Apache 2.0.
+- MapLibre Native pour Android : Copyright MapLibre contributors, licence BSD à deux clauses. La bibliothèque native
+  contient des composants tiers dont les mentions sont publiées par le projet MapLibre Native.
+- Bibliothèques clientes des services Google Play (com.google.android.gms) : Android Software Development Kit License.
+  Ce ne sont pas des logiciels libres ; la licence Apache 2.0 de Roadly ne s'y applique pas.
+- Police Inter : Copyright The Inter Project Authors, SIL Open Font License 1.1
+  (core/designsystem/LICENSE-Inter-OFL.txt).
+- Police Nunito : Copyright The Nunito Project Authors, SIL Open Font License 1.1
+  (core/designsystem/licenses/Nunito-OFL.txt).
+
+Données et services
+-------------------
+
+Roadly n'embarque pas ces données : il les demande à des services en ligne. Leur attribution reste due par quiconque
+distribue l'application ; elle est affichée dans Réglages › À propos et sur la carte.
+
+- Données cartographiques : © les contributeurs d'OpenStreetMap, Open Database License (ODbL).
+  https://www.openstreetmap.org/copyright
+- Tuiles : OpenFreeMap. https://openfreemap.org
+- Adresses : Base Adresse Nationale, service de géocodage de la Géoplateforme (IGN), Licence Ouverte 2.0.
+- Photos aériennes : IGN – Géoplateforme, Licence Ouverte 2.0.
+- Incidents de circulation : Bison Futé, données publiques.
+- Zones à faibles émissions, prix des carburants, points de recharge, équipements de contrôle routier : données publiques
+  de l'État, Licence Ouverte 2.0.
+- Météo : Open-Meteo, CC BY 4.0.
+- Itinéraires : Valhalla (licence MIT), calculés à partir des données OpenStreetMap.
+- Lieux : Photon (Komoot), à partir des données OpenStreetMap.
+
+Les conditions et limites de chaque service sont décrites dans docs/SERVICES.md.
