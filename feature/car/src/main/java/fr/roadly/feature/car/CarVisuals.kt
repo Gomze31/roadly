@@ -31,13 +31,19 @@ internal object CarLanes {
     /** Voie conseillée (ou, à défaut de conseil, toute voie valide) : ses directions sont « recommandées » pour l'hôte. */
     fun recommended(lane: Lane, anyActive: Boolean): Boolean = if (anyActive) lane.active else lane.valid
 
+    /**
+     * Voies à envoyer à l'hôte : toutes, ou aucune. Une voie sans direction connue (donnée absente d'OpenStreetMap) ne peut pas être
+     * dessinée sans inventer une flèche, et un bloc dont il manquerait une voie serait faux : le bloc entier est retiré.
+     */
+    fun displayable(lanes: List<Lane>): List<Lane> = if (lanes.any { it.directions.isEmpty() }) emptyList() else lanes
+
     fun toCar(lanes: List<Lane>): List<CarLane> {
-        val anyActive = lanes.any { it.active }
-        return lanes.map { lane ->
+        val shown = displayable(lanes)
+        val anyActive = shown.any { it.active }
+        return shown.map { lane ->
             val b = CarLane.Builder()
             val rec = recommended(lane, anyActive)
-            val dirs = lane.directions.ifEmpty { setOf(LaneDirection.STRAIGHT) }
-            for (d in dirs) b.addDirection(CarLaneDirection.create(shape(d), rec))
+            for (d in lane.directions) b.addDirection(CarLaneDirection.create(shape(d), rec))
             b.build()
         }
     }
@@ -99,8 +105,8 @@ internal object CarVisuals {
                 lane.valid -> VALID
                 else -> DIM
             }
-            val dirs = lane.directions.ifEmpty { setOf(LaneDirection.STRAIGHT) }
-            for (d in dirs) drawLaneArrow(c, left + LANE_W / 2f, d, color)
+            // Aucune flèche inventée : une voie sans direction reste vide (l'appelant n'envoie pas un tel bloc, voir CarLanes.displayable).
+            for (d in lane.directions) drawLaneArrow(c, left + LANE_W / 2f, d, color)
         }
         icon(bmp)
     }

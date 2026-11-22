@@ -103,6 +103,9 @@ class CarModelsTest {
         assertNull(h.speedKmh)
         assertFalse(h.overLimit)
         assertEquals(50, h.limitKmh)
+        // Drapeau lu par CarHudView pour dessiner « Signal GPS perdu ».
+        assertTrue(h.gpsLost)
+        assertFalse(CarHudModel.from(guiding(ms, 1, speed = 90.0, limit = 50), 5).gpsLost)
     }
 
     @Test fun `free drive hud prefers the zone being crossed`() {

@@ -9,7 +9,6 @@ import androidx.car.app.model.Distance
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.model.Destination
-import androidx.car.app.navigation.model.Maneuver
 import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.RoutingInfo
@@ -51,6 +50,8 @@ internal class CarGuidanceScreen(
     private var shownArrowIndex = -1
     /** Contenu du gabarit au dernier rafraîchissement : l'hôte n'est sollicité que si l'affichage change. */
     private var shownKey: Any? = null
+    /** Clé du dernier résumé de trajet accepté par l'hôte ([CarGuidanceMapper.tripKey]) : un résumé identique n'est pas renvoyé. */
+    private var sentTripKey: Any? = null
     private val alerts = CarZoneAlerts(carContext, deps, lifecycleScope)
     /** Domicile enregistré ; le bouton n'est proposé que s'il diffère de la destination en cours. */
     private var home: fr.roadly.core.model.Place? = null
@@ -69,7 +70,7 @@ internal class CarGuidanceScreen(
             override fun onStart(owner: LifecycleOwner) {
                 shownRouteId = null
                 shownArrowIndex = -1
-                (state as? NavigationState.Guiding)?.let { drawMap(it, CarHudModel.from(it, toleranceKmh)) }
+                (state as? NavigationState.Guiding)?.let { drawMap(it, CarHudModel.from(it, toleranceKmh)) } ?: clearStale(state)
             }
             override fun onStop(owner: LifecycleOwner) {
                 renderer.clearRoutes()
@@ -93,12 +94,27 @@ internal class CarGuidanceScreen(
                 alerts.onZone(s.radarActive?.key ?: s.radarNext?.key, hud.zone)
             }
             updateTrip(s)
+        } else {
+            // Arrivée, échec, arrêt : plus aucune mesure n'arrive. Rien de périmé ne reste affiché, et une reprise renvoie le résumé.
+            sentTripKey = null
+            if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) clearStale(s)
         }
         val key = displayKey(s, m)
         if (key != shownKey) {
             shownKey = key
             invalidate()
         }
+    }
+
+    /**
+     * Hors guidage : vitesse, limitation et zone effacées, repère du véhicule et flèche de manœuvre retirés (ils resteraient figés à
+     * la dernière position du guidage). Le tracé et le repère d'arrivée restent. LIMITE : la position n'est plus suivie ici.
+     */
+    private fun clearStale(s: NavigationState) {
+        renderer.setHud(CarHudModel.forState(s, toleranceKmh))
+        renderer.setUser(null)
+        renderer.setManeuverArrow(ManeuverArrowBuilder.EMPTY)
+        shownArrowIndex = -1
     }
 
     private fun drawMap(g: NavigationState.Guiding, hud: CarHudModel) {
@@ -200,14 +216,15 @@ internal class CarGuidanceScreen(
 
     /** [lanes] : voies à l'approche (étape courante seulement) — la bibliothèque exige les voies et leur image ensemble. */
     private fun step(s: CarStep, lanes: List<fr.roadly.core.model.Lane> = emptyList()): Step {
-        val maneuver = Maneuver.Builder(s.maneuverCode).setIcon(CarIcons.maneuver(s.type)).apply {
-            s.roundaboutExit?.let { setRoundaboutExitNumber(it) }
-        }.build()
+        // Numéro de sortie posé seulement sur un type qui l'accepte (sinon la bibliothèque lève une exception).
+        val maneuver = CarGuidanceMapper.maneuverBuilder(s).setIcon(CarIcons.maneuver(s.type)).build()
         val cue = s.cue.ifBlank { s.road.orEmpty() }
+        // Une voie sans direction connue : pas de bloc de voies du tout (ni voies, ni image).
+        val carLanes = CarLanes.toCar(lanes)
         return Step.Builder(cue).setManeuver(maneuver).apply {
             s.road?.let { setRoad(it) }
-            if (lanes.isNotEmpty()) {
-                CarLanes.toCar(lanes).forEach(::addLane)
+            if (carLanes.isNotEmpty()) {
+                carLanes.forEach(::addLane)
                 setLanesImage(CarVisuals.lanes(lanes))
             }
         }.build()
@@ -232,6 +249,9 @@ internal class CarGuidanceScreen(
     /** Résumé pour le combiné d'instruments et les notifications de l'hôte. */
     private fun updateTrip(g: NavigationState.Guiding) {
         val model = CarGuidanceMapper.map(g)
+        // Même étape, mêmes textes, même minute d'arrivée : l'hôte a déjà ce résumé (l'état est émis à chaque position).
+        val key = CarGuidanceMapper.tripKey(g.route.id, g.progress.nextManeuverIndex, model, deps.guidance.destinationName)
+        if (key == sentTripKey) return
         val trip = if (model == null || model.rerouting) {
             Trip.Builder().setLoading(true).build()
         } else {
@@ -248,6 +268,7 @@ internal class CarGuidanceScreen(
         }
         try {
             navigationManager.updateTrip(trip)
+            sentTripKey = key
         } catch (e: IllegalStateException) {
             // Navigation pas (encore) déclarée à l'hôte : le prochain état la déclarera.
         }

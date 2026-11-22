@@ -202,11 +202,6 @@ internal class CarHomeScreen(
         else row(icon, title, carContext.getString(R.string.car_place_unset)) { openSearch(assign) }
     }
 
-    private fun goHome() {
-        val home = places?.home
-        if (home != null) screenManager.push(CarRoutePreviewScreen(carContext, deps, renderer, home)) else openSearch(CarSearchAssign.HOME)
-    }
-
     private fun openSearch(assign: CarSearchAssign? = null) =
         screenManager.push(CarSearchScreen(carContext, deps, renderer, initialQuery = null, assign = assign))
 

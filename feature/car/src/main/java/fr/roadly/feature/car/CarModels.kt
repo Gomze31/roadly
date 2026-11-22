@@ -39,6 +39,9 @@ data class CarHudModel(
                 .copy(nextLimitKmh = next?.kmh, nextLimitDistanceM = next?.let { Formatters.roundManeuverMeters(it.distanceM) })
         }
 
+        /** Hors guidage (arrivée, échec, arrêt) : plus aucune mesure n'arrive, rien n'est affiché plutôt qu'une vitesse périmée. */
+        fun forState(s: NavigationState, toleranceKmh: Int): CarHudModel = if (s is NavigationState.Guiding) from(s, toleranceKmh) else EMPTY
+
         fun from(s: FreeDriveState.Active, toleranceKmh: Int): CarHudModel {
             val zone = s.zone?.let { CarZoneModel(true, it.distanceM, it.limitKmh, it.confidence) }
                 ?: s.nextZone?.let { CarZoneModel(it.inside, it.distanceM, it.speedLimitKmh, it.confidence) }
@@ -180,7 +183,7 @@ object CarGuidanceMapper {
             etaEpochMs = g.etaEpochMs,
             rerouting = g.rerouting,
             gpsLost = g.gpsLost,
-            lanes = if (distance <= LANES_WITHIN_M) g.lanes else emptyList(),
+            lanes = if (distance <= LANES_WITHIN_M) CarLanes.displayable(g.lanes) else emptyList(),
             junction = junction(current, distance, g.speedKmh, g.roundabout?.exitAngleDeg, g.roundabout?.exitNumber, g.roundaboutLive),
         ).let { model -> roundaboutCue(g.roundaboutLive, current)?.let { model.copy(current = model.current.copy(cue = it)) } ?: model }
     }
@@ -193,6 +196,9 @@ object CarGuidanceMapper {
         if (live == null || live.phase == fr.roadly.core.navigation.RoundaboutPhase.EXITED) return null
         if (current.type != ManeuverType.ROUNDABOUT_ENTER && current.type != ManeuverType.ROUNDABOUT_EXIT) return null
         val remaining = live.exitsRemaining ?: return null
+        // Position douteuse dans l'anneau : le décompte est gelé (le téléphone écrit « Position imprécise »). La carte de l'hôte n'a
+        // qu'une ligne : le décompte n'y est pas présenté comme sûr, sauf « prochaine sortie », qui ne peut plus reculer.
+        if (unsureInside(live) && !live.exitIsNext) return null
         val street = live.layout.exitStreet?.takeIf { it.isNotBlank() }
         val head = when {
             remaining == 0 && live.phase == fr.roadly.core.navigation.RoundaboutPhase.INSIDE -> "Prochaine sortie"
@@ -202,6 +208,10 @@ object CarGuidanceMapper {
         }
         return listOfNotNull(head, street).joinToString(" · ")
     }
+
+    /** Dans l'anneau avec une position douteuse ([fr.roadly.core.navigation.RoundaboutConfidence.LOW]) : même condition que le téléphone. */
+    private fun unsureInside(live: fr.roadly.core.navigation.RoundaboutLive): Boolean =
+        live.phase == fr.roadly.core.navigation.RoundaboutPhase.INSIDE && live.confidence == fr.roadly.core.navigation.RoundaboutConfidence.LOW
 
     /** Pas de l'angle du véhicule sur l'image (°) : une nouvelle image au plus tous les 20° d'anneau. */
     const val VEHICLE_ANGLE_STEP_DEG = 20.0
@@ -237,7 +247,8 @@ object CarGuidanceMapper {
         val drawn = 180.0 - exit
         fun toImage(layoutAngleDeg: Double) = 180.0 - layoutAngleDeg / sweep * drawn
         val arms = if (live.layout.counted) live.layout.branches.filter { !it.isTarget }.map { CarJunctionVisual.RoundaboutArm(Math.round(toImage(it.angleDeg) / 5.0) * 5.0, it.rank <= live.exitsPassed) } else emptyList()
-        val vehicle = live.vehicleAngleDeg?.takeIf { live.phase == fr.roadly.core.navigation.RoundaboutPhase.INSIDE }
+        // Position douteuse : pas de repère de véhicule (il serait dessiné à la dernière position sûre, comme s'il était mesuré).
+        val vehicle = live.vehicleAngleDeg?.takeIf { live.phase == fr.roadly.core.navigation.RoundaboutPhase.INSIDE && !unsureInside(live) }
             ?.let { toImage(Math.floor(it / VEHICLE_ANGLE_STEP_DEG) * VEHICLE_ANGLE_STEP_DEG) }
         return base.copy(otherExits = arms, vehicleAngleDeg = vehicle)
     }
@@ -278,6 +289,32 @@ object CarGuidanceMapper {
         ManeuverType.FERRY -> CarManeuver.TYPE_FERRY_BOAT
         ManeuverType.OTHER -> CarManeuver.TYPE_UNKNOWN
     }
+
+    /**
+     * Types pour lesquels la bibliothèque accepte un numéro de sortie (`Maneuver.isValidTypeWithExitNumber`, Car App 1.7.0) ;
+     * pour tout autre type, `setRoundaboutExitNumber` lève `IllegalArgumentException`.
+     */
+    fun acceptsExitNumber(maneuverCode: Int): Boolean = maneuverCode == CarManeuver.TYPE_ROUNDABOUT_ENTER_AND_EXIT_CW ||
+        maneuverCode == CarManeuver.TYPE_ROUNDABOUT_ENTER_AND_EXIT_CCW ||
+        maneuverCode == CarManeuver.TYPE_ROUNDABOUT_ENTER_AND_EXIT_CW_WITH_ANGLE ||
+        maneuverCode == CarManeuver.TYPE_ROUNDABOUT_ENTER_AND_EXIT_CCW_WITH_ANGLE
+
+    /** Manœuvre de la bibliothèque pour [s], sans icône : le numéro de sortie n'est posé que sur un type qui l'accepte. */
+    fun maneuverBuilder(s: CarStep): CarManeuver.Builder = CarManeuver.Builder(s.maneuverCode).apply {
+        s.roundaboutExit?.takeIf { it >= 1 && acceptsExitNumber(s.maneuverCode) }?.let { setRoundaboutExitNumber(it) }
+    }
+
+    /**
+     * Ce qui distingue deux résumés de trajet envoyés à l'hôte (`NavigationManager.updateTrip`) : étape, textes de distance tels
+     * qu'affichés, minute d'arrivée, recalcul. Deux états de même clé donnent le même résumé à l'écran : il n'est pas renvoyé.
+     */
+    fun tripKey(routeId: String, stepIndex: Int, model: CarGuidanceModel?, destinationName: String?): Any =
+        if (model == null || model.rerouting) listOf(routeId, "loading")
+        else listOf(
+            routeId, stepIndex, model.current, destinationName,
+            CarDistances.maneuver(model.distanceToCurrentM), CarDistances.remaining(model.remainingDistanceM),
+            model.etaEpochMs / 60_000, (model.remainingDurationS / 60).toLong(),
+        )
 }
 
 /** Valeur et unité (`Distance.UNIT_*`) affichées par l'hôte ; mêmes arrondis que la voix et le téléphone. */

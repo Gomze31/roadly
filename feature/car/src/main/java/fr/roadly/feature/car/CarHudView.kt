@@ -52,12 +52,30 @@ internal class CarHudView(context: Context) : View(context) {
         val a = area ?: SurfaceArea(0, 0, width, height)
         if (a.width <= 0 || a.height <= 0) return
         val margin = MARGIN_DP * dp
-        model.zone?.let { drawZone(canvas, it, a, margin) }
+        val zoneBottom = model.zone?.let { drawZone(canvas, it, a, margin) }
+        // Signal perdu : dit en haut de la zone libre, sous la pastille de zone s'il y en a une (la vitesse, elle, disparaît).
+        if (model.gpsLost) drawGpsLost(canvas, a, (zoneBottom ?: a.top.toFloat()) + margin)
         drawSpeed(canvas, a, margin)
         model.roadName?.let { drawRoadName(canvas, it, a, margin) }
     }
 
-    private fun drawZone(canvas: Canvas, zone: CarZoneModel, a: SurfaceArea, margin: Float) {
+    /** Pastille « Signal GPS perdu », centrée, dont le haut est à [top]. */
+    private fun drawGpsLost(canvas: Canvas, a: SurfaceArea, top: Float) {
+        val padH = 16 * dp
+        val text = android.text.TextUtils.ellipsize(
+            context.getString(R.string.car_gps_lost), android.text.TextPaint(title), (a.width - 2 * MARGIN_DP * dp - 2 * padH).coerceAtLeast(0f), android.text.TextUtils.TruncateAt.END,
+        ).toString()
+        val w = title.measureText(text) + 2 * padH
+        val h = title.textSize + 18 * dp
+        val left = a.centerX - w / 2
+        rect.set(left, top, left + w, top + h)
+        fill.color = GPS_LOST
+        canvas.drawRoundRect(rect, h / 2, h / 2, fill)
+        canvas.drawText(text, left + padH, rect.centerY() - (title.ascent() + title.descent()) / 2, title)
+    }
+
+    /** Dessine la pastille de zone et rend l'ordonnée de son bord bas. */
+    private fun drawZone(canvas: Canvas, zone: CarZoneModel, a: SurfaceArea, margin: Float): Float {
         val res = context.resources
         val head = res.getString(R.string.car_zone_title)
         val parts = buildList {
@@ -80,6 +98,7 @@ internal class CarHudView(context: Context) : View(context) {
         val baseTitle = top + padV - title.ascent()
         canvas.drawText(head, left + padH, baseTitle, title)
         canvas.drawText(sub, left + padH, baseTitle + title.descent() + gap - detail.ascent(), detail)
+        return top + h
     }
 
     /**
@@ -177,5 +196,7 @@ internal class CarHudView(context: Context) : View(context) {
         const val OVER_RED = 0xFFFF5252.toInt()
         const val ZONE_INSIDE = 0xF2C62828.toInt()
         const val ZONE_AHEAD = 0xF2B45309.toInt()
+        /** Pastille « Signal GPS perdu » : gris sombre, distinct des pastilles de zone de danger. */
+        const val GPS_LOST = 0xF23A3F4B.toInt()
     }
 }

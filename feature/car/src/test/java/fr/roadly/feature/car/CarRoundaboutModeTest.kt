@@ -3,6 +3,8 @@ package fr.roadly.feature.car
 import fr.roadly.core.model.Maneuver
 import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.navigation.RoundaboutBranch
+import fr.roadly.core.navigation.RoundaboutConfidence
+import fr.roadly.core.navigation.RoundaboutFix
 import fr.roadly.core.navigation.RoundaboutLayout
 import fr.roadly.core.navigation.RoundaboutLive
 import fr.roadly.core.navigation.RoundaboutPhase
@@ -69,6 +71,45 @@ class CarRoundaboutModeTest {
         assertEquals(a, b)
         val c = CarGuidanceMapper.roundabout(-90.0, 3, live(70.0)).vehicleAngleDeg
         assertTrue(c!! < a!!)
+    }
+
+    /** Position sûre à [sureOffsetM] dans l'anneau, puis position extrapolée (tunnel, signal perdu) à [unsureOffsetM] : confiance LOW. */
+    private fun unsure(sureOffsetM: Double, unsureOffsetM: Double): RoundaboutLive {
+        val l = layout()
+        val t = RoundaboutProgressTracker()
+        t.update("r", 1, l, inside = true, distanceToNextM = 90.0 - sureOffsetM)
+        return t.update("r", 1, l, inside = true, distanceToNextM = 90.0 - unsureOffsetM, fix = RoundaboutFix(extrapolated = true))
+    }
+
+    @Test fun `an unsure position inside the ring shows no countdown and no vehicle marker`() {
+        val exit = maneuver(ManeuverType.ROUNDABOUT_EXIT)
+        val live = unsure(sureOffsetM = 40.0, unsureOffsetM = 55.0)
+        assertEquals(RoundaboutConfidence.LOW, live.confidence)
+        // Le décompte gelé (« encore 1 sortie ») n'est pas présenté comme sûr : le texte habituel de la manœuvre reste.
+        assertEquals(1, live.exitsRemaining)
+        assertNull(CarGuidanceMapper.roundaboutCue(live, exit))
+        val v = CarGuidanceMapper.roundabout(-90.0, 3, live)
+        assertNull(v.vehicleAngleDeg)
+        // Les branches gardent le dernier état établi avec certitude (une sortie passée).
+        assertEquals(listOf(true, false), v.otherExits.map { it.passed })
+        // La même position, sûre : décompte et repère reviennent.
+        assertEquals("Encore 1 sortie à passer · Rue de la Gare", CarGuidanceMapper.roundaboutCue(live.copy(confidence = RoundaboutConfidence.HIGH), exit))
+        assertTrue(CarGuidanceMapper.roundabout(-90.0, 3, live.copy(confidence = RoundaboutConfidence.HIGH)).vehicleAngleDeg != null)
+    }
+
+    @Test fun `an unsure position keeps the next exit announcement, which cannot go back`() {
+        val live = unsure(sureOffsetM = 70.0, unsureOffsetM = 80.0)
+        assertEquals(RoundaboutConfidence.LOW, live.confidence)
+        assertTrue(live.exitIsNext)
+        assertEquals("Prochaine sortie · Rue de la Gare", CarGuidanceMapper.roundaboutCue(live, maneuver(ManeuverType.ROUNDABOUT_EXIT)))
+        assertNull(CarGuidanceMapper.roundabout(-90.0, 3, live).vehicleAngleDeg)
+    }
+
+    @Test fun `an unsure position before the ring does not hide the announced countdown`() {
+        val l = layout()
+        val approach = RoundaboutProgressTracker().update("r", 1, l, inside = false, distanceToNextM = 120.0, fix = RoundaboutFix(extrapolated = true))
+        assertEquals(RoundaboutConfidence.LOW, approach.confidence)
+        assertEquals("Encore 2 sorties à passer · Rue de la Gare", CarGuidanceMapper.roundaboutCue(approach, maneuver(ManeuverType.ROUNDABOUT_ENTER)))
     }
 
     @Test fun `without the phone roundabout mode the image is the plain one, and no vehicle before the ring`() {
