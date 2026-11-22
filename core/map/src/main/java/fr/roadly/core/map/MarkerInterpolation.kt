@@ -20,6 +20,23 @@ internal object MarkerInterpolation {
         return MarkerPose(from.lat + (to.lat - from.lat) * k, from.lon + (to.lon - from.lon) * k, Bearings.lerp(from.bearingDeg, to.bearingDeg, k))
     }
 
+    /** Vitesse (m/s) sous laquelle le véhicule est tenu pour arrêté, et plancher (m) de la dérive GPS tolérée à l'arrêt. */
+    const val STANDSTILL_BELOW_MPS = 0.5f
+    const val STANDSTILL_MIN_JITTER_M = 2.0
+
+    /**
+     * Vrai si [to] n'est que la dérive GPS d'un véhicule arrêté : vitesse mesurée quasi nulle et écart à la pose affichée [from]
+     * inférieur à la précision annoncée (au moins [STANDSTILL_MIN_JITTER_M]). Le marqueur reste alors où il est. Constat sur le
+     * HONOR, application à l'arrêt en intérieur (précision 8–12 m) : la carte était rendue à 57–59 images par seconde en continu ;
+     * chaque position, décalée de quelques mètres, relançait 1 s d'animation. L'écart est mesuré à la pose affichée, pas au fix
+     * précédent : un déplacement lent mais réel finit par dépasser la précision et le marqueur suit.
+     */
+    fun isStandstillJitter(from: MarkerPose, to: MarkerPose, speedMps: Float?, accuracyM: Float): Boolean {
+        if (speedMps == null || speedMps >= STANDSTILL_BELOW_MPS) return false
+        val moved = GeoPoint(from.lat, from.lon).distanceTo(GeoPoint(to.lat, to.lon))
+        return moved < maxOf(STANDSTILL_MIN_JITTER_M, accuracyM.toDouble())
+    }
+
     /** En deçà (m, et degrés de cap), le marqueur n'a pas bougé : une seule écriture au lieu d'une par image pendant 1 s. */
     const val STILL_BELOW_M = 0.5
     const val STILL_BELOW_DEG = 1.0

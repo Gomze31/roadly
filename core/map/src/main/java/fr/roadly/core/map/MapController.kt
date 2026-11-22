@@ -435,6 +435,8 @@ class MapController(internal val context: Context) {
             return
         }
         val from = shownPose
+        // À l'arrêt, la dérive GPS ne déplace pas le marqueur : ni saut à l'écran, ni animation, ni image rendue pour rien.
+        if (from != null && MarkerInterpolation.isStandstillJitter(from, target, fix.speedMps, fix.accuracyM)) return
         if (from == null || !MarkerInterpolation.shouldAnimate(from, target, animateMs)) {
             shownPose = target
             src.setGeoJson(PointFeatureBuilder.user(target, fix.accuracyM))
