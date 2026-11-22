@@ -160,12 +160,12 @@ None of the items above has been validated on a device or on the road.
 |---|---|---|
 | Blocker 1 — automatic reroute drops planned stops | FIXED | `NavigationSession.rerouteWaypoints`, set by `GuidanceActions`; stops re-projected on the new route. JVM test `an automatic reroute after leaving the route keeps the stops still ahead` — PASS |
 | Blocker 2 — scooter or bicycle mode routed as a car by voice, Android Auto shortcut and Home « Reprendre » | FIXED by refusal | `GuidanceActions.startTo` and `HomeViewModel.resumeLastGuidance` refuse in those modes. JVM test `scooter or bicycle mode - the car shortcut ... is refused` — PASS. The Home refusal has no dedicated test, and neither path computes a scooter route yet: the rider must use the route screen |
-| Blocker 3 — location services off never detected on the phone | OPEN | needs a banner on the home screen; not done |
+| Blocker 3 — location services off never detected on the phone | FIXED | `LocationReadiness` (core:location): banner on Home with a button to the location settings, re-read on return to the foreground and on each change of the switch; guidance start refused meanwhile. JVM tests `LocationReadinessTest`, `StartChecksTest` — PASS. Never seen on a device |
 | Blocker 4 — simulation toggle visible to end users | FIXED | `DriveSimulationGate`: setting hidden and start refused outside debuggable builds. JVM test — PASS; release APK built, not run |
 | Major 5 — trip saved under the variant label | FIXED | recorded under the destination name; covered by the existing suite only |
 | Major 6 — recording restarts on every route change | FIXED | `begin` skipped when guidance continues to the same destination; covered by the existing suite only |
-| Major 7 — no French voice: silent trip with no notice | OPEN | |
-| Major 8 — approximate-only location counts as granted | OPEN | |
-| Major 9 — trip lists load every full GPS track | OPEN | |
+| Major 7 — no French voice: silent trip with no notice | FIXED | `SpeechService.voiceAvailable`; dialog once per app launch with a button to the text-to-speech settings; guidance continues on screen. The once-only rule is tested (`StartChecksTest`); the engine-failure path itself has no test (no Android engine on JVM) |
+| Major 8 — approximate-only location counts as granted | FIXED | same banner and start refusal as blocker 3, with the steps to enable precise location. JVM tests — PASS |
+| Major 9 — trip lists load every full GPS track | FIXED | `TripDao.observeSummaries` returns every column except the track; the track is read only by `byId` (replay screen). JVM test `TripSummaryQueryTest` — PASS. The query has not run against a real database |
 
 None of these fixes has run on a device.

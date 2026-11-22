@@ -432,3 +432,44 @@ Built from `git log --oneline origin/main -40`, the three local commits of `inte
 - `backend/` and `tools/` were not audited.
 - Deep-link input handling (`geo:`, `google.navigation:`) was not re-audited; see `SECURITY.md`.
 - Legal reading of provider terms is the project's own notes, not a fresh review of the providers' pages.
+
+## Addendum — 22 November 2026, after the authorised fixes (local commits, not pushed)
+
+### Signing
+
+| Item | Value | Method |
+|---|---|---|
+| Installed on the HONOR | `fr.roadly` 0.1.215 (code 215), signer `CN=Android Debug`, SHA-256 `7611a323b2f1b159e445174dd57a19c87a42b7d0648de7398e7935de3aa3c9c2` | APK pulled from the phone, `apksigner verify --print-certs` |
+| Current debug APK | same package, same signer and same SHA-256; version code = commit count of the branch (higher than 215) | `aapt2 dump badging`, `apksigner` |
+| In-place update of the phone with the debug APK | technically possible: same package, same certificate, higher version code. **Not done, not authorised.** | comparison above |
+| Release APK built on this PC | **unsigned** (`app-release-unsigned.apk`, `apksigner`: DOES NOT VERIFY): no release keystore is configured locally, and the build no longer falls back to the debug key | build + `apksigner` |
+| Release APK built by CI | signed with the key held in the repository secrets; its fingerprint is not visible from here | INCONCLUSIVE |
+| Published release over the phone's debug install | not possible unless CI signs with the same debug key, which it should not; expect an uninstall, i.e. loss of local data, when moving the phone to a published build | Android signing rules |
+
+Change made: `app/build.gradle.kts` — without the release key the release APK is unsigned; `-Proadly.debugSignedRelease=true` signs it with
+the debug key for a local trial and appends `-debugsigned` to the version name. The debug build type is unchanged.
+
+### Blockers closed since the checklist was written
+
+- Simulation toggle shipped to end users: fixed (debuggable builds only).
+- Silent debug signing of release builds: fixed (above).
+- Location services off, approximate-only location, no French voice, stops dropped on automatic reroute, car routes in scooter mode,
+  trip lists loading every track: fixed, JVM-tested, never run on a device (`AUDIT.md`, status table).
+
+### Still open before a 1.0
+
+| Blocker | State |
+|---|---|
+| Road, battery screen-off and Android Auto validation | NOT TESTED |
+| Version name `1.0.x` | not changed: `0.1.<count>` is written both in `app/build.gradle.kts` and in `.github/workflows/release.yml`; both must change in the same commit on `main`, and that push publishes a release |
+| FOSSGIS Valhalla usage policy for a public release | not done: the public instance is the hard-coded default; rate limiting, cache, identifying User-Agent and reroute backoff are in place, the announcement to the operators and a self-hosted fallback are not |
+| Room upgrade from 0.1.x on a device | NOT TESTED: migration chain 1→7 read as complete, `exportSchema` is off, no migration test exists |
+| Third-party notices file | missing |
+| R8 | release stays unminified; three latent risks listed above if minification is ever enabled |
+
+### The one failing test
+
+`CarHomeStripTest` (from origin/main) fails only on this PC. Robolectric 4.18.1, for SDK 35, opens its `android-all-instrumented` jar through a
+URL-encoded path: it looks under `Forza%20PC\.m2\...` in the Windows user folder while the file is under `Forza PC\.m2\...` (the jar is present).
+Tests on SDK 34 in `feature:navigation` are not affected. It is an environment limitation of a Windows user folder containing a space, not a
+defect of the code; CI on Linux is not concerned. Not worked around.
