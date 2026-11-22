@@ -24,6 +24,7 @@ val localProps = Properties().apply {
 }
 fun signing(env: String, prop: String): String? = System.getenv(env)?.takeIf { it.isNotBlank() } ?: localProps.getProperty(prop)?.takeIf { it.isNotBlank() }
 val keystorePath = signing("ROADLY_KEYSTORE", "roadly.keystore")
+val debugSignedRelease = (findProperty("roadly.debugSignedRelease") as String?) == "true"
 
 android {
     namespace = "fr.roadly.app"
@@ -47,7 +48,12 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.findByName("roadly") ?: signingConfigs.getByName("debug")
+            // Jamais de clé de débogage en silence : sans la clé de publication, l'APK « release » sort NON SIGNÉ (il ne s'installe pas).
+            // Pour un essai local seulement : -Proadly.debugSignedRelease=true le signe avec la clé de débogage et le marque dans son nom
+            // de version ; un tel APK ne peut ni être publié ni mettre à jour une version publiée.
+            val releaseKey = signingConfigs.findByName("roadly")
+            signingConfig = releaseKey ?: if (debugSignedRelease) signingConfigs.getByName("debug") else null
+            if (releaseKey == null && debugSignedRelease) versionNameSuffix = "-debugsigned"
         }
         // Même clé en debug si elle est configurée : une version installée depuis le poste peut être mise à jour depuis GitHub.
         debug { signingConfigs.findByName("roadly")?.let { signingConfig = it } }
