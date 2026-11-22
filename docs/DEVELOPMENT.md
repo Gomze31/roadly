@@ -88,7 +88,7 @@ Règles de dépendance : un module `feature:*` ne dépend que de modules `core:*
 |---|---|---|---|
 | Tuiles vectorielles | OpenFreeMap, styles `positron` (clair) et `dark` (sombre) sous `https://tiles.openfreemap.org/styles/` | Gratuit, sans clé, usage commercial autorisé, pas de quota publié | MapTiler, Protomaps auto-hébergé |
 | Rendu carte | MapLibre Android 11.13.5 | BSD-2 | — |
-| Géocodage adresses France | Base Adresse Nationale : `https://api-adresse.data.gouv.fr/search/` et `/reverse/` | Licence Ouverte 2.0, environ 50 req/s/IP, sans clé | Nominatim, Pelias |
+| Géocodage adresses France | Base Adresse Nationale (Géoplateforme IGN) : `https://data.geopf.fr/geocodage/search/` et `/reverse/` | Licence Ouverte 2.0, environ 50 req/s/IP, sans clé | Nominatim, Pelias |
 | Géocodage POI, villes, Europe | Photon : `https://photon.komoot.io/api/` et `/reverse` | Fair-use, aucune garantie de production | Photon auto-hébergé |
 | Coordonnées saisies | Parseur local (décimal `48.85, 2.35`, DMS `48°51'N 2°21'E`) | — | — |
 | Routage | Valhalla FOSSGIS : `https://valhalla1.openstreetmap.de/route` | Fair-use, développement uniquement ; en production, Valhalla Docker sur VPS | GraphHopper, OSRM |
@@ -217,7 +217,7 @@ La spec est [`docs/superpowers/specs/2026-10-30-roadly-v1-design.md`](superpower
 - Photon (Komoot) et Valhalla (FOSSGIS) : services publics, voir leurs conditions d'usage respectives.
 - Police Inter : SIL Open Font License 1.1, fichier `core/designsystem/LICENSE-Inter-OFL.txt`.
 
-L'écran Réglages › À propos reproduit ces mentions. Le code de Roadly est sous licence GNU GPL v3 (fichier `LICENSE`).
+L'écran Réglages › À propos reproduit ces mentions. Le code de Roadly est sous licence Apache 2.0 (fichier `LICENSE`) ; les bibliothèques livrées et leurs licences sont dans `THIRD_PARTY_LICENSES.md`.
 
 ## Documentation complémentaire
 

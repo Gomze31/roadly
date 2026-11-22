@@ -34,7 +34,7 @@ Légende : ✅ présent · 🟡 partiel · ❌ absent · ? non vérifié (foncti
 | Image dans l'image | ? | ✅ | ? | ? | ✅ |
 | Cartes hors connexion | ❌ | ✅ | ❌ | ✅ | 🟡 carte du trajet téléchargeable ; pas de calcul d'itinéraire hors ligne |
 | Vie privée | ❌ | ❌ | ? | ✅ | ✅ pas de compte, pas de traqueur, données ouvertes |
-| Code libre | ❌ | ❌ | ❌ | ✅ | ✅ GPL-3.0 |
+| Code libre | ❌ | ❌ | ❌ | ✅ | ✅ Apache-2.0 |
 | Voiture garée, péages en flux libre, historique | ? | 🟡 | ? | ❌ | ✅ |
 | Transports en commun, marche, vélo | ❌ | ✅ | ❌ | ✅ | ❌ hors du champ (GPS voiture) ; mode trottinette |
 

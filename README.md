@@ -10,7 +10,7 @@ Guidage vocal, route à venir, zones de vigilance, ZFE, coût du trajet, Android
 Données publiques et ouvertes. Aucun compte obligatoire. Aucun traqueur.
 
 [![Dernière version](https://img.shields.io/github/v/release/Gomze31/roadly?label=t%C3%A9l%C3%A9charger&color=F03CDC&style=for-the-badge)](https://github.com/Gomze31/roadly/releases/latest)
-[![Licence GPL-3.0](https://img.shields.io/badge/licence-GPL--3.0-8B5CF6?style=for-the-badge)](LICENSE)
+[![Licence Apache 2.0](https://img.shields.io/badge/licence-Apache--2.0-8B5CF6?style=for-the-badge)](LICENSE)
 [![Android 10+](https://img.shields.io/badge/Android-10%2B-2BC48A?style=for-the-badge&logo=android&logoColor=white)](#installer)
 [![Android Auto](https://img.shields.io/badge/Android%20Auto-oui-F5A524?style=for-the-badge)](#android-auto)
 
@@ -25,7 +25,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - 🔒 **Vos trajets restent chez vous.** Favoris, historique et véhicule sont stockés sur le téléphone. Pas de compte obligatoire, pas de publicité, aucun outil d'analyse.
 - 🗺️ **Des sources ouvertes et vérifiables.** OpenStreetMap, Base Adresse Nationale, données publiques de l'État pour les zones de vigilance, les ZFE et le prix des carburants. Roadly n'invente rien : sans donnée, l'écran le dit.
 - 🚗 **Pensé pour la conduite.** Gros chiffres, interface sombre lisible de jour comme de nuit, annonces vocales à la bonne distance, Android Auto.
-- 💜 **Libre.** Code sous GPL-3.0 : vous pouvez le lire, le compiler, l'améliorer.
+- 💜 **Ouvert.** Code sous licence Apache 2.0 : vous pouvez le lire, le compiler, l'améliorer. Une seule bibliothèque n'est pas libre : celle de Google pour la position ([détail](THIRD_PARTY_LICENSES.md)).
 
 ## Ce que Roadly sait faire
 
@@ -110,13 +110,29 @@ Roadly s'affiche sur l'écran de la voiture : recherche, favoris, choix de l'iti
 
 Détails et dépannage : [`docs/ANDROID-AUTO.md`](docs/ANDROID-AUTO.md).
 
+## État du projet
+
+Roadly est en développement actif, avant sa version 1.0. À savoir avant de s'en servir :
+
+- **Le guidage n'a pas encore été validé sur route dans son état actuel.** Les règles de guidage sont couvertes par plus de 1 400 tests automatiques, mais plusieurs comportements récents (reprise après arrêt de l'application, précision dégradée, mise à jour intégrée, sauvegarde) n'ont été vérifiés que sur ordinateur. Gardez les yeux sur la route et sur la signalisation.
+- **Les services en ligne sont publics et sans garantie** : itinéraires, recherche et carte dépendent de serveurs tiers gratuits, qui peuvent ralentir ou refuser. Voir [`docs/SERVICES.md`](docs/SERVICES.md).
+- **France uniquement** pour les adresses, les ZFE, les prix des carburants et les incidents.
+- **Services Google Play requis** pour la position : pas de version pour les téléphones sans services Google.
+- Pas de cartes hors ligne, pas d'info trafic en temps réel hors incidents officiels.
+
+L'état de chaque fonction est suivi dans [`FEATURES.md`](FEATURES.md).
+
 ## Installer
 
-1. Téléchargez le fichier `roadly-x.y.z.apk` de la **[dernière version](https://github.com/Gomze31/roadly/releases/latest)** depuis votre téléphone.
+1. Téléchargez le fichier `roadly-x.y.z.apk` de la **[dernière version](https://github.com/Gomze31/roadly/releases/latest)** depuis votre téléphone. C'est la seule source officielle.
 2. Ouvrez-le et autorisez l'installation depuis cette source si Android le demande.
-3. Les versions suivantes arrivent directement dans l'application : **Réglages › Mises à jour**.
+3. Les versions suivantes arrivent directement dans l'application : **Réglages › Mises à jour**. Chaque mise à jour est vérifiée (serveur, taille, empreinte SHA-256, certificat de signature) avant d'être remise à Android, qui demande votre accord.
 
 Configuration minimale : Android 10. Services Google Play requis pour la localisation.
+
+**Vérifier un téléchargement** : chaque version publie l'empreinte du fichier et celle du certificat de signature. La méthode et le certificat officiel sont dans [`docs/SIGNATURE.md`](docs/SIGNATURE.md). Une version qui ne porte pas ce certificat n'est pas une version officielle de Roadly.
+
+Désinstaller Roadly efface vos favoris et vos trajets : exportez-les d'abord (Réglages › Données › Sauvegarde).
 
 ## Compiler
 
@@ -127,10 +143,12 @@ cd roadly
 ```
 
 ```bash
-./gradlew testDebugUnitTest :core:model:test :core:common:test
+./gradlew testDebugUnitTest :core:model:test :core:common:test :core:scooter:test :core:radar:test
 ```
 
-Prérequis : JDK 17+, SDK Android 36, un `local.properties` contenant `sdk.dir=…`. Aucune clé d'API n'est nécessaire. Le guide complet (modules, fournisseurs, configuration, auto-hébergement) est dans **[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)**.
+Prérequis : JDK 17+, SDK Android 36, un `local.properties` contenant `sdk.dir=…` (ou la variable `ANDROID_HOME`). Aucune clé d'API n'est nécessaire. Le guide complet (modules, fournisseurs, configuration, auto-hébergement) est dans **[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)**, la vue d'ensemble dans [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+Votre compilation est signée par votre propre clé : Android ne l'installera pas par-dessus une version officielle, et inversement.
 
 ## Sous le capot
 
@@ -143,7 +161,7 @@ Prérequis : JDK 17+, SDK Android 36, un `local.properties` contenant `sdk.dir=�
 | **Recherche** | Base Adresse Nationale, Photon |
 | **Stockage** | Room, DataStore |
 | **Voiture** | Android for Cars App Library |
-| **Tests** | 780+ tests JVM, rendus d'écran Robolectric, tests instrumentés |
+| **Tests** | 1 400+ tests JVM, rendus d'écran Robolectric, tests instrumentés |
 
 Les adresses des fournisseurs se changent dans **Réglages › Fournisseurs**, par exemple pour pointer vers votre propre Valhalla. Détails : [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md).
 
@@ -155,7 +173,11 @@ Les contributions sont bienvenues : signalement de bug, idée, correction, nouve
 2. Créez une branche, ajoutez des tests, vérifiez que `./gradlew testDebugUnitTest` passe.
 3. Proposez une *pull request*.
 
+Le guide complet est dans [`CONTRIBUTING.md`](CONTRIBUTING.md), les règles de vie commune dans [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Une contribution fusionnée n'est pas une version publiée : les versions officielles sont signées par le propriétaire du projet.
+
 Une faille de sécurité ? Ne l'ouvrez pas en *issue* publique : voir [`SECURITY.md`](SECURITY.md) (signalement privé et dernier audit).
+
+Ce que Roadly envoie, et à qui : [`PRIVACY.md`](PRIVACY.md).
 
 Une règle guide le projet : **aucune fonction fictive**. Une fonction n'existe que si elle repose sur une source réelle ; sinon, l'interface le dit.
 
@@ -179,7 +201,11 @@ Les serveurs publics de Valhalla et Photon sont offerts en *fair-use* : pour une
 
 ## Licence
 
-Roadly est un logiciel libre distribué sous **[GNU General Public License v3.0](LICENSE)**. Vous pouvez l'utiliser, l'étudier, le modifier et le redistribuer ; toute version modifiée et distribuée doit rester libre sous la même licence.
+Le code de Roadly est distribué sous **[licence Apache 2.0](LICENSE)**. Vous pouvez l'utiliser, l'étudier, le modifier et le redistribuer, en conservant les mentions de [`NOTICE`](NOTICE).
+
+- Les bibliothèques livrées avec l'application et leurs licences : [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). L'une d'elles, la bibliothèque de Google pour la position, n'est pas libre.
+- Les données (OpenStreetMap, données publiques) gardent leur propre licence et leur attribution.
+- La licence ne couvre ni le nom « Roadly » ni son logo : une version modifiée et redistribuée change de nom, d'icône et d'identifiant d'application.
 
 <div align="center">
 <sub>Fait avec 💜 pour tous ceux qui aiment conduire sans être suivis.</sub>

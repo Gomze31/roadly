@@ -1,0 +1,158 @@
+# Signature des versions officielles
+
+Android n'installe une mise à jour que si elle est signée par la même clé que l'application déjà installée. La clé de
+signature **est** l'identité de Roadly : qui la détient peut publier une mise à jour que tous les téléphones accepteront.
+
+État au 2026-11-23 : **aucune clé de publication n'est choisie.** Le téléphone de développement porte une version signée
+avec la clé de debug du PC. Rien dans ce document n'a été exécuté ; c'est la procédure prête à l'être.
+
+## Ce qu'implique le choix de la clé (à lire avant de la créer)
+
+1. **Le choix est définitif.** Changer de clé plus tard oblige chaque utilisateur à désinstaller (perte des données
+   locales), ou impose une rotation de clé, qui ne fonctionne en place qu'à partir d'Android 13.
+2. **La perte de la clé est irréparable.** Sans elle, plus aucune mise à jour ne s'installe par-dessus les versions
+   publiées. Il n'existe pas de procédure de récupération hors Google Play.
+3. **Une fuite de la clé est grave.** Un tiers qui la détient, et qui parvient à faire télécharger son APK, met à jour
+   l'application des utilisateurs. La clé ne doit exister qu'à trois endroits : le coffre du propriétaire, une copie hors
+   ligne, les secrets GitHub.
+4. **Le téléphone actuel devra être réinstallé une fois** (voir [`MIGRATION-HONOR.md`](MIGRATION-HONOR.md)) : sa version
+   est signée par la clé de debug, que le pipeline refuse désormais.
+5. **La clé de debug ne peut pas servir de clé de publication** : ses mots de passe sont publics (`android`), son
+   certificat s'appelle `CN=Android Debug`, et le SDK peut la régénérer sans prévenir. Le workflow de publication refuse
+   tout APK signé avec elle.
+6. **Google Play** exigerait sa propre gestion de clé (Play App Signing). Une version Play et une version GitHub signées
+   différemment ne se mettent pas à jour l'une l'autre.
+
+Options comparées, avec leurs sources : [`ROADLY-1.0/DECISIONS.md`](ROADLY-1.0/DECISIONS.md), section 3.
+Recommandation : une clé dédiée (option B).
+
+## 1. Créer la clé (propriétaire seulement, hors ligne)
+
+Sur le PC du propriétaire, dans un dossier hors du dépôt :
+
+```bash
+keytool -genkeypair -v -keystore roadly-release.jks -alias roadly -keyalg RSA -keysize 4096 -validity 10000
+```
+
+- Deux mots de passe forts et différents (keystore, clé), générés par un gestionnaire de mots de passe.
+- Nom du certificat : au choix (`CN=Roadly`). Il est public et ne peut plus changer.
+
+Relever l'empreinte du certificat. Elle est **publique** et sert partout ensuite :
+
+```bash
+keytool -list -v -keystore roadly-release.jks -alias roadly
+```
+
+Ligne `SHA256:` du résultat. L'inscrire dans la section « Certificat officiel » ci-dessous.
+
+## 2. Sauvegarder
+
+| Copie | Où | Contenu |
+|---|---|---|
+| Principale | gestionnaire de mots de passe du propriétaire | fichier `.jks` en pièce jointe, les deux mots de passe, l'alias |
+| Hors ligne | support chiffré rangé ailleurs que le PC (clé USB chiffrée) | fichier `.jks` ; mots de passe sur papier, à part |
+
+- Jamais dans le dépôt (`.gitignore` exclut `*.jks`, `*.keystore`, `keystore.properties`, `local.properties`).
+- Jamais dans un dossier synchronisé en clair, ni dans un message.
+- Vérifier une fois par an que la copie hors ligne s'ouvre : `keytool -list -keystore <copie>`.
+- Conserver aussi `%USERPROFILE%\.android\debug.keystore` tant que le téléphone n'est pas migré : c'est la seule clé qui
+  peut encore mettre à jour sa version actuelle.
+
+## 3. Configurer GitHub
+
+Dépôt › Settings › **Environments** › créer l'environnement `release` :
+
+| Réglage | Valeur |
+|---|---|
+| Required reviewers | le propriétaire (lui seul) |
+| Deployment branches and tags | `main` et les tags `v*` |
+| Environment secrets | `ROADLY_KEYSTORE_BASE64`, `ROADLY_KEYSTORE_PASSWORD`, `ROADLY_KEY_ALIAS`, `ROADLY_KEY_PASSWORD` |
+
+Dépôt › Settings › Secrets and variables › Actions › **Variables** : `ROADLY_SIGNER_SHA256` = empreinte relevée à l'étape 1.
+
+Encodage du fichier de clé (PowerShell, résultat dans le presse-papiers) :
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("roadly-release.jks")) | Set-Clipboard
+```
+
+Supprimer ensuite les quatre secrets du même nom au niveau du dépôt s'ils existent : seuls ceux de l'environnement
+doivent rester, sinon la protection de l'environnement ne protège rien.
+
+Effet : la tâche `sign` de `.github/workflows/release.yml` attend l'approbation du propriétaire à chaque publication. Une
+*pull request* fusionnée ne devient jamais une version officielle sans cette approbation.
+
+## 4. Ce que vérifie le workflow
+
+La tâche `sign` échoue, et rien n'est publié, si :
+
+- un secret manque ;
+- l'APK signé ne passe pas `apksigner verify` pour Android 10 ;
+- il porte plus d'un signataire ;
+- le certificat est une clé de debug Android ;
+- la variable `ROADLY_SIGNER_SHA256` est absente ;
+- le certificat n'est pas celui de `ROADLY_SIGNER_SHA256`.
+
+Vérifié en local le 2026-11-23 : signature et vérification passent, et la clé de debug est refusée. Les autres refus et
+l'exécution sur GitHub n'ont pas été essayés.
+
+## 5. Épingler la clé dans l'application
+
+Une fois la clé choisie et une première version signée vérifiée, inscrire son empreinte dans
+`core/common/src/main/java/fr/roadly/core/common/update/AppUpdate.kt` :
+
+```kotlin
+val PINNED_SIGNERS: Set<String> = setOf("<empreinte SHA-256 en minuscules, sans deux-points>")
+```
+
+Effet : la mise à jour intégrée refuse tout APK signé par une autre clé, même si Android ne sait pas lire le certificat.
+
+**Ordre à respecter** : n'épingler que dans une version elle-même signée par la clé de publication, donc après la
+migration du téléphone. Une version épinglée installée sur un téléphone encore signé en debug refuserait toutes les mises à
+jour.
+
+## Certificat officiel
+
+| | |
+|---|---|
+| Identifiant de l'application | `fr.roadly` |
+| Empreinte SHA-256 du certificat | *à inscrire ici après l'étape 1* |
+
+Tant que cette ligne est vide, aucune version n'est « officielle » au sens de ce document.
+
+## Vérifier un APK téléchargé
+
+Chaque release publie l'APK, `update.json`, `SHA256SUMS.txt` et, dans ses notes, l'empreinte du fichier et celle du
+certificat.
+
+Intégrité du fichier :
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+Sous Windows :
+
+```powershell
+Get-FileHash roadly-1.0.0.apk -Algorithm SHA256
+```
+
+Identité du signataire (outil `apksigner` du SDK Android) :
+
+```bash
+apksigner verify --print-certs roadly-1.0.0.apk
+```
+
+La ligne `Signer #1 certificate SHA-256 digest` doit être l'empreinte du tableau ci-dessus. L'empreinte du fichier seule
+ne prouve rien sur l'auteur : elle vient de la même page que le fichier. C'est le certificat qui fait foi.
+
+## Perte, fuite, rotation
+
+| Situation | Conduite |
+|---|---|
+| Clé perdue, sauvegarde intacte | restaurer depuis la sauvegarde ; rien d'autre |
+| Clé et sauvegardes perdues | nouvelle clé, annonce publique, réinstallation par chaque utilisateur après export de ses données |
+| Clé peut-être copiée | retirer les secrets GitHub ; nouvelle clé ; publier une version à clé tournée (`apksigner rotate`), en place à partir d'Android 13, réinstallation en dessous ; annoncer l'ancienne empreinte comme révoquée |
+| Changement volontaire de clé | même mécanisme de rotation, préparé et essayé sur émulateur avant |
+
+La rotation n'a jamais été essayée sur ce projet.

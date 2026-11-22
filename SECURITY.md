@@ -4,6 +4,16 @@
 
 Merci de ne pas ouvrir d'*issue* publique pour une faille. Utilisez le signalement privé de GitHub : onglet **Security › Report a vulnerability** du dépôt. Décrivez la version de Roadly, les étapes pour reproduire et l'impact. Une réponse est donnée dès que possible ; la correction est publiée dans une release, puis la faille est décrite ici.
 
+## Versions officielles
+
+Une version officielle de Roadly vient des releases du dépôt officiel et porte le certificat de signature publié dans
+[`docs/SIGNATURE.md`](docs/SIGNATURE.md), qui donne aussi les commandes pour le vérifier. Une compilation faite par un tiers
+porte un autre certificat : Android refuse de l'installer par-dessus une version officielle.
+
+Aucun contributeur n'a accès à la clé de signature. Le code d'une *pull request* est vérifié par un workflow sans secret
+(`.github/workflows/ci.yml`) ; la signature se fait dans un environnement protégé, après l'approbation du propriétaire
+(`.github/workflows/release.yml`).
+
 ## Audit du 2026-11-16 (corrections publiées dans la version 0.1.206)
 
 Audit de l'ensemble de l'application : mise à jour intégrée, composants exposés aux autres applications, réseau, stockage local, service communautaire, chaîne de publication, dépendances et données envoyées. Les failles du service communautaire ont été reproduites sur PostgreSQL 16 avec le rôle `anon` de Supabase, avant et après correction.
