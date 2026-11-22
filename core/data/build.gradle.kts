@@ -19,7 +19,11 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildFeatures { buildConfig = true }
+    // Tests JVM de la base (migrations, DAO) sous Robolectric.
+    testOptions { unitTests { isIncludeAndroidResources = true } }
 }
+// Schéma Room exporté (un fichier JSON par version de la base, à conserver dans git) : référence pour les migrations.
+ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     api(project(":core:model"))
@@ -40,6 +44,7 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.robolectric)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.room.testing)

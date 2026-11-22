@@ -1,0 +1,731 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 7,
+    "identityHash": "d26d02f4a55eed30952578338216b832",
+    "entities": [
+      {
+        "tableName": "favorite_places",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `address` TEXT, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `kind` TEXT NOT NULL, `source` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `isHome` INTEGER NOT NULL, `isWork` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isHome",
+            "columnName": "isHome",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isWork",
+            "columnName": "isWork",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "recent_searches",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `placeId` TEXT NOT NULL, `placeJson` TEXT NOT NULL, `searchedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "rowId",
+            "columnName": "rowId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placeId",
+            "columnName": "placeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placeJson",
+            "columnName": "placeJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchedAt",
+            "columnName": "searchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "rowId"
+          ]
+        }
+      },
+      {
+        "tableName": "vehicle_profile",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `type` TEXT NOT NULL, `fuel` TEXT NOT NULL, `consumptionPer100` REAL NOT NULL, `fuelPriceEur` REAL, `updatedAt` INTEGER NOT NULL, `heightM` REAL, `widthM` REAL, `lengthM` REAL, `weightT` REAL, `axles` INTEGER, `critAir` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuel",
+            "columnName": "fuel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "consumptionPer100",
+            "columnName": "consumptionPer100",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuelPriceEur",
+            "columnName": "fuelPriceEur",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "heightM",
+            "columnName": "heightM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "widthM",
+            "columnName": "widthM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lengthM",
+            "columnName": "lengthM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "weightT",
+            "columnName": "weightT",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "axles",
+            "columnName": "axles",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "critAir",
+            "columnName": "critAir",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "saved_routes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `originJson` TEXT NOT NULL, `destinationJson` TEXT NOT NULL, `waypointsJson` TEXT NOT NULL, `costing` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originJson",
+            "columnName": "originJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationJson",
+            "columnName": "destinationJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "waypointsJson",
+            "columnName": "waypointsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "costing",
+            "columnName": "costing",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "vigilance_zones",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `direction` TEXT, `type` TEXT, `road` TEXT, `limitKmh` INTEGER, `updatedAt` INTEGER NOT NULL, `kind` TEXT, `bearingDeg` REAL, `bothWays` INTEGER, `sectionLengthM` REAL, `heavyLimitKmh` INTEGER, `commune` TEXT, `department` TEXT, `country` TEXT, `source` TEXT, `sourceVersion` TEXT, `enrichedFrom` TEXT, `commissionedAt` TEXT, `verifiedAt` INTEGER, `precisionM` REAL, `confidence` INTEGER, `status` TEXT, `directionHint` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "direction",
+            "columnName": "direction",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "road",
+            "columnName": "road",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "limitKmh",
+            "columnName": "limitKmh",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bearingDeg",
+            "columnName": "bearingDeg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bothWays",
+            "columnName": "bothWays",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sectionLengthM",
+            "columnName": "sectionLengthM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "heavyLimitKmh",
+            "columnName": "heavyLimitKmh",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "commune",
+            "columnName": "commune",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "department",
+            "columnName": "department",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "country",
+            "columnName": "country",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceVersion",
+            "columnName": "sourceVersion",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "enrichedFrom",
+            "columnName": "enrichedFrom",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "commissionedAt",
+            "columnName": "commissionedAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "verifiedAt",
+            "columnName": "verifiedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "precisionM",
+            "columnName": "precisionM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "directionHint",
+            "columnName": "directionHint",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "trips",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER NOT NULL, `destinationName` TEXT NOT NULL, `distanceM` REAL NOT NULL, `durationS` INTEGER NOT NULL, `maxSpeedKmh` REAL NOT NULL, `costEur` REAL, `arrived` INTEGER NOT NULL, `pointsCsv` TEXT NOT NULL, `travelMode` TEXT, `ascentM` REAL, `descentM` REAL, `energyModelWh` REAL, `batteryStartPct` INTEGER, `batteryEndPct` INTEGER, `scooterProfileId` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAt",
+            "columnName": "endedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationName",
+            "columnName": "destinationName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceM",
+            "columnName": "distanceM",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationS",
+            "columnName": "durationS",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxSpeedKmh",
+            "columnName": "maxSpeedKmh",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "costEur",
+            "columnName": "costEur",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "arrived",
+            "columnName": "arrived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pointsCsv",
+            "columnName": "pointsCsv",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "travelMode",
+            "columnName": "travelMode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ascentM",
+            "columnName": "ascentM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "descentM",
+            "columnName": "descentM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "energyModelWh",
+            "columnName": "energyModelWh",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "batteryStartPct",
+            "columnName": "batteryStartPct",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "batteryEndPct",
+            "columnName": "batteryEndPct",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "scooterProfileId",
+            "columnName": "scooterProfileId",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "scooter_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `brand` TEXT, `model` TEXT, `maxSpeedKmh` REAL NOT NULL, `cruiseSpeedKmh` REAL, `claimedRangeKm` REAL, `claimedRangeConditions` TEXT, `batteryWh` REAL, `batteryVoltage` REAL, `scooterWeightKg` REAL, `riderWeightKg` REAL, `maxLoadKg` REAL, `wheelSizeInch` REAL, `tireType` TEXT NOT NULL, `suspension` TEXT NOT NULL, `comfort` TEXT NOT NULL, `maxGradePct` REAL, `motorRatedW` REAL, `hasRegenerativeBraking` INTEGER, `specSource` TEXT, `updatedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brand",
+            "columnName": "brand",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "model",
+            "columnName": "model",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "maxSpeedKmh",
+            "columnName": "maxSpeedKmh",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cruiseSpeedKmh",
+            "columnName": "cruiseSpeedKmh",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "claimedRangeKm",
+            "columnName": "claimedRangeKm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "claimedRangeConditions",
+            "columnName": "claimedRangeConditions",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "batteryWh",
+            "columnName": "batteryWh",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "batteryVoltage",
+            "columnName": "batteryVoltage",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "scooterWeightKg",
+            "columnName": "scooterWeightKg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "riderWeightKg",
+            "columnName": "riderWeightKg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "maxLoadKg",
+            "columnName": "maxLoadKg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "wheelSizeInch",
+            "columnName": "wheelSizeInch",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "tireType",
+            "columnName": "tireType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "suspension",
+            "columnName": "suspension",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "comfort",
+            "columnName": "comfort",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxGradePct",
+            "columnName": "maxGradePct",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "motorRatedW",
+            "columnName": "motorRatedW",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "hasRegenerativeBraking",
+            "columnName": "hasRegenerativeBraking",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "specSource",
+            "columnName": "specSource",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "radar_versions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fetchedAt` INTEGER NOT NULL, `status` TEXT NOT NULL, `sourceUrl` TEXT, `sourceModified` TEXT, `total` INTEGER NOT NULL, `added` INTEGER NOT NULL, `removed` INTEGER NOT NULL, `moved` INTEGER NOT NULL, `limitChanged` INTEGER NOT NULL, `enriched` INTEGER NOT NULL, `withDirection` INTEGER NOT NULL, `highPrecision` INTEGER NOT NULL, `rejected` INTEGER NOT NULL, `message` TEXT, `enrichment` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceUrl",
+            "columnName": "sourceUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceModified",
+            "columnName": "sourceModified",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "total",
+            "columnName": "total",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "added",
+            "columnName": "added",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "removed",
+            "columnName": "removed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "moved",
+            "columnName": "moved",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "limitChanged",
+            "columnName": "limitChanged",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enriched",
+            "columnName": "enriched",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "withDirection",
+            "columnName": "withDirection",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "highPrecision",
+            "columnName": "highPrecision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rejected",
+            "columnName": "rejected",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "message",
+            "columnName": "message",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "enrichment",
+            "columnName": "enrichment",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd26d02f4a55eed30952578338216b832')"
+    ]
+  }
+}

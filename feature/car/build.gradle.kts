@@ -36,4 +36,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    // Session, service et écrans Android Auto sous Robolectric (TestCarContext, SessionController, ScreenController).
+    testImplementation(libs.car.app.testing)
+    testImplementation(libs.coroutines.test)
 }

@@ -15,7 +15,27 @@ val gitCommitCount: Int = runCatching {
     providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)
 val roadlyVersionCode = (findProperty("roadly.versionCode") as String?)?.toIntOrNull() ?: gitCommitCount
-val roadlyVersionName = (findProperty("roadly.versionName") as String?) ?: "0.1.$gitCommitCount"
+
+// Nom de version (REL-1). Tant que roadly.versionBase est vide (gradle.properties) : « 0.1.<code> », comme avant.
+// Dès qu'il vaut N : « 1.0.<code − N> » — le commit dont le code vaut N est la 1.0.0, les suivants 1.0.1, 1.0.2…
+// Le code de version, lui, ne change pas de formule : il reste strictement croissant, la mise à jour intégrée ne compare que lui.
+// Cette formule est la seule : le workflow de release la lit par la tâche printRoadlyVersion au lieu de la recopier.
+val roadlyVersionBase: Int? = (findProperty("roadly.versionBase") as String?)?.trim()?.takeIf { it.isNotEmpty() }?.let {
+    it.toIntOrNull() ?: throw GradleException("roadly.versionBase doit être un entier (reçu : « $it »).")
+}
+fun defaultVersionName(code: Int): String {
+    val base = roadlyVersionBase ?: return "0.1.$code"
+    if (code < base) throw GradleException("roadly.versionBase ($base) dépasse le code de version ($code) : le nom de version serait négatif.")
+    return "1.0.${code - base}"
+}
+val roadlyVersionName = (findProperty("roadly.versionName") as String?) ?: defaultVersionName(roadlyVersionCode)
+
+// Lue par .github/workflows/release.yml : une ligne « roadlyVersion code=<n> name=<x.y.z> ».
+tasks.register("printRoadlyVersion") {
+    val code = roadlyVersionCode
+    val name = roadlyVersionName
+    doLast { println("roadlyVersion code=$code name=$name") }
+}
 
 // Signature : variables d'environnement (CI) ou local.properties (poste). Les mises à jour depuis GitHub exigent
 // que l'APK publié et l'application installée soient signés avec la même clé (docs/UPDATES.md).

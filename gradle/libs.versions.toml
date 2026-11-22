@@ -62,6 +62,7 @@ okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver",
 maplibre = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
 car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
 car-app-projected = { group = "androidx.car.app", name = "app-projected", version.ref = "carApp" }
+car-app-testing = { group = "androidx.car.app", name = "app-testing", version.ref = "carApp" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playLocation" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
