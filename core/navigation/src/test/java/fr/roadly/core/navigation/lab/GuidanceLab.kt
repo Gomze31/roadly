@@ -87,6 +87,13 @@ internal object GuidanceLab {
         /** Le véhicule continue normalement, mais le GPS le place à [lateralM] m à gauche du tracé pendant [seconds] fix. */
         data class GpsJump(val lateralM: Double, val seconds: Int = 1, val accuracyM: Float = 5f) : Segment
 
+        /**
+         * Le véhicule continue normalement pendant [seconds] s, mais chaque fix passe par [tamper] avant d'être livré : vitesse, cap
+         * ou précision faussés, position périmée, fix supprimé (`null`). [tamper] reçoit le rang du fix, le fix exact, et une fonction
+         * qui rend le fix exact d'une position décalée de n mètres le long du tracé (négatif = en arrière : fix en retard).
+         */
+        class Tamper(val seconds: Int, val label: String, val tamper: (Int, LocationFix, (Double) -> LocationFix) -> LocationFix?) : Segment
+
         /** À l'arrêt pendant [seconds] s : fixes sans vitesse ni cap, dispersés de ±[jitterM] m. */
         data class Stop(val seconds: Int, val jitterM: Double = 0.0, val accuracyM: Float = 5f) : Segment
 
@@ -135,6 +142,9 @@ internal object GuidanceLab {
         fun gpsGap(seconds: Int) { segments += Segment.GpsGap(seconds) }
         fun gpsJump(lateralM: Double, seconds: Int = 1, accuracyM: Float = 5f) { segments += Segment.GpsJump(lateralM, seconds, accuracyM) }
         fun stop(seconds: Int, jitterM: Double = 0.0, accuracyM: Float = 5f) { segments += Segment.Stop(seconds, jitterM, accuracyM) }
+        fun tamper(seconds: Int, label: String, tamper: (Int, LocationFix, (Double) -> LocationFix) -> LocationFix?) {
+            segments += Segment.Tamper(seconds, label, tamper)
+        }
         fun leave(seconds: Int, speedKmh: Double, bearingDeg: Double? = null, turnDeg: Double = 0.0, chordM: Double = 60.0, untilServed: Boolean = false) {
             segments += Segment.Leave(seconds, speedKmh, bearingDeg, turnDeg, chordM, untilServed = untilServed)
         }
@@ -302,6 +312,13 @@ internal object GuidanceLab {
                     val a = along ?: error("${scenario.name} : gpsJump() hors tracé")
                     require(speedKmh > 0.0) { "gpsJump() à l'arrêt" }
                     step("saut GPS", vScript.drive(a, a, speedKmh, accuracyM = s.accuracyM, lateralM = s.lateralM).single())
+                }
+                is Segment.Tamper -> repeat(s.seconds) { i ->
+                    advance()
+                    val a = along ?: error("${scenario.name} : tamper() hors tracé")
+                    require(speedKmh > 0.0) { "tamper() à l'arrêt" }
+                    val exact = vScript.drive(a, a, speedKmh).single()
+                    step(s.label, s.tamper(i, exact) { offsetM -> (a + offsetM).coerceIn(0.0, vTracker.totalGeometryM).let { vScript.drive(it, it, speedKmh).single() } })
                 }
                 is Segment.Stop -> {
                     speedKmh = 0.0
