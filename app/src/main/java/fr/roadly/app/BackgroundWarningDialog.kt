@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import fr.roadly.core.navigation.BackgroundIssue
+import fr.roadly.core.navigation.BackgroundReadiness
 
 /**
  * Avertissement montré une fois par lancement de l'application, avant le premier guidage, quand un réglage du téléphone peut
@@ -40,6 +41,12 @@ fun BackgroundWarningDialog(issues: List<BackgroundIssue>, onStart: () -> Unit, 
                     Text(stringResource(issue.title()), style = MaterialTheme.typography.titleSmall)
                     Text(stringResource(issue.detail()), style = MaterialTheme.typography.bodyMedium)
                     TextButton(onClick = { openSettings(ctx, issue) }) { Text(stringResource(issue.action())) }
+                    // NAV-1 : accès direct à la liste système des exemptions de batterie, en plus de la fiche de l'application.
+                    if (issue == BackgroundIssue.BATTERY_OPTIMIZED) {
+                        TextButton(onClick = { openSettings(ctx, issue, BackgroundReadiness.batteryExemptionIntent()) }) {
+                            Text(stringResource(R.string.bg_open_battery_exemption))
+                        }
+                    }
                 }
             }
         },
@@ -66,9 +73,9 @@ private fun BackgroundIssue.action() = when (this) {
 }
 
 /** Écran système correspondant ; à défaut (constructeur qui ne le fournit pas), la fiche de l'application. */
-private fun openSettings(ctx: Context, issue: BackgroundIssue) {
+private fun openSettings(ctx: Context, issue: BackgroundIssue, preferred: Intent? = null) {
     val details = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", ctx.packageName, null))
-    val wanted = when (issue) {
+    val wanted = preferred ?: when (issue) {
         BackgroundIssue.NOTIFICATIONS_OFF -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
         BackgroundIssue.BATTERY_OPTIMIZED, BackgroundIssue.BACKGROUND_RESTRICTED -> details
     }

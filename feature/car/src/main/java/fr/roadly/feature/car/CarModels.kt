@@ -344,9 +344,14 @@ sealed interface CarNavigateTarget {
 object CarNavigateIntent {
     private val COORDS_WITH_LABEL = Regex("""^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*(?:\((.*)\))?\s*$""")
 
+    /** Nom de lieu ou recherche venant de l'hôte (assistant, autre application) : longueur bornée, comme sur le téléphone. */
+    const val MAX_TEXT = 200
+    /** Une URI plus longue n'est pas une adresse : ignorée (pas d'analyse d'une chaîne arbitraire), comme sur le téléphone. */
+    const val MAX_URI = 2_000
+
     /** `geo:lat,lon`, `geo:lat,lon?q=lat,lon(nom)`, `geo:0,0?q=adresse` ; null si l'URI n'est pas exploitable. */
     fun parse(uri: String?): CarNavigateTarget? {
-        if (uri == null || !uri.startsWith("geo:", ignoreCase = true)) return null
+        if (uri == null || uri.length > MAX_URI || !uri.startsWith("geo:", ignoreCase = true)) return null
         val body = uri.substring(4)
         val coordsPart = body.substringBefore('?').substringBefore(';')
         val params = body.substringAfter('?', "").split('&').mapNotNull { kv ->
@@ -357,9 +362,9 @@ object CarNavigateIntent {
         if (q != null) {
             COORDS_WITH_LABEL.find(q)?.let { m ->
                 val p = point(m.groupValues[1], m.groupValues[2]) ?: return@let
-                return CarNavigateTarget.Coordinates(p, m.groupValues[3].trim().takeIf { it.isNotEmpty() })
+                return CarNavigateTarget.Coordinates(p, m.groupValues[3].trim().takeIf { it.isNotEmpty() }?.take(MAX_TEXT))
             }
-            return CarNavigateTarget.Query(q)
+            return CarNavigateTarget.Query(q.take(MAX_TEXT))
         }
         val parts = coordsPart.split(',')
         if (parts.size < 2) return null

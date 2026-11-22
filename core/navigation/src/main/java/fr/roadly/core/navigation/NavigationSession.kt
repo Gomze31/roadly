@@ -83,7 +83,7 @@ class NavigationSession @Inject constructor(
     private val routing: RoutingProvider,
     private val speedLimits: SpeedLimitProvider,
     private val speech: SpeechService,
-    private val prefs: UserPreferencesRepository,
+    private val userPrefs: UserPreferencesRepository,
     private val serviceController: NavigationServiceController,
     private val clock: NavigationClock,
     private val vigilance: VigilanceZoneProvider,
@@ -106,6 +106,9 @@ class NavigationSession @Inject constructor(
     /** Ralentisseurs OSM du tracé (une requête Overpass par tracé, après son profil). */
     private val speedBumps: SpeedBumpProvider = NoSpeedBumpProvider,
 ) {
+    /** NAV-6 : réglages lus pendant la course ; une lecture en échec rend la dernière valeur connue au lieu d'arrêter le guidage. */
+    private val prefs = GuidancePreferences(userPrefs)
+
     private val _state = MutableStateFlow<NavigationState>(NavigationState.Idle)
     val state: StateFlow<NavigationState> = _state.asStateFlow()
 
@@ -134,7 +137,7 @@ class NavigationSession @Inject constructor(
      * Les valeurs courantes de [resumeOfferOpen] et de l'état sont relues à chaque émission (pas celles, peut-être en retard, du `combine`).
      * LIMITE : aucune limite d'âge.
      */
-    val resumableGuidance: Flow<LastGuidance?> = combine(prefs.lastGuidance, resumeOfferOpen, state) { last, _, _ ->
+    val resumableGuidance: Flow<LastGuidance?> = combine(userPrefs.lastGuidance.orLastKnown(null), resumeOfferOpen, state) { last, _, _ ->
         last.takeIf { resumeOfferOpen.value && _state.value is NavigationState.Idle }
     }.distinctUntilChanged()
 
@@ -274,7 +277,7 @@ class NavigationSession @Inject constructor(
     private fun persistLastGuidance(value: LastGuidance?) {
         scope.launch(confined) {
             try {
-                prefs.setLastGuidance(value)
+                userPrefs.setLastGuidance(value)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -341,8 +344,14 @@ class NavigationSession @Inject constructor(
         private val announcedCurves = HashSet<Double>()
         private var bumpsAlong: List<Double> = emptyList()
         private val announcedBumps = HashSet<Double>()
+        /** Heure de départ (heure du téléphone) : ne sert qu'à l'heure d'arrivée du premier état publié. */
         val startedAtMs = clock.nowMs()
-        private var lastFixAtMs = startedAtMs
+        /**
+         * NAV-2 : toutes les durées de la course (âge d'un fix, silence du GPS, intervalle entre recalculs, délais de la voix) sont
+         * mesurées sur l'horloge monotone ; l'heure du téléphone ne sert qu'aux heures affichées ou enregistrées.
+         */
+        private val startedAtElapsedMs = clock.elapsedMs()
+        private var lastFixAtMs = startedAtElapsedMs
         private var lastAdvanceAtMs = lastFixAtMs
         private var hadFix = false
         private var lastRerouteAtMs: Long? = null
@@ -400,18 +409,28 @@ class NavigationSession @Inject constructor(
         private var rainLowersLimit = GuidanceDefaults.RAIN_LOWERS_LIMIT
         private lateinit var runScope: CoroutineScope
 
-        /** Garde de dernier recours : une exception inattendue publie `Failed` et relâche le GPS (le service s'arrête alors). */
+        /**
+         * Garde de dernier recours : une exception inattendue publie `Failed` et relâche le GPS (le service s'arrête alors).
+         * La course est alors close comme par un arrêt : simulation et parole coupées, parcours déjà fait enregistré.
+         */
         suspend fun execute() {
             try {
                 body()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                synchronized(stateLock) {
-                    if (gen == generation) {
-                        _state.value = NavigationState.Failed(AppError.Unknown(e.message))
-                        location.setGuidanceActive(false)
+                val mine = synchronized(stateLock) {
+                    (gen == generation).also {
+                        if (it) {
+                            _state.value = NavigationState.Failed(AppError.Unknown(e.message))
+                            location.setGuidanceActive(false)
+                        }
                     }
+                }
+                if (mine) {
+                    simulation.stop()
+                    speech.stop(VoiceChannel.GUIDANCE)
+                    scope.launch { tripRecorder.end(arrived = false, nowMs = clock.nowMs()) }
                 }
             }
         }
@@ -435,15 +454,18 @@ class NavigationSession @Inject constructor(
             say(depart.verbalPre ?: depart.instruction)
             launch { watchdog() }
             // Le flux de localisation rejoue son dernier fix : un fix antérieur au démarrage de la course est périmé.
-            location.fixes.collect { if (it.timestampMs >= startedAtMs - GuidanceConstants.STALE_FIX_TOLERANCE_MS) onFix(it) }
+            location.fixes.collect { if (!it.isStale(startedAtElapsedMs, startedAtMs)) onFix(it) }
         }
 
         private suspend fun onFix(fix: LocationFix) {
-            val now = clock.nowMs()
+            // NAV-3 : un fix grossier (position « réseau » dans un tunnel) vaut une absence de fix : il ne déplace pas la position, ne
+            // met pas fin à la perte du GPS et n'interrompt pas l'extrapolation ; il n'entre pas non plus dans le trajet enregistré.
+            if (fix.accuracyM > GuidanceConstants.UNUSABLE_FIX_ACCURACY_M) return
+            val now = clock.elapsedMs()
             // Premier fix après une longue coupure (tunnel) : le suivi peut le voir hors itinéraire à tort, on attend le suivant.
             val afterLongGap = hadFix && now - lastFixAtMs > GuidanceConstants.REROUTE_MIN_INTERVAL_MS
             hadFix = true
-            tripRecorder.onFix(fix, now)
+            tripRecorder.onFix(fix, clock.nowMs())
             lastFixAtMs = now; gpsLostSaid = false
             lastAdvanceAtMs = now
             recent.addLast(fix)
@@ -468,7 +490,7 @@ class NavigationSession @Inject constructor(
             updateJunction(progress, now, gpsLost = false)
             updateSituation(progress, gpsLost = false)
             // Un recalcul a pu aboutir pendant une suspension : ne jamais associer l'ancienne progression au nouveau tracé.
-            if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = false))
+            if (progress.routeId == route.id) publish(guiding(progress, clock.nowMs(), gpsLost = false))
         }
 
         /** Virages (géométrie) et zones de vigilance (base locale) du tracé courant ; vide si l'option est désactivée. */
@@ -499,7 +521,7 @@ class NavigationSession @Inject constructor(
                 .filter { it.kind == HazardKind.VIGILANCE_ZONE && it.endAlongM - along > -RADAR_BEHIND_M && it.startAlongM - along < RADAR_AHEAD_M }
                 .map { ZoneObservation(zoneKey(it), it.startAlongM - along, it.endAlongM - along, it.speedLimitKmh, it.confidence ?: RadarQuality.MIN_VOICE) }
                 .toList()
-            val out = radarEngine.update(clock.nowMs(), observations, speedKmh, prefs.speedAlertToleranceKmh.first())
+            val out = radarEngine.update(clock.elapsedMs(), observations, speedKmh, prefs.speedAlertToleranceKmh.first())
             activeZone = out.active?.let { a -> hazards.firstOrNull { it.kind == HazardKind.VIGILANCE_ZONE && zoneKey(it) == a.key } }
             radarActive = out.active
             radarNext = out.next
@@ -607,7 +629,7 @@ class NavigationSession @Inject constructor(
         }
 
         private fun roundaboutFix(progress: RouteProgress) =
-            RoundaboutFix(accuracyM = progress.accuracyM, extrapolated = progress.extrapolated, speedKmh = speedKmh, nowMs = clock.nowMs())
+            RoundaboutFix(accuracyM = progress.accuracyM, extrapolated = progress.extrapolated, speedKmh = speedKmh, nowMs = clock.elapsedMs())
 
         private fun updateSituation(progress: RouteProgress, gpsLost: Boolean) {
             if (progress.routeId != route.id) return
@@ -736,7 +758,7 @@ class NavigationSession @Inject constructor(
             if (rerouting || progress.routeId != route.id) return
             // Hors du tracé : la position projetée n'est plus celle du véhicule, les manœuvres du tracé abandonné ne le concernent plus.
             if (strayed || tracker.isOffRoute) return
-            val now = clock.nowMs()
+            val now = clock.elapsedMs()
             if (progress.nextManeuverIndex != lastNextIndex) {
                 val previous = lastNextIndex
                 if (previous != null) indexChangedAtMs = now
@@ -934,7 +956,7 @@ class NavigationSession @Inject constructor(
                 // Échec : on continue sur l'ancien tracé ; l'intervalle avant le nouvel essai court depuis la fin de celui-ci.
                 if (fresh == null || freshTracker == null) {
                     rerouteFailures++
-                    lastRerouteAtMs = clock.nowMs()
+                    lastRerouteAtMs = clock.elapsedMs()
                     if (rerouteFailures == 1) say(SpokenPhrases.REROUTE_FAILED)
                 }
                 rerouting = false
@@ -946,7 +968,7 @@ class NavigationSession @Inject constructor(
         private suspend fun watchdog() {
             while (true) {
                 delay(GuidanceConstants.WATCHDOG_TICK_MS)
-                val now = clock.nowMs()
+                val now = clock.elapsedMs()
                 val silentMs = now - lastFixAtMs
                 if (silentMs <= GuidanceConstants.GPS_EXTRAPOLATE_AFTER_MS) continue
                 if (silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS && !gpsLostSaid) {
@@ -963,7 +985,7 @@ class NavigationSession @Inject constructor(
                 updateJunction(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS)
                 updateSituation(progress, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS)
                 // Un recalcul a pu aboutir pendant la suspension de l'annonce : on abandonne la progression périmée.
-                if (progress.routeId == route.id) publish(guiding(progress, now, gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
+                if (progress.routeId == route.id) publish(guiding(progress, clock.nowMs(), gpsLost = silentMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS))
             }
         }
 
@@ -1019,7 +1041,7 @@ class NavigationSession @Inject constructor(
             // Idem pour un recalcul abouti entre-temps : une annonce issue de l'ancien tracé serait fausse.
             if (routeId != null && routeId != route.id) return
             // Jamais la même phrase deux fois de suite à quelques secondes d'écart (deux paliers franchis d'un coup au départ).
-            val at = clock.nowMs()
+            val at = clock.elapsedMs()
             if (text == lastSpokenText && lastSpeechAtMs?.let { at - it < REPEAT_GUARD_MS } == true) return
             lastSpokenText = text
             lastSpeechAtMs = at
@@ -1036,6 +1058,7 @@ class NavigationSession @Inject constructor(
          */
         private val rerouteShown: Boolean get() = rerouting || rerouteFailures > 0
 
+        /** [now] : heure du téléphone (epoch ms), base de l'heure d'arrivée affichée. */
         fun guiding(progress: RouteProgress, now: Long, gpsLost: Boolean): NavigationState.Guiding {
             val ms = route.maneuvers
             val next = progress.nextManeuverIndex.coerceIn(0, ms.lastIndex)

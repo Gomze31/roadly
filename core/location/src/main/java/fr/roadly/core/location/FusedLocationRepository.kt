@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -35,14 +36,22 @@ import javax.inject.Singleton
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
-class FusedLocationRepository @Inject constructor(
-    @param:ApplicationContext private val ctx: Context,
-    @param:ApplicationScope private val scope: CoroutineScope,
+class FusedLocationRepository internal constructor(
+    private val ctx: Context,
+    private val scope: CoroutineScope,
     private val prefs: UserPreferencesRepository,
     /** Outil de test : positions rejouées à la place du GPS tant qu'un rejeu est actif. */
     private val replay: LocationReplay,
+    /** Client de localisation ; passé explicitement par les tests (TST-3), sinon celui des services Google Play. */
+    private val fused: FusedLocationProviderClient,
 ) : LocationRepository {
-    private val fused = LocationServices.getFusedLocationProviderClient(ctx)
+    @Inject constructor(
+        @ApplicationContext ctx: Context,
+        @ApplicationScope scope: CoroutineScope,
+        prefs: UserPreferencesRepository,
+        replay: LocationReplay,
+    ) : this(ctx, scope, prefs, replay, LocationServices.getFusedLocationProviderClient(ctx))
+
     private val mode = MutableStateFlow(LocationMode.OFF)
     private val guidance = MutableStateFlow(false)
     private val car = MutableStateFlow(false)
@@ -115,6 +124,8 @@ class FusedLocationRepository @Inject constructor(
         speedMps = if (hasSpeed()) speed else null,
         accuracyM = if (hasAccuracy()) accuracy else 50f,
         timestampMs = time,
+        // NAV-2 : instant monotone du fix, seule base comparable à `SystemClock.elapsedRealtime()` (0 = non renseigné par la source).
+        elapsedRealtimeMs = (elapsedRealtimeNanos / 1_000_000L).takeIf { it > 0L },
     )
 }
 

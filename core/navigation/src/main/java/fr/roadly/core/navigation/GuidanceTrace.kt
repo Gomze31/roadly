@@ -1,5 +1,7 @@
 package fr.roadly.core.navigation
 
+import fr.roadly.core.common.AppError
+
 /**
  * Journal du guidage pour la validation sur téléphone (docs/VALIDATION-TELEPHONE.md) : une ligne par changement utile — manœuvre
  * visée, situation, décompte du rond-point, recalcul, GPS. Lu avec `adb logcat -s RoadlyGuidage`, il permet de comparer ce que
@@ -49,7 +51,24 @@ object GuidanceTrace {
             }
             NavigationState.Idle -> "arrêt"
             is NavigationState.Arrived -> "arrivée"
-            is NavigationState.Failed -> "échec ${current.error}"
+            is NavigationState.Failed -> "échec ${errorLabel(current.error)}"
         }
+    }
+
+    /**
+     * Erreur telle qu'elle est écrite au journal (SEC-9) : sa classe et, s'il y en a un, le code HTTP. Jamais le contenu — corps de
+     * réponse d'un serveur (jusqu'à 300 caractères dans [AppError.Http]), détail d'analyse ou message d'exception — : le journal
+     * d'une version publiée est lisible par d'autres outils du téléphone.
+     */
+    internal fun errorLabel(error: AppError): String = when (error) {
+        is AppError.Http -> "Http ${error.code}"
+        is AppError.ProviderUnavailable -> error.httpCode?.let { "ProviderUnavailable $it" } ?: "ProviderUnavailable"
+        AppError.Network -> "Network"
+        AppError.Timeout -> "Timeout"
+        AppError.RateLimited -> "RateLimited"
+        AppError.PermissionDenied -> "PermissionDenied"
+        AppError.NoResult -> "NoResult"
+        is AppError.Parse -> "Parse"
+        is AppError.Unknown -> "Unknown"
     }
 }

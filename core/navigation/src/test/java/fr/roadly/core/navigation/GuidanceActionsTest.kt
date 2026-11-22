@@ -160,6 +160,34 @@ class GuidanceActionsTest {
         assertTrue(car.startTo(place("dest", tracker.pointAt(1_000.0))) is Outcome.Success)
     }
 
+    /** Budget de requêtes : avant ce changement, le démarrage direct demandait les trois variantes (3 `/route`) pour n'en garder qu'une. */
+    @Test fun `direct start asks for the fastest route only - one route request instead of three`() = runTest {
+        val (session, actions) = fixture()
+        location.emit(LocationFix(tracker.pointAt(0.0), 90f, 0f, 5f, 0L)); runCurrent()
+        requests.clear()
+        val r = actions.startTo(place("dest", tracker.pointAt(1_000.0))); runCurrent()
+        assertEquals("requêtes /route du démarrage direct (3 avant)", 1, requests.size)
+        assertEquals(fr.roadly.core.model.RouteCosting.FASTEST, requests.single().costing)
+        val best = (r as Outcome.Success).value
+        assertEquals("Le plus rapide", best.label)
+        location.emit(LocationFix(tracker.pointAt(10.0), 90f, 10f, 5f, 0L)); runCurrent()
+        assertEquals(best.route.id, (session.state.value as NavigationState.Guiding).route.id)
+        // L'écran de choix en cours de guidage garde ses trois variantes.
+        requests.clear()
+        actions.alternativesFromHere()
+        assertEquals(3, requests.size)
+    }
+
+    @Test fun `direct start with tolls avoided - one route request instead of two, preferences kept`() = runTest {
+        val (_, actions) = fixture()
+        prefs.setRoutePreferences(RoutePreferences(avoidTolls = true))
+        location.emit(LocationFix(tracker.pointAt(0.0), 90f, 0f, 5f, 0L)); runCurrent()
+        requests.clear()
+        assertTrue(actions.startTo(place("dest", tracker.pointAt(1_000.0))) is Outcome.Success)
+        assertEquals(1, requests.size)
+        assertTrue(requests.single().preferences.avoidTolls)
+    }
+
     @Test fun `without guidance, route changes fail with NoResult`() = runTest {
         val (_, actions) = fixture()
         assertEquals(Outcome.Failure(AppError.NoResult), actions.recalculate())

@@ -60,12 +60,12 @@ class NavigationSessionTest {
         override suspend fun speedLimitKmh(recent: List<LocationFix>): Outcome<Int?> = Outcome.Success(limit)
     }
 
-    private fun TestScope.session(preferences: UserPreferencesRepository = prefs): NavigationSession {
+    private fun TestScope.session(preferences: UserPreferencesRepository = prefs, voice: SpeechService = speech, recorder: TripRecorder = NoopTripRecorder()): NavigationSession {
         val d = StandardTestDispatcher(testScheduler)
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
         }
-        return NavigationSession(location, routing, speedLimits, speech, preferences, service, { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
+        return NavigationSession(location, routing, speedLimits, voice, preferences, service, { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), recorder, dispatchers, backgroundScope)
     }
 
     /** Un écart latéral simulé s'accompagne d'un cap qui s'éloigne du tracé (20°, soit 70° d'écart, B6) ; sinon cap du tracé (90°). */
@@ -337,14 +337,63 @@ class NavigationSessionTest {
         assertEquals(2, service.starts)
     }
 
-    @Test fun `unexpected failure publishes Failed and releases GPS`() = runTest {
+    @Test fun `unreadable preferences do not end guidance (NAV-6)`() = runTest {
+        val unreadable = IOException("datastore illisible")
         val broken = object : UserPreferencesRepository by prefs {
-            override val voiceEnabled: Flow<Boolean> = flow { throw IOException("datastore illisible") }
+            override val voiceEnabled: Flow<Boolean> = flow { throw unreadable }
+            override val voiceVolume: Flow<Int> = flow { throw unreadable }
+            override val voiceBrief: Flow<Boolean> = flow { throw unreadable }
+            override val vigilanceEnabled: Flow<Boolean> = flow { throw unreadable }
+            override val rainLowersLimit: Flow<Boolean> = flow { throw unreadable }
+            override val junction3dEnabled: Flow<Boolean> = flow { throw unreadable }
+            override val speedAlertToleranceKmh: Flow<Int> = flow { throw unreadable }
+            override val speedAlertSound: Flow<Boolean> = flow { throw unreadable }
         }
+        limit = 30 // 36 km/h : dépassement, donc lecture de la tolérance et du réglage du bip, tous deux illisibles
         val s = session(broken)
         s.start(option, RoutePreferences()); runCurrent()
-        assertEquals(NavigationState.Failed(AppError.Unknown("datastore illisible")), s.state.value)
+        assertTrue("le guidage continue", s.state.value is NavigationState.Guiding)
+        val turnAt = tracker.maneuverStartM[1]
+        location.emit(fixAt(turnAt - 70.0)); runCurrent()
+        location.emit(fixAt(turnAt - 62.0)); runCurrent()
+        assertTrue(s.state.value is NavigationState.Guiding)
+        assertTrue(location.guidanceActive)
+        // Réglages par défaut : voix active, volume 100.
+        assertEquals(100, speech.volume)
+        assertEquals("Conduisez vers l'est.", speech.spoken.first())
+        assertTrue("l'annonce du virage est dite", speech.spoken.any { it.contains("tournez à droite") })
+    }
+
+    @Test fun `a setting read before the failure keeps its value`() = runTest {
+        var fail = false
+        val flaky = object : UserPreferencesRepository by prefs {
+            override val voiceEnabled: Flow<Boolean> = flow { if (fail) throw IOException("datastore illisible") else emit(false) }
+        }
+        val s = session(flaky)
+        s.start(option, RoutePreferences()); runCurrent()
+        fail = true
+        val turnAt = tracker.maneuverStartM[1]
+        location.emit(fixAt(turnAt - 70.0)); runCurrent()
+        location.emit(fixAt(turnAt - 62.0)); runCurrent()
+        assertTrue(s.state.value is NavigationState.Guiding)
+        assertEquals("la voix coupée par l'utilisateur le reste", emptyList<String>(), speech.spoken)
+    }
+
+    @Test fun `unexpected failure publishes Failed, releases GPS and closes the trip`() = runTest {
+        var ended = 0
+        val recorder = object : TripRecorder {
+            override fun begin(destinationName: String, startedAtMs: Long) = Unit
+            override fun onFix(fix: LocationFix, nowMs: Long) = Unit
+            override suspend fun end(arrived: Boolean, nowMs: Long) { ended++ }
+        }
+        val brokenVoice = object : SpeechService by speech {
+            override fun setVolume(percent: Int) = throw IllegalStateException("moteur vocal")
+        }
+        val s = session(voice = brokenVoice, recorder = recorder)
+        s.start(option, RoutePreferences()); runCurrent()
+        assertEquals(NavigationState.Failed(AppError.Unknown("moteur vocal")), s.state.value)
         assertFalse(location.guidanceActive)
+        assertEquals("le parcours déjà fait est enregistré", 1, ended)
     }
 
     @Test fun `disabled voice also silences the over-speed beep`() = runTest {

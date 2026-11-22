@@ -199,7 +199,7 @@ class FreeDriveSession @Inject constructor(
     private val roads: RoadSnapshotProvider,
     private val vigilance: VigilanceRepository,
     private val speech: SpeechService,
-    private val prefs: UserPreferencesRepository,
+    userPrefs: UserPreferencesRepository,
     private val serviceController: NavigationServiceController,
     private val clock: NavigationClock,
     private val tripRecorder: TripRecorder,
@@ -208,6 +208,9 @@ class FreeDriveSession @Inject constructor(
     @param:ApplicationScope private val scope: CoroutineScope,
     private val radarSettings: RadarSettingsRepository = DefaultRadarSettingsRepository,
 ) {
+    /** NAV-6 : réglages lus en roulant ; une lecture en échec rend la dernière valeur connue au lieu d'arrêter la session. */
+    private val prefs = GuidancePreferences(userPrefs)
+
     private val _state = MutableStateFlow<FreeDriveState>(FreeDriveState.Idle)
     val state: StateFlow<FreeDriveState> = _state.asStateFlow()
 
@@ -225,12 +228,37 @@ class FreeDriveSession @Inject constructor(
             return false
         }
         val now = clock.nowMs()
+        // NAV-2 : l'âge des fixes et le silence du GPS se mesurent sur l'horloge monotone, pas sur l'heure du téléphone.
+        val elapsedNow = clock.elapsedMs()
         val gen = synchronized(lock) { (++generation).also { _state.value = FreeDriveState.Active(now) } }
         tripRecorder.begin(TRIP_LABEL, now)
         location.setGuidanceActive(true)
         serviceController.start()
-        job = scope.launch(confined) { Drive(gen, now).run() }
+        job = scope.launch(confined) {
+            try {
+                Drive(gen, now, elapsedNow).run()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                fail(gen, e)
+            }
+        }
         return true
+    }
+
+    /**
+     * Garde de dernier recours (NAV-6) : sans elle, une exception inattendue remontait au processus et le faisait tomber.
+     * La session passe en `Failed` et se clôt comme par un arrêt : GPS relâché, parole coupée, trajet enregistré.
+     */
+    private fun fail(gen: Int, e: Exception) {
+        val mine = synchronized(lock) {
+            (gen == generation).also { if (it) { generation++; _state.value = FreeDriveState.Failed(AppError.Unknown(e.message)) } }
+        }
+        if (!mine) return
+        location.setGuidanceActive(false)
+        speech.stop(VoiceChannel.GUIDANCE)
+        speech.release()
+        scope.launch { tripRecorder.end(arrived = false, nowMs = clock.nowMs()) }
     }
 
     /** Arrête la conduite libre : GPS relâché, trajet enregistré s'il est assez long. */
@@ -256,10 +284,11 @@ class FreeDriveSession @Inject constructor(
         return wasActive
     }
 
-    private inner class Drive(val gen: Int, val startedAtMs: Long) {
+    /** [startedAtMs] : heure du téléphone (durée affichée, trajet) ; [startedAtElapsedMs] : horloge monotone (toutes les durées internes). */
+    private inner class Drive(val gen: Int, val startedAtMs: Long, val startedAtElapsedMs: Long) {
         private var current = FreeDriveState.Active(startedAtMs)
         private val recent = ArrayDeque<LocationFix>()
-        private var lastFixAtMs = startedAtMs
+        private var lastFixAtMs = startedAtElapsedMs
         private var policy = RoadQueryPolicy.PUBLIC
         private var lastQueryAtMs: Long? = null
         private var lastQueryPoint: GeoPoint? = null
@@ -280,11 +309,13 @@ class FreeDriveSession @Inject constructor(
             speech.setVolume(prefs.voiceVolume.first())
             launch { navigation.state.collect { if (it is NavigationState.Guiding) endForGuidance() } }
             launch { watchdog() }
-            location.fixes.collect { if (it.timestampMs >= startedAtMs - GuidanceConstants.STALE_FIX_TOLERANCE_MS) onFix(it) }
+            location.fixes.collect { if (!it.isStale(startedAtElapsedMs, startedAtMs)) onFix(it) }
         }
 
         private suspend fun onFix(fix: LocationFix) {
-            val now = clock.nowMs()
+            // NAV-3 : position grossière (réseau, pas de satellites) : ni position, ni distance, ni fin de la perte du GPS.
+            if (fix.accuracyM > GuidanceConstants.UNUSABLE_FIX_ACCURACY_M) return
+            val now = clock.elapsedMs()
             lastFixAtMs = now
             val previous = recent.lastOrNull()
             val step = if (previous != null && fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M) previous.point.distanceTo(fix.point) else 0.0
@@ -293,7 +324,7 @@ class FreeDriveSession @Inject constructor(
                 recent.addLast(fix)
                 while (recent.size > GuidanceConstants.RECENT_FIXES) recent.removeFirst()
             }
-            tripRecorder.onFix(fix, now)
+            tripRecorder.onFix(fix, clock.nowMs())
             val turned = FreeDriveRules.turned(headingAtQuery, fix)
             current = current.copy(
                 speedKmh = fix.speedMps?.let { it * 3.6 },
@@ -400,7 +431,7 @@ class FreeDriveSession @Inject constructor(
         private suspend fun watchdog() {
             while (true) {
                 delay(GuidanceConstants.WATCHDOG_TICK_MS)
-                val lost = clock.nowMs() - lastFixAtMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS
+                val lost = clock.elapsedMs() - lastFixAtMs > GuidanceConstants.GPS_LOST_BADGE_AFTER_MS
                 if (lost != current.gpsLost) { current = current.copy(gpsLost = lost); publish() }
             }
         }

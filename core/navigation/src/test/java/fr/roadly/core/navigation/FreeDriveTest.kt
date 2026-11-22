@@ -4,6 +4,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.db.VigilanceZoneEntity
+import fr.roadly.core.data.repository.UserPreferencesRepository
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.data.vigilance.VigilanceRepository
 import fr.roadly.core.location.testing.FakeLocationRepository
@@ -20,7 +21,9 @@ import fr.roadly.core.routing.RouteOption
 import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -33,6 +36,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 /** 1.0 : conduite libre — règles pures, décodage, et session (limitation espacée, zones, exclusivité avec le guidage). */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -91,7 +95,7 @@ class FreeDriveTest {
         override suspend fun refreshIfStale(nowMs: Long): Outcome<Int>? = null
     }
 
-    private fun TestScope.sessions(): Pair<FreeDriveSession, NavigationSession> {
+    private fun TestScope.sessions(preferences: UserPreferencesRepository = prefs, voice: SpeechService = speech): Pair<FreeDriveSession, NavigationSession> {
         val d = StandardTestDispatcher(testScheduler)
         val dispatchers = object : DispatcherProvider {
             override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
@@ -101,8 +105,36 @@ class FreeDriveTest {
             override suspend fun route(request: RouteRequest): Outcome<List<Route>> = Outcome.Failure(AppError.NoResult)
         }
         val nav = NavigationSession(location, routing, NoopSpeedLimitProvider(), speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers, backgroundScope)
-        val free = FreeDriveSession(location, roads, vigilance, speech, prefs, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopTripRecorder(), nav, dispatchers, backgroundScope)
+        val free = FreeDriveSession(location, roads, vigilance, voice, preferences, FakeNavigationServiceController(), { testScheduler.currentTime }, NoopTripRecorder(), nav, dispatchers, backgroundScope)
         return free to nav
+    }
+
+    @Test fun `unreadable preferences do not end free drive (NAV-6)`() = runTest {
+        val unreadable = IOException("datastore illisible")
+        val broken = object : UserPreferencesRepository by prefs {
+            override val voiceEnabled: Flow<Boolean> = flow { throw unreadable }
+            override val voiceVolume: Flow<Int> = flow { throw unreadable }
+            override val vigilanceEnabled: Flow<Boolean> = flow { throw unreadable }
+            override val speedAlertToleranceKmh: Flow<Int> = flow { throw unreadable }
+            override val speedAlertSound: Flow<Boolean> = flow { throw unreadable }
+        }
+        val (free, _) = sessions(broken)
+        assertTrue(free.start()); runCurrent()
+        location.emit(fixEast(0.0)); runCurrent()
+        location.emit(fixEast(15.0)); runCurrent()
+        assertEquals(80, active(free).speedLimitKmh)
+        assertTrue(location.guidanceActive)
+        assertEquals(100, speech.volume)
+    }
+
+    @Test fun `an unexpected error ends free drive in Failed and releases the gps instead of crashing`() = runTest {
+        val brokenVoice = object : SpeechService by speech {
+            override fun setVolume(percent: Int) = throw IllegalStateException("moteur vocal")
+        }
+        val (free, _) = sessions(voice = brokenVoice)
+        assertTrue(free.start()); runCurrent()
+        assertEquals(FreeDriveState.Failed(AppError.Unknown("moteur vocal")), free.state.value)
+        assertFalse(location.guidanceActive)
     }
 
     /** Fix [m] mètres à l'est du point de départ, cap est, 15 m/s, horodaté à l'instant virtuel. */
@@ -127,6 +159,18 @@ class FreeDriveTest {
         free.stop(); runCurrent()
         assertEquals(FreeDriveState.Idle, free.state.value)
         assertFalse(location.guidanceActive)
+    }
+
+    @Test fun `a coarse fix changes nothing in free drive - no distance, no road query (NAV-3)`() = runTest {
+        val (free, _) = sessions()
+        assertTrue(free.start()); runCurrent()
+        location.emit(fixEast(0.0)); runCurrent()
+        location.emit(fixEast(15.0)); runCurrent()
+        val before = active(free).distanceM
+        // Position « réseau » à 800 m près, 5 km plus loin : ce n'est pas un déplacement.
+        location.emit(fixEast(5_000.0).copy(accuracyM = 800f)); runCurrent()
+        assertEquals(before, active(free).distanceM, 0.001)
+        assertEquals("aucune requête de route sur une position grossière", 1, snapshotCalls)
     }
 
     @Test fun `a vigilance zone ahead is announced once`() = runTest {

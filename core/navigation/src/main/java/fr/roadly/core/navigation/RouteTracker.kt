@@ -72,9 +72,14 @@ class RouteTracker(private val route: Route) {
     private var backtrackFixes = 0
     /** Précision du dernier fix réel : marge de passage reprise par l'extrapolation. */
     private var lastAccuracyM = 0f
-    /** Horodatage et vitesse du dernier fix réel : bornent l'avance plausible du fix suivant (voir [maxForwardAlong]). */
+    /** Instant (horloge monotone si le fix la porte, NAV-2) et vitesse du dernier fix réel : bornent l'avance plausible du fix suivant (voir [maxForwardAlong]). */
     private var lastFixTimeMs = 0L
     private var lastSpeedMps = 0f
+    /** NAV-4 : position du dernier fix réel et nombre de fixes médiocres consécutifs cohérents entre eux (voir [degradedStreak]). */
+    private var lastFixPoint: GeoPoint? = null
+    private var degradedFixes = 0
+    /** NAV-4 : fixes médiocres consécutifs dans la zone d'arrivée, véhicule au pas. */
+    private var degradedArrivalFixes = 0
 
     var isOffRoute: Boolean = false
         private set
@@ -88,6 +93,9 @@ class RouteTracker(private val route: Route) {
     fun update(fix: LocationFix): RouteProgress {
         val prev = lastProgress
         val lastAlong = prev?.distanceAlongM
+        val trusted = fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M
+        // NAV-4 : précision médiocre mais durable et cohérente — les décisions reprennent, avec des marges élargies.
+        val degraded = degradedStreak(fix) >= GuidanceConstants.DEGRADED_MIN_FIXES
         val gpsHeading = fix.bearingDeg?.takeIf { (fix.speedMps ?: 0f) >= GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS }
         val maxAlong = if (lastAlong == null) Double.MAX_VALUE else maxForwardAlong(lastAlong, fix)
         var best = if (lastAlong == null) {
@@ -111,7 +119,10 @@ class RouteTracker(private val route: Route) {
         }
         // B6 : un fix imprécis (> 30 m) ne change aucune décision « hors itinéraire » ; une position en attente de confirmation non plus
         // (sortie d'un long tunnel : le premier fix est loin du dernier point connu, mais sur le tracé).
-        if (fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M && !held) updateOffRoute(best, gpsHeading)
+        // NAV-4 : en règle dégradée, l'écart est compté diminué de la précision du fix.
+        if (!held) {
+            if (trusted) updateOffRoute(best, gpsHeading) else if (degraded) updateOffRoute(best, gpsHeading, marginM = fix.accuracyM.toDouble())
+        }
         val moving = (fix.speedMps ?: 0f) >= 1f
         val heading = fix.bearingDeg?.takeIf { moving } ?: bearing(pts[best.segment], pts[best.segment + 1]).toFloat()
         lastAccuracyM = fix.accuracyM
@@ -122,10 +133,15 @@ class RouteTracker(private val route: Route) {
             p.offRouteM <= GuidanceConstants.OFF_ROUTE_SOFT_M
         // Un fix imprécis (> 30 m) posé près de la destination ne prouve pas qu'on y est : avec 120 m de précision, l'arrivée était
         // déclarée 290 m trop tôt et le guidage s'arrêtait. L'arrivée attend un fix exploitable, comme la décision « hors itinéraire ».
-        val trusted = fix.accuracyM <= GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M
-        if (!hasArrived && trusted && onLast && (nearDestination || alongTheEnd)) hasArrived = true
+        val inArrivalZone = onLast && (nearDestination || alongTheEnd)
+        // NAV-4 : en règle dégradée, l'arrivée demande plusieurs fixes consécutifs dans la zone, véhicule au pas ou à l'arrêt (vitesse
+        // connue) : un fix médiocre posé près de la destination pendant que le véhicule roule encore ne la prouve pas.
+        val slow = fix.speedMps?.let { it < GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS } == true
+        degradedArrivalFixes = if (degraded && inArrivalZone && slow) degradedArrivalFixes + 1 else 0
+        if (!hasArrived && inArrivalZone && (trusted || degradedArrivalFixes >= GuidanceConstants.DEGRADED_ARRIVAL_FIXES)) hasArrived = true
         lastRealAlong = p.distanceAlongM
-        lastFixTimeMs = fix.timestampMs
+        lastFixPoint = fix.point
+        lastFixTimeMs = fix.durationBaseMs
         lastSpeedMps = fix.speedMps ?: 0f
         lastProgress = p
         return p
@@ -142,9 +158,33 @@ class RouteTracker(private val route: Route) {
     private fun maxForwardAlong(lastAlong: Double, fix: LocationFix): Double {
         val speed = fix.speedMps ?: return Double.MAX_VALUE
         if (max(speed, lastSpeedMps) >= GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS) return Double.MAX_VALUE
-        val dtS = ((fix.timestampMs - lastFixTimeMs) / 1000.0).coerceAtLeast(1.0)
+        val dtS = ((fix.durationBaseMs - lastFixTimeMs) / 1000.0).coerceAtLeast(1.0)
         val v = max(max(speed, lastSpeedMps), GuidanceConstants.HEADING_FILTER_MIN_SPEED_MPS).toDouble()
         return lastAlong + v * dtS * FORWARD_SPEED_FACTOR + fix.accuracyM + FORWARD_MARGIN_M
+    }
+
+    /**
+     * NAV-4 : nombre de fixes médiocres consécutifs, [fix] compris — précision entre [GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M] et
+     * [GuidanceConstants.UNUSABLE_FIX_ACCURACY_M] — et cohérents entre eux : chacun est à une distance du précédent que le véhicule a
+     * pu parcourir (même borne de vitesse que [maxForwardAlong]), à la moins bonne des deux précisions près. Un fix précis ou un
+     * saut remet le compte à zéro (le fix du saut recommence une série) ; un fix inutilisable reçu ici aussi. En guidage, les
+     * fix inutilisables sont écartés par la session avant d'arriver au suivi (NAV-3) : ils n'interrompent donc pas la série, qui
+     * continue avec le fix médiocre suivant s'il reste cohérent avec le précédent. À appeler avant la mise à jour de l'état du
+     * dernier fix.
+     */
+    private fun degradedStreak(fix: LocationFix): Int {
+        val moderate = fix.accuracyM > GuidanceConstants.OFF_ROUTE_MAX_ACCURACY_M && fix.accuracyM <= GuidanceConstants.UNUSABLE_FIX_ACCURACY_M
+        val previous = lastFixPoint
+        degradedFixes = when {
+            !moderate -> 0
+            degradedFixes == 0 || previous == null -> 1
+            else -> {
+                val dtS = ((fix.durationBaseMs - lastFixTimeMs) / 1000.0).coerceAtLeast(1.0)
+                val reachM = max(fix.speedMps ?: 0f, lastSpeedMps) * dtS * FORWARD_SPEED_FACTOR + max(fix.accuracyM, lastAccuracyM)
+                if (fix.point.distanceTo(previous) <= reachM) degradedFixes + 1 else 1
+            }
+        }
+        return degradedFixes
     }
 
     /**
@@ -258,18 +298,23 @@ class RouteTracker(private val route: Route) {
     /**
      * B6 : hors itinéraire si > 100 m une fois, ou > 40 m sur 5 fixes consécutifs **et** cap écarté de plus de 50° sur 3 fixes
      * consécutifs : une route parallèle suivie dans le même sens n'est pas une sortie d'itinéraire.
+     *
+     * NAV-4, règle dégradée : [marginM] (la précision du fix) est retranchée de l'écart avant de le comparer aux seuils. Le retour sur
+     * le tracé reste jugé sur l'écart mesuré ; entre les deux (écart au-delà du seuil seulement à la précision près), rien n'est
+     * prouvé et la décision précédente est gardée, compteur inchangé.
      */
-    private fun updateOffRoute(best: Hit, gpsHeading: Float?) {
+    private fun updateOffRoute(best: Hit, gpsHeading: Float?, marginM: Double = 0.0) {
         val deviates = gpsHeading != null && headingDiffDeg(best.segment, gpsHeading) > GuidanceConstants.OFF_ROUTE_HEADING_DEG
         consecutiveHeadingOff = if (deviates) consecutiveHeadingOff + 1 else 0
+        val provenOffM = best.offM - marginM
         when {
-            best.offM > GuidanceConstants.OFF_ROUTE_HARD_M -> { consecutiveOff++; isOffRoute = true }
-            best.offM > GuidanceConstants.OFF_ROUTE_SOFT_M -> {
+            provenOffM > GuidanceConstants.OFF_ROUTE_HARD_M -> { consecutiveOff++; isOffRoute = true }
+            provenOffM > GuidanceConstants.OFF_ROUTE_SOFT_M -> {
                 consecutiveOff++
                 isOffRoute = consecutiveOff >= GuidanceConstants.OFF_ROUTE_SOFT_FIXES &&
                     consecutiveHeadingOff >= GuidanceConstants.OFF_ROUTE_HEADING_FIXES
             }
-            else -> { consecutiveOff = 0; isOffRoute = false }
+            best.offM <= GuidanceConstants.OFF_ROUTE_SOFT_M -> { consecutiveOff = 0; isOffRoute = false }
         }
     }
 

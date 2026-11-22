@@ -9,7 +9,6 @@ import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.Route
-import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
@@ -105,9 +104,10 @@ class GuidanceActions @Inject constructor(
         val origin = guiding?.progress?.snapped ?: location.lastKnown?.point ?: return Outcome.Failure(AppError.PermissionDenied)
         val p = prefs.routePreferences.first()
         val v = vehicles.profile.first()
-        return when (val r = alternatives(origin, destination.point, v, clock.nowMs(), p)) {
+        // Seul le plus rapide sert ici : une requête `/route`, pas les trois variantes de l'écran de choix.
+        return when (val r = alternatives.fastest(origin, destination.point, v, clock.nowMs(), p)) {
             is Outcome.Success -> {
-                val best = r.value.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: r.value.first()
+                val best = r.value
                 start(best, p, v, emptyList(), destination.name)
                 Outcome.Success(best)
             }

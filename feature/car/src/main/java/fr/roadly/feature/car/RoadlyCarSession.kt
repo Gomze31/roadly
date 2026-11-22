@@ -10,10 +10,12 @@ import androidx.car.app.Session
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.designsystem.component.userMessage
+import fr.roadly.core.location.LocationPermissionState
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.PlaceKind
 import fr.roadly.core.navigation.FreeDriveState
@@ -22,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -55,7 +58,9 @@ internal class RoadlyCarSession(private val deps: CarDependencies) : Session() {
             override fun onStart(owner: LifecycleOwner) {
                 deps.carScreen.set(true)
                 deps.location.setCarDisplayActive(true)
-                deps.foregroundService.start()
+                // État relu : une autorisation donnée dans les réglages du téléphone depuis le dernier affichage est prise en compte.
+                deps.location.refreshPermission()
+                startLocationService()
             }
             override fun onStop(owner: LifecycleOwner) {
                 deps.carScreen.set(false)
@@ -80,6 +85,10 @@ internal class RoadlyCarSession(private val deps: CarDependencies) : Session() {
         }
         lifecycleScope.launch(Dispatchers.Main) { deps.navigation.state.collect(::onNavigationState) }
         lifecycleScope.launch(Dispatchers.Main) { deps.freeDrive.state.collect(::onFreeDriveState) }
+        // Autorisation accordée pendant que l'écran de la voiture est affiché (bouton de l'accueil) : le service démarre alors.
+        lifecycleScope.launch(Dispatchers.Main) {
+            deps.location.permissionState.drop(1).collect { if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) startLocationService() }
+        }
         val home = CarHomeScreen(carContext, deps, renderer)
         lifecycleScope.launch(Dispatchers.Main) { handleIntent(intent) }
         return home
@@ -89,6 +98,15 @@ internal class RoadlyCarSession(private val deps: CarDependencies) : Session() {
 
     override fun onCarConfigurationChanged(newConfiguration: Configuration) {
         dark.value = carContext.isDarkMode
+    }
+
+    /**
+     * Service de premier plan `location` : jamais sans l'autorisation de localisation. Sur Android 14 et plus, `startForeground`
+     * de ce type est alors refusé, et un service demandé par `startForegroundService` qui s'arrête sans être passé au premier plan
+     * fait tomber l'application. Sans autorisation, l'accueil affiche la demande (« sur le téléphone ») et rien n'est démarré.
+     */
+    private fun startLocationService() {
+        if (deps.location.permissionState.value == LocationPermissionState.GRANTED) deps.foregroundService.start()
     }
 
     private fun onNavigationState(state: NavigationState) {

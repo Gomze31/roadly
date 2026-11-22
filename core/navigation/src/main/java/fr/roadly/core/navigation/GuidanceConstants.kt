@@ -28,8 +28,31 @@ object GuidanceConstants {
     /** Extrapolation GPS plafonnée : au plus 10 s et 150 m après le dernier fix réel. */
     const val EXTRAPOLATION_MAX_MS = 10_000L
     const val EXTRAPOLATION_MAX_M = 150.0
-    /** B6 : un fix de précision > 30 m est ignoré par toute décision « hors itinéraire » (compteurs inchangés). */
+    /** B6 : un fix de précision > 30 m est ignoré par toute décision « hors itinéraire » (compteurs inchangés), sauf règle dégradée ([DEGRADED_MIN_FIXES]). */
     const val OFF_ROUTE_MAX_ACCURACY_M = 30f
+    /**
+     * NAV-3 : un fix moins précis que ce seuil est traité comme une absence de fix par le guidage (position inchangée, GPS toujours
+     * réputé perdu, extrapolation poursuivie). Ce sont les positions « réseau » (antenne, Wi-Fi) que le téléphone rend quand le GNSS
+     * est coupé — tunnel, parking — précises à plusieurs centaines de mètres : elles ne disent pas où est le véhicule sur le tracé.
+     * 100 m : c'est l'écart qui suffit à déclarer le véhicule hors itinéraire ([OFF_ROUTE_HARD_M]) ; un fix qui peut se tromper
+     * d'autant ne peut pas servir à le placer. Un GNSS médiocre (canyon urbain, 30 à 80 m) et la précision par défaut d'un fix qui
+     * n'en déclare pas (50 m) restent en dessous.
+     */
+    const val UNUSABLE_FIX_ACCURACY_M = 100f
+    /**
+     * NAV-4 : règle dégradée. Quand la précision reste durablement entre [OFF_ROUTE_MAX_ACCURACY_M] et [UNUSABLE_FIX_ACCURACY_M]
+     * (canyon urbain), plus aucun fix ne « décide » : ni hors itinéraire, ni recalcul, ni arrivée. Après ce nombre de fixes médiocres
+     * consécutifs et cohérents entre eux (chacun à une distance du précédent compatible avec la vitesse et les deux précisions),
+     * les décisions sont de nouveau prises, avec des marges élargies :
+     * - hors itinéraire : l'écart au tracé est compté diminué de la précision du fix (le véhicule est au moins à cette distance
+     *   du tracé même si l'erreur joue contre lui) — à 45 m de précision, 145 m au lieu de 100, 85 m au lieu de 40 ;
+     * - arrivée : [DEGRADED_ARRIVAL_FIXES] fixes consécutifs dans la zone d'arrivée, véhicule au pas ou à l'arrêt.
+     * 10 fixes (10 s à 1 Hz) : un passage médiocre de quelques secondes (pont, carrefour encaissé) ne change rien au comportement
+     * d'avant, et un saut isolé remet le compte à zéro. Un recalcul à tort coûte plus cher qu'un recalcul en retard.
+     */
+    const val DEGRADED_MIN_FIXES = 10
+    /** NAV-4 : fixes médiocres consécutifs dans la zone d'arrivée, à moins de [HEADING_FILTER_MIN_SPEED_MPS], pour déclarer l'arrivée. */
+    const val DEGRADED_ARRIVAL_FIXES = 3
     /** B6 : la règle des 5 fixes > 40 m exige aussi un cap écarté de plus de 50° du tracé sur 3 fixes consécutifs (route parallèle). */
     const val OFF_ROUTE_HEADING_DEG = 50.0
     const val OFF_ROUTE_HEADING_FIXES = 3

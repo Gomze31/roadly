@@ -10,6 +10,7 @@ import fr.roadly.core.model.junction.NodeBranch
 import fr.roadly.core.model.junction.RoadClass
 import fr.roadly.core.model.junction.TopologyEdge
 import fr.roadly.core.navigation.RouteGeometry
+import fr.roadly.core.navigation.ValhallaTraceSpeedLimitProvider
 import fr.roadly.core.scooter.geo.Polyline6Encoder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -140,6 +141,7 @@ object NoJunctionTopologyProvider : JunctionTopologyProvider {
  * Une petite requête `trace_attributes` (≈ 1,3 km de forme) par carrefour retenu, faite pendant la préparation (à ≈ 800 m ou
  * 30 s) : quelques requêtes par trajet, du même ordre qu'un recalcul. Hors ligne ou en échec, la vue se construit sans topologie
  * (tracé + tuiles). Les dernières topologies sont gardées en mémoire ; deux requêtes sont espacées d'au moins [MIN_INTERVAL_MS].
+ * Sur l'instance publique FOSSGIS, aucune requête n'est faite : la topologie demande un Valhalla auto-hébergé.
  */
 @Singleton
 class ValhallaJunctionTopologyProvider @Inject constructor(
@@ -156,16 +158,19 @@ class ValhallaJunctionTopologyProvider @Inject constructor(
     override suspend fun topology(route: Route, maneuverIndex: Int, window: JunctionWindow): Outcome<JunctionTopology> {
         if (route.scooterGoal != null || window.size < 2) return Outcome.Failure(AppError.NoResult)
         val key = "${route.id}#$maneuverIndex"
-        mutex.withLock {
-            cache[key]?.let { return Outcome.Success(it) }
-            val now = System.currentTimeMillis()
-            if (now - lastCallAtMs < MIN_INTERVAL_MS) return Outcome.Failure(AppError.NoResult)
-            lastCallAtMs = now
-        }
+        mutex.withLock { cache[key] }?.let { return Outcome.Success(it) }
         val base = try { config.config.first().valhallaBaseUrl } catch (e: CancellationException) { throw e } catch (e: Exception) {
             return Outcome.Failure(AppError.ProviderUnavailable("valhalla"))
         }
         val url = "${base.trimEnd('/')}/trace_attributes".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable("valhalla"))
+        // Instance publique (fair-use) : aucune requête par carrefour, donc aucune nouvelle tentative non plus. Même définition
+        // de l'hôte public que la conduite libre et le suivi de limitation ; la vue se construit alors sans topologie.
+        if (ValhallaTraceSpeedLimitProvider.isPublicInstance(url)) return Outcome.Failure(AppError.NoResult)
+        mutex.withLock {
+            val now = System.currentTimeMillis()
+            if (now - lastCallAtMs < MIN_INTERVAL_MS) return Outcome.Failure(AppError.NoResult)
+            lastCallAtMs = now
+        }
         val shape = route.geometry.subList(window.fromIndex, window.toIndex + 1)
         val body = ValhallaJunctionTopology.request(Polyline6Encoder.encode(shape))
         val edges = when (val r = api.postJson(url, body.toString())) {

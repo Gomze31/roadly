@@ -3,6 +3,8 @@ package fr.roadly.core.navigation.lab
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.DispatcherProvider
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.data.network.ApiPriority
+import fr.roadly.core.data.network.ValhallaRateLimiter
 import fr.roadly.core.data.testing.FakeUserPreferencesRepository
 import fr.roadly.core.location.testing.FakeLocationRepository
 import fr.roadly.core.model.GeoPoint
@@ -15,6 +17,7 @@ import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.junction.JunctionTopology
 import fr.roadly.core.navigation.GuidanceConstants
 import fr.roadly.core.navigation.GuidanceMode
+import fr.roadly.core.navigation.NavigationClock
 import fr.roadly.core.navigation.NavigationSession
 import fr.roadly.core.navigation.NavigationState
 import fr.roadly.core.navigation.NoopRainProvider
@@ -41,6 +44,7 @@ import fr.roadly.core.routing.RoutingProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -112,6 +116,15 @@ internal object GuidanceLab {
 
         /** Le véhicule suit désormais le dernier tracé rendu par le routeur, depuis sa position projetée sur ce tracé. */
         data object FollowServedRoute : Segment
+
+        /** L'heure du téléphone saute de [deltaMs] (réglage manuel, synchronisation réseau) ; l'horloge monotone et le GPS continuent. */
+        data class WallClockJump(val deltaMs: Long) : Segment
+
+        /**
+         * Une requête d'arrière-plan (profil du tracé, carrefour) part maintenant vers le serveur public et met [seconds] s à répondre.
+         * Elle passe par le même limiteur de débit que le routeur du laboratoire (scénario `publicServer`).
+         */
+        data class BackgroundRequest(val seconds: Int) : Segment
     }
 
     class Scenario(
@@ -124,12 +137,18 @@ internal object GuidanceLab {
         val seed: Int,
         /** Délai de réponse du routeur (ms) : pendant ce temps l'état « recalcul » est observable. */
         val routerLatencyMs: Long,
+        /** Avance (ms) de l'heure du téléphone sur l'heure GNSS des fixes et sur le temps réel, dès le départ. */
+        val wallClockAheadMs: Long = 0L,
+        /** Vrai : le routeur passe par le vrai limiteur de débit du serveur public ([ValhallaRateLimiter], 1 requête/s, une en vol). */
+        val publicServer: Boolean = false,
     )
 
     class ScenarioBuilder {
         val segments = ArrayList<Segment>()
         var seed = 42
         var routerLatencyMs = 1_500L
+        var wallClockAheadMs = 0L
+        var publicServer = false
 
         fun drive(
             from: Double? = null, to: Double? = null, speedKmh: Double, noiseM: Double = 0.0, accuracyM: Float = 5f, lateralM: Double = 0.0,
@@ -145,9 +164,14 @@ internal object GuidanceLab {
         fun tamper(seconds: Int, label: String, tamper: (Int, LocationFix, (Double) -> LocationFix) -> LocationFix?) {
             segments += Segment.Tamper(seconds, label, tamper)
         }
-        fun leave(seconds: Int, speedKmh: Double, bearingDeg: Double? = null, turnDeg: Double = 0.0, chordM: Double = 60.0, untilServed: Boolean = false) {
-            segments += Segment.Leave(seconds, speedKmh, bearingDeg, turnDeg, chordM, untilServed = untilServed)
+        fun leave(
+            seconds: Int, speedKmh: Double, bearingDeg: Double? = null, turnDeg: Double = 0.0, chordM: Double = 60.0, untilServed: Boolean = false,
+            accuracyM: Float = 5f,
+        ) {
+            segments += Segment.Leave(seconds, speedKmh, bearingDeg, turnDeg, chordM, accuracyM, untilServed)
         }
+        fun wallClockJump(deltaMs: Long) { segments += Segment.WallClockJump(deltaMs) }
+        fun backgroundRequest(seconds: Int) { segments += Segment.BackgroundRequest(seconds) }
         fun routerFails() { segments += Segment.RouterAnswers { null } }
         fun routerAnswers(answer: (RouteRequest) -> Route?) { segments += Segment.RouterAnswers(answer) }
         fun followServedRoute() { segments += Segment.FollowServedRoute }
@@ -156,7 +180,7 @@ internal object GuidanceLab {
     /** [topology] : nom d'une trace réelle de [RealJunctions] (« etoile », « muret », « nation », « motorway ») ou null. */
     fun scenario(name: String, route: Route, topology: String? = null, build: ScenarioBuilder.() -> Unit): Scenario {
         val b = ScenarioBuilder().apply(build)
-        return Scenario(name, route, topology?.let(::realTopology), b.segments.toList(), b.seed, b.routerLatencyMs)
+        return Scenario(name, route, topology?.let(::realTopology), b.segments.toList(), b.seed, b.routerLatencyMs, b.wallClockAheadMs, b.publicServer)
     }
 
     fun realTopology(name: String) = object : JunctionTopologyProvider {
@@ -200,7 +224,14 @@ internal object GuidanceLab {
     class RerouteRequest(val t: Int, val atMs: Long, val request: RouteRequest)
     class ServedRoute(val t: Int, val atMs: Long, val route: Route)
 
-    class Timeline(val scenario: Scenario, val ticks: List<Tick>, val requests: List<RerouteRequest>, val served: List<ServedRoute>) {
+    /** Départ réel d'une requête vers le serveur public (créneau obtenu du limiteur) : [kind] = « recalcul » ou « arrière-plan ». */
+    class ServerStart(val atMs: Long, val kind: String)
+
+    class Timeline(
+        val scenario: Scenario, val ticks: List<Tick>, val requests: List<RerouteRequest>, val served: List<ServedRoute>,
+        /** Scénario `publicServer` : requêtes réellement parties, dans l'ordre. */
+        val serverStarts: List<ServerStart> = emptyList(),
+    ) {
         /** Tout ce qui a été dit, dans l'ordre. */
         val spoken: List<String> get() = ticks.flatMap { it.spoken }
 
@@ -239,17 +270,27 @@ internal object GuidanceLab {
     /** Rejoue [scenario] dans une session réelle neuve, sur l'horloge virtuelle de [scope] (à appeler dans `runTest`). */
     suspend fun run(scope: TestScope, scenario: Scenario): Timeline = Runner(scope, scenario).play()
 
-    private class LabRouter(private val nowMs: () -> Long, private val startMs: () -> Long, private val latencyMs: Long) : RoutingProvider {
+    private class LabRouter(
+        private val nowMs: () -> Long, private val startMs: () -> Long, private val latencyMs: Long,
+        /** Limiteur du serveur public (null = serveur sans limite) : le recalcul y passe en priorité « guidage », comme en production. */
+        private val limiter: ValhallaRateLimiter?,
+    ) : RoutingProvider {
         override val id = "laboratoire"
         var answer: (RouteRequest) -> Route? = { null }
         val requests = ArrayList<RerouteRequest>()
         val served = ArrayList<ServedRoute>()
+        val serverStarts = ArrayList<ServerStart>()
         private fun second() = ((nowMs() - startMs()) / 1000).toInt()
+
+        /** Requête d'arrière-plan de [durationMs] : même limiteur, priorité par défaut. */
+        suspend fun background(durationMs: Long) {
+            limiter?.withPermit(ApiPriority.BACKGROUND) { serverStarts += ServerStart(nowMs(), "arrière-plan"); delay(durationMs) }
+        }
 
         override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
             requests += RerouteRequest(second(), nowMs(), request)
             val reply = answer
-            delay(latencyMs)
+            if (limiter == null) delay(latencyMs) else limiter.withPermit(ApiPriority.GUIDANCE) { serverStarts += ServerStart(nowMs(), "recalcul"); delay(latencyMs) }
             val route = reply(request) ?: return Outcome.Failure(AppError.Network)
             served += ServedRoute(second(), nowMs(), route)
             return Outcome.Success(listOf(route))
@@ -260,7 +301,11 @@ internal object GuidanceLab {
         private val location = FakeLocationRepository()
         private val speech = FakeSpeechService()
         private var startMs = 0L
-        private val router = LabRouter({ scope.testScheduler.currentTime }, { startMs }, scenario.routerLatencyMs)
+        private val limiter = if (scenario.publicServer) ValhallaRateLimiter(throttledHost = { true }, nowMs = { scope.testScheduler.currentTime }) else null
+        private val router = LabRouter({ scope.testScheduler.currentTime }, { startMs }, scenario.routerLatencyMs, limiter)
+        /** Avance courante de l'heure du téléphone sur le temps réel (voir [Segment.WallClockJump]). */
+        private var wallAheadMs = scenario.wallClockAheadMs
+        private lateinit var dispatcher: CoroutineDispatcher
         private val ticks = ArrayList<Tick>()
         private lateinit var session: NavigationSession
 
@@ -276,12 +321,18 @@ internal object GuidanceLab {
 
         suspend fun play(): Timeline {
             val d = StandardTestDispatcher(scope.testScheduler)
+            dispatcher = d
+            // Deux bases de temps, comme sur un téléphone : heure (peut être fausse ou sauter) et temps monotone.
+            val clock = object : NavigationClock {
+                override fun nowMs(): Long = scope.testScheduler.currentTime + wallAheadMs
+                override fun elapsedMs(): Long = scope.testScheduler.currentTime
+            }
             val dispatchers = object : DispatcherProvider {
                 override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
             }
             session = NavigationSession(
                 location, router, NoopSpeedLimitProvider(), speech, FakeUserPreferencesRepository(), FakeNavigationServiceController(),
-                { scope.testScheduler.currentTime }, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers,
+                clock, NoopVigilanceZoneProvider(), NoopRainProvider(), NoopTripRecorder(), dispatchers,
                 scope.backgroundScope, junctionTopology = scenario.topology ?: NoJunctionTopologyProvider,
             )
             startMs = scope.testScheduler.currentTime
@@ -289,7 +340,7 @@ internal object GuidanceLab {
             scope.runCurrent()
             record("départ", null)
             for (segment in scenario.segments) play(segment)
-            return Timeline(scenario, ticks, router.requests.toList(), router.served.toList())
+            return Timeline(scenario, ticks, router.requests.toList(), router.served.toList(), router.serverStarts.toList())
         }
 
         private suspend fun play(s: Segment) {
@@ -341,6 +392,12 @@ internal object GuidanceLab {
                     }
                 }
                 is Segment.RouterAnswers -> router.answer = s.answer
+                is Segment.WallClockJump -> wallAheadMs += s.deltaMs
+                is Segment.BackgroundRequest -> {
+                    require(limiter != null) { "${scenario.name} : backgroundRequest() demande un scénario publicServer" }
+                    scope.backgroundScope.launch(dispatcher) { router.background(s.seconds * 1_000L) }
+                    scope.runCurrent()
+                }
                 Segment.FollowServedRoute -> {
                     vRoute = router.served.lastOrNull()?.route
                         ?: throw AssertionError("${scenario.name} : le routeur n'a rendu aucun tracé\n" + describe(Timeline(scenario, ticks, router.requests, router.served)))
@@ -366,7 +423,8 @@ internal object GuidanceLab {
         /** Une seconde : l'horloge avance, le fix (s'il existe) est émis, la session le traite, l'état et la voix sont relevés. */
         private suspend fun step(label: String, fix: LocationFix?) {
             scope.advanceTimeBy(1_000)
-            val stamped = fix?.copy(timestampMs = scope.testScheduler.currentTime)
+            // Heure GNSS et instant monotone du fix : tous deux en temps réel, indépendants de l'heure du téléphone.
+            val stamped = fix?.copy(timestampMs = scope.testScheduler.currentTime, elapsedRealtimeMs = scope.testScheduler.currentTime)
             if (stamped != null) location.emit(stamped)
             scope.runCurrent()
             record(label, stamped)

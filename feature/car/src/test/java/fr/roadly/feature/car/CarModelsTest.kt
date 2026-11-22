@@ -129,4 +129,26 @@ class CarModelsTest {
         assertNull(CarNavigateIntent.parse("https://example.org"))
         assertNull(CarNavigateIntent.parse(null))
     }
+
+    // --- SEC-5 : mêmes bornes que l'analyse des intents du téléphone (URI 2 000 caractères, texte 200) ---
+
+    @Test fun `a navigate uri longer than the limit is ignored, one at the limit is read`() {
+        val prefix = "geo:0,0?q="
+        val atLimit = prefix + "a".repeat(CarNavigateIntent.MAX_URI - prefix.length)
+        assertEquals(CarNavigateIntent.MAX_URI, atLimit.length)
+        assertEquals(CarNavigateTarget.Query("a".repeat(CarNavigateIntent.MAX_TEXT)), CarNavigateIntent.parse(atLimit))
+        assertNull(CarNavigateIntent.parse(atLimit + "a"))
+        assertNull(CarNavigateIntent.parse("geo:48.8584,2.2945?z=" + "1".repeat(CarNavigateIntent.MAX_URI)))
+    }
+
+    @Test fun `a navigate query and a place label are cut at the text limit`() {
+        val long = "b".repeat(CarNavigateIntent.MAX_TEXT + 50)
+        val query = CarNavigateIntent.parse("geo:0,0?q=$long") as CarNavigateTarget.Query
+        assertEquals(CarNavigateIntent.MAX_TEXT, query.text.length)
+        val place = CarNavigateIntent.parse("geo:0,0?q=45.76,4.84($long)") as CarNavigateTarget.Coordinates
+        assertEquals(GeoPoint(45.76, 4.84), place.point)
+        assertEquals("b".repeat(CarNavigateIntent.MAX_TEXT), place.label)
+        // Sous la borne : rien n'est coupé.
+        assertEquals(CarNavigateTarget.Query("b".repeat(CarNavigateIntent.MAX_TEXT)), CarNavigateIntent.parse("geo:0,0?q=" + "b".repeat(CarNavigateIntent.MAX_TEXT)))
+    }
 }

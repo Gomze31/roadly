@@ -52,7 +52,7 @@ class ValhallaTraceSpeedLimitProvider @Inject constructor(
         val url = "${base.trimEnd('/')}/trace_attributes".toHttpUrlOrNull() ?: return@withLock Outcome.Success(null)
         if (isPublicInstance(url)) return@withLock Outcome.Success(null)
         if (recent.size < 2) return@withLock Outcome.Success(lastValue)
-        val now = clock.nowMs()
+        val now = clock.elapsedMs() // NAV-2 : un intervalle se mesure sur l'horloge monotone, pas sur l'heure du téléphone
         val last = lastCallAtMs
         if (last != null && now - last < GuidanceConstants.SPEED_LIMIT_MIN_INTERVAL_MS) return@withLock Outcome.Success(lastValue)
         lastCallAtMs = now

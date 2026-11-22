@@ -7,6 +7,7 @@ import fr.roadly.core.data.network.ApiClient
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Route
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -65,38 +66,110 @@ object SpeedBumpQuery {
 }
 
 /**
- * Une requête Overpass par tracé (par paquets de 400 voies, seulement les voies lentes) : même volume que l'analyse des voies du
- * mode trottinette, jamais à chaque position. Les derniers résultats sont gardés en mémoire.
+ * Requêtes Overpass par tracé (par paquets de 400 voies, seulement les voies lentes), jamais à chaque position. L'instance
+ * publique n'est pas faite pour servir de serveur à une application (voir `docs/API-PROVIDERS.md`) : le volume est donc borné ici.
+ * - Une seule requête en vol, et au moins [MIN_REQUEST_INTERVAL_MS] entre la fin d'une requête et le début de la suivante.
+ * - Zone déjà lue : les voies déjà interrogées et leurs ralentisseurs sont gardés ; un tracé dont toutes les voies lentes sont
+ *   connues (recalcul sur le même couloir) ne coûte aucune requête, un tracé partiellement connu ne demande que les voies
+ *   manquantes.
+ * - Serveur qui demande de ralentir (HTTP 429, 5xx dont 504, délai dépassé) : plus aucune requête pendant [BACKOFF_MS],
+ *   doublé à chaque échec de suite jusqu'à [BACKOFF_MAX_MS] ; le tracé suivant n'est pas une nouvelle tentative.
+ * - Un tracé dépassé par un plus récent pendant l'attente n'est pas demandé.
  */
 @Singleton
 class OverpassSpeedBumpProvider @Inject constructor(
     private val api: ApiClient,
     private val config: ProviderConfigRepository,
     private val json: Json,
+    private val clock: NavigationClock,
 ) : SpeedBumpProvider {
     private val mutex = Mutex()
     private val cache = object : LinkedHashMap<String, List<Double>>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Double>>?) = size > 6
     }
+    /** Rang de la dernière demande reçue (sous [mutex]). */
+    private var newest = 0L
+
+    /** Une seule requête en vol ; protège aussi tout l'état ci-dessous. */
+    private val fetch = Mutex()
+    private val knownWays = HashSet<Long>()
+    /**
+     * Un paquet lu : ses voies et les ralentisseurs rendus pour elles. Un tracé ne reçoit que les ralentisseurs des paquets
+     * qui contiennent l'une de ses voies : ceux d'un autre trajet, sur une rue parallèle à moins de [SpeedBumpQuery.MAX_OFFSET_M],
+     * ne lui sont pas attribués. Limite : la réponse ne dit pas à quelle voie d'un paquet appartient un nœud, donc deux rues
+     * parallèles lues dans le même paquet restent indiscernables (c'était déjà le cas au sein d'un même tracé).
+     */
+    private class Packet(val ways: Set<Long>, val nodes: List<GeoPoint>)
+    private val packets = ArrayList<Packet>()
+    private var lastRequestEndMs: Long? = null
+    private var pausedUntilMs: Long? = null
+    private var failuresInARow = 0
 
     override suspend fun bumps(route: Route, attributes: RouteAttributes): Outcome<List<Double>> {
         if (attributes.slowWayIds.isEmpty()) return Outcome.Success(emptyList())
-        mutex.withLock { cache[route.id] }?.let { return Outcome.Success(it) }
-        val base = try { config.config.first().overpassBaseUrl } catch (e: CancellationException) { throw e } catch (e: Exception) {
-            return Outcome.Failure(AppError.ProviderUnavailable("overpass"))
+        val wanted = attributes.slowWayIds.take(MAX_WAYS)
+        val mine = mutex.withLock {
+            cache[route.id]?.let { return Outcome.Success(it) }
+            ++newest
         }
-        val url = "${base.trimEnd('/')}/interpreter".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable("overpass"))
-        val nodes = ArrayList<GeoPoint>()
-        for (chunk in attributes.slowWayIds.take(MAX_WAYS).chunked(SpeedBumpQuery.MAX_WAY_IDS)) {
-            when (val r = api.postForm(url, mapOf("data" to SpeedBumpQuery.query(chunk)))) {
-                is Outcome.Success -> nodes += SpeedBumpQuery.parse(json, r.value) ?: return Outcome.Failure(AppError.Parse("overpass"))
-                is Outcome.Failure -> return r
+        return fetch.withLock {
+            // Mémoire bornée : au-delà, la zone connue repart du tracé courant.
+            if (knownWays.size > MAX_KNOWN_WAYS) { knownWays.clear(); packets.clear() }
+            val missing = wanted.filterNot { it in knownWays }
+            if (missing.isNotEmpty()) {
+                val base = try { config.config.first().overpassBaseUrl } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                    return Outcome.Failure(AppError.ProviderUnavailable("overpass"))
+                }
+                val url = "${base.trimEnd('/')}/interpreter".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable("overpass"))
+                for (chunk in missing.chunked(SpeedBumpQuery.MAX_WAY_IDS)) {
+                    awaitSlot()?.let { return Outcome.Failure(it) }
+                    if (mutex.withLock { mine != newest }) return Outcome.Failure(AppError.NoResult)
+                    // Pas de nouvelle tentative du client HTTP après un 429 : le retrait ci-dessous commence dès la première réponse.
+                    val r = try { api.postForm(url, mapOf("data" to SpeedBumpQuery.query(chunk)), retryRateLimited = false) } finally { lastRequestEndMs = clock.elapsedMs() }
+                    when (r) {
+                        is Outcome.Success -> {
+                            val nodes = SpeedBumpQuery.parse(json, r.value) ?: return Outcome.Failure(AppError.Parse("overpass"))
+                            knownWays += chunk; packets += Packet(chunk.toHashSet(), nodes)
+                            failuresInARow = 0
+                        }
+                        is Outcome.Failure -> { backOffAfter(r.error); return r }
+                    }
+                }
             }
+            val wantedWays = wanted.toHashSet()
+            val nodes = packets.filter { p -> p.ways.any(wantedWays::contains) }.flatMapTo(LinkedHashSet()) { it.nodes }
+            val along = SpeedBumpQuery.along(route.geometry, nodes.toList())
+            mutex.withLock { cache[route.id] = along }
+            Outcome.Success(along)
         }
-        val along = SpeedBumpQuery.along(route.geometry, nodes)
-        mutex.withLock { cache[route.id] = along }
-        return Outcome.Success(along)
     }
 
-    private companion object { const val MAX_WAYS = 1_200 }
+    /** Attend le prochain créneau ; pendant un retrait demandé par le serveur, rend l'erreur sans attendre ni rien envoyer. */
+    private suspend fun awaitSlot(): AppError? {
+        val now = clock.elapsedMs()
+        pausedUntilMs?.let { if (now < it) return AppError.RateLimited }
+        val last = lastRequestEndMs ?: return null
+        val wait = (last + MIN_REQUEST_INTERVAL_MS - now).coerceIn(0L, MIN_REQUEST_INTERVAL_MS)
+        if (wait > 0L) delay(wait)
+        return null
+    }
+
+    private fun backOffAfter(e: AppError) {
+        val slowDown = e == AppError.RateLimited || e == AppError.Timeout || (e is AppError.ProviderUnavailable && (e.httpCode ?: 0) in 500..599)
+        if (!slowDown) return
+        val pause = (BACKOFF_MS shl failuresInARow.coerceAtMost(8)).coerceAtMost(BACKOFF_MAX_MS)
+        failuresInARow++
+        pausedUntilMs = clock.elapsedMs() + pause
+    }
+
+    companion object {
+        private const val MAX_WAYS = 1_200
+        /** Voies gardées dans la zone déjà lue (≈ 4 tracés complets). */
+        private const val MAX_KNOWN_WAYS = 5_000
+        /** Écart minimal entre deux requêtes Overpass de ralentisseurs. */
+        const val MIN_REQUEST_INTERVAL_MS = 10_000L
+        /** Retrait après un 429, un 5xx (504 : serveur surchargé) ou un délai dépassé. */
+        const val BACKOFF_MS = 60_000L
+        const val BACKOFF_MAX_MS = 900_000L
+    }
 }

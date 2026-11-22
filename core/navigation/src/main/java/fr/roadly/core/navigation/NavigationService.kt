@@ -25,15 +25,33 @@ class NavigationService : Service() {
     @Inject lateinit var session: NavigationSession
     @Inject lateinit var freeDrive: FreeDriveSession
     @Inject lateinit var carScreen: CarScreenPresence
+    @Inject lateinit var restorer: GuidanceRestorer
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var collector: Job? = null
     private var lastContent: Pair<String, String>? = null
+    /** NAV-1 : une seule tentative de reprise par création du service, quoi qu'il arrive ensuite. */
+    private var restoreAttempted = false
+    /** Reprise en cours : le service reste au premier plan le temps de la tentative, alors que rien n'est encore en cours. */
+    private var restoring = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * NAV-1 : pendant un guidage le service est « sticky ». Si le téléphone arrête le processus (économie de batterie, écran
+     * éteint), Android peut recréer le service, dans un nouveau processus, avec un `intent` nul : rien n'est alors en cours, et
+     * [GuidanceRestorer] tente une fois de reprendre la course mémorisée. Sans reprise possible, le service s'arrête et la carte
+     * « Reprendre le guidage » de l'accueil reste proposée. Conduite libre et écran Android Auto seuls : pas de redémarrage.
+     *
+     * NON VÉRIFIÉ hors téléphone : qu'Android (12 à 15, MagicOS) recrée effectivement le service, qu'il accepte alors
+     * `startForeground` de type `location` sans que l'application soit à l'écran, et qu'il lui donne la position. Un refus de
+     * `startForeground` arrête simplement le service (voir plus bas) ; une position refusée fait échouer la reprise.
+     */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         NavigationNotifications.ensureChannel(this)
+        val restore = intent == null && !restoreAttempted && restorer.idle()
+        if (intent == null) restoreAttempted = true
+        if (restore) restoring = true
         val content = currentContent(session.state.value, freeDrive.state.value, carScreen.active.value)
         // startForeground dans les 5 s suivant startForegroundService : immédiatement, avant toute autre chose.
         val foreground = try {
@@ -52,6 +70,7 @@ class NavigationService : Service() {
             if (freeDrive.state.value is FreeDriveState.Active) freeDrive.stop() else session.stop()
         }
         if (!foreground || intent?.action == ACTION_STOP) {
+            restoring = false
             stopSelf()
             return START_NOT_STICKY
         }
@@ -63,19 +82,28 @@ class NavigationService : Service() {
             }
             combine(session.state, freeDrive.state, carScreen.active, ::Triple).collect { (nav, free, car) -> render(nav, free, car) }
         }
-        return START_NOT_STICKY
+        if (restore) scope.launch {
+            val outcome = restorer.attempt()
+            Log.i(TAG, "Reprise du guidage après redémarrage du service : $outcome")
+            restoring = false
+            // Reprise faite : la notification du guidage remplace « Reprise du guidage… » ; sinon plus rien ne retient le service.
+            render(session.state.value, freeDrive.state.value, carScreen.active.value)
+        }
+        // « Sticky » seulement pour un guidage (ou sa reprise) : lui seul a une destination mémorisée à reprendre.
+        return if (session.state.value is NavigationState.Guiding || restoring) START_STICKY else START_NOT_STICKY
     }
 
-    /** Guidage prioritaire ; sinon conduite libre ; sinon écran Android Auto ; sinon contenu par défaut (le service va s'arrêter). */
+    /** Guidage prioritaire ; sinon conduite libre ; sinon écran Android Auto ; sinon reprise en cours ; sinon contenu par défaut (le service va s'arrêter). */
     private fun currentContent(nav: NavigationState, free: FreeDriveState, car: Boolean): Pair<String, String> = when {
         nav is NavigationState.Guiding -> NavigationNotifications.content(this, nav)
         free is FreeDriveState.Active -> NavigationNotifications.freeDriveContent(this, free)
         car -> NavigationNotifications.carContent(this)
+        restoring -> NavigationNotifications.restoringContent(this)
         else -> NavigationNotifications.content(this, null)
     }
 
     private fun render(nav: NavigationState, free: FreeDriveState, car: Boolean) {
-        if (!keepForeground(nav, free, car)) {
+        if (!keepForeground(nav, free, car) && !restoring) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
             return

@@ -21,6 +21,7 @@
     <string name="bg_issue_restricted_detail">Roadly n\'a pas le droit de fonctionner en arrière-plan : le guidage s\'arrêtera dès que vous quitterez l\'écran. Fiche de l\'application › Batterie › autorisez l\'activité en arrière-plan.</string>
     <string name="bg_open_notifications">Ouvrir les notifications</string>
     <string name="bg_open_app_settings">Ouvrir la fiche de l\'application</string>
+    <string name="bg_open_battery_exemption">Ouvrir l\'optimisation de la batterie</string>
     <string name="bg_warning_start">Démarrer</string>
     <string name="bg_warning_cancel">Annuler</string>
     <string name="loc_off_title">Localisation désactivée</string>

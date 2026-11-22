@@ -210,9 +210,39 @@ class ValhallaRouteAttributesProvider @Inject constructor(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RouteAttributes>?) = size > CACHE_SIZE
     }
 
+    /** Tracés dont la réponse du serveur est inexploitable (illisible, longueurs incohérentes, refus 4xx) : la redemander ne changerait rien. */
+    private val unusable = object : LinkedHashMap<String, AppError>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AppError>?) = size > CACHE_SIZE
+    }
+    /** Un verrou par tracé en cours de demande : deux demandeurs du même tracé (écran de choix puis guidage) ne font qu'une requête. */
+    private val inFlight = object : LinkedHashMap<String, Mutex>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Mutex>?) = size > 2 * CACHE_SIZE
+    }
+
+    private fun known(routeId: String): Outcome<RouteAttributes>? =
+        cache[routeId]?.let { Outcome.Success(it) } ?: unusable[routeId]?.let { Outcome.Failure(it) }
+
     override suspend fun attributes(route: Route): Outcome<RouteAttributes> {
         if (route.scooterGoal != null || route.geometry.size < 2) return Outcome.Failure(AppError.NoResult)
-        mutex.withLock { cache[route.id] }?.let { return Outcome.Success(it) }
+        val gate = mutex.withLock { known(route.id)?.let { return it }; inFlight.getOrPut(route.id) { Mutex() } }
+        return gate.withLock {
+            // Le même tracé vient peut-être d'être traité par un autre demandeur pendant l'attente du verrou.
+            mutex.withLock { known(route.id) }?.let { return it }
+            val out = request(route)
+            mutex.withLock {
+                when {
+                    out is Outcome.Success -> cache[route.id] = out.value
+                    out is Outcome.Failure && deterministic(out.error) -> unusable[route.id] = out.error
+                }
+            }
+            out
+        }
+    }
+
+    /** Une panne passagère (réseau, délai, serveur saturé) n'est pas retenue : le prochain tracé demandera à nouveau. */
+    private fun deterministic(e: AppError): Boolean = e is AppError.Parse || e == AppError.NoResult || (e is AppError.Http && e.code in 400..499)
+
+    private suspend fun request(route: Route): Outcome<RouteAttributes> {
         val base = try { config.config.first().valhallaBaseUrl } catch (e: CancellationException) { throw e } catch (e: Exception) {
             return Outcome.Failure(AppError.ProviderUnavailable("valhalla"))
         }
@@ -223,7 +253,6 @@ class ValhallaRouteAttributesProvider @Inject constructor(
             is Outcome.Failure -> return r
         }
         val attrs = RouteAttributesBuilder.build(route.id, RouteGeometry(route.geometry).totalM, edges) ?: return Outcome.Failure(AppError.NoResult)
-        mutex.withLock { cache[route.id] = attrs }
         return Outcome.Success(attrs)
     }
 
