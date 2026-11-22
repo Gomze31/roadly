@@ -11,3 +11,6 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+
+# Journaux et captures des essais sur appareil : locaux, jamais publiés.
+validation/
