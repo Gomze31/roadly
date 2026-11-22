@@ -2,7 +2,9 @@ package fr.roadly.core.data.db
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import dagger.Module
@@ -12,7 +14,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-private val Context.roadlyPrefs: DataStore<Preferences> by preferencesDataStore(name = "roadly_prefs")
+// NAV-9 : un fichier de réglages illisible (corrompu) est remplacé par des réglages vides au lieu de faire échouer chaque
+// démarrage ; les réglages reviennent alors à leurs valeurs par défaut.
+private val Context.roadlyPrefs: DataStore<Preferences> by preferencesDataStore(
+    name = "roadly_prefs",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -27,5 +34,5 @@ object DatabaseModule {
     @Provides fun recentDao(db: RoadlyDatabase) = db.recentSearchDao()
     @Provides fun vehicleDao(db: RoadlyDatabase) = db.vehicleProfileDao()
     @Provides fun scooterProfileDao(db: RoadlyDatabase) = db.scooterProfileDao()
-    @Provides @Singleton fun dataStore(@ApplicationContext ctx: Context): DataStore<Preferences> = ctx.roadlyPrefs
+    @Provides @Singleton fun dataStore(@ApplicationContext ctx: Context): DataStore<Preferences> = ResilientPreferencesDataStore(ctx.roadlyPrefs)
 }

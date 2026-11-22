@@ -162,6 +162,25 @@
     <string name="settings_confirm_action">Effacer</string>
     <string name="settings_cancel">Annuler</string>
 
+    <string name="settings_backup">Sauvegarde</string>
+    <string name="settings_backup_export">Exporter mes favoris et trajets</string>
+    <string name="settings_backup_export_hint">Dans un fichier à conserver hors de Roadly</string>
+    <string name="settings_backup_import">Importer une sauvegarde</string>
+    <string name="settings_backup_import_hint">Ajoute son contenu sans rien supprimer</string>
+    <string name="settings_backup_footer">Android ne sauvegarde pas les données de Roadly : désinstaller l\'application les efface. Exportez-les avant une réinstallation. Les réglages et les clés d\'accès ne sont pas exportés.</string>
+    <string name="settings_backup_working">Sauvegarde en cours…</string>
+    <string name="settings_backup_exported">Export terminé : favoris %1$d, trajets %2$d.</string>
+    <string name="settings_backup_exported_no_track">Trajets exportés sans leur tracé (trop volumineux) : %1$d.</string>
+    <string name="settings_backup_imported">Import terminé : favoris %1$d, trajets ajoutés %2$d, trajets déjà présents %3$d.</string>
+    <string name="settings_backup_rows_ignored">Lignes illisibles ignorées : %1$d.</string>
+    <string name="settings_backup_export_failed">Export impossible : %1$s</string>
+    <string name="settings_backup_import_failed">Import impossible : %1$s</string>
+    <string name="settings_backup_error_too_large">sauvegarde trop volumineuse (32 Mo au plus).</string>
+    <string name="settings_backup_error_not_a_backup">ce fichier n\'est pas une sauvegarde Roadly.</string>
+    <string name="settings_backup_error_newer_format">sauvegarde écrite par une version plus récente de Roadly. Mettez l\'application à jour, puis réessayez.</string>
+    <string name="settings_backup_error_write">le fichier n\'a pas pu être écrit.</string>
+    <string name="settings_backup_error_read">le fichier n\'a pas pu être lu.</string>
+
     <string name="settings_privacy">Confidentialité</string>
     <string name="settings_privacy_body">Vos positions ne quittent l\'appareil que vers les services listés ci-dessous (géocodage, routage, tuiles). Aucune donnée n\'est vendue ni stockée sur un serveur Roadly en v1.</string>
 

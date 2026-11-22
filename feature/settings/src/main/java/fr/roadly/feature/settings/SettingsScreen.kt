@@ -354,6 +354,7 @@ private fun SettingsPageContent(page: SettingsPage, state: SettingsUiState, vm: 
         SettingsPage.ANDROID_AUTO -> AndroidAutoGroup()
         SettingsPage.UPDATES -> UpdatesGroup(updatesVm)
         SettingsPage.DATA -> {
+            BackupGroup()
             DataGroup(onClearHistory = vm::clearHistory, onClearFavorites = vm::clearFavorites)
             PrivacyGroup()
         }
