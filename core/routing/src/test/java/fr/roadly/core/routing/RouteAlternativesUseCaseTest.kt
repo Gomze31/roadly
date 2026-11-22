@@ -99,6 +99,41 @@ class RouteAlternativesUseCaseTest {
         assertTrue(seen.all { it.preferences == prefs })
     }
 
+    @Test fun `fastest only - one request where the comparison sends three, same option as the comparison`() = runTest {
+        val seen = mutableListOf<RouteRequest>()
+        val routing = object : RoutingProvider {
+            override val id = "fake"
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> {
+                synchronized(seen) { seen += request }
+                return Outcome.Success(listOf(route(request.costing, 100.0, 60.0, if (request.costing == RouteCosting.FASTEST) g1 else g2)))
+            }
+        }
+        val uc = RouteAlternativesUseCase(routing)
+        val prefs = RoutePreferences(avoidHighways = true)
+        val stop = GeoPoint(48.2, 2.2)
+        val compared = (uc(o, d, null, 5_000L, prefs, listOf(stop)) as Outcome.Success).value
+        assertEquals("comparaison : trois requêtes /route", 3, seen.size)
+        seen.clear()
+        val fastest = (uc.fastest(o, d, null, 5_000L, prefs, listOf(stop)) as Outcome.Success).value
+        assertEquals("démarrage direct : une seule requête /route", 1, seen.size)
+        assertEquals(RouteCosting.FASTEST, seen.single().costing)
+        assertEquals(prefs, seen.single().preferences)
+        assertEquals(listOf(stop), seen.single().waypoints)
+        assertEquals(compared.first { it.route.costing == RouteCosting.FASTEST }, fastest)
+    }
+
+    @Test fun `fastest only - a failure is returned as is, a thrown exception becomes a failure`() = runTest {
+        val down = RouteAlternativesUseCase(FakeRouting(mapOf(RouteCosting.FASTEST to Outcome.Failure(AppError.RateLimited))))
+        assertEquals(AppError.RateLimited, (down.fastest(o, d, null, 0L) as Outcome.Failure).error)
+        val none = RouteAlternativesUseCase(FakeRouting(mapOf(RouteCosting.FASTEST to Outcome.Success(emptyList()))))
+        assertEquals(AppError.NoResult, (none.fastest(o, d, null, 0L) as Outcome.Failure).error)
+        val throwing = RouteAlternativesUseCase(object : RoutingProvider {
+            override val id = "fake"
+            override suspend fun route(request: RouteRequest): Outcome<List<Route>> = throw IllegalStateException("boom")
+        })
+        assertTrue((throwing.fastest(o, d, null, 0L) as Outcome.Failure).error is AppError.Unknown)
+    }
+
     /** Instance publique : une requête à la fois (limiteur), chacune bornée à 15 s. [answer] : résultat de la n-ième requête partie. */
     private class OneAtATimeRouting(val answer: (Int) -> Outcome<List<Route>>) : RoutingProvider {
         override val id = "fake"

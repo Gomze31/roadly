@@ -262,7 +262,7 @@ class RouteViewModelTest {
         assertTrue(saved.value.isEmpty())
     }
 
-    @Test fun `each variant gets its identity card from its real profile, a failed one gets none`() = runTest {
+    @Test fun `only the displayed variant has its profile requested - another one when it is selected, a failed one gets no card`() = runTest {
         location.lastKnown = LocationFix(GeoPoint(48.8, 2.3), null, null, 5f, 0L)
         val asked = mutableListOf<String>()
         val attributes = object : fr.roadly.core.navigation.RouteAttributesProvider {
@@ -280,11 +280,23 @@ class RouteViewModelTest {
         v.uiState.test {
             advanceUntilIdle()
             val s = expectMostRecentItem().phase as RouteUiState.Content
-            assertEquals("FASTEST", asked.first()) // variante active d'abord
+            assertEquals("une requête par recherche : la variante affichée seulement (3 avant, VAL-2)", listOf("FASTEST"), asked)
             assertEquals(50, s.identities.getValue("FASTEST").knownLimitPercent)
             assertEquals(1, s.identities.getValue("FASTEST").tollGantries)
-            assertEquals(0, s.identities.getValue("NO_TOLL").tollGantries)
-            assertTrue("échec : pas de carte inventée", "SHORTEST" !in s.identities)
+            assertEquals(setOf("FASTEST"), s.identities.keys)
+            // Une autre variante est choisie : son profil est demandé à ce moment-là.
+            v.selectRoute("NO_TOLL"); advanceUntilIdle()
+            val second = expectMostRecentItem().phase as RouteUiState.Content
+            assertEquals(listOf("FASTEST", "NO_TOLL"), asked)
+            assertEquals(0, second.identities.getValue("NO_TOLL").tollGantries)
+            assertEquals("la carte déjà obtenue est gardée", 1, second.identities.getValue("FASTEST").tollGantries)
+            // Variante dont le profil échoue : pas de carte inventée.
+            v.selectRoute("SHORTEST"); advanceUntilIdle()
+            assertTrue("SHORTEST" !in (expectMostRecentItem().phase as RouteUiState.Content).identities)
+            // Retour sur une variante déjà consultée : aucune nouvelle requête.
+            v.selectRoute("FASTEST"); advanceUntilIdle()
+            assertEquals(listOf("FASTEST", "NO_TOLL", "SHORTEST"), asked)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 

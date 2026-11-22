@@ -122,6 +122,90 @@ class ValhallaRateLimiterTest {
         assertEquals(Permit.Refused(429, ValhallaRateLimiter.MAX_PAUSE_MS), l.withPermit { })
     }
 
+    // ---- NAV-5 : un recalcul n'attend pas une requête d'arrière-plan en vol ----
+
+    @Test fun `a reroute interrupts a background request in flight, which is replayed afterwards`() = runTest {
+        val l = limiter(); val order = mutableListOf<String>(); var inFlight = 0; var maxInFlight = 0
+        suspend fun call(name: String, ms: Long): String {
+            inFlight++; maxInFlight = maxOf(maxInFlight, inFlight); order += "$name@${now()}"
+            try { delay(ms) } finally { inFlight-- }
+            return name
+        }
+        var background: Permit<String>? = null
+        launch { background = l.withPermit(ApiPriority.BACKGROUND) { call("profil", 15_000) } }
+        advanceTimeBy(3_000); runCurrent()
+        var reroute: Permit<String>? = null
+        launch { reroute = l.withPermit(ApiPriority.GUIDANCE) { call("recalcul", 2_000) } }
+        advanceUntilIdle()
+        // Le recalcul part tout de suite (le créneau de la requête interrompue date de 3 s) ; le profil repart quand il a fini.
+        assertEquals(listOf("profil@0", "recalcul@3000", "profil@5000"), order)
+        assertEquals(Permit.Ran("recalcul"), reroute)
+        assertEquals("l'appelant de la requête interrompue reçoit son résultat", Permit.Ran("profil"), background)
+        assertEquals(20_000L, now())
+        assertEquals(1, maxInFlight)
+    }
+
+    @Test fun `interrupting a background request never shortens the one second between two starts`() = runTest {
+        val l = limiter(); val starts = mutableListOf<Long>()
+        launch { l.withPermit(ApiPriority.BACKGROUND) { starts += now(); delay(15_000) } }
+        advanceTimeBy(200); runCurrent()
+        launch { l.withPermit(ApiPriority.GUIDANCE) { starts += now(); delay(300) } }
+        advanceUntilIdle()
+        // Départs : arrière-plan à 0, recalcul à 1 000 (pas à 200), arrière-plan rejoué à 2 000 (pas à 1 300).
+        assertEquals(listOf(0L, 1_000L, 2_000L), starts)
+    }
+
+    @Test fun `a reroute does not interrupt a user search or another reroute in flight`() = runTest {
+        for (running in listOf(ApiPriority.INTERACTIVE, ApiPriority.GUIDANCE)) {
+            val l = limiter(); val order = mutableListOf<String>(); val t0 = now()
+            launch { l.withPermit(running) { order += "en vol@${now() - t0}"; delay(5_000); order += "fini@${now() - t0}" } }
+            advanceTimeBy(1_000); runCurrent()
+            launch { l.withPermit(ApiPriority.GUIDANCE) { order += "recalcul@${now() - t0}" } }
+            advanceUntilIdle()
+            assertEquals("$running", listOf("en vol@0", "fini@5000", "recalcul@5000"), order)
+        }
+    }
+
+    @Test fun `a user search waits for the background request in flight, it does not interrupt it`() = runTest {
+        val l = limiter(); val order = mutableListOf<String>()
+        launch { l.withPermit(ApiPriority.BACKGROUND) { order += "profil@${now()}"; delay(5_000) } }
+        advanceTimeBy(1_000); runCurrent()
+        launch { l.withPermit(ApiPriority.INTERACTIVE) { order += "recherche@${now()}" } }
+        advanceUntilIdle()
+        assertEquals(listOf("profil@0", "recherche@5000"), order)
+    }
+
+    @Test fun `an interrupted background request keeps its rank among the queued ones`() = runTest {
+        val l = limiter(); val order = mutableListOf<String>()
+        launch { l.withPermit(ApiPriority.BACKGROUND) { order += "a@${now()}"; delay(15_000) } }
+        launch { l.withPermit(ApiPriority.BACKGROUND) { order += "b@${now()}" } }
+        advanceTimeBy(2_000); runCurrent()
+        launch { l.withPermit(ApiPriority.GUIDANCE) { order += "recalcul@${now()}" } }
+        advanceUntilIdle()
+        assertEquals(listOf("a@0", "recalcul@2000", "a@3000", "b@18000"), order)
+    }
+
+    @Test fun `cancelling the caller of a background request in flight is still a cancellation, not a replay`() = runTest {
+        val l = limiter(); var runs = 0
+        val job = launch { l.withPermit(ApiPriority.BACKGROUND) { runs++; delay(15_000) } }
+        advanceTimeBy(500); runCurrent()
+        job.cancel()
+        advanceUntilIdle()
+        assertTrue(job.isCancelled)
+        assertEquals(1, runs)
+        var startedAt = -1L
+        l.withPermit { startedAt = now() }
+        assertEquals("le créneau est rendu", 1_000L, startedAt)
+    }
+
+    @Test fun `a background request that fails while a reroute waits reports its own error`() = runTest {
+        val l = limiter(); var error: Throwable? = null
+        launch { error = runCatching { l.withPermit<Unit>(ApiPriority.BACKGROUND) { throw IllegalStateException("boom") } }.exceptionOrNull() }
+        launch { l.withPermit(ApiPriority.GUIDANCE) { } }
+        advanceUntilIdle()
+        assertTrue("$error", error is IllegalStateException)
+    }
+
     @Test fun `only public FOSSGIS hosts are throttled`() {
         assertTrue(ValhallaRateLimiter.isPublicFossgisHost("valhalla1.openstreetmap.de"))
         assertTrue(ValhallaRateLimiter.isPublicFossgisHost("routing.openstreetmap.de"))

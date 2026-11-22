@@ -4,6 +4,7 @@ import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.config.ProviderConfigRepository
 import fr.roadly.core.data.network.ApiClient
+import fr.roadly.core.data.network.OverpassGate
 import fr.roadly.core.model.ElectricScooterProfile
 import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.Route
@@ -66,6 +67,8 @@ class ValhallaScooterRouteAnalyzer @Inject constructor(
     private val api: ApiClient,
     private val config: ProviderConfigRepository,
     private val json: Json,
+    /** Porte commune des appels Overpass : une requête à la fois, intervalle minimal, retrait après 429 / 5xx / délai dépassé. */
+    private val gate: OverpassGate = OverpassGate(),
 ) : ScooterRouteAnalyzer {
     private val tagCache = object : LinkedHashMap<Long, Map<String, String>>(256, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Map<String, String>>?) = size > 5_000
@@ -85,22 +88,30 @@ class ValhallaScooterRouteAnalyzer @Inject constructor(
         return Outcome.Success(ScooterRouteAnalysisBuilder.build(route, trace, tags, request.profile))
     }
 
-    /** Null si Overpass est indisponible (l'analyse le signale) ; voies déjà connues servies depuis le cache. */
+    /**
+     * Null si Overpass est indisponible ou en retrait (l'analyse le signale) ; voies déjà connues servies depuis le cache.
+     * Les variantes d'une même recherche sont analysées en parallèle et partagent la plupart de leurs voies : elles passent la
+     * porte l'une après l'autre, et les voies manquantes sont relues une fois la porte obtenue — la variante suivante ne
+     * redemande pas celles que la précédente vient de recevoir.
+     */
     private suspend fun wayTags(base: String, ids: List<Long>): Map<Long, Map<String, String>>? {
         val wanted = ids.distinct()
         if (wanted.isEmpty()) return emptyMap()
-        val missing = synchronized(tagCache) { wanted.filter { it !in tagCache } }
-        if (missing.isNotEmpty()) {
-            val url = "${base.trimEnd('/')}/interpreter".toHttpUrlOrNull() ?: return null
-            val fetched = missing.chunked(Overpass.MAX_WAY_IDS).map { chunk ->
-                when (val r = api.postForm(url, mapOf("data" to Overpass.wayTagsQuery(chunk)))) {
-                    is Outcome.Success -> Overpass.parseWayTags(json, r.value) ?: return null
-                    is Outcome.Failure -> return null
+        fun known() = synchronized(tagCache) { wanted.mapNotNull { id -> tagCache[id]?.let { id to it } }.toMap() }
+        if (synchronized(tagCache) { wanted.all { it in tagCache } }) return known()
+        val url = "${base.trimEnd('/')}/interpreter".toHttpUrlOrNull() ?: return null
+        return gate.withTurn {
+            val missing = synchronized(tagCache) { wanted.filter { it !in tagCache } }
+            for (chunk in missing.chunked(Overpass.MAX_WAY_IDS)) {
+                // Pas de nouvelle tentative du client HTTP après un 429 : le retrait de la porte commence dès la première réponse.
+                val tags = when (val r = call { api.postForm(url, mapOf("data" to Overpass.wayTagsQuery(chunk)), retryRateLimited = false) }) {
+                    is Outcome.Success -> Overpass.parseWayTags(json, r.value) ?: return@withTurn null
+                    is Outcome.Failure -> return@withTurn null
                 }
+                synchronized(tagCache) { tagCache.putAll(tags) }
             }
-            synchronized(tagCache) { fetched.forEach { tagCache.putAll(it) } }
+            known()
         }
-        return synchronized(tagCache) { wanted.mapNotNull { id -> tagCache[id]?.let { id to it } }.toMap() }
     }
 }
 
@@ -218,11 +229,13 @@ class OverpassScooterPoiProvider @Inject constructor(
     private val api: ApiClient,
     private val config: ProviderConfigRepository,
     private val json: Json,
+    private val gate: OverpassGate = OverpassGate(),
 ) : ScooterPoiProvider {
     override suspend fun around(kind: fr.roadly.core.scooter.osm.ScooterPoiKind, center: GeoPoint, radiusM: Int): Outcome<List<fr.roadly.core.scooter.osm.ScooterPoi>> {
         val base = try { config.config.first().overpassBaseUrl } catch (e: CancellationException) { throw e } catch (e: Exception) { return Outcome.Failure(AppError.ProviderUnavailable("overpass")) }
         val url = "${base.trimEnd('/')}/interpreter".toHttpUrlOrNull() ?: return Outcome.Failure(AppError.ProviderUnavailable("overpass"))
-        return when (val r = api.postForm(url, mapOf("data" to Overpass.poiQuery(kind, center, radiusM.coerceIn(100, 10_000))))) {
+        val answer = gate.withTurn { call { api.postForm(url, mapOf("data" to Overpass.poiQuery(kind, center, radiusM.coerceIn(100, 10_000))), retryRateLimited = false) } }
+        return when (val r = answer) {
             is Outcome.Success -> Overpass.parsePois(json, r.value, kind)?.sortedBy { it.point.distanceTo(center) }?.let { Outcome.Success(it) } ?: Outcome.Failure(AppError.Parse("overpass"))
             is Outcome.Failure -> r
         }

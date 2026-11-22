@@ -232,11 +232,12 @@ class HomeViewModel @Inject constructor(
             }
             val p = prefs.routePreferences.first()
             val v = vehicles.profile.first()
-            val r = alternatives(origin, last.destination, v, System.currentTimeMillis(), p)
+            // Seul le plus rapide sert à la reprise : une requête `/route`, pas les trois variantes de l'écran de choix (VAL-2).
+            val r = alternatives.fastest(origin, last.destination, v, System.currentTimeMillis(), p)
             ensureActive() // « Ignorer » pendant le calcul : un résultat tardif ne démarre rien.
             when (r) {
                 is Outcome.Success -> {
-                    val best = r.value.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: r.value.first()
+                    val best = r.value
                     resumePhase.value = ResumePhase.OFFER
                     navigationSession.start(best, p, v, destinationName = last.destinationName)
                 }

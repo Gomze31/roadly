@@ -83,6 +83,26 @@ class ApiClientRateLimitTest {
         assertEquals(0L, testScheduler.currentTime)
     }
 
+    /** NAV-5 : l'appel d'arrière-plan lent est réellement annulé (connexion fermée), le recalcul part, puis l'appel est rejoué. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun `a reroute cancels a slow background call in flight, which is replayed after it`() = runTest {
+        val client = throttledClient()
+        server.enqueue(MockResponse().setBody("lent").setHeadersDelay(2, java.util.concurrent.TimeUnit.SECONDS))
+        server.enqueue(MockResponse().setBody("recalcul"))
+        server.enqueue(MockResponse().setBody("profil"))
+        val background = async { client.postJson(server.url("/trace_attributes"), "{}") }
+        testScheduler.runCurrent()
+        assertEquals("/trace_attributes", server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)?.path)
+        val reroute = client.postJson(server.url("/route"), "{}", priority = ApiPriority.GUIDANCE)
+        assertEquals("recalcul", (reroute as Outcome.Success).value)
+        assertEquals("le recalcul part au créneau suivant, 1 s après la requête interrompue", 1_000L, testScheduler.currentTime)
+        assertEquals("profil", (background.await() as Outcome.Success).value)
+        assertEquals("/route", server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)?.path)
+        assertEquals("/trace_attributes", server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)?.path)
+        assertEquals(3, server.requestCount)
+        assertEquals(2_000L, testScheduler.currentTime)
+    }
+
     @Test fun `a long 429 pause is reported as RateLimited without retry loop`() = runTest {
         val client = throttledClient() // délais de nouvelle tentative par défaut (2 s, 8 s)
         server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "600"))

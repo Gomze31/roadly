@@ -1,6 +1,13 @@
 package fr.roadly.core.data.network
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -8,7 +15,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * passe d'abord, puis la plus ancienne. Sans effet sur un hôte non limité.
  */
 enum class ApiPriority {
-    /** Recalcul en cours de guidage : ne doit pas attendre derrière les requêtes d'arrière-plan. */
+    /** Recalcul en cours de guidage : ne doit pas attendre derrière les requêtes d'arrière-plan, ni derrière celle qui est en vol. */
     GUIDANCE,
     /** Demande directe de l'utilisateur (recherche d'itinéraire, ordre des étapes). */
     INTERACTIVE,
@@ -26,10 +33,15 @@ enum class ApiPriority {
  * - au moins [minIntervalMs] entre deux débuts de requête ;
  * - [pause] (en-tête `Retry-After`, HTTP 429 / 503) repousse le prochain créneau ; si l'attente imposée dépasse
  *   [maxPauseWaitMs], les requêtes sont refusées tout de suite au lieu de rester en file ;
- * - une attente annulée libère sa place sans consommer de créneau.
+ * - une attente annulée libère sa place sans consommer de créneau ;
+ * - NAV-5 : une requête [ApiPriority.GUIDANCE] qui arrive pendant qu'une requête [ApiPriority.BACKGROUND] est en vol l'interrompt
+ *   (l'appel est annulé) et part au créneau suivant ; la requête interrompue reprend sa place dans la file et repart ensuite,
+ *   sans que son appelant le voie. Sans cela, un appel d'arrière-plan lent (jusqu'à 15 s) retenait l'unique créneau et le recalcul
+ *   abandonnait à 10 s sans être parti. Le débit ne change pas : la requête interrompue a consommé son créneau, la suivante
+ *   attend l'intervalle, et l'appel annulé est terminé avant que le créneau soit rendu (jamais deux requêtes en vol).
  *
- * Limite connue : la priorité joue entre requêtes en attente ; une requête déjà partie n'est pas interrompue, un recalcul
- * attend donc au plus la fin de la requête en vol et le reste de l'intervalle.
+ * Limite connue : une requête [ApiPriority.INTERACTIVE] ou [ApiPriority.GUIDANCE] en vol n'est jamais interrompue ; un recalcul
+ * attend alors sa fin et le reste de l'intervalle.
  *
  * Kotlin pur : l'horloge [nowMs] (monotone) et l'attente (`delay` des coroutines) se pilotent en test par le temps virtuel.
  * Un hôte auto-hébergé n'est pas concerné ([appliesTo] faux) : [ApiClient] ne passe alors pas par le limiteur.
@@ -51,10 +63,15 @@ class ValhallaRateLimiter(
         val wake = Channel<Unit>(Channel.CONFLATED)
     }
 
+    /** Annulation d'une requête d'arrière-plan en vol au profit d'un recalcul : [withPermit] la rejoue, l'appelant ne la voit pas. */
+    private class PreemptedException : CancellationException("Requête d'arrière-plan interrompue par un recalcul")
+
     private val lock = Any()
     private val waiters = ArrayList<Waiter>()
     private var seq = 0L
     private var busy = false
+    /** Requête d'arrière-plan en vol, interruptible par un recalcul ; null si le créneau est libre ou tenu par une requête plus prioritaire. */
+    private var preemptible: Job? = null
     private var nextStartMs = NEVER
     private var pausedUntilMs = NEVER
     private var pauseHttpCode = 429
@@ -64,12 +81,32 @@ class ValhallaRateLimiter(
 
     /** Exécute [block] dans le prochain créneau libre, ou renvoie [Permit.Refused] sans l'exécuter pendant une longue pause. */
     suspend fun <T> withPermit(priority: ApiPriority = ApiPriority.BACKGROUND, block: suspend () -> T): Permit<T> {
-        acquire(priority)?.let { return it }
-        try {
-            return Permit.Ran(block())
-        } finally {
-            synchronized(lock) { busy = false; wakeAll() }
+        // Rang gardé d'un essai à l'autre : une requête interrompue ne repasse pas derrière les requêtes arrivées après elle.
+        val order = synchronized(lock) { seq++ }
+        while (true) {
+            acquire(priority, order)?.let { return it }
+            try {
+                return Permit.Ran(if (priority == ApiPriority.BACKGROUND) runPreemptible(block) else block())
+            } catch (e: PreemptedException) {
+                // Interrompue par un recalcul : retour dans la file. Une annulation de l'appelant, elle, se propage.
+                currentCoroutineContext().ensureActive()
+            } finally {
+                synchronized(lock) { busy = false; preemptible = null; wakeAll() }
+            }
         }
+    }
+
+    /** Exécute [block] dans une coroutine fille qu'un recalcul en attente peut annuler ([PreemptedException]). */
+    private suspend fun <T> runPreemptible(block: suspend () -> T): T = coroutineScope {
+        // Démarrage immédiat : la requête part dans le créneau obtenu, elle n'est interruptible qu'une fois réellement en vol.
+        val call = async(start = CoroutineStart.UNDISPATCHED) { block() }
+        val preempted = synchronized(lock) {
+            preemptible = call
+            // Un recalcul a pu se mettre en file entre l'obtention du créneau et ce point.
+            waiters.any { it.priority == ApiPriority.GUIDANCE }
+        }
+        if (preempted) call.cancel(PreemptedException())
+        call.await()
     }
 
     /**
@@ -84,8 +121,14 @@ class ValhallaRateLimiter(
     }
 
     /** Null = créneau obtenu (à rendre par [withPermit]) ; sinon le refus. */
-    private suspend fun acquire(priority: ApiPriority): Permit.Refused? {
-        val me = synchronized(lock) { Waiter(priority, seq++).also { waiters += it } }
+    private suspend fun acquire(priority: ApiPriority, order: Long): Permit.Refused? {
+        val me = synchronized(lock) {
+            Waiter(priority, order).also {
+                waiters += it
+                // NAV-5 : un recalcul n'attend pas la fin d'une requête d'arrière-plan en vol.
+                if (priority == ApiPriority.GUIDANCE) preemptible?.cancel(PreemptedException())
+            }
+        }
         try {
             while (true) {
                 var waitMs = WAIT_FOR_SIGNAL

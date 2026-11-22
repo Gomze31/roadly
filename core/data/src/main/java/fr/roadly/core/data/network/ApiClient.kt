@@ -40,7 +40,9 @@ class ApiClient @Inject constructor(
         const val THROTTLED_CALL_TIMEOUT_S = 15L
     }
 
-    suspend fun get(url: HttpUrl): Outcome<String> = execute(Request.Builder().url(url).get().build(), ApiPriority.BACKGROUND)
+    /** [retryRateLimited] faux : un HTTP 429 est rendu tout de suite (appelant qui tient son propre retrait, voir [postForm]). */
+    suspend fun get(url: HttpUrl, retryRateLimited: Boolean = true): Outcome<String> =
+        execute(Request.Builder().url(url).get().build(), ApiPriority.BACKGROUND, retryRateLimited)
 
     /**
      * [headers] : en-têtes supplémentaires (clé d'API d'un service configuré par l'utilisateur, par exemple).
@@ -57,13 +59,18 @@ class ApiClient @Inject constructor(
         priority,
     )
 
-    /** Formulaire `application/x-www-form-urlencoded` (Overpass : champ `data`). */
-    suspend fun postForm(url: HttpUrl, fields: Map<String, String>): Outcome<String> = execute(
+    /**
+     * Formulaire `application/x-www-form-urlencoded` (Overpass : champ `data`).
+     * [retryRateLimited] faux : un HTTP 429 est rendu tout de suite, sans les nouvelles tentatives de ce client — pour un
+     * appelant qui tient son propre retrait (ralentisseurs : un 429 coûtait trois requêtes avant que le retrait ne commence).
+     */
+    suspend fun postForm(url: HttpUrl, fields: Map<String, String>, retryRateLimited: Boolean = true): Outcome<String> = execute(
         Request.Builder().url(url).post(okhttp3.FormBody.Builder().apply { fields.forEach { (k, v) -> add(k, v) } }.build()).build(),
         ApiPriority.BACKGROUND,
+        retryRateLimited,
     )
 
-    private suspend fun execute(request: Request, priority: ApiPriority): Outcome<String> {
+    private suspend fun execute(request: Request, priority: ApiPriority, retryRateLimited: Boolean = true): Outcome<String> {
         val throttled = limiter.appliesTo(request.url.host)
         var attempt = 0
         while (true) {
@@ -76,7 +83,7 @@ class ApiClient @Inject constructor(
                     )
                 }
             }
-            if (outcome is Outcome.Failure && outcome.error == AppError.RateLimited && attempt < retryDelaysMs.size) {
+            if (retryRateLimited && outcome is Outcome.Failure && outcome.error == AppError.RateLimited && attempt < retryDelaysMs.size) {
                 delay(retryDelaysMs[attempt++])
                 continue
             }

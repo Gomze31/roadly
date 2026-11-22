@@ -49,9 +49,35 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         departAtEpochMs: Long,
         preferences: RoutePreferences = RoutePreferences(),
         waypoints: List<GeoPoint> = emptyList(),
+    ): Outcome<List<RouteOption>> = compute(order(preferences), origin, destination, vehicle, departAtEpochMs, preferences, waypoints)
+
+    /**
+     * Démarrage direct (voix, Android Auto, « y aller ») : seul l'itinéraire le plus rapide sert, il est donc le seul demandé.
+     * Une requête `/route` au lieu de trois (deux quand les péages sont évités). L'écran de choix garde [invoke].
+     */
+    suspend fun fastest(
+        origin: GeoPoint,
+        destination: GeoPoint,
+        vehicle: VehicleProfile?,
+        departAtEpochMs: Long,
+        preferences: RoutePreferences = RoutePreferences(),
+        waypoints: List<GeoPoint> = emptyList(),
+    ): Outcome<RouteOption> = when (val r = compute(listOf(RouteCosting.FASTEST), origin, destination, vehicle, departAtEpochMs, preferences, waypoints)) {
+        is Outcome.Success -> Outcome.Success(r.value.first())
+        is Outcome.Failure -> r
+    }
+
+    private suspend fun compute(
+        costings: List<RouteCosting>,
+        origin: GeoPoint,
+        destination: GeoPoint,
+        vehicle: VehicleProfile?,
+        departAtEpochMs: Long,
+        preferences: RoutePreferences,
+        waypoints: List<GeoPoint>,
     ): Outcome<List<RouteOption>> {
         val results = coroutineScope {
-            order(preferences).map { c ->
+            costings.map { c ->
                 async { c to safely { routing.route(RouteRequest(origin, destination, waypoints = waypoints, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) } }
             }.let { pending ->
                 // Serveur injoignable ou muet : inutile d'attendre les variantes suivantes, chacune irait jusqu'à son propre délai

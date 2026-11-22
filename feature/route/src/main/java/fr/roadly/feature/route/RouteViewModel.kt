@@ -262,25 +262,25 @@ class RouteViewModel @Inject constructor(
     }
 
     /**
-     * S5 : carte d'identité de chaque variante (part à limitation connue, temps au-dessus de 90, portiques en flux libre). Une requête
-     * `trace_attributes` par variante, mise en cache par le fournisseur (le guidage réutilise celle de la variante choisie).
+     * S5 : carte d'identité d'une variante (part à limitation connue, temps au-dessus de 90, portiques en flux libre). L'écran ne
+     * montre que celle de la variante active : son profil (`trace_attributes`) est donc le seul demandé, et celui d'une autre
+     * variante ne l'est que lorsqu'elle est choisie (VAL-2 : une requête par recherche au lieu d'une par variante, puis une par
+     * variante consultée). Le fournisseur garde les profils en mémoire ; le guidage réutilise celui de la variante choisie.
      */
     private val identities = MutableStateFlow<Map<String, RouteIdentity>>(emptyMap())
 
     init {
         val provider = routeAttributes
         if (provider != null) viewModelScope.launch {
-            computed.collectLatest { s ->
-                identities.value = emptyMap()
-                if (s !is RouteUiState.Content || s.scooter != null) return@collectLatest
-                // Variante active d'abord : c'est celle que l'écran montre.
-                val ordered = s.options.sortedByDescending { it.route.id == activeId.value }
-                val found = HashMap<String, RouteIdentity>()
-                for (o in ordered) {
-                    val r = try { provider.attributes(o.route) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
-                    // Échec (réseau, tracé non reconnu) : pas de carte pour cette variante, rien d'inventé.
-                    if (r is Outcome.Success) { found[o.route.id] = RouteIdentity.from(r.value); identities.value = found.toMap() }
-                }
+            combine(computed, activeId) { s, id -> s to id }.collectLatest { (s, id) ->
+                val options = (s as? RouteUiState.Content)?.takeIf { it.scooter == null }?.options.orEmpty()
+                // Nouvelle recherche : les cartes des tracés qui n'existent plus sont retirées (chaque tracé a son identifiant).
+                identities.value = identities.value.filterKeys { key -> options.any { it.route.id == key } }
+                val active = options.firstOrNull { it.route.id == (id ?: (s as RouteUiState.Content).activeId) } ?: return@collectLatest
+                if (active.route.id in identities.value) return@collectLatest
+                val r = try { provider.attributes(active.route) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                // Échec (réseau, tracé non reconnu) : pas de carte pour cette variante, rien d'inventé.
+                if (r is Outcome.Success) identities.value = identities.value + (active.route.id to RouteIdentity.from(r.value))
             }
         }
     }

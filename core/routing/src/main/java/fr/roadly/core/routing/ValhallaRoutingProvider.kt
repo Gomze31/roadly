@@ -253,7 +253,8 @@ class ValhallaRoutingProvider @Inject constructor(
                 )
             }
         }
-        if (geometry.isEmpty()) Outcome.Failure(AppError.NoResult) else Outcome.Success(listOf(
+        // Sans géométrie ou sans manœuvre, le tracé est inutilisable (le guidage lit la première manœuvre dès le départ).
+        if (geometry.isEmpty() || maneuvers.isEmpty()) Outcome.Failure(AppError.NoResult) else Outcome.Success(listOf(
             Route(
                 id = UUID.randomUUID().toString(),
                 costing = costing,
