@@ -75,8 +75,10 @@ internal fun NavigationGroup(s: NavigationSettings, vm: SettingsViewModel) {
             subtitle = stringResource(R.string.settings_nav_then_subtitle), icon = Icons.Default.TurnRight,
         )
         val powers = PowerSaveMode.entries.associateWith { it.label() }
-        ChoiceRow(stringResource(R.string.settings_nav_power), stringResource(R.string.settings_nav_power_subtitle), Icons.Default.BatterySaver, PowerSaveMode.entries, s.powerSaveMode, powers, vm::setPowerSaveMode)
-        // Outil de test : le guidage roule tout seul le long de l'itinéraire (ou rejoue replay.gpx), à la vitesse choisie.
+        // Outil de test (guidage qui roule tout seul, ou rejeu de replay.gpx) : versions débogables seulement, jamais chez un conducteur.
+        val testTools = fr.roadly.core.navigation.DriveSimulationGate.allowed(androidx.compose.ui.platform.LocalContext.current.applicationInfo.flags)
+        ChoiceRow(stringResource(R.string.settings_nav_power), stringResource(R.string.settings_nav_power_subtitle), Icons.Default.BatterySaver, PowerSaveMode.entries, s.powerSaveMode, powers, vm::setPowerSaveMode, last = !testTools)
+        if (testTools) {
         val simulate = vm.simulateDrive.collectAsStateWithLifecycle()
         ToggleRow(
             stringResource(R.string.settings_simulate), checked = simulate.value, onCheckedChange = vm::setSimulateDrive,
@@ -85,6 +87,7 @@ internal fun NavigationGroup(s: NavigationSettings, vm: SettingsViewModel) {
         val simulationSpeed = vm.simulationSpeed.collectAsStateWithLifecycle()
         val speeds = listOf(1, 2, 4).associateWith { stringResource(R.string.settings_simulate_speed_value, it) }
         ChoiceRow(stringResource(R.string.settings_simulate_speed), stringResource(R.string.settings_simulate_speed_subtitle), Icons.Default.Speed, listOf(1, 2, 4), simulationSpeed.value, speeds, vm::setSimulationSpeed, last = true)
+        }
     }
 }
 

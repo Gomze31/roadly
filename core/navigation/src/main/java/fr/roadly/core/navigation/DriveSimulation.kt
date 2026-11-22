@@ -88,6 +88,8 @@ class ReplayDriveSimulation @Inject constructor(
     private val prefs: UserPreferencesRepository,
 ) : DriveSimulation {
     override suspend fun start(route: Route): Boolean {
+        // Outil de test : jamais dans une version publiée, même si le réglage est resté activé (données d'une version de test).
+        if (!DriveSimulationGate.allowed(ctx.applicationInfo.flags)) return false
         if (!prefs.simulateDrive.first()) return false
         val track = gpxTrack() ?: RouteSimulation.fixes(route)
         if (track.isEmpty()) return false
@@ -107,4 +109,14 @@ class ReplayDriveSimulation @Inject constructor(
         const val GPX_FILE = "replay.gpx"
         private const val MAX_GPX_BYTES = 20L * 1024 * 1024
     }
+}
+
+/**
+ * La simulation de trajet remplace le GPS par des positions calculées : dans une version publiée, un conducteur qui l'activerait
+ * verrait son véhicule suivre l'itinéraire tout seul. Elle n'existe donc que dans les versions débogables (réglage masqué, et
+ * démarrage refusé ici même si le réglage a été activé auparavant).
+ */
+object DriveSimulationGate {
+    /** [applicationFlags] : `ApplicationInfo.flags` de l'application. */
+    fun allowed(applicationFlags: Int): Boolean = (applicationFlags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 }

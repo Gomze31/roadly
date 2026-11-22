@@ -37,6 +37,14 @@ import org.junit.Test
 class DriveSimulationTest {
     private val motorway = RealJunctions.route("motorway")
 
+    @Test fun `the simulation tool exists only in debuggable builds`() {
+        val debuggable = android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE
+        assertTrue(fr.roadly.core.navigation.DriveSimulationGate.allowed(debuggable or android.content.pm.ApplicationInfo.FLAG_HAS_CODE))
+        // Version publiée : aucun autre drapeau de l'application n'ouvre la simulation.
+        assertTrue(!fr.roadly.core.navigation.DriveSimulationGate.allowed(0))
+        assertTrue(!fr.roadly.core.navigation.DriveSimulationGate.allowed(debuggable.inv()))
+    }
+
     @Test fun `simulated drive covers the whole route at plausible speeds with bounded acceleration`() {
         val fixes = RouteSimulation.fixes(motorway)
         assertTrue(fixes.size > 200)
