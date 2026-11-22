@@ -23,4 +23,15 @@
     <string name="bg_open_app_settings">Ouvrir la fiche de l\'application</string>
     <string name="bg_warning_start">Démarrer</string>
     <string name="bg_warning_cancel">Annuler</string>
+    <string name="loc_off_title">Localisation désactivée</string>
+    <string name="loc_off_text">La localisation du téléphone est coupée : Roadly ne peut pas trouver votre position. Activez-la dans les réglages du téléphone.</string>
+    <string name="loc_off_action">Ouvrir les réglages de localisation</string>
+    <string name="loc_approx_title">Position approximative seulement</string>
+    <string name="loc_approx_text">Roadly n\'a accès qu\'à une position approximative, à plusieurs centaines de mètres près. Le guidage a besoin de la position exacte. Dans la fiche de l\'application : Autorisations › Position › activez « Utiliser la position exacte ».</string>
+    <string name="loc_approx_action">Ouvrir la fiche de l\'application</string>
+    <string name="loc_guidance_blocked">Le guidage démarrera une fois ce réglage fait.</string>
+    <string name="voice_missing_title">Voix française indisponible</string>
+    <string name="voice_missing_text">Aucune voix française n\'est installée sur ce téléphone : le guidage continue à l\'écran, sans annonces vocales. Dans les réglages du téléphone : Synthèse vocale › choisissez un moteur (« Synthèse vocale Google » par exemple) et installez les données vocales du français. La voix reviendra au prochain guidage.</string>
+    <string name="voice_missing_action">Ouvrir la synthèse vocale</string>
+    <string name="voice_missing_later">Plus tard</string>
 </resources>

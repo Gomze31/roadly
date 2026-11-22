@@ -89,6 +89,8 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     @Volatile private var volume = 1f
     private val _speaking = MutableStateFlow(false)
     override val speaking: StateFlow<Boolean> = _speaking.asStateFlow()
+    private val _voiceAvailable = MutableStateFlow(true)
+    override val voiceAvailable: StateFlow<Boolean> = _voiceAvailable.asStateFlow()
     /** Relance programmée : fin du délai de reprise avant un message de l'assistant. */
     private val drainTask = Runnable { drain() }
     /** Libération différée forcée : l'assistant n'a pas fini en [VoiceArbiter.RELEASE_DEFER_MAX_MS]. */
@@ -210,6 +212,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
             releasePending = false
             ready = false
             unavailable = false
+            _voiceAvailable.value = true
             engineGeneration++
             engine.also { engine = null }
         }
@@ -291,6 +294,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
                 if (gen != engineGeneration) return
                 Log.w(TAG, "Voix française indisponible (statut $status, langue $lang)")
                 unavailable = true
+                _voiceAvailable.value = false
                 queue.clear()
                 engine = null
                 refreshSpeaking()

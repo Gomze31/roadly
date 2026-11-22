@@ -10,6 +10,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import fr.roadly.core.navigation.BackgroundIssue
 import fr.roadly.core.navigation.BackgroundReadiness
+import fr.roadly.core.location.LocationIssue
+import fr.roadly.core.location.LocationReadiness
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,8 +84,18 @@ fun RoadlyNavHost(
     // signalés une fois par lancement de l'application. L'avertissement ne bloque rien.
     var backgroundWarned by rememberSaveable { mutableStateOf(false) }
     var pendingStart by remember { mutableStateOf<Pair<List<BackgroundIssue>, () -> Unit>?>(null) }
+    // Position : localisation coupée ou position approximative seulement. Relu au retour au premier plan (retour des réglages) et
+    // à chaque bascule de l'interrupteur ; le bandeau de l'accueil et le refus de démarrer disparaissent d'eux-mêmes.
+    var locationIssue by remember { mutableStateOf(LocationReadiness.read(context)) }
+    var locationBlocked by remember { mutableStateOf<LocationIssue?>(null) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { locationIssue = LocationReadiness.read(context) }
+    LaunchedEffect(Unit) { LocationReadiness.changes(context).collect { locationIssue = it } }
     val guardedStart: (() -> Unit) -> Unit = { block ->
-        withNotificationPermission {
+        val position = LocationReadiness.read(context)
+        locationIssue = position
+        if (StartChecks.blocksGuidance(position)) {
+            locationBlocked = position
+        } else withNotificationPermission {
             val issues = if (backgroundWarned) emptyList() else BackgroundReadiness.read(context)
             if (issues.isEmpty()) block() else { backgroundWarned = true; pendingStart = issues to block }
         }
@@ -158,6 +170,7 @@ fun RoadlyNavHost(
     }
     // Accueil du premier lancement, posé sur la carte de l'écran d'accueil (jamais par-dessus un guidage ouvert par la notification).
     if (backStackEntry?.destination?.hasRoute(HomeRoute::class) == true) {
+        locationIssue?.let { LocationIssueBanner(it, Modifier.align(androidx.compose.ui.Alignment.Center)) }
         OnboardingScreen(
             onRequestLocationPermission = onRequestLocationPermission,
             onOpenAppSettings = onOpenAppSettings,
@@ -166,6 +179,11 @@ fun RoadlyNavHost(
         )
     }
     }
+    locationBlocked?.let { issue -> LocationIssueDialog(issue, onDismiss = { locationBlocked = null }) }
+    // Voix française absente : dit une fois par lancement, quand le moteur l'a constaté (au départ du guidage).
+    val voiceAvailable by launch.voiceAvailable.collectAsStateWithLifecycle()
+    var voiceWarned by rememberSaveable { mutableStateOf(false) }
+    if (StartChecks.voiceNoticeDue(voiceAvailable, voiceWarned)) VoiceUnavailableDialog(onDismiss = { voiceWarned = true })
     pendingStart?.let { (issues, block) ->
         BackgroundWarningDialog(issues, onStart = { pendingStart = null; block() }, onDismiss = { pendingStart = null })
     }

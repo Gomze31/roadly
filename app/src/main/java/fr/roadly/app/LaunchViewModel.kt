@@ -21,7 +21,11 @@ class LaunchViewModel @Inject constructor(
     private val favorites: FavoritesRepository,
     private val updates: AppUpdateController,
     private val freeDrive: FreeDriveSession,
+    speech: fr.roadly.core.navigation.SpeechService,
 ) : ViewModel() {
+    /** Faux quand aucune voix française n'est utilisable : l'interface le signale une fois (guidage muet sinon). */
+    val voiceAvailable: kotlinx.coroutines.flow.StateFlow<Boolean> = speech.voiceAvailable
+
     /** 1.0 : la notification du service ouvre la conduite libre quand c'est elle qui tourne. */
     fun freeDriveActive(): Boolean = freeDrive.state.value is FreeDriveState.Active
 
