@@ -33,7 +33,7 @@ L'icône d'attribution de la carte redevient accessible en portrait.
 ## Contraintes globales
 
 **Environnement et commandes**
-- Travailler uniquement dans le worktree `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d`, branche `feat/roadly-3d`, base `c33efc5`.
+- Travailler uniquement dans le worktree `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d`, branche `feat/roadly-3d`, base `c33efc5`.
 - Lancer Gradle avec l'outil PowerShell, toujours avec `--offline`. Les tâches utilisées sont :
   - `.\gradlew.bat :core:navigation:testDebugUnitTest --offline -q` ;
   - `:core:map:testDebugUnitTest` ;
@@ -3118,9 +3118,9 @@ Base commune `60033fe`. L'IA modifie dans `feature/navigation` les fichiers `Nav
 - Chaînes : `nav_roundabout_desc` et `nav_lanes_desc` (4) ; `nav_then`, `nav_preview_*`, `nav_close`, `nav_sign_*` (5) ; `nav_panel_*`, `nav_destination`, `nav_trip_*` (6). Chaque ancre `strings.xml` est la dernière chaîne ajoutée par la tâche précédente.
 
 ### Fichiers critiques pour l'implémentation
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationUiState.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationViewModel.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\RoundaboutResolver.kt` (voisin du nouveau `RoundaboutGeometry.kt`)
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\map\src\main\java\fr\roadly\core\map\MapController.kt`
-- Référence de fusion (lecture seule) : `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-ai\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationUiState.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationViewModel.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\RoundaboutResolver.kt` (voisin du nouveau `RoundaboutGeometry.kt`)
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\map\src\main\java\fr\roadly\core\map\MapController.kt`
+- Référence de fusion (lecture seule) : `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-ai\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`

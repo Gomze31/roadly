@@ -94,7 +94,7 @@ Chaque correction tient dans `feature/car` et ne demande aucun changement du mot
   local a été retiré du bandeau (`goHome` n'est plus appelé) ; les lignes Domicile et Travail restent en tête de liste.
 - `car/CarMapRenderer.kt` : détail selon la vitesse (local) conservé à la place de `MapDetail.REDUCED` (origin/main), `setAerial` ajouté.
 - `CarHomeStripTest` (origin/main) échoue sur ce PC : Robolectric ne charge pas sa bibliothèque native quand le dossier utilisateur
-  contient une espace (`C:\Users\Forza%20PC\.m2\…`). Défaut d'environnement, pas du code.
+  contient une espace (`C:\Users\<nom%20avec%20espace>\.m2\…`). Défaut d'environnement, pas du code.
 
 ## À vérifier sur le DHU ou en voiture
 

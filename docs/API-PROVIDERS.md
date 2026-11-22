@@ -25,13 +25,15 @@ Aucune clé d'API n'est nécessaire pour les fournisseurs de ce document. Trois 
 
 ## 3. Base Adresse Nationale (BAN)
 
-- **Endpoints** : `GET https://api-adresse.data.gouv.fr/search/` et `GET https://api-adresse.data.gouv.fr/reverse/`.
+- **Endpoints** : `GET https://data.geopf.fr/geocodage/search/` et `GET https://data.geopf.fr/geocodage/reverse/` (service de géocodage de la Géoplateforme de l'IGN).
+- **Changement d'adresse (2026-11-22)** : l'ancienne adresse `https://api-adresse.data.gouv.fr` répond encore, mais avec les en-têtes `deprecation` et `sunset` au 31 janvier 2026 et un renvoi vers la Géoplateforme. Le défaut de l'application est donc la nouvelle adresse ; un réglage enregistré avec l'ancienne adresse suit le nouveau défaut, une adresse choisie par l'utilisateur est gardée.
+- **Vérification** : trois requêtes en tout le 2026-11-22 (une sur l'ancienne adresse, puis une `/search/` et une `/reverse/` sur la nouvelle) : HTTP 200, mêmes champs lus par l'application (`geometry.coordinates`, `label`, `name`, `type`, `postcode`, `city`, `id`). La documentation de l'IGN (cartes.gouv.fr, guide « Géocodage ») donne ces deux adresses, sans clé.
 - **Paramètres utilisés** :
   - `search` : `q` (texte saisi), `limit`, et `lat` / `lon` quand la position est connue (priorité aux résultats proches).
   - `reverse` : `lon`, `lat`.
 - **Réponse** : GeoJSON `FeatureCollection`. Chaque `Feature` porte `geometry.coordinates` (`[lon, lat]`) et des `properties` (libellé, ville, code postal, type). L'application les convertit en `Place`.
 - **Licence** : Licence Ouverte 2.0 (Etalab). Mentionner la source.
-- **Limites** : environ 50 requêtes par seconde et par IP, sans clé. Couvre uniquement la France.
+- **Limites** : 50 requêtes par seconde et par IP (documentation de l'IGN et de adresse.data.gouv.fr ; au-delà, HTTP 429 puis blocage de 5 s), sans clé. Les réponses portent aussi un en-tête `x-ratelimit-limit-second: 1` dont le sens n'est pas documenté. Usage gratuit, soumis aux conditions générales de la Géoplateforme (l'IGN peut limiter ou bloquer un usage abusif). Couvre uniquement la France.
 - **Prérequis de production** : respecter le quota (la recherche est déjà soumise à un debounce de 300 ms et à une seule requête en vol) ; prévoir un message clair en cas d'erreur 429 ou 5xx.
 - **Alternative** : Nominatim ou Pelias (auto-hébergés pour un usage intensif).
 
@@ -63,14 +65,14 @@ Pas de service : le parseur local (`CoordinateParser`, module `core:geocoding`) 
 - **Réponse** : JSON `trip` contenant le résumé (distance, durée) et, par tronçon, la géométrie en polyline encodée à précision 6 et la liste des manœuvres (type, instruction, longueur). L'application décode la polyline (précision 6) et fait correspondre les types de manœuvres à ses propres types.
 - **Erreurs** : une réponse 400 avec un code Valhalla 170, 171 ou 442 (pas d'arête proche, pas de chemin) est traitée comme « aucun résultat » et non comme une panne.
 - **Licence** : moteur sous licence MIT ; données OpenStreetMap sous ODbL.
-- **Limites** : l'instance FOSSGIS est un service public en fair-use, destiné au développement. Elle ne garantit ni disponibilité ni débit. La v1 envoie trois requêtes en parallèle (une par itinéraire : rapide, court, sans péage) à chaque comparaison.
+- **Limites** : l'instance FOSSGIS est un service public en fair-use, destiné au développement. Elle ne garantit ni disponibilité ni débit. L'écran de choix demande trois itinéraires (rapide, court, sans péage ; deux quand les péages sont déjà évités), envoyés un par un par le limiteur de débit. Le démarrage direct (voix, Android Auto) n'en demande qu'un, le plus rapide. Le budget complet d'un trajet est détaillé plus bas (« Budget de requêtes par trajet »).
 - **Prérequis de production** : Valhalla auto-hébergé (section suivante). Cette étape est aussi nécessaire pour le suivi de la limitation fix par fix (`trace_attributes`, voir plus bas) ; le profil du tracé, lui, fonctionne aussi sur l'instance publique.
 
 ### Valhalla `/trace_attributes` : profil du tracé (limitations, portiques en flux libre)
 
 - **Endpoint** : `POST <base Valhalla>/trace_attributes`, corps JSON ; implémenté par `ValhallaRouteAttributesProvider` (`core/navigation/.../RouteAttributes.kt`).
 - **Corps de requête** : `encoded_polyline` (tracé, précision 6), `shape_match` : `edge_walk`, `costing` : `auto`, filtre sur `edge.length`, `edge.speed_limit`, `edge.names`, `edge.end_node`, `node.type`, `admin.country_code`.
-- **Débit** : une requête par tracé motorisé, y compris sur l'instance publique FOSSGIS (même volume qu'un calcul d'itinéraire) ; les 6 derniers profils sont gardés en mémoire. Aucune requête à chaque position.
+- **Débit** : une requête par tracé motorisé, y compris sur l'instance publique FOSSGIS (même volume qu'un calcul d'itinéraire) ; les 6 derniers profils sont gardés en mémoire. Aucune requête à chaque position. Deux demandes simultanées du même tracé (écran de choix puis guidage) ne font qu'une requête ; une réponse inexploitable (illisible, longueurs incohérentes, refus 4xx) n'est pas redemandée pour le même tracé ; une panne passagère n'est pas retentée en boucle (une demande = une requête).
 - **Résultat** : tronçons à limitation connue et portiques de péage en flux libre (OSM `highway=toll_gantry`). Le profil est rejeté si la longueur des arêtes s'écarte de plus de 5 % de celle du tracé. Sans `maxspeed` OpenStreetMap, la limitation reste « — ».
 - **Limite** : l'instance publique reste un service en fair-use, pour le développement ; non vérifié en roulant.
 - **Alternative** : GraphHopper, OSRM.
@@ -87,6 +89,42 @@ Pas de service : le parseur local (`CoordinateParser`, module `core:geocoding`) 
 - **Débit** : au plus une requête toutes les 5 s pendant le guidage ; entre deux appels, la dernière valeur est conservée. En cas d'échec, la valeur est effacée (« — »).
 - **Limite** : `speed_limit` n'est renseigné que si OpenStreetMap porte `maxspeed` sur la route. Le format exact de la réponse n'a pas été vérifié sur une instance réelle (les tests utilisent des réponses JSON écrites à la main).
 - **Alerte de dépassement** : se déclenche seulement quand une limitation est connue (tolérance 0/5/10 km/h réglable).
+
+### Valhalla `/trace_attributes` : topologie des carrefours (vue 3D, auto-hébergé)
+
+- **Endpoint** : `POST <base Valhalla>/trace_attributes` sur une fenêtre d'environ 1,3 km autour du carrefour ; implémenté par `ValhallaJunctionTopologyProvider` (`core/navigation/.../junction/JunctionTopologyProvider.kt`).
+- **Règle de blocage** : aucune requête si l'hôte configuré est `openstreetmap.de` ou un sous-domaine (même définition que pour la limitation fix par fix, `ValhallaTraceSpeedLimitProvider.isPublicInstance`). Sur l'instance publique, la vue de carrefour se construit sans topologie (tracé et tuiles), comme elle le fait hors ligne ; le compte des sorties d'un rond-point s'appuie alors sur la seule valeur de Valhalla.
+- **Débit (auto-hébergé)** : une requête par carrefour retenu, au plus trois essais espacés de 5 s en cas d'échec, deux requêtes espacées d'au moins 4 s ; les 24 dernières topologies sont gardées en mémoire.
+
+### Overpass : ralentisseurs du tracé
+
+- **Endpoint** : `POST https://overpass-api.de/api/interpreter` (champ de formulaire `data`) ; implémenté par `OverpassSpeedBumpProvider` (`core/navigation/.../SpeedBumps.kt`). L'URL se change dans Réglages › Fournisseurs.
+- **Requête** : nœuds `traffic_calming` (dos-d'âne, plateau, coussin) des voies lentes du tracé (limitation inconnue ou ≤ 70 km/h), par paquets de 400 voies, 1 200 voies au plus par tracé.
+- **Débit** : une seule requête en vol ; au moins 10 s entre la fin d'une requête et la suivante ; les voies déjà interrogées et leurs ralentisseurs sont gardés en mémoire (5 000 voies), un tracé dont toutes les voies lentes sont connues ne coûte donc aucune requête et un tracé partiellement connu ne demande que les voies manquantes ; un tracé remplacé par un plus récent pendant l'attente n'est pas demandé.
+- **Retrait** : après un HTTP 429, un 5xx (dont 504) ou un délai dépassé, plus aucune requête pendant 60 s, durée doublée à chaque échec de suite (15 min au plus). Les tracés calculés entre-temps n'ont pas de ralentisseurs annoncés.
+- **Limites** : l'instance publique est un service communautaire ; sa politique d'usage n'a pas été relue pour ce document (l'audit du 2026-11-22 la cite comme déconseillant l'usage en serveur d'une application). L'en-tête `Retry-After` n'est pas lu (le client HTTP commun ne le transmet pas). Après un 429, ce client ne refait plus ses deux essais (2 s puis 8 s) pour les ralentisseurs : le retrait commence dès la première réponse. Les ralentisseurs d'un tracé ne viennent que des paquets de voies qui contiennent l'une de ses voies : ceux lus pour un autre trajet sur une rue parallèle ne lui sont pas attribués ; deux rues parallèles lues dans le même paquet restent indiscernables (la réponse ne dit pas à quelle voie appartient un nœud). Les autres usages d'Overpass (mode trottinette, `core/routing/.../ScooterRouting.kt` : tags des voies d'un itinéraire, lieux autour d'un point) passent par une porte commune, `OverpassGate` (`core/data/.../network/`) : une seule requête à la fois, au moins 1 s entre deux requêtes (ces appels répondent à une demande à l'écran), aucun nouvel essai après un 429, et le même retrait de 60 s à 15 min après un 429, un 5xx ou un délai dépassé. Les variantes d'une recherche, analysées en parallèle, ne redemandent plus les voies qu'elles partagent (1 requête au lieu de 3 dans `ScooterRoutingTest`). Pendant un retrait, l'analyse aboutit sans tags (agglomération, éclairage et restrictions locales « inconnus », comme lors d'une panne) et la recherche de lieux échoue tout de suite. Les ralentisseurs gardent leur propre limiteur : les deux ne se partagent pas le créneau, mais un itinéraire trottinette ne demande pas de ralentisseurs.
+- **Prérequis de production** : une instance Overpass propre ou un extrait embarqué, ou un réglage que l'utilisateur active lui-même ; à décider.
+
+### Budget de requêtes par trajet
+
+Les valeurs « après » sont **mesurées dans les tests sur des doublures** (faux fournisseur d'itinéraires, faux client HTTP, temps virtuel : `RequestBudgetTest`, `GuidanceActionsTest`, `RouteAlternativesUseCaseTest`), **jamais sur les serveurs réels**. Les valeurs « avant » viennent de la lecture du code précédent.
+
+| Moment du trajet | Service | Avant | Après |
+|---|---|---|---|
+| Démarrage direct (voix, Android Auto) | Valhalla `/route` | 3 (2 si les péages sont évités) | 1 |
+| Écran de choix des itinéraires | Valhalla `/route` | 3 (2 si les péages sont évités) | inchangé |
+| Écran de choix : carte d'identité des variantes | Valhalla `/trace_attributes` | 1 par variante affichée | inchangé |
+| Reprise d'un trajet interrompu depuis l'accueil | Valhalla `/route` | 3 | 1 (`HomeViewModelTest`) ; comme au démarrage direct, plus de repli sur une autre variante si le plus rapide échoue |
+| Départ du guidage : profil du tracé | Valhalla `/trace_attributes` | 1, ou 2 si l'écran de choix le demandait au même moment | 1 (0 s'il est déjà en mémoire) |
+| Chaque recalcul adopté | Valhalla `/route` + `/trace_attributes` | 1 + 1 | inchangé (le profil d'un nouveau tracé reste nécessaire : limitations, péages) |
+| Chaque carrefour retenu, instance publique | Valhalla `/trace_attributes` | 1 (jusqu'à 3 en cas d'échec) | 0 |
+| Chaque carrefour retenu, auto-hébergé | Valhalla `/trace_attributes` | 1 (jusqu'à 3 en cas d'échec) | inchangé |
+| Ralentisseurs du premier tracé | Overpass | 1 à 3 selon la longueur, d'affilée | 1 à 3, espacées de 10 s |
+| Ralentisseurs après un recalcul sur le même couloir | Overpass | 1 à 3 par recalcul (6 pour un tracé et cinq recalculs) | 0 (1 pour un tracé et cinq recalculs) |
+| Ralentisseurs après un recalcul par d'autres rues | Overpass | 1 à 3 | 1 le plus souvent : seules les voies nouvelles sont demandées |
+| Tracé suivant après un 504 | Overpass | 1 à 3 par tracé | 0 pendant le retrait |
+| Tracé suivant après un 429 | Overpass | 1 à 3 par tracé | 0 pendant le retrait ; le 429 lui-même coûte 1 requête (3 avant) |
+| Conduite libre, instance publique | Valhalla `/trace_attributes` | espacées selon `RoadQueryPolicy.PUBLIC` (20 s) | inchangé |
 
 ### Valhalla auto-hébergé : `docker-compose.yml` indicatif
 

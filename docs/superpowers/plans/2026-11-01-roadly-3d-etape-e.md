@@ -33,7 +33,7 @@ Emplacement proposé : `docs/superpowers/plans/2026-11-01-roadly-3d-etape-e.md`.
 ## Contraintes globales
 
 **Environnement et commandes**
-- Travailler uniquement dans le worktree `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d`, branche `feat/roadly-3d`, base `8907dd8`.
+- Travailler uniquement dans le worktree `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d`, branche `feat/roadly-3d`, base `8907dd8`.
 - Lancer Gradle avec l'outil PowerShell, toujours avec `--offline`. Les tâches utilisées sont :
   - `.\gradlew.bat :core:navigation:testDebugUnitTest --offline -q` ;
   - `:core:model:test` ;
@@ -3197,11 +3197,11 @@ Base commune `60033fe`. Ce qui suit a été vérifié par `git diff 60033fe HEAD
   - `home_resume_*` (tâche 8, après la ligne 20).
 
 ### Fichiers critiques pour l'implémentation
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\AndroidSpeechService.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\SpeechQueue.kt` (et `VoiceArbiter.kt`, nouveau, à côté)
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\NavigationSession.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\data\src\main\java\fr\roadly\core\data\repository\UserPreferencesRepository.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\AndroidSpeechService.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\SpeechQueue.kt` (et `VoiceArbiter.kt`, nouveau, à côté)
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\NavigationSession.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\data\src\main\java\fr\roadly\core\data\repository\UserPreferencesRepository.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`
 - Références de fusion (lecture seule) :
-  - `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-ai\core\assistant\src\main\java\fr\roadly\core\assistant\AssistantController.kt`
-  - `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-ai\core\navigation\src\main\java\fr\roadly\core\navigation\GuidanceActions.kt`
+  - `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-ai\core\assistant\src\main\java\fr\roadly\core\assistant\AssistantController.kt`
+  - `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-ai\core\navigation\src\main\java\fr\roadly\core\navigation\GuidanceActions.kt`

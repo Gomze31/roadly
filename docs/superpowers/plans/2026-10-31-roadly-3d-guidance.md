@@ -1147,7 +1147,7 @@ Lancer un guidage (destination à > 2 km avec au moins un virage ; si le télép
 Captures :
 
 ```bash
-adb -s (numéro de série retiré) exec-out screencap -p > "C:/Users/FORZAP~1/AppData/Local/Temp/claude/C--Users-Forza-PC-Documents-Yannis-Projet-Yannis-GPS/2cf31ddc-48c6-40e0-a417-479338457359/scratchpad/nav3d-portrait.png"
+adb -s (numéro de série retiré) exec-out screencap -p > "C:/Users/<NOMCOU~1>/AppData/Local/Temp/claude/C--Users-Forza-PC-Documents-Yannis-Projet-Yannis-GPS/2cf31ddc-48c6-40e0-a417-479338457359/scratchpad/nav3d-portrait.png"
 adb -s (numéro de série retiré) logcat -d | grep -i FATAL
 ```
 

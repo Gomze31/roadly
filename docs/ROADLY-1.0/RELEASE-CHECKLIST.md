@@ -469,7 +469,32 @@ the debug key for a local trial and appends `-debugsigned` to the version name. 
 
 ### The one failing test
 
-`CarHomeStripTest` (from origin/main) fails only on this PC. Robolectric 4.18.1, for SDK 35, opens its `android-all-instrumented` jar through a
-URL-encoded path: it looks under `Forza%20PC\.m2\...` in the Windows user folder while the file is under `Forza PC\.m2\...` (the jar is present).
-Tests on SDK 34 in `feature:navigation` are not affected. It is an environment limitation of a Windows user folder containing a space, not a
-defect of the code; CI on Linux is not concerned. Not worked around.
+`CarHomeStripTest` (from origin/main, `@Config(sdk = [35])`) failed on this PC with `AssertionError: Unable to load Robolectric native runtime
+library`, caused by `NoSuchFileException: C:\Users\<nom%20avec%20espace>\.m2\repository\org\robolectric\android-all-instrumented\15-robolectric-14663667-2-i7\...jar`.
+
+Cause, read in the Robolectric 4.18.1 source (`DefaultNativeRuntimeLoader`, line numbers match the stack trace): for SDK 35 and above the ICU data
+is copied out of the `android-all-instrumented` jar, and `androidAllArchive()` builds the jar's `File` from the text of its URL without decoding
+it, so a space in the path stays `%20`. For SDK 34 and below the ICU data is read through the classpath URL and this code is not reached. The
+defect is in Robolectric (still present on its `master` branch when checked), and it is triggered by any local Maven repository path that
+contains a character a URL escapes (here the space of the user folder), on any operating system; it is not a defect of the app or of the test.
+
+Evidence (one change at a time, same test):
+
+| Run | Result |
+|---|---|
+| SDK 35, jar under `C:\Users\<nom avec espace>\.m2\...` (unchanged) | 1 test, 1 failure |
+| SDK 35, same jar reached through the short path without a space (`-ProbolectricDir=C:/Users/<NOMCOU~1>/.m2/repository/org/robolectric/android-all-instrumented/15-robolectric-14663667-2-i7`) | 1 test, 0 failure |
+| SDK 34, nothing else changed | 1 test, 0 failure |
+| GitHub Actions `Release Android` on `ubuntu-latest`, test at SDK 35 (5 of the last 6 runs, 2026-11-09 to 2026-11-16; the sixth was cancelled) | step "Tests unitaires" succeeded |
+
+Fix applied: the test is pinned to `@Config(sdk = [34])` like the other Robolectric tests of `feature:car`. It checks the constraints of the
+Car App library templates, which do not depend on the Android level, and no assertion was changed. `:feature:car:testDebugUnitTest`: 69 tests,
+0 failure.
+
+Still true on this PC: every Robolectric test on SDK 35 (the on-demand `*Screenshots` renderings) hits the same defect; pass the
+`-ProbolectricDir=` option above (short path, that folder holds only the SDK 35 image) to run them.
+
+Linux CI: the SDK 34 image (`org.robolectric:android-all-instrumented:14-robolectric-10818077-i7`) exists on Maven Central (HTTP 200, 151 MB) and
+the Linux x86_64 native library is inside `nativeruntime-dist-compat-1.0.20.jar`; the workflow does not pass `-ProbolectricDir`, so Robolectric
+downloads from Maven Central. No CI run has yet executed a test on SDK 34 (none existed on `main` at the last run), and the workflow cannot be
+executed from this PC: the first push will be the first real proof.

@@ -83,3 +83,43 @@ Defects found and fixed earlier in the same laboratory are listed in `docs/GUIDA
 | Physical device, in-app simulation | NOT TESTED |
 | Real-world driving | NOT TESTED — protocol ready in `validation/field-tests/session-002-real-gps/JOURNEY-PROTOCOL.md` |
 | Recorded real GPX traces | none exist; the first drive should record one |
+
+## 22 November 2026 (later pass) — phone clock, coarse fixes, urban canyon, busy public server (audit NAV-2 to NAV-5)
+
+Nine new scenarios in `lab/GpsTimeAndAccuracyLabTest`, all on **synthetic GPS** (positions computed along the real `nation` and
+`motorway` routes) replayed in the production `NavigationSession`. **None was driven**; no phone, emulator or car was used. The
+laboratory gained three things for them: a clock with two time bases (phone time that can be wrong or jump, monotonic time),
+fixes stamped with a monotonic time as on a phone, and a router that goes through the real `ValhallaRateLimiter`.
+
+Run: `:core:navigation:testDebugUnitTest` → 444 tests, 0 failure, 4 skipped (JVM). Each scenario below except the "guard"
+failed before the corresponding change (for the three clock-jump scenarios the failure was observed with the laboratory clock
+collapsed to a single time base, which reproduces the previous computation).
+
+| Item | Scenario | Route | Before | After (simulated GPS, JVM) |
+|---|---|---|---|---|
+| NAV-2 | phone clock 30 s ahead of GNSS time at departure | `nation` | first 28 s of fixes dropped, « Signal GPS perdu » said | PASS: true position on the first fix, no GPS-lost badge, arrival time still on phone time |
+| NAV-2 | phone clock jumps +2 min during a 4 s gap (bridge) | `nation` | « Signal GPS perdu » and badge after 3 s | PASS: nothing said, no badge |
+| NAV-2 | phone clock set back 10 min at a tunnel entrance, 25 s without fix | `motorway` | no extrapolation, no badge, nothing said | PASS: extrapolated from 4 s, badge and « Signal GPS perdu » (once) after 10 s |
+| NAV-2 | phone clock set back 10 min after a failed reroute | `nation` | no further reroute attempt | PASS: 4 attempts, 12 s, 12 s and 22 s apart |
+| NAV-3 | 40 s tunnel with a network position every 5 s (900 m accuracy, 500 m off the road) | `motorway` | each coarse fix ended the GPS loss and restarted extrapolation | PASS: position not moved by them, badge from 10 s to the tunnel exit, « Signal GPS perdu » once, true position on the second fix after the tunnel, exit announced once |
+| NAV-4 | 45 m accuracy throughout, wrong turn | `nation` | never a reroute | PASS: reroute requested 18 s after the turn, 150 m off the route, « Recalcul » said once |
+| NAV-4 | 45 m accuracy, 20 m noise and two 130 m jumps, on the route (guard) | `nation` | no reroute | PASS: no reroute |
+| NAV-4 | 45 m accuracy to the destination, then stopped | `nation` | never arrived | PASS: arrival on the third stopped fix, 3 m from the destination |
+| NAV-5 | reroute while a 15 s background request is in flight on the public server | `nation` | reroute abandoned at 10 s without being sent, « Recalcul impossible » said | PASS: reroute sent at once and answered 1.5 s later; background request replayed after it; no two starts less than 1 s apart |
+
+What changed in the engine:
+
+- **Time (NAV-2).** Fix age, GPS silence, reroute back-off and voice delays use the monotonic clock (`SystemClock.elapsedRealtime()`
+  and `Location.elapsedRealtimeNanos`). Phone time is kept only for what is shown or stored (arrival time, trip start and end,
+  remembered guidance, toll reminder, parked vehicle).
+- **Coarse fixes (NAV-3).** A fix with an accuracy worse than 100 m is treated by guidance as no fix at all.
+- **Degraded rule (NAV-4).** After 10 consecutive fixes between 30 m and 100 m of accuracy that are consistent with each other,
+  off-route is decided on the gap minus the accuracy (145 m instead of 100 m at 45 m), and arrival on 3 consecutive fixes in the
+  arrival zone at walking pace or stopped. This supersedes finding 1 above for off-route and arrival; « maintenant » is still
+  withheld above 30 m.
+- **Public server (NAV-5).** A reroute cancels the background request in flight and takes the next slot; the cancelled request is
+  replayed afterwards. The rate (1 request per second, one in flight) is unchanged.
+
+Not covered: the thresholds (100 m, 10 fixes, 3 fixes) are reasoned, not measured — no real urban-canyon or tunnel trace exists.
+Real accuracy values in a canyon, how often a phone delivers network positions in a tunnel, and the real server's behaviour when
+a call is cancelled are NOT TESTED.
