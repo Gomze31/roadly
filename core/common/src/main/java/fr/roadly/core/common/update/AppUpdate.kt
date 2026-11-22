@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 
 /** Version installée (BuildConfig de l'application). */
@@ -100,4 +101,72 @@ object AppUpdates {
     }
 
     fun sha256(file: File): String = file.inputStream().use { sha256(it) }
+
+    /**
+     * Copie [input] vers [output] et renvoie l'empreinte SHA-256 des octets **réellement copiés** : l'empreinte vérifiée est
+     * ainsi celle de ce qui est remis à l'installateur, pas celle d'une lecture antérieure du fichier.
+     */
+    fun copyHashing(input: InputStream, output: OutputStream): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buffer)
+            if (n < 0) break
+            output.write(buffer, 0, n)
+            digest.update(buffer, 0, n)
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
+
+/**
+ * Certificats de signature d'un APK ou de l'application installée, en empreintes SHA-256 (hexadécimal).
+ * [current] : signataire(s) en vigueur ; [past] : anciens certificats d'une rotation de clé (schéma v3), sans le courant.
+ */
+data class ApkSigners(val current: Set<String>, val past: Set<String> = emptySet()) {
+    companion object {
+        fun of(current: Collection<ByteArray>, past: Collection<ByteArray> = emptyList()) =
+            ApkSigners(current.map(::digest).toSet(), past.map(::digest).toSet())
+
+        fun digest(certificate: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(certificate).joinToString("") { "%02x".format(it) }
+    }
+}
+
+enum class SignerVerdict {
+    /** Android acceptera la mise à jour (même clé, ou rotation déclarée depuis la clé installée). */
+    SAME,
+    /** Autre clé : Android refusera la mise à jour, une réinstallation est nécessaire. */
+    DIFFERENT,
+    /** Certificats illisibles d'un côté ou de l'autre : rien ne peut être affirmé. */
+    UNKNOWN,
+}
+
+/** Comparaison des signatures avant l'installation d'une mise à jour. */
+object SignerCheck {
+    /**
+     * Empreintes SHA-256 des certificats autorisés à signer une mise à jour. **Vide = aucune clé épinglée** : seule l'identité
+     * avec la clé de l'application installée est exigée. Le choix de la clé de publication est à venir ; l'épingler se fera
+     * ici, et nulle part ailleurs.
+     */
+    val PINNED_SIGNERS: Set<String> = emptySet()
+
+    fun verdict(installed: ApkSigners?, candidate: ApkSigners?, pinned: Set<String> = PINNED_SIGNERS): SignerVerdict {
+        val pins = pinned.map { it.lowercase() }.toSet()
+        val mine = installed?.current?.map { it.lowercase() }?.toSet().orEmpty()
+        val theirs = candidate?.current?.map { it.lowercase() }?.toSet().orEmpty()
+        if (theirs.isEmpty()) return SignerVerdict.UNKNOWN
+        if (pins.isNotEmpty() && !pins.containsAll(theirs)) return SignerVerdict.DIFFERENT
+        if (mine.isEmpty()) return SignerVerdict.UNKNOWN
+        if (mine == theirs) return SignerVerdict.SAME
+        // Rotation de clé : l'APK proposé déclare la clé installée parmi ses anciennes clés (un seul signataire de chaque côté).
+        val rotated = mine.size == 1 && theirs.size == 1 && candidate?.past.orEmpty().any { it.lowercase() == mine.single() }
+        return if (rotated) SignerVerdict.SAME else SignerVerdict.DIFFERENT
+    }
+
+    /** Faut-il remettre l'APK à l'installateur ? Signature illisible : oui sans clé épinglée (Android tranche), non sinon. */
+    fun mayInstall(verdict: SignerVerdict, pinned: Set<String> = PINNED_SIGNERS): Boolean = when (verdict) {
+        SignerVerdict.SAME -> true
+        SignerVerdict.DIFFERENT -> false
+        SignerVerdict.UNKNOWN -> pinned.isEmpty()
+    }
 }

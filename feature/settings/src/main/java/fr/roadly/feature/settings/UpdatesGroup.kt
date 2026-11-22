@@ -60,6 +60,8 @@ internal fun UpdatesGroup(vm: UpdatesViewModel) {
             is UpdateState.ReadyToInstall -> "Prête à installer"
             is UpdateState.NeedsPermission -> "Autorisez Roadly à installer des applications"
             is UpdateState.Installing -> "Installation : confirmez dans la fenêtre Android"
+            is UpdateState.ReinstallRequired -> "Version ${st.update.manifest.versionName} signée avec une autre clé : réinstallation nécessaire. " +
+                "Exportez vos favoris et trajets (Réglages › Données), désinstallez Roadly, puis installez cette version."
             is UpdateState.Failed -> st.message
         }
         ListRow(
@@ -93,6 +95,7 @@ internal fun UpdatesGroup(vm: UpdatesViewModel) {
                     permissionLauncher.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
                 })
                 is UpdateState.Failed -> if (st.update != null) GlassButton("Réessayer", onClick = vm::install)
+                is UpdateState.Downloading -> GlassButton("Annuler", onClick = vm::cancelDownload, style = GlassButtonStyle.Secondary)
                 else -> Unit
             }
             GlassButton("Vérifier maintenant", onClick = vm::check, style = GlassButtonStyle.Secondary, enabled = st !is UpdateState.Checking && st !is UpdateState.Downloading)

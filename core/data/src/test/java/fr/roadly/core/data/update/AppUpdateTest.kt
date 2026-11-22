@@ -1,7 +1,11 @@
 package fr.roadly.core.data.update
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CompletableDeferred
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.common.update.ApkSigners
 import fr.roadly.core.common.update.AppUpdates
 import fr.roadly.core.common.update.AppVersion
 import fr.roadly.core.common.update.GitHubRelease
@@ -10,6 +14,7 @@ import fr.roadly.core.common.update.UpdateManifest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -37,10 +42,23 @@ class FakeUpdateSettings(token: String? = null, repo: String = AppUpdates.DEFAUL
     override suspend fun setSkippedVersionCode(value: Int?) { skippedVersionCode.value = value }
 }
 
+/** Comme l'installateur réel : copie le fichier en calculant son empreinte, et refuse si elle n'est pas celle attendue. */
 class FakeInstaller(var allowed: Boolean = true) : ApkInstaller {
     val installed = mutableListOf<File>()
     override fun canInstall() = allowed
-    override suspend fun install(file: File): Outcome<Unit> { installed += file; return Outcome.Success(Unit) }
+    override suspend fun install(file: File, expectedSha256: String): Outcome<Unit> {
+        val copied = file.inputStream().use { AppUpdates.copyHashing(it, java.io.ByteArrayOutputStream()) }
+        if (!copied.equals(expectedSha256, ignoreCase = true)) return Outcome.Failure(ApkInstaller.CONTENT_CHANGED)
+        installed += file
+        return Outcome.Success(Unit)
+    }
+}
+
+/** Signatures simulées : [installed] pour l'application en place, [archive] pour tout APK téléchargé. */
+class FakeSignatures(var installed: ApkSigners? = ApkSigners(setOf("clé-a")), var archive: ApkSigners? = ApkSigners(setOf("clé-a")), var failing: Boolean = false) : ApkSignatureReader {
+    var archiveReads = 0
+    override fun installed(): ApkSigners? = installed
+    override fun archive(file: File): ApkSigners? { archiveReads++; if (failing) error("lecture impossible"); return archive }
 }
 
 class AppUpdateControllerTest {
@@ -64,8 +82,163 @@ class AppUpdateControllerTest {
         }
     }
 
-    private fun controller(source: ReleaseSource, settings: UpdateSettings = FakeUpdateSettings(), installer: ApkInstaller = FakeInstaller(), version: Int = 100, now: Long = 1_000_000_000L) =
-        AppUpdateController(source, settings, installer, AppVersion(version, "0.1.0"), 36, tmp.newFolder(), { now })
+    private fun controller(
+        source: ReleaseSource, settings: UpdateSettings = FakeUpdateSettings(), installer: ApkInstaller = FakeInstaller(), version: Int = 100, now: Long = 1_000_000_000L,
+        signatures: ApkSignatureReader = FakeSignatures(),
+    ) = AppUpdateController(source, settings, installer, signatures, AppVersion(version, "0.1.0"), 36, tmp.newFolder(), { now })
+
+    // --- Téléchargement annulé ou interrompu ---
+
+    @Test fun cancelledDownloadReturnsToAvailableAndLeavesNoFile() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val stuck = object : ReleaseSource by FakeSource() {
+            override suspend fun download(asset: ReleaseAsset, token: String?, dest: File, onProgress: (Long, Long) -> Unit): Outcome<File> {
+                File(dest.parentFile, dest.name + ".part").writeBytes(ByteArray(10)); onProgress(10, 100)
+                started.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val installer = FakeInstaller()
+        val c = controller(stuck, installer = installer)
+        val update = (c.check() as UpdateState.Available).update
+        val job = launch { c.downloadAndInstall(update) }
+        started.await()
+        assertTrue(c.state.value is UpdateState.Downloading)
+        c.cancelDownload()
+        job.join()
+        assertEquals(UpdateState.Available(update), c.state.value)
+        assertTrue("aucun fichier partiel ne reste", tmp.root.walk().none { it.isFile })
+        assertTrue(installer.installed.isEmpty())
+    }
+
+    @Test fun downloadInterruptedByItsCallerDoesNotLeaveTheStateStuck() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val stuck = object : ReleaseSource by FakeSource() {
+            override suspend fun download(asset: ReleaseAsset, token: String?, dest: File, onProgress: (Long, Long) -> Unit): Outcome<File> {
+                started.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val c = controller(stuck)
+        val update = (c.check() as UpdateState.Available).update
+        // L'écran qui a lancé le téléchargement est fermé.
+        val job = launch { c.downloadAndInstall(update) }
+        started.await()
+        job.cancel(); job.join()
+        assertEquals(UpdateState.Available(update), c.state.value)
+        // La vérification automatique n'est plus bloquée par un état « téléchargement » fantôme.
+        c.cancelDownload()
+        assertEquals(UpdateState.Available(update), c.check())
+    }
+
+    @Test fun cancelWithoutADownloadDoesNothing() = runTest {
+        val c = controller(FakeSource())
+        c.cancelDownload()
+        assertEquals(UpdateState.Idle, c.state.value)
+    }
+
+    // --- REL-2 / SEC-1 : signature comparée avant l'installation ---
+
+    @Test fun updateSignedWithAnotherKeyIsNeverHandedToTheInstaller() = runTest {
+        val installer = FakeInstaller()
+        val settings = FakeUpdateSettings()
+        val c = controller(FakeSource(), settings, installer, signatures = FakeSignatures(installed = ApkSigners(setOf("clé-debug")), archive = ApkSigners(setOf("clé-publication"))))
+        val update = (c.check() as UpdateState.Available).update
+        c.downloadAndInstall(update)
+        assertEquals(UpdateState.ReinstallRequired(update), c.state.value)
+        assertTrue(installer.installed.isEmpty())
+        // L'APK inutilisable ne reste pas sur l'appareil.
+        assertTrue(tmp.root.walk().none { it.name.endsWith(".apk") })
+    }
+
+    @Test fun updateSignedWithAnotherKeyIsNotOfferedAgain() = runTest {
+        val installer = FakeInstaller()
+        val settings = FakeUpdateSettings()
+        val signatures = FakeSignatures(installed = ApkSigners(setOf("clé-debug")), archive = ApkSigners(setOf("clé-publication")))
+        val c = controller(FakeSource(), settings, installer, signatures = signatures)
+        c.downloadAndInstall((c.check() as UpdateState.Available).update)
+        // Ni invite automatique, ni état « disponible » : pas de boucle téléchargement → refus.
+        assertNull(c.promptable())
+        assertEquals(150, settings.skippedVersionCode.value)
+        settings.lastCheckAtMs.value = 0
+        c.checkIfDue()
+        assertTrue(c.state.value is UpdateState.ReinstallRequired)
+        assertNull(c.promptable())
+        assertTrue(c.check() is UpdateState.ReinstallRequired)
+        // « Installer » ou « Réessayer » ne font rien dans cet état.
+        c.install()
+        assertTrue(c.state.value is UpdateState.ReinstallRequired)
+        assertEquals(1, signatures.archiveReads)
+        assertTrue(installer.installed.isEmpty())
+    }
+
+    @Test fun aLaterVersionIsOfferedAgainAfterAKeyMismatch() = runTest {
+        val source = FakeSource()
+        val signatures = FakeSignatures(installed = ApkSigners(setOf("clé-debug")), archive = ApkSigners(setOf("clé-publication")))
+        val installer = FakeInstaller()
+        val c = controller(source, installer = installer, signatures = signatures)
+        c.downloadAndInstall((c.check() as UpdateState.Available).update)
+        // Version suivante, cette fois signée avec la clé de l'application installée.
+        source.manifest = source.manifest.copy(versionCode = 151, versionName = "0.2.1")
+        signatures.archive = ApkSigners(setOf("clé-debug"))
+        val next = c.check()
+        assertTrue(next is UpdateState.Available)
+        assertEquals(151, c.promptable()!!.manifest.versionCode)
+        c.downloadAndInstall((next as UpdateState.Available).update)
+        assertEquals(1, installer.installed.size)
+    }
+
+    @Test fun declaredKeyRotationIsInstalled() = runTest {
+        val installer = FakeInstaller()
+        val c = controller(FakeSource(), installer = installer, signatures = FakeSignatures(installed = ApkSigners(setOf("ancienne")), archive = ApkSigners(setOf("nouvelle"), past = setOf("ancienne"))))
+        c.downloadAndInstall((c.check() as UpdateState.Available).update)
+        assertEquals(1, installer.installed.size)
+    }
+
+    @Test fun unreadableSignatureIsLeftToAndroidWhileNoKeyIsPinned() = runTest {
+        // Lecture impossible (null ou exception) : pas de faux « réinstallation nécessaire » ; Android reste le juge.
+        for (signatures in listOf(FakeSignatures(archive = null), FakeSignatures(installed = null), FakeSignatures(failing = true))) {
+            val installer = FakeInstaller()
+            val c = controller(FakeSource(), installer = installer, signatures = signatures)
+            c.downloadAndInstall((c.check() as UpdateState.Available).update)
+            assertEquals(1, installer.installed.size)
+            assertTrue(c.state.value is UpdateState.Installing)
+        }
+    }
+
+    @Test fun corruptedDownloadIsRejectedBeforeAnySignatureCheck() = runTest {
+        val signatures = FakeSignatures()
+        val c = controller(FakeSource(corrupt = true), signatures = signatures)
+        c.downloadAndInstall((c.check() as UpdateState.Available).update)
+        assertEquals(0, signatures.archiveReads)
+        assertTrue(c.state.value is UpdateState.Failed)
+    }
+
+    // --- SEC-7 : le fichier ne peut pas changer entre sa vérification et son installation ---
+
+    @Test fun fileChangedAfterVerificationIsNotInstalled() = runTest {
+        val installer = FakeInstaller(allowed = false)
+        val c = controller(FakeSource(), installer = installer)
+        c.downloadAndInstall((c.check() as UpdateState.Available).update)
+        assertTrue(c.state.value is UpdateState.NeedsPermission)
+        // Le fichier vérifié est remplacé pendant que l'utilisateur accorde l'autorisation.
+        val file = tmp.root.walk().first { it.name.endsWith(".apk") }
+        file.writeBytes("contenu substitué".toByteArray())
+        installer.allowed = true
+        c.install()
+        assertTrue(installer.installed.isEmpty())
+        val failed = c.state.value as UpdateState.Failed
+        assertTrue(failed.message.contains("modifié"))
+        assertFalse(file.exists())
+        // « Réessayer » repart d'un téléchargement neuf.
+        c.downloadAndInstall(failed.update!!)
+        assertEquals(1, installer.installed.size)
+    }
+
+    @Test fun downloadGuardsHaveReadableMessages() {
+        assertTrue(GitHubErrors.message(GitHubReleaseSource.UNTRUSTED_HOST, false).contains("GitHub"))
+        assertTrue(GitHubErrors.message(GitHubReleaseSource.TOO_LARGE, false).contains("volumineux"))
+    }
 
     @Test fun newerReleaseIsDownloadedVerifiedAndInstalled() = runTest {
         val installer = FakeInstaller()
@@ -160,8 +333,110 @@ class GitHubReleaseSourceTest {
     private lateinit var source: GitHubReleaseSource
     @get:Rule val tmp = TemporaryFolder()
 
-    @Before fun setUp() { server.start(); source = GitHubReleaseSource(OkHttpClient(), server.url("/").toString(), Dispatchers.Unconfined) }
+    // Serveur local en HTTP : la liste d'hôtes GitHub est remplacée par « tout accepter », sauf dans les tests qui la vérifient.
+    @Before fun setUp() { server.start(); source = GitHubReleaseSource(OkHttpClient(), server.url("/").toString(), Dispatchers.Unconfined, allowed = { true }) }
     @After fun tearDown() = server.shutdown()
+
+    private fun otherHost(path: String) = server.url(path).let { it.newBuilder().host(if (it.host == "localhost") "127.0.0.1" else "localhost").build() }
+    private fun sourceTrustingOnlyTheServer(maxText: Long = GitHubReleaseSource.MAX_TEXT_BYTES, maxApk: Long = GitHubReleaseSource.MAX_APK_BYTES) =
+        GitHubReleaseSource(OkHttpClient(), server.url("/").toString(), Dispatchers.Unconfined, allowed = { it.host == server.url("/").host }, maxTextBytes = maxText, maxApkBytes = maxApk)
+
+    // --- SEC-6 : hôtes acceptés ---
+
+    @Test fun onlyGitHubHostsOverHttpsAreAllowedByDefault() {
+        fun allowed(url: String) = GitHubHosts.isAllowed(url.toHttpUrl())
+        assertTrue(allowed("https://api.github.com/repos/Gomze31/roadly/releases/latest"))
+        assertTrue(allowed("https://API.GitHub.com/repos/x/y/releases/assets/1"))
+        assertTrue(allowed("https://github.com/Gomze31/roadly/releases/download/v1/roadly.apk"))
+        assertTrue(allowed("https://objects.githubusercontent.com/github-production-release-asset/x"))
+        assertTrue(allowed("https://release-assets.githubusercontent.com/github-production-release-asset/x"))
+        assertFalse(allowed("http://api.github.com/repos/x/y/releases/latest"))
+        assertFalse(allowed("https://api.github.com.evil.example/repos/x/y"))
+        assertFalse(allowed("https://evilgithub.com/x.apk"))
+        assertFalse(allowed("https://raw.githubusercontent.com/x/y/main/roadly.apk"))
+        assertFalse(allowed("https://example.org/roadly.apk"))
+        assertFalse(allowed("https://api.github.com@evil.example/x"))
+    }
+
+    @Test fun defaultAllowListRefusesAnyOtherServerWithoutContactingIt() = runTest {
+        val strict = GitHubReleaseSource(OkHttpClient(), server.url("/").toString(), Dispatchers.Unconfined)
+        assertEquals(GitHubReleaseSource.UNTRUSTED_HOST, (strict.latest("Gomze31", "roadly", "github_pat_abc") as Outcome.Failure).error)
+        val asset = ReleaseAsset(1, "roadly.apk", 10, server.url("/assets/1").toString())
+        assertEquals(GitHubReleaseSource.UNTRUSTED_HOST, (strict.text(asset, null) as Outcome.Failure).error)
+        val dest = File(tmp.root, "roadly.apk")
+        assertEquals(GitHubReleaseSource.UNTRUSTED_HOST, (strict.download(asset, null, dest) { _, _ -> } as Outcome.Failure).error)
+        assertEquals(0, server.requestCount)
+        assertFalse(dest.exists())
+    }
+
+    @Test fun assetAddressOnAnUntrustedHostIsNotFetched() = runTest {
+        val strict = sourceTrustingOnlyTheServer()
+        val asset = ReleaseAsset(1, "roadly.apk", 10, otherHost("/assets/1").toString())
+        assertEquals(GitHubReleaseSource.UNTRUSTED_HOST, (strict.text(asset, null) as Outcome.Failure).error)
+        assertEquals(GitHubReleaseSource.UNTRUSTED_HOST, (strict.download(asset, null, File(tmp.root, "x.apk")) { _, _ -> } as Outcome.Failure).error)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test fun redirectToAnUntrustedHostIsNotFollowed() = runTest {
+        val strict = sourceTrustingOnlyTheServer()
+        val asset = ReleaseAsset(9, "roadly.apk", 10, server.url("/repos/Gomze31/roadly/releases/assets/9").toString())
+        val dest = File(tmp.root, "roadly.apk")
+        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", otherHost("/ailleurs/roadly.apk").toString()))
+        assertEquals(GitHubReleaseSource.UNTRUSTED_HOST, (strict.download(asset, null, dest) { _, _ -> } as Outcome.Failure).error)
+        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", otherHost("/ailleurs/update.json").toString()))
+        assertEquals(GitHubReleaseSource.UNTRUSTED_HOST, (strict.text(asset, null) as Outcome.Failure).error)
+        // Seules les deux requêtes initiales sont parties : la cible des redirections n'a rien reçu.
+        assertEquals(2, server.requestCount)
+        assertFalse(dest.exists())
+    }
+
+    @Test fun redirectToATrustedHostIsFollowed() = runTest {
+        val strict = sourceTrustingOnlyTheServer()
+        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", server.url("/signed/update.json").toString()))
+        server.enqueue(MockResponse().setBody("{}"))
+        assertEquals("{}", (strict.text(ReleaseAsset(2, "update.json", 2, server.url("/assets/2").toString()), null) as Outcome.Success).value)
+    }
+
+    // --- SEC-6 : tailles bornées ---
+
+    @Test fun sizeLimitsAreOneAndTwoHundredMebibytes() {
+        assertEquals(1_048_576L, GitHubReleaseSource.MAX_TEXT_BYTES)
+        assertEquals(209_715_200L, GitHubReleaseSource.MAX_APK_BYTES)
+    }
+
+    @Test fun oversizedManifestOrReleaseIsRefused() = runTest {
+        val small = sourceTrustingOnlyTheServer(maxText = 64)
+        val asset = ReleaseAsset(2, "update.json", 2, server.url("/assets/2").toString())
+        server.enqueue(MockResponse().setBody("x".repeat(64)))
+        assertEquals(64, (small.text(asset, null) as Outcome.Success).value.length)
+        server.enqueue(MockResponse().setBody("x".repeat(65)))
+        assertEquals(GitHubReleaseSource.TOO_LARGE, (small.text(asset, null) as Outcome.Failure).error)
+        // Taille non annoncée (transfert par morceaux) : la limite porte sur les octets reçus.
+        server.enqueue(MockResponse().setChunkedBody("x".repeat(500), 16))
+        assertEquals(GitHubReleaseSource.TOO_LARGE, (small.text(asset, null) as Outcome.Failure).error)
+        server.enqueue(MockResponse().setBody("""{"tag_name":"v1","body":"${"n".repeat(100)}","assets":[]}"""))
+        assertEquals(GitHubReleaseSource.TOO_LARGE, (small.latest("Gomze31", "roadly", null) as Outcome.Failure).error)
+    }
+
+    @Test fun oversizedApkIsRefusedAndLeavesNoFile() = runTest {
+        val small = sourceTrustingOnlyTheServer(maxApk = 1000)
+        val dest = File(tmp.root, "roadly.apk")
+        val url = server.url("/assets/9").toString()
+        // Taille annoncée par la release : aucune requête.
+        assertEquals(GitHubReleaseSource.TOO_LARGE, (small.download(ReleaseAsset(9, "roadly.apk", 1001, url), null, dest) { _, _ -> } as Outcome.Failure).error)
+        assertEquals(0, server.requestCount)
+        // Taille annoncée par le serveur.
+        server.enqueue(MockResponse().setBody(okio.Buffer().write(ByteArray(1001))))
+        assertEquals(GitHubReleaseSource.TOO_LARGE, (small.download(ReleaseAsset(9, "roadly.apk", 10, url), null, dest) { _, _ -> } as Outcome.Failure).error)
+        // Taille non annoncée : arrêt dès que la limite est dépassée.
+        server.enqueue(MockResponse().setChunkedBody(okio.Buffer().write(ByteArray(5000)), 256))
+        assertEquals(GitHubReleaseSource.TOO_LARGE, (small.download(ReleaseAsset(9, "roadly.apk", 10, url), null, dest) { _, _ -> } as Outcome.Failure).error)
+        assertTrue(tmp.root.listFiles().orEmpty().isEmpty())
+        // Juste à la limite : accepté.
+        server.enqueue(MockResponse().setBody(okio.Buffer().write(ByteArray(1000))))
+        assertTrue(small.download(ReleaseAsset(9, "roadly.apk", 10, url), null, dest) { _, _ -> } is Outcome.Success)
+        assertEquals(1000L, dest.length())
+    }
 
     @Test fun latestSendsTokenAndApiHeaders() = runTest {
         server.enqueue(MockResponse().setBody("""{"tag_name":"v1","assets":[]}"""))

@@ -45,6 +45,7 @@ class UpdatesViewModel @Inject constructor(
             }
         }
     }
+    fun cancelDownload() = controller.cancelDownload()
     /** Retour des réglages Android « sources inconnues » : relance l'installation si l'autorisation est accordée. */
     fun onPermissionScreenClosed() { viewModelScope.launch { if (controller.state.value is UpdateState.NeedsPermission) controller.install() } }
     /** Vide = garder le dépôt actuel ; valeur invalide refusée à la vérification. */

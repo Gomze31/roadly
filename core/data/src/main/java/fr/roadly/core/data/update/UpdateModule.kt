@@ -19,13 +19,14 @@ import javax.inject.Singleton
 abstract class UpdateModule {
     @Binds abstract fun settings(impl: DataStoreUpdateSettings): UpdateSettings
     @Binds abstract fun installer(impl: PackageApkInstaller): ApkInstaller
+    @Binds abstract fun signatures(impl: PackageSignatureReader): ApkSignatureReader
 
     companion object {
         @Provides @Singleton
         fun source(client: OkHttpClient): ReleaseSource = GitHubReleaseSource(client)
 
         @Provides @Singleton
-        fun controller(source: ReleaseSource, settings: UpdateSettings, installer: ApkInstaller, version: AppVersion, @ApplicationContext ctx: Context): AppUpdateController =
-            AppUpdateController(source, settings, installer, version, Build.VERSION.SDK_INT, File(ctx.cacheDir, "updates"))
+        fun controller(source: ReleaseSource, settings: UpdateSettings, installer: ApkInstaller, signatures: ApkSignatureReader, version: AppVersion, @ApplicationContext ctx: Context): AppUpdateController =
+            AppUpdateController(source, settings, installer, signatures, version, Build.VERSION.SDK_INT, File(ctx.cacheDir, "updates"))
     }
 }
