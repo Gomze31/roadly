@@ -1,0 +1,64 @@
+# Vérification des contributions : tests JVM, compilation release non signée, contrôle des licences.
+# Aucun secret n'est utilisé ni accessible ici, et le jeton du dépôt est en lecture seule. Ce workflow est le seul qui
+# exécute le code d'une pull request ; la signature et la publication sont dans release.yml, qui n'a pas de déclencheur
+# « pull_request ». Ne jamais remplacer « pull_request » par « pull_request_target » : cela donnerait les secrets du dépôt
+# au code d'un contributeur.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]   # main est vérifié par release.yml avant toute publication
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # Actions épinglées à un commit, comme dans release.yml.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0               # versionCode = nombre de commits
+          persist-credentials: false
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Licences Android SDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        with:
+          # Une contribution lit le cache mais ne l'écrit pas : elle ne peut pas empoisonner les compilations suivantes.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Tests unitaires
+        run: ./gradlew testDebugUnitTest :core:model:test :core:common:test :core:scooter:test :core:radar:test --stacktrace
+
+      # Variante release, non signée : c'est celle que release.yml construit avant la signature. Aucune clé n'existe ici.
+      - name: Compilation release non signée
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      # Échoue si une bibliothèque sous une licence hors liste est ajoutée, ou si THIRD_PARTY_LICENSES.md n'est plus à jour.
+      - name: Licences des dépendances
+        run: python3 tools/licenses/third_party_licenses.py --check
+
+      # Aucun fichier de clé ne doit entrer dans le dépôt, quel que soit son nom dans .gitignore.
+      - name: Fichiers interdits
+        run: |
+          FOUND=$(git ls-files | grep -E -i '\.(jks|keystore|p12|pfx|pem)$|(^|/)(local|keystore)\.properties$|(^|/)\.env' || true)
+          if [ -n "$FOUND" ]; then
+            echo "::error::Fichiers de clé ou de configuration locale suivis par git : $FOUND"
+            exit 1
+          fi

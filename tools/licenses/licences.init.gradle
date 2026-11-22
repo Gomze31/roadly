@@ -1,0 +1,37 @@
+// Script d'initialisation utilisé par third_party_licenses.py : pour chaque module du classpath d'exécution release de :app,
+// écrit la licence déclarée dans son POM (ou dans son POM parent). Les POM sont résolus par Gradle lui-même, depuis les dépôts
+// du projet : aucune dépendance au contenu du cache local.
+allprojects {
+    if (path == ':app') {
+        tasks.register('roadlyLicences') {
+            doLast {
+                def pomOf = { String g, String a, String v ->
+                    try {
+                        configurations.detachedConfiguration(dependencies.create("$g:$a:$v@pom")).resolve().first()
+                    } catch (Exception ignored) {
+                        null
+                    }
+                }
+                def licence
+                licence = { String g, String a, String v, int depth ->
+                    def file = pomOf(g, a, v)
+                    if (file == null) return null
+                    def xml = new groovy.xml.XmlSlurper(false, false).parse(file)
+                    def names = xml.licenses.license.collect { it.name.text().trim() }.findAll { it }
+                    if (names) return [names.join(' / '), xml.licenses.license[0].url.text().trim()]
+                    if (xml.parent.size() > 0 && depth < 5) {
+                        return licence(xml.parent.groupId.text().trim(), xml.parent.artifactId.text().trim(), xml.parent.version.text().trim(), depth + 1)
+                    }
+                    return ['', '']
+                }
+                configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.allComponents
+                    .collect { it.id }
+                    .findAll { it instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+                    .each { id ->
+                        def found = licence(id.group, id.module, id.version, 0)
+                        println "ROADLY_LICENCE|${id.group}|${id.module}|${id.version}|${found == null ? 'POM_INTROUVABLE' : found[0]}|${found == null ? '' : found[1]}"
+                    }
+            }
+        }
+    }
+}

@@ -1,0 +1,91 @@
+name: Signaler un bug
+description: Roadly fait autre chose que ce qui est attendu
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci. Deux règles avant d'écrire :
+        - **Une faille de sécurité ne se signale pas ici** : voir SECURITY.md (signalement privé).
+        - **Aucune donnée personnelle** : pas de trace GPS de vos trajets, pas de capture montrant votre domicile ou votre
+          trajet habituel, pas de jeton. Tout ce qui est écrit ici est public.
+  - type: input
+    id: version
+    attributes:
+      label: Version de Roadly
+      description: Réglages › Mises à jour, par exemple « 1.0.3 (240) ».
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Origine de l'application
+      options:
+        - Version officielle (release GitHub du dépôt officiel)
+        - Compilée par moi
+        - Autre ou inconnue
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Téléphone et version d'Android
+      placeholder: Pixel 8, Android 15
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Partie concernée
+      options:
+        - Guidage et voix
+        - Itinéraires
+        - Carte
+        - Recherche
+        - Android Auto
+        - Mise à jour intégrée
+        - Sauvegarde (export, import)
+        - Réglages
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      description: Dans l'ordre. Remplacez les adresses réelles par des lieux publics (une gare, une mairie).
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ce qui était attendu
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Ce qui s'est passé
+      description: Message affiché, mot pour mot, s'il y en a un.
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Fréquence
+      options:
+        - À chaque fois
+        - Souvent
+        - Une seule fois
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Vérification
+      options:
+        - label: Ce signalement ne contient ni trace de mes trajets, ni adresse personnelle, ni jeton.
+          required: true
