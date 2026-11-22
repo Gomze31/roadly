@@ -92,9 +92,18 @@ interface VigilanceZoneDao {
     suspend fun replaceAll(rows: List<VigilanceZoneEntity>) { clear(); rows.chunked(500).forEach { insertAll(it) } }
 }
 
+/** Toutes les colonnes de `trips` sauf le tracé, rendu vide. À tenir à jour avec [TripEntity] (vérifié par `TripSummaryQueryTest`). */
+const val TRIP_SUMMARY_SQL = "SELECT id, startedAt, endedAt, destinationName, distanceM, durationS, maxSpeedKmh, costEur, arrived, '' AS pointsCsv, " +
+    "travelMode, ascentM, descentM, energyModelWh, batteryStartPct, batteryEndPct, scooterProfileId FROM trips ORDER BY startedAt DESC"
+
 @Dao
 interface TripDao {
-    @Query("SELECT * FROM trips ORDER BY startedAt DESC") fun observeAll(): Flow<List<TripEntity>>
+    /**
+     * Liste des trajets **sans leur tracé** (`pointsCsv` vide) : listes et statistiques n'ont besoin que des totaux. Charger chaque
+     * tracé complet ralentissait ces écrans à mesure que l'historique grandissait, et un très long trajet pouvait dépasser la
+     * taille maximale d'une ligne lue (2 Mo). Le tracé se lit à la demande avec [byId].
+     */
+    @Query(TRIP_SUMMARY_SQL) fun observeSummaries(): Flow<List<TripEntity>>
     @Query("SELECT * FROM trips WHERE id = :id") suspend fun byId(id: Long): TripEntity?
     @Insert suspend fun insert(trip: TripEntity): Long
     @Query("DELETE FROM trips WHERE id = :id") suspend fun delete(id: Long)
