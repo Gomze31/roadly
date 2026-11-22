@@ -118,6 +118,48 @@ class GuidanceActionsTest {
         assertEquals(listOf(tracker.pointAt(900.0)), requests.last().waypoints)
     }
 
+    @Test fun `an automatic reroute after leaving the route keeps the stops still ahead`() = runTest {
+        val (session, actions) = fixture()
+        val passed = place("passed", tracker.pointAt(200.0))
+        val ahead = place("ahead", tracker.pointAt(1_300.0))
+        guideAt(actions, 900.0, stops = listOf(passed, ahead))
+        requests.clear()
+        // 150 m au nord du tracé : hors itinéraire au premier fix, la session recalcule d'elle-même (sans passer par GuidanceActions).
+        location.emit(LocationFix(TestRoutes.north(tracker.pointAt(920.0), 150.0), 0f, 10f, 5f, 1_000L))
+        runCurrent()
+        assertEquals("un recalcul automatique", 1, requests.size)
+        assertEquals("l'arrêt encore devant reste une étape, celui déjà passé non", listOf(ahead.point), requests.single().waypoints)
+        assertTrue(requests.single().reroute)
+        // Le nouveau tracé adopté, l'arrêt est toujours dû (replacé sur le nouveau tracé).
+        location.emit(LocationFix(tracker.pointAt(930.0), 90f, 10f, 5f, 2_000L))
+        runCurrent()
+        assertEquals("r1", (session.state.value as NavigationState.Guiding).route.id)
+        assertEquals(listOf("ahead"), actions.remainingStops().map { it.id })
+    }
+
+    @Test fun `scooter or bicycle mode - the car shortcut used by voice and Android Auto is refused`() = runTest {
+        val d = StandardTestDispatcher(testScheduler)
+        val dispatchers = object : DispatcherProvider {
+            override val io: CoroutineDispatcher = d; override val default: CoroutineDispatcher = d; override val main: CoroutineDispatcher = d
+        }
+        val clock = NavigationClock { testScheduler.currentTime }
+        for (mode in listOf(fr.roadly.core.model.TravelMode.ELECTRIC_SCOOTER, fr.roadly.core.model.TravelMode.BICYCLE)) {
+            val (session, _) = fixture()
+            val actions = GuidanceActions(
+                session, RouteAlternativesUseCase(routing), routing, location, prefs, vehicles, clock,
+                fr.roadly.core.data.testing.FakeMobilityPreferencesRepository(mode),
+            )
+            location.emit(LocationFix(tracker.pointAt(0.0), 90f, 0f, 5f, 0L)); runCurrent()
+            requests.clear()
+            assertEquals(Outcome.Failure(AppError.Unknown(LIGHT_VEHICLE_REFUSED)), actions.startTo(place("dest", tracker.pointAt(1_000.0))))
+            assertEquals("aucun itinéraire automobile demandé", 0, requests.size)
+            assertTrue(session.state.value is NavigationState.Idle)
+        }
+        // Voiture (ou mode jamais choisi) : le raccourci fonctionne.
+        val (_, car) = fixture()
+        assertTrue(car.startTo(place("dest", tracker.pointAt(1_000.0))) is Outcome.Success)
+    }
+
     @Test fun `without guidance, route changes fail with NoResult`() = runTest {
         val (_, actions) = fixture()
         assertEquals(Outcome.Failure(AppError.NoResult), actions.recalculate())

@@ -119,6 +119,13 @@ class NavigationSession @Inject constructor(
      * (définitivement, de façon synchrone) au premier départ, arrêt ou « Ignorer » : l'effacement DataStore étant asynchrone, la course
      * qu'on vient d'arrêter n'est ainsi jamais proposée, même quelques images.
      */
+    /**
+     * Arrêts encore à desservir, demandés à chaque recalcul automatique (la session ne connaît que le tracé ; les arrêts sont
+     * tenus par [GuidanceActions]). Sans cela, un virage manqué recalculait droit vers la destination et les arrêts prévus
+     * disparaissaient sans un mot.
+     */
+    @Volatile var rerouteWaypoints: () -> List<GeoPoint> = { emptyList() }
+
     private val resumeOfferOpen = MutableStateFlow(true)
 
     /**
@@ -183,7 +190,9 @@ class NavigationSession @Inject constructor(
         destinationName: String? = null,
     ) {
         // Un départ qui ne prolonge pas une course en cours repart sans portique franchi (le précédent rappel a déjà été enregistré).
-        if (_state.value !is NavigationState.Guiding) persistTollReminder()
+        // Changement d'itinéraire en cours de guidage (variante, arrêt ajouté, recalcul manuel) : c'est le même trajet qui continue.
+        val alreadyGuiding = _state.value is NavigationState.Guiding
+        if (!alreadyGuiding) persistTollReminder()
         cancelRun(null)
         val previousDestination = lastOption?.route?.geometry?.lastOrNull()
         val sameDestination = previousDestination != null &&
@@ -212,7 +221,9 @@ class NavigationSession @Inject constructor(
                 _state.value = it.guiding(tracker.initialProgress(), it.startedAtMs, gpsLost = false)
             }
         }
-        tripRecorder.begin(option.label, clock.nowMs())
+        // Trajet enregistré sous le nom de la destination (pas « Le plus rapide »), et une seule fois : le recommencer à chaque
+        // changement d'itinéraire effaçait le parcours déjà fait.
+        if (!(alreadyGuiding && sameDestination)) tripRecorder.begin(name ?: option.label, clock.nowMs())
         if (scooter != null) {
             tripRecorder.setContext(TripContext(TravelMode.ELECTRIC_SCOOTER, scooter.request.profile.id.takeIf { it != 0L }, scooter.batteryPct?.roundToInt()))
         }
@@ -883,7 +894,7 @@ class NavigationSession @Inject constructor(
                             RouteRequest(
                                 origin = fix.point, destination = destination, costing = costing,
                                 preferences = routePreferences, originHeadingDeg = heading, vehicle = vehicle,
-                                scooter = scooter?.request, reroute = true,
+                                scooter = scooter?.request, reroute = true, waypoints = rerouteWaypoints(),
                             ),
                         )
                     }

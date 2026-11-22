@@ -86,6 +86,8 @@ class HomeViewModel @Inject constructor(
     private val routing: RoutingProvider? = null,
     /** Carte « Départ » (null dans les tests existants : départ immédiat, carte inactive). */
     private val departurePlanner: DeparturePlanner? = null,
+    /** Mode de déplacement (null dans les tests existants : voiture). */
+    private val mobility: fr.roadly.core.data.repository.MobilityPreferencesRepository? = null,
 ) : ViewModel() {
     /** Fond de carte en photos aériennes IGN : bascule rapide depuis l'accueil (même réglage que dans Réglages › Navigation). */
     val mapAerial: StateFlow<Boolean> = prefs.mapAerial.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -221,6 +223,13 @@ class HomeViewModel @Inject constructor(
         if (resumePhase.value == ResumePhase.ROUTING) return true
         resumePhase.value = ResumePhase.ROUTING
         resumeJob = viewModelScope.launch {
+            // Trottinette ou vélo : la reprise calcule un itinéraire automobile (voies rapides comprises). Elle est refusée ;
+            // l'itinéraire adapté se recalcule depuis l'écran des itinéraires.
+            val mode = mobility?.travelMode?.first()
+            if (mode == fr.roadly.core.model.TravelMode.ELECTRIC_SCOOTER || mode == fr.roadly.core.model.TravelMode.BICYCLE) {
+                resumePhase.value = ResumePhase.FAILED
+                return@launch
+            }
             val p = prefs.routePreferences.first()
             val v = vehicles.profile.first()
             val r = alternatives(origin, last.destination, v, System.currentTimeMillis(), p)
