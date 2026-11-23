@@ -97,20 +97,23 @@ La tâche `sign` échoue, et rien n'est publié, si :
 Vérifié en local le 2026-11-23 : signature et vérification passent, et la clé de debug est refusée. Les autres refus et
 l'exécution sur GitHub n'ont pas été essayés.
 
-## 5. Épingler la clé dans l'application
+## 5. Clé épinglée dans l'application
 
-Une fois la clé choisie et une première version signée vérifiée, inscrire son empreinte dans
-`core/common/src/main/java/fr/roadly/core/common/update/AppUpdate.kt` :
+L'empreinte du certificat officiel est inscrite dans `SignerCheck.PINNED_SIGNERS`
+(`core/common/src/main/java/fr/roadly/core/common/update/AppUpdate.kt`). À partir de la version qui contient ce changement, la
+mise à jour intégrée refuse, avant de rien remettre à Android :
 
-```kotlin
-val PINNED_SIGNERS: Set<String> = setOf("<empreinte SHA-256 en minuscules, sans deux-points>")
-```
+- tout APK signé par une autre clé, même si l'application installée porte cette autre clé ;
+- tout APK dont le certificat ne peut pas être lu.
 
-Effet : la mise à jour intégrée refuse tout APK signé par une autre clé, même si Android ne sait pas lire le certificat.
+**Risque connu.** La lecture du certificat d'un APK téléchargé (`PackageManager.getPackageArchiveInfo`) n'a jamais été
+observée sur un téléphone, seulement sous Robolectric. Si elle échouait sur un appareil, une version épinglée refuserait
+toutes les mises à jour intégrées ; il resterait l'installation manuelle de l'APK de la release, qu'Android accepte (même
+clé). C'est pourquoi une mise à jour intégrée doit avoir réussi une fois, sur une version non épinglée, avant de publier une
+version épinglée.
 
-**Ordre à respecter** : n'épingler que dans une version elle-même signée par la clé de publication, donc après la
-migration du téléphone. Une version épinglée installée sur un téléphone encore signé en debug refuserait toutes les mises à
-jour.
+Changer de clé plus tard : ajouter la nouvelle empreinte à cette liste dans une version encore signée par l'ancienne, la
+laisser se diffuser, puis signer avec la nouvelle (rotation `apksigner`).
 
 ## Certificat officiel
 

@@ -106,6 +106,8 @@ class AppUpdateController(
     private val deviceSdk: Int,
     private val downloadDir: File,
     private val nowMs: () -> Long = System::currentTimeMillis,
+    /** Certificats autorisés à signer une mise à jour ; vide dans les tests qui n'étudient pas l'épinglage. */
+    private val pinnedSigners: Set<String> = SignerCheck.PINNED_SIGNERS,
 ) {
     companion object {
         /** Chaque push sur main publie une release : plusieurs par jour. 30 min évite de solliciter GitHub à chaque retour dans l'appli. */
@@ -214,11 +216,11 @@ class AppUpdateController(
                 _state.value = UpdateState.Failed("Fichier corrompu (empreinte SHA-256 différente) : réessayez", update)
                 return
             }
-            // Signature comparée avant toute installation. Illisible : Android tranchera (sauf clé épinglée, voir SignerCheck).
+            // Signature comparée avant toute installation, à la clé installée et à la clé épinglée. Illisible : refusé (clé épinglée).
             val verdict = try {
-                SignerCheck.verdict(signatures.installed(), signatures.archive(file))
+                SignerCheck.verdict(signatures.installed(), signatures.archive(file), pinnedSigners)
             } catch (e: CancellationException) { throw e } catch (e: Exception) { SignerVerdict.UNKNOWN }
-            if (!SignerCheck.mayInstall(verdict)) {
+            if (!SignerCheck.mayInstall(verdict, pinnedSigners)) {
                 file.delete()
                 // Plus proposée automatiquement (comme « Plus tard ») ; une version suivante, peut-être signée autrement, le sera.
                 otherKeyVersionCode = update.manifest.versionCode

@@ -143,12 +143,16 @@ enum class SignerVerdict {
 
 /** Comparaison des signatures avant l'installation d'une mise à jour. */
 object SignerCheck {
+    /** Certificat de publication officiel (docs/SIGNATURE.md), créé le 2026-11-23. */
+    const val OFFICIAL_SIGNER = "fd785ce163d39cf00ab361b3e5c2bd4b9b49b8d074a91df59d9156b7e0f27834"
+
     /**
-     * Empreintes SHA-256 des certificats autorisés à signer une mise à jour. **Vide = aucune clé épinglée** : seule l'identité
-     * avec la clé de l'application installée est exigée. Le choix de la clé de publication est à venir ; l'épingler se fera
-     * ici, et nulle part ailleurs.
+     * Empreintes SHA-256 des certificats autorisés à signer une mise à jour. Une mise à jour signée par toute autre clé est
+     * refusée avant d'être remise à Android, même si l'application installée porte cette autre clé, et un APK dont le
+     * certificat est illisible est refusé lui aussi. Un changement de clé passe par ici, et nulle part ailleurs : la nouvelle
+     * empreinte s'ajoute à cette liste dans une version encore signée par l'ancienne.
      */
-    val PINNED_SIGNERS: Set<String> = emptySet()
+    val PINNED_SIGNERS: Set<String> = setOf(OFFICIAL_SIGNER)
 
     fun verdict(installed: ApkSigners?, candidate: ApkSigners?, pinned: Set<String> = PINNED_SIGNERS): SignerVerdict {
         val pins = pinned.map { it.lowercase() }.toSet()
