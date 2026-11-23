@@ -1,7 +1,12 @@
 # Ouverture publique du projet : audit et décisions
 
-État au 2026-11-23. Le dépôt est privé. **Rien n'a été publié, poussé ni rendu public.** Ce document rassemble ce qui a
-été vérifié, ce qui a été préparé, et ce qui reste à décider par le propriétaire avant l'ouverture.
+État au 2026-11-23.
+
+**Correction du même jour : le dépôt `Gomze31/roadly` est déjà public** (vérifié par l'API GitHub : visibilité publique, aucune
+étoile, aucun fork, licence affichée GPL-3.0, releases publiques jusqu'à `v0.1.210`). La première version de ce document le
+disait privé, d'après d'anciennes notes non revérifiées. L'historique et les APK publiés sont donc déjà exposés.
+
+Ce document rassemble ce qui a été vérifié, ce qui a été préparé, et les décisions du propriétaire.
 
 ## 1. Licence
 
@@ -31,13 +36,19 @@
 `LICENSE` contient désormais le texte de la licence Apache 2.0 ; `NOTICE`, `THIRD_PARTY_LICENSES.md` et le README sont
 alignés. C'est un changement local, dans un commit séparé, annulable par `git revert`.
 
-### Ce que le propriétaire doit confirmer avant publication
+### Décision du propriétaire (2026-11-23)
+
+**Apache 2.0 confirmé** par le propriétaire, qui se déclare seul titulaire des droits. Les versions déjà publiées sous
+GPL-3.0 (releases jusqu'à `v0.1.210`, et tout l'historique jusqu'au commit de changement de licence) restent disponibles
+sous GPL-3.0 pour qui les a reçues ; Apache 2.0 s'applique à partir du commit qui change `LICENSE`.
+
+### Points examinés pour cette décision
 
 1. **Qu'il est le seul titulaire des droits.** Changer de licence n'est possible que pour qui détient tous les droits.
 2. **Qu'il renonce au copyleft.** Sous Apache 2.0, un tiers peut reprendre le code dans un produit fermé. Le README
    affichait jusqu'ici l'intention inverse (« toute version modifiée doit rester libre »).
-3. **Que les versions déjà remises à quelqu'un sous GPL-3.0 le restent.** Le dépôt étant privé et l'APK n'ayant été
-   installé que sur les appareils du propriétaire, il n'y en a vraisemblablement aucune : à confirmer.
+3. **Que les versions déjà remises à quelqu'un sous GPL-3.0 le restent.** Le dépôt étant public, c'est le cas de toutes
+   les versions publiées jusqu'ici.
 4. Le statut juridique du code produit avec un assistant de programmation est une question ouverte. Elle n'empêche pas de
    choisir la licence ; elle peut affaiblir une action en contrefaçon. À voir avec un juriste si cela compte.
 
@@ -83,7 +94,8 @@ restent, même retirés des fichiers actuels. Trois options, toutes à décider 
 | B. Nouveau dépôt public démarrant par un commit unique de l'état actuel | rien d'ancien n'est publié ; l'ancien dépôt reste privé comme archive | l'historique public commence à zéro ; le `versionCode` (nombre de commits) doit garder sa valeur par `roadly.versionCode` ou une base |
 | C. Réécrire l'historique (`git filter-repo`) puis publier | historique conservé et nettoyé | opération lourde et irréversible côté GitHub, tous les identifiants de commits changent |
 
-Recommandation : **B**. Aucune réécriture ni publication n'a été faite.
+Décision du propriétaire (2026-11-23) : **A, laisser tel quel.** Le dépôt étant déjà public, ces informations sont déjà
+exposées ; il n'a ni fork ni étoile. Aucune réécriture n'a été faite.
 
 ## 3. Réglages GitHub à poser avant l'ouverture
 

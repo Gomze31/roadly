@@ -77,9 +77,9 @@ roadly.key.password=…
 
 Les builds debug et release locaux sont alors signés avec la clé dédiée. À réserver au poste du propriétaire : ne jamais distribuer un APK de développement.
 
-### 4. Jeton GitHub (le dépôt est privé)
+### 4. Jeton GitHub (seulement si le dépôt est privé)
 
-Sans jeton, GitHub répond « introuvable » pour un dépôt privé. Créer un jeton *fine-grained* : GitHub › Settings › Developer settings › Personal access tokens › Fine-grained tokens › *Generate new token* :
+Le dépôt officiel est public : aucun jeton n'est nécessaire. Sans jeton, GitHub répond « introuvable » pour un dépôt privé. Créer un jeton *fine-grained* : GitHub › Settings › Developer settings › Personal access tokens › Fine-grained tokens › *Generate new token* :
 - Repository access : *Only select repositories* → `Gomze31/roadly` ;
 - Permissions : **Contents : Read-only** (rien d'autre) ;
 - Expiration : au choix (à renouveler ensuite dans Roadly).
