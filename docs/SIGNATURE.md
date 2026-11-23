@@ -3,8 +3,9 @@
 Android n'installe une mise à jour que si elle est signée par la même clé que l'application déjà installée. La clé de
 signature **est** l'identité de Roadly : qui la détient peut publier une mise à jour que tous les téléphones accepteront.
 
-État au 2026-11-23 : **aucune clé de publication n'est choisie.** Le téléphone de développement porte une version signée
-avec la clé de debug du PC. Rien dans ce document n'a été exécuté ; c'est la procédure prête à l'être.
+État au 2026-11-23 : la clé de publication est créée et son empreinte déclarée (section « Certificat officiel »). Restent
+à faire : ranger ses secrets dans l'environnement `release` (étape 3), publier une première version signée, migrer le
+téléphone, qui porte encore une version signée avec la clé de debug du PC, puis épingler la clé (étape 5).
 
 ## Ce qu'implique le choix de la clé (à lire avant de la créer)
 
@@ -116,9 +117,13 @@ jour.
 | | |
 |---|---|
 | Identifiant de l'application | `fr.roadly` |
-| Empreinte SHA-256 du certificat | *à inscrire ici après l'étape 1* |
+| Empreinte SHA-256 du certificat | `fd785ce163d39cf00ab361b3e5c2bd4b9b49b8d074a91df59d9156b7e0f27834` |
+| La même, telle que l'affiche `keytool` | `FD:78:5C:E1:63:D3:9C:F0:0A:B3:61:B3:E5:C2:BD:4B:9B:49:B8:D0:74:A9:1D:F5:9D:91:56:B7:E0:F2:78:34` |
+| Déclarée dans la variable GitHub `ROADLY_SIGNER_SHA256` | oui, le 2026-11-23 |
 
-Tant que cette ligne est vide, aucune version n'est « officielle » au sens de ce document.
+Clé créée par le propriétaire le 2026-11-23. Les versions publiées avant (jusqu'à `v0.1.210`) portent la clé de debug
+`7611a323…c9c2` et ne sont pas des versions officielles au sens de ce document. Aucune version n'a encore été signée avec
+la clé officielle.
 
 ## Vérifier un APK téléchargé
 
