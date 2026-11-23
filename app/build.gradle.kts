@@ -15,7 +15,27 @@ val gitCommitCount: Int = runCatching {
     providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)
 val roadlyVersionCode = (findProperty("roadly.versionCode") as String?)?.toIntOrNull() ?: gitCommitCount
-val roadlyVersionName = (findProperty("roadly.versionName") as String?) ?: "0.1.$gitCommitCount"
+
+// Nom de version (REL-1). Tant que roadly.versionBase est vide (gradle.properties) : « 0.1.<code> », comme avant.
+// Dès qu'il vaut N : « 1.0.<code − N> » — le commit dont le code vaut N est la 1.0.0, les suivants 1.0.1, 1.0.2…
+// Le code de version, lui, ne change pas de formule : il reste strictement croissant, la mise à jour intégrée ne compare que lui.
+// Cette formule est la seule : le workflow de release la lit par la tâche printRoadlyVersion au lieu de la recopier.
+val roadlyVersionBase: Int? = (findProperty("roadly.versionBase") as String?)?.trim()?.takeIf { it.isNotEmpty() }?.let {
+    it.toIntOrNull() ?: throw GradleException("roadly.versionBase doit être un entier (reçu : « $it »).")
+}
+fun defaultVersionName(code: Int): String {
+    val base = roadlyVersionBase ?: return "0.1.$code"
+    if (code < base) throw GradleException("roadly.versionBase ($base) dépasse le code de version ($code) : le nom de version serait négatif.")
+    return "1.0.${code - base}"
+}
+val roadlyVersionName = (findProperty("roadly.versionName") as String?) ?: defaultVersionName(roadlyVersionCode)
+
+// Lue par .github/workflows/release.yml : une ligne « roadlyVersion code=<n> name=<x.y.z> ».
+tasks.register("printRoadlyVersion") {
+    val code = roadlyVersionCode
+    val name = roadlyVersionName
+    doLast { println("roadlyVersion code=$code name=$name") }
+}
 
 // Signature : variables d'environnement (CI) ou local.properties (poste). Les mises à jour depuis GitHub exigent
 // que l'APK publié et l'application installée soient signés avec la même clé (docs/UPDATES.md).
@@ -24,6 +44,7 @@ val localProps = Properties().apply {
 }
 fun signing(env: String, prop: String): String? = System.getenv(env)?.takeIf { it.isNotBlank() } ?: localProps.getProperty(prop)?.takeIf { it.isNotBlank() }
 val keystorePath = signing("ROADLY_KEYSTORE", "roadly.keystore")
+val debugSignedRelease = (findProperty("roadly.debugSignedRelease") as String?) == "true"
 
 android {
     namespace = "fr.roadly.app"
@@ -47,7 +68,12 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.findByName("roadly") ?: signingConfigs.getByName("debug")
+            // Jamais de clé de débogage en silence : sans la clé de publication, l'APK « release » sort NON SIGNÉ (il ne s'installe pas).
+            // Pour un essai local seulement : -Proadly.debugSignedRelease=true le signe avec la clé de débogage et le marque dans son nom
+            // de version ; un tel APK ne peut ni être publié ni mettre à jour une version publiée.
+            val releaseKey = signingConfigs.findByName("roadly")
+            signingConfig = releaseKey ?: if (debugSignedRelease) signingConfigs.getByName("debug") else null
+            if (releaseKey == null && debugSignedRelease) versionNameSuffix = "-debugsigned"
         }
         // Même clé en debug si elle est configurée : une version installée depuis le poste peut être mise à jour depuis GitHub.
         debug { signingConfigs.findByName("roadly")?.let { signingConfig = it } }

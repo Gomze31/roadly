@@ -1,0 +1,13 @@
+# Relecture obligatoire par le propriétaire du projet (à activer avec la protection de la branche main :
+# « Require review from Code Owners »).
+*                       @Gomze31
+
+# Chaîne de publication, signature et mise à jour intégrée : toute modification engage la sécurité des utilisateurs.
+/.github/               @Gomze31
+/app/build.gradle.kts   @Gomze31
+/gradle/                @Gomze31
+/core/common/src/main/java/fr/roadly/core/common/update/   @Gomze31
+/core/data/src/main/java/fr/roadly/core/data/update/       @Gomze31
+/LICENSE                @Gomze31
+/NOTICE                 @Gomze31
+/docs/SIGNATURE.md      @Gomze31

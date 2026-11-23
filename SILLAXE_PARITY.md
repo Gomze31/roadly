@@ -28,7 +28,7 @@ Préservé tel quel (ne pas dégrader) :
 - `core:navigation` : `NavigationSession`, `RouteTracker`, `AnnouncementPolicy`, `SpeedSmoother`, `NavigationService` (premier plan `location`), notification avec « Arrêter », `AndroidSpeechService` (TTS fr-FR, focus audio), `ValhallaTraceSpeedLimitProvider`.
 - 224 tests unitaires JVM (`testDebugUnitTest :core:model:test :core:common:test`) et 3 tests instrumentés verts sur HONOR Magic 8 Pro (`FavoriteDaoTest` ×2, `GlassSearchBarTest` ×1).
 - Modules (15) : `app`, `core:{model,common,designsystem,data,location,map,geocoding,routing,navigation}`, `feature:{home,search,route,settings,navigation}`.
-- Fournisseurs sans clé : BAN + Photon (géocodage), Valhalla FOSSGIS (routage, fair-use), styles MapLibre (URL dans les réglages). Limitation de vitesse et alerte de dépassement : code prêt, actives seulement avec un Valhalla auto-hébergé.
+- Fournisseurs sans clé : BAN + Photon (géocodage), Valhalla FOSSGIS (routage, fair-use), styles MapLibre (URL dans les réglages). Limitation de vitesse et alerte de dépassement : code prêt, actives seulement avec un Valhalla auto-hébergé. *(Depuis : profil du tracé en une requête `trace_attributes` par itinéraire, y compris sur FOSSGIS, voir § 2.)*
 
 Constats de l'audit (écarts avec Sillaxe) :
 
@@ -37,7 +37,7 @@ Constats de l'audit (écarts avec Sillaxe) :
 3. Écran d'itinéraires : liste de cartes au lieu du panneau « Votre choix » (durée en grand, arrivée, distance, alternatives compactes, « Ajouter un arrêt », bouton « Rouler »).
 4. Aucun des écrans 6 à 25 de la mission n'existe (Horizon, signalements, stations, bornes, parkings, planificateur, arrêts, profil, classements, ligues, défis, trophées, historique, replay, personnalisation, profils véhicules multiples, abonnement, notifications, assistance).
 5. Pas de backend, pas de compte, pas de stockage des trajets.
-6. Pas de mode paysage vérifié, pas d'Android Auto, pas de widgets, pas de raccourcis, pas de commandes vocales. *(Depuis : paysage L3, widget / raccourcis / intents L12 ; Android Auto toujours ⬜.)*
+6. Pas de mode paysage vérifié, pas d'Android Auto, pas de widgets, pas de raccourcis, pas de commandes vocales. *(Depuis : paysage L3, widget / raccourcis / intents L12 ; Android Auto 🟡 : `feature:car`, exécuté sur la DHU, pas en voiture.)*
 
 ---
 
@@ -48,8 +48,8 @@ Constats de l'audit (écarts avec Sillaxe) :
 | 1 | Accueil avec carte | L2 | 🟡 | Carte, position, recherche, domicile/travail, recentrage, **boussole (L2)**, **bouton Signaler (L2, envoi L8)**, **toucher sa position → copier/partager (L2)**, **puces Stations/Bornes/Parkings/Aires → recherche à proximité (L2)**. Manque : carte de profil (L9), autres conducteurs (L8), couches sur la carte (L5) |
 | 2 | Recherche | L2 | 🟡 | BAN + Photon + coordonnées, récents, favoris, **catégories à proximité (Photon `reverse` + `osm_tag`, triées par distance, distance affichée) (L2)**. Manque : horaires d'ouverture (⛔ non fournis par Photon), contacts/calendrier (L6), dictée (L12) |
 | 3 | Fiche de lieu | L2 | 🟡 | Distance, itinéraire, favori, domicile/travail. Manque : horaires, téléphone, partage, « Enregistrer un repère », parking à proximité, mise en page Sillaxe |
-| 4 | Choix des itinéraires | L3 | 🟡 | 3 variantes, carte, coût carburant, panneau « Votre choix » (L1), **« Partir à » / « Arriver à » (L3)**, **puces éviter péages / autoroutes / ferries (L3)**. Manque : montant des péages (⛔), trafic (⛔), « Ajouter un arrêt » (L6), feux/ralentisseurs comptés (⛔ données) |
-| 5 | Navigation GPS | L3 | 🟡 | Bandeau repliable, voies, Horizon, barre ETA · min · km, vitesse, arrivée, recalcul, GPS perdu, notification, TTS, Signaler, paysage, **« Changer d'itinéraire » en cours de trajet (L3)**. Manque : limitation (⛔ Valhalla auto-hébergé), ajout d'arrêt (L6), autres conducteurs (L8) |
+| 4 | Choix des itinéraires | L3 | 🟡 | 3 variantes, carte, coût carburant, panneau « Votre choix » (L1), **« Partir à » / « Arriver à » (L3)**, **puces éviter péages / autoroutes / ferries (L3)**. **« Ajouter un arrêt » (L6, voir écran 11)**. Manque : montant des péages (⛔), trafic (⛔), feux/ralentisseurs comptés (⛔ données) |
+| 5 | Navigation GPS | L3 | 🟡 | Bandeau repliable, voies, Horizon, barre ETA · min · km, vitesse, arrivée, recalcul, GPS perdu, notification, TTS, Signaler, paysage, **« Changer d'itinéraire » en cours de trajet (L3)**. **limitation par le profil du tracé (🟡, voir § 2)**, **ajout d'arrêt (L6, voir écran 12)**. Manque : autres conducteurs (L8) |
 | 6 | Horizon | L4 | 🟡 | Ruban « route à venir » : manœuvres, arrivée, **virages serrés (courbure du tracé, L4)**, **zones de vigilance (base officielle, L4)**, échelle log 0–5 km. Manque : ralentissements/travaux/fermetures (⛔ trafic), services sur le trajet (L5), densité trafic (⛔) |
 | 7 | Signalements | L8 | 🟡 | **Client complet (L8)** : feuille des 9 types (accueil et guidage), envoi à la position avec le cap, signalements actifs sur la carte (icône ambre, rafraîchis toutes les 60 s) et dans l'Horizon pendant le guidage, retour « envoyé / limité / impossible ». **Backend fourni** (`backend/supabase/schema.sql`, `docs/BACKEND.md`) : expiration par type côté serveur, 1 signalement/min/appareil, votes (une voix par appareil, jamais sur le sien), 3 démentis désactivent, points serveur (+2 auteur, +1 par confirmation), RLS. L'exploitant crée le projet Supabase et saisit URL + clé anon dans Réglages → Communauté ; sinon la feuille reste inactive. Manque : écran de confirmation / démenti sur un signalement touché, historique des contributions (L9/L10), modération humaine (tableau de bord Supabase) |
 | 8 | Stations-service | L5 | 🟡 | **Prix réels (L5)** : flux instantané data.economie.gouv.fr (Licence Ouverte, ~10 min), 6 carburants, date de chaque prix, 24h/24, services, tri distance / prix, carburant du profil par défaut, repli OSM si le flux échoue. Manque : prix sur la carte (couche), calcul du détour, horaires détaillés (L5 suite) |
@@ -85,8 +85,8 @@ Constats de l'audit (écarts avec Sillaxe) :
 | Schéma de rond-point (anneau, arc parcouru, sortie) | 3D | 🟡 | `RoundaboutManeuverView` tiré de l'anneau réel (`RoundaboutGeometry`, arc borné à 40°–340°), compact dans le bandeau, grand dans l'aperçu ; les autres sorties ne sont jamais dessinées (absentes de `/route`) ; circulation à droite seulement ; entrée et sortie réelles à faire en roulant |
 | Panneau de direction (sortie d'autoroute) | 3D | 🟡 | `ExitSignPanel` (D3) : numéro de sortie, directions, numéro de route, distance, à l'approche (400 m au-delà de 70 km/h) ; seulement si Valhalla renvoie `sign` ; vérifié à l'arrêt sur les sorties 31b et 19 (Toulouse), flèche de manœuvre entière visible ; à faire à 110–130 km/h |
 | Compteur de vitesse | L3 | ✅ | Vitesse brute GPS |
-| Limitations de vitesse | — | ⛔ | `trace_attributes` ; Valhalla auto-hébergé requis |
-| Alertes de dépassement | — | ⛔ | Bip + badge rouge ; dépend de la limitation |
+| Limitations de vitesse | — | 🟡 | Profil du tracé : une requête `trace_attributes` (`edge_walk`) par itinéraire, y compris sur FOSSGIS (`RouteAttributes.kt`) ; « — » là où OSM n'a pas de `maxspeed` ; suivi fix par fix réservé à un Valhalla auto-hébergé ; instance publique en fair-use (développement) ; non vérifié en roulant |
+| Alertes de dépassement | — | 🟡 | Bip + badge rouge ; dépend de la limitation ; non vérifié en roulant |
 | Zones de vigilance | L4 | ✅ | Jeu officiel « Radars automatiques » (Sécurité routière, data.gouv.fr, Licence Ouverte, millésime 2018) en cache Room ; zones de 300 m / 2 km / 4 km selon la limitation, jamais un point exact ; annonce vocale + bip à l'entrée, badge, Horizon ; France seulement (aucune donnée en Suisse) |
 | Alertes sonores, bips d'approche | L4 | ✅ | Bip à l'entrée de zone (option) |
 | Horizon (route à venir) | L4 | 🟡 | Manœuvres, virages, zones ; trafic ⛔ |
@@ -131,7 +131,7 @@ Constats de l'audit (écarts avec Sillaxe) :
 | Parkings gratuits/payants | L5 | ⛔ | OSM + BNLS |
 | Ponts bas | L7 | ⬜ | OSM `maxheight` + profil véhicule |
 | Ralentisseurs | L4 | ⬜ | OSM `traffic_calming` |
-| Péages, péages en flux libre | L3/L11 | ⛔ | Pas d'API publique ; `hasToll` Valhalla seulement ; montant jamais inventé |
+| Péages, péages en flux libre | L3/L11 | 🟡 | Montants : ⛔ pas d'API publique, jamais inventés ; présence : `hasToll` Valhalla ; flux libre : portiques OSM `highway=toll_gantry` du profil du tracé (`RouteAttributes.kt`), comptés sur la carte d'identité du trajet et signalés au passage ; non vérifié en roulant |
 | ZFE | L7 | ⬜ | Source à identifier (données ZFE communales) |
 | Date de mise à jour affichée | L5 | ✅ | Chaque prix porte « il y a X h/j » ; zones de vigilance : date de téléchargement + millésime |
 
@@ -176,7 +176,7 @@ Constats de l'audit (écarts avec Sillaxe) :
 | Itinéraires temps réel longs trajets | L4 | ⛔ |
 | Mode tournée | L6 | 🟡 | = optimisation de l'ordre ; pas encore d'enchaînement « arrêt par arrêt » avec validation |
 | Partage de trajet en direct | L9 | ⬜ |
-| Rappels péages flux libre | L11 | ⛔ (géofences des portiques à constituer) |
+| Rappels péages flux libre | L11 | 🟡 | Portiques tirés d'OSM (`toll_gantry`) sur le tracé guidé ; rappel « vérifiez comment le payer » gardé sur l'accueil (`TollReminder`), échéance calculée pour la France seulement ; pas de notification programmée, non vérifié en roulant |
 | Replay | L9 | ✅ | Marqué Roadly+ (`Feature.REPLAY`) |
 | Synchronisation favoris, domicile, travail | L9 | ⬜ |
 | Historique kilométrique, coût des déplacements | L9 | ⬜ |
@@ -199,7 +199,7 @@ Constats de l'audit (écarts avec Sillaxe) :
 
 | Fonction | Lot | Statut |
 |---|---|---|
-| Android Auto (catégorie navigation) | L12 | ⬜ | `androidx.car.app` absent du cache Gradle hors ligne ; marche à suivre dans `docs/ANDROID.md` (service `CarAppService`, `NavigationTemplate`, déclaration `com.google.android.gms.car.application`) |
+| Android Auto (catégorie navigation) | L12 | 🟡 | Module `feature:car` (`androidx.car.app` 1.7.0, `RoadlyCarAppService`) : accueil, recherche, aperçu d'itinéraire, guidage, conduite libre ; parcours exécuté sur la DHU 2.1 avec le HONOR (2026-11-05). Jamais vu sur une vraie voiture : elle exige une installation depuis Google Play (`docs/ANDROID-AUTO.md`) |
 | App Shortcuts (domicile, travail, rechercher, signaler) | L12 | 🟡 | **Raccourcis statiques domicile / travail / rechercher (L12)** ; domicile ou travail non défini → recherche + message. « Signaler » : ⬜ (exige le service communautaire et une position) |
 | Widgets | L12 | ✅ | Widget 4×1 « Roadly » (domicile, travail, rechercher), jour / nuit, `RoadlyWidgetProvider` (L12) |
 | Notifications (guidage) | — | ✅ |
@@ -214,9 +214,9 @@ Constats de l'audit (écarts avec Sillaxe) :
 
 | Fonction | Lot | Statut |
 |---|---|---|
-| Enregistrement du tracé (Room `trips`, `trip_points`, `trip_events`) | L9 | ⬜ |
-| Date, distance, durée, vitesse moyenne, coût, arrêts, événements | L9 | ⬜ |
-| Replay : carte, timeline, vitesse de lecture, événements | L9 | ⬜ |
+| Enregistrement du tracé (Room `trips`, `trip_points`, `trip_events`) | L9 | 🟡 | `TripRecorder`, table Room `trips` (points encodés dans la ligne) ; pas de `trip_events` ; non vérifié avec un vrai trajet |
+| Date, distance, durée, vitesse moyenne, coût, arrêts, événements | L9 | 🟡 | « Mes trajets » (`feature:trips`, `TripsScreen`) ; arrêts et événements : ⬜ |
+| Replay : carte, timeline, vitesse de lecture, événements | L9 | 🟡 | `ReplayScreen` : carte, timeline, ×1 à ×8 ; événements : ⬜ |
 
 ## 11. Qualité (§14)
 
@@ -275,3 +275,4 @@ Constats de l'audit (écarts avec Sillaxe) :
   - **Étape D** (interface premium) : bandeau interactif et aperçu, ligne « puis », schéma de rond-point, voies à trois états, panneau de direction, panneau du bas repliable et « Trajet complet », attribution accessible. 11/11 tests instrumentés verts sur le HONOR ; passe appareil à l'arrêt avec deux vagues de correctifs (colonne d'actions, paysage compact, flèche entière visible). LIMITE acceptée : paysage sur petit écran.
   - **Étape E** (audio et intégration) : coordinateur vocal à deux canaux (guidage / assistant), groupe de réglages « Navigation » persistés et appliqués, carte « Reprendre le guidage vers … » après la mort du processus. 521 tests verts, `assembleDebug` vert ; **passe appareil E à faire** (voix avec musique, préemption, réglages, reprise après `kill -9`, arrière-plan).
   - **Étape F** (validation, sans appareil) : 521/521 tests JVM, `assembleDebug` vert, `:app:lintDebug` : 5 erreurs et 31 avertissements, tous préexistants dans `app` (fichiers non modifiés par la branche). Les scénarios en roulant (autoroute 110–130 km/h, ronds-points, tunnel, recalcul réel, voix avec musique) restent à faire par l'utilisateur.
+- 2026-11-21 — **Remise à niveau de la matrice** sur le code : limitations et alertes de dépassement ⛔ → 🟡 (profil du tracé), péages en flux libre ⛔ → 🟡 (portiques OSM, rappel sur l'accueil), Android Auto ⬜ → 🟡 (`feature:car`, DHU seulement), § 10 historique et Replay ⬜ → 🟡 (`feature:trips`). Guidage intelligent (moteur de situation, rond-point en direct, voix progressive) : `docs/GUIDAGE-INTELLIGENT.md`. Rien de tout cela n'est vérifié en roulant.

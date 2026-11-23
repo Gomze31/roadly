@@ -29,7 +29,8 @@ class DataStoreProviderConfigRepository @Inject constructor(
     override val config: Flow<ProviderConfig> = store.data.map { p ->
         val d = ProviderConfig.DEFAULT
         ProviderConfig(
-            banBaseUrl = p[kBan] ?: d.banBaseUrl,
+            // L'enregistrement des fournisseurs écrit toutes les adresses : l'ancien défaut de la BAN, enregistré tel quel, suit le nouveau.
+            banBaseUrl = p[kBan]?.takeUnless { it == ProviderConfig.BAN_LEGACY } ?: d.banBaseUrl,
             photonBaseUrl = p[kPhoton] ?: d.photonBaseUrl,
             valhallaBaseUrl = p[kValhalla] ?: d.valhallaBaseUrl,
             mapStyleLightUrl = p[kLight] ?: d.mapStyleLightUrl,

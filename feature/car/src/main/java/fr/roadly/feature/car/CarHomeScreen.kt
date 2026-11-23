@@ -171,9 +171,11 @@ internal class CarHomeScreen(
                 screenManager.push(CarGuidanceScreen(carContext, deps, renderer, carContext.getCarService(androidx.car.app.navigation.NavigationManager::class.java)))
             })
         }
+        // Domicile et travail d'abord, toujours présents : un lieu pas encore défini se choisit ici (constat en voiture : aucun
+        // accès au domicile quand il n'était pas enregistré sur le téléphone).
+        add(shortcutRow(Icons.Default.Home, R.string.car_home, p.home, CarSearchAssign.HOME))
+        add(shortcutRow(Icons.Default.Work, R.string.car_work, p.work, CarSearchAssign.WORK))
         add(row(Icons.Default.Search, carContext.getString(R.string.car_search), null) { openSearch() })
-        p.home?.let { add(placeRow(Icons.Default.Home, carContext.getString(R.string.car_home), it)) }
-        p.work?.let { add(placeRow(Icons.Default.Work, carContext.getString(R.string.car_work), it)) }
         add(row(Icons.Default.Speed, carContext.getString(R.string.car_free_drive), carContext.getString(R.string.car_free_drive_detail)) { startFreeDrive() })
         val shown = setOfNotNull(p.home?.id, p.work?.id).toMutableSet()
         for (f in p.favorites) if (shown.add(f.id)) add(placeRow(Icons.Default.Star, f.name, f))
@@ -193,7 +195,15 @@ internal class CarHomeScreen(
         return row(icon, title, detail) { screenManager.push(CarRoutePreviewScreen(carContext, deps, renderer, place)) }
     }
 
-    private fun openSearch() = screenManager.push(CarSearchScreen(carContext, deps, renderer, initialQuery = null))
+    /** Domicile ou travail : itinéraire direct s'il est défini, sinon recherche qui l'enregistre. */
+    private fun shortcutRow(icon: ImageVector, titleRes: Int, place: Place?, assign: CarSearchAssign): Row {
+        val title = carContext.getString(titleRes)
+        return if (place != null) placeRow(icon, title, place)
+        else row(icon, title, carContext.getString(R.string.car_place_unset)) { openSearch(assign) }
+    }
+
+    private fun openSearch(assign: CarSearchAssign? = null) =
+        screenManager.push(CarSearchScreen(carContext, deps, renderer, initialQuery = null, assign = assign))
 
     private fun startFreeDrive() {
         // La session pousse l'écran de conduite libre quand l'état devient actif.

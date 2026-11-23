@@ -7,10 +7,13 @@ import androidx.car.app.model.CarColor
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import fr.roadly.core.designsystem.component.userMessage
 import fr.roadly.core.navigation.FreeDriveState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
@@ -52,13 +55,30 @@ internal class CarFreeDriveScreen(
         }
     }
 
+    private var home: fr.roadly.core.model.Place? = null
+
+    init {
+        lifecycleScope.launch(Dispatchers.Main) { deps.favorites.observeHome().collect { if (it != home) { home = it; invalidate() } } }
+    }
+
+    private fun goHome(place: fr.roadly.core.model.Place) {
+        deps.freeDrive.stop()
+        lifecycleScope.launch {
+            val r = deps.guidance.startTo(place)
+            if (r is fr.roadly.core.common.Outcome.Failure) {
+                androidx.car.app.CarToast.makeText(carContext, r.error.userMessage(), androidx.car.app.CarToast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun drawMap(s: FreeDriveState.Active) {
         val hud = CarHudModel.from(s, toleranceKmh)
         renderer.setHud(hud)
         alerts.onZone(s.zone?.id ?: s.nextZone?.key, hud.zone)
         val fix = s.lastFix ?: return
         renderer.setUser(fix)
-        renderer.follow(fix.point, fix.bearingDeg?.toDouble(), FollowProfile.FREE_DRIVE)
+        renderer.setSpeed(s.speedKmh)
+        renderer.follow(fix.point, fix.bearingDeg?.toDouble(), FollowProfile.FREE_DRIVE, CarCameraPolicy.freeDrive(s.speedKmh, renderer.currentCamera))
     }
 
     override fun onGetTemplate(): Template {
@@ -70,7 +90,10 @@ internal class CarFreeDriveScreen(
             else -> null
         }
         val actions = if (s is FreeDriveState.Active) {
-            ActionStrip.Builder().addAction(CarActions.text(carContext, R.string.car_stop) { deps.freeDrive.stop() }).build()
+            // Domicile en un appui : la conduite libre s'arrête et le guidage part (la session pousse l'écran de guidage).
+            ActionStrip.Builder()
+                .apply { home?.let { h -> addAction(CarActions.icon(Icons.Default.Home) { goHome(h) }) } }
+                .addAction(CarActions.text(carContext, R.string.car_stop) { deps.freeDrive.stop() }).build()
         } else {
             ActionStrip.Builder().addAction(CarActions.text(carContext, R.string.car_close) { screenManager.pop() }).build()
         }

@@ -25,7 +25,7 @@ Contraintes ajoutées pour ce plan :
 - Tout élément interactif agit réellement ; rien n'est inventé : la limitation de vitesse reste `null` (« — ») sur l'instance publique Valhalla FOSSGIS ; les voies n'apparaissent que si Valhalla les renvoie.
 - Les `feature:*` ne dépendent que de `core:*`. `core:model` et `core:common` restent JVM purs.
 - Les 83 tests existants restent verts à chaque tâche.
-- Chaque tâche se termine par la commande Gradle exacte et son résultat attendu, puis un commit. Toutes les commandes se lancent depuis `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS` sous PowerShell : `.\gradlew.bat <tâches> --console=plain`. Les commandes > 2 min se lancent en arrière-plan.
+- Chaque tâche se termine par la commande Gradle exacte et son résultat attendu, puis un commit. Toutes les commandes se lancent depuis `C:\Users\<nom avec espace>\Documents\<projet>\GPS` sous PowerShell : `.\gradlew.bat <tâches> --console=plain`. Les commandes > 2 min se lancent en arrière-plan.
 - Branche `feat/roadly-v1`. Un commit par tâche, message en français, dernier paragraphe = ligne de trailer exacte : `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` (dans PowerShell : `git commit -m "<titre>" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"`).
 - Dans les tests coroutines qui démarrent une `NavigationSession` : la session tourne dans `backgroundScope` avec une boucle de surveillance infinie (`delay(1 s)`) ; utiliser `runCurrent()` / `advanceTimeBy()`, **jamais** `advanceUntilIdle()` après `session.start(...)`.
 

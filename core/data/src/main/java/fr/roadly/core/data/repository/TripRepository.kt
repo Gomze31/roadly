@@ -14,6 +14,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface TripRepository {
+    /** Trajets du plus récent au plus ancien, **sans leur tracé** (`points` vide) ; le tracé d'un trajet se lit avec [byId]. */
     val trips: Flow<List<Trip>>
     suspend fun byId(id: Long): Trip?
     suspend fun save(trip: Trip): Long
@@ -25,7 +26,8 @@ interface TripRepository {
 
 @Singleton
 class RoomTripRepository @Inject constructor(private val dao: TripDao) : TripRepository {
-    override val trips: Flow<List<Trip>> = dao.observeAll().map { list -> list.map { it.toModel() } }
+    // Résumés seulement (`points` vide) : le tracé d'un trajet se charge avec [byId] (écran de relecture).
+    override val trips: Flow<List<Trip>> = dao.observeSummaries().map { list -> list.map { it.toModel() } }
     override suspend fun byId(id: Long): Trip? = dao.byId(id)?.toModel()
     override suspend fun save(trip: Trip): Long = dao.insert(trip.toEntity())
     override suspend fun delete(id: Long) = dao.delete(id)

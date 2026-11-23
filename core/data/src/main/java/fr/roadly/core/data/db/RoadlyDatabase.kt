@@ -8,7 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [FavoritePlaceEntity::class, RecentSearchEntity::class, VehicleProfileEntity::class, SavedRouteEntity::class, VigilanceZoneEntity::class, TripEntity::class, ScooterProfileEntity::class, RadarVersionEntity::class],
     version = 7,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class RoadlyDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao

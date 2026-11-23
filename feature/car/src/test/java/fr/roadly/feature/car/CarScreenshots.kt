@@ -44,4 +44,5 @@ class CarScreenshots {
     @Test fun hudWithLimitAndZone() = shot("car_hud", CarHudModel(48, 50, false, CarZoneModel(inside = false, distanceM = 650.0, limitKmh = 50, confidence = 90)))
     @Test fun hudOverLimit() = shot("car_hud_over", CarHudModel(63, 50, true, null))
     @Test fun hudLimitOnly() = shot("car_hud_limit_only", CarHudModel(null, 90, false, null))
+    @Test fun hudGpsLost() = shot("car_hud_gps_lost", CarHudModel(null, 90, false, CarZoneModel(inside = true, distanceM = 400.0, limitKmh = 90, confidence = 90), gpsLost = true))
 }

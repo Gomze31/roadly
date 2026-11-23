@@ -51,6 +51,12 @@ sealed interface NavigationState {
         val radarNext: fr.roadly.core.radar.ZoneStatus? = null,
         /** Vue 3D de carrefour : manœuvre retenue et étape d'anticipation ; null = aucune (ou réglage désactivé). */
         val junction: fr.roadly.core.model.junction.JunctionGuidance? = null,
+        /** Mode rond-point : schéma vivant (sorties, position, décompte) à l'approche, dans l'anneau et juste après ; null sinon. */
+        val roundaboutLive: RoundaboutLive? = null,
+        /** Schéma de bifurcation de la prochaine sortie, fourche ou intersection chargée (branches réelles du nœud) ; null sans topologie. */
+        val branchDiagram: BranchDiagram? = null,
+        /** Situation de conduite : mode, densité d'affichage, urgence, côté où se placer. */
+        val situation: GuidanceSituation = GuidanceSituation(),
         /** La prochaine manœuvre a lieu à un feu tricolore (profil OSM du tracé). */
         val nextAtTrafficLight: Boolean = false,
     ) : NavigationState

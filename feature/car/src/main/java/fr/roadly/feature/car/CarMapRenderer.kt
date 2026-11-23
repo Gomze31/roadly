@@ -10,6 +10,8 @@ import androidx.car.app.SurfaceContainer
 import fr.roadly.core.map.DangerZoneFeatures
 import fr.roadly.core.map.DangerZoneSpan
 import fr.roadly.core.map.ManeuverArrowBuilder
+import fr.roadly.core.map.MapController
+import fr.roadly.core.map.MapDetailPolicy
 import fr.roadly.core.map.SurfaceArea
 import fr.roadly.core.map.SurfaceMapHost
 import fr.roadly.core.model.GeoPoint
@@ -53,6 +55,10 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
     private var hudModel = CarHudModel.EMPTY
 
     private var follow: Triple<GeoPoint, Double?, FollowProfile>? = null
+    /** Cadrage calculé par l'écran (guidage, conduite libre) ; null = celui du profil. */
+    private var camera: CarCamera? = null
+    private var detail = MapDetail.REDUCED
+    private var night = true
     private var overview: List<GeoPoint>? = null
     /** Défilement manuel : la caméra ne suit plus jusqu'à [recenter]. */
     private var panned = false
@@ -121,15 +127,48 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         host?.controller?.setUserLocation(fix)
     }
 
+    /** Cadrage en cours (point de départ du prochain calcul de [CarCameraPolicy]) ; null hors guidage et conduite libre. */
+    val currentCamera: CarCamera? get() = camera
+
+    /**
+     * Niveau de détail : complet à l'arrêt et en ville (noms de rues, repères), réduit à vitesse soutenue (lecture d'un coup d'œil).
+     * Hystérésis de [MapDetailPolicy] : pas de clignotement autour du seuil.
+     */
+    fun setSpeed(speedKmh: Double?) {
+        val next = MapDetailPolicy.effective(MapDetail.NORMAL, speedKmh, detail)
+        if (next == detail) return
+        detail = next
+        host?.controller?.applyDetail(next)
+    }
+
+    /** Jour / nuit : couleurs du tracé, de la flèche de manœuvre et des bâtiments, accordées au style de la voiture. */
+    fun setNight(night: Boolean) {
+        this.night = night
+        host?.controller?.let(::applyPalette)
+    }
+
+    private fun applyPalette(c: MapController) {
+        if (night) {
+            c.setRouteColors(active = "#B794FF", inactive = "#6B6880", casing = "#0E0B14")
+            c.setArrowColor(body = "#FFFFFF", casing = "#2B1A66")
+            c.setBuildings3d(true, "#2A2E3C")
+        } else {
+            c.setRouteColors(active = "#6D3DF5", inactive = "#9A97AE", casing = "#FFFFFF")
+            c.setArrowColor(body = "#FFFFFF", casing = "#3A1FA8")
+            c.setBuildings3d(true, "#C5C9D6")
+        }
+    }
+
     fun setHud(model: CarHudModel) {
         hudModel = model
         hud?.update(model)
     }
 
     /** Suit [point] avec le cadrage [profile] ; [bearingDeg] = cap du véhicule (null = nord en haut ou cap précédent). */
-    fun follow(point: GeoPoint, bearingDeg: Double?, profile: FollowProfile) {
+    fun follow(point: GeoPoint, bearingDeg: Double?, profile: FollowProfile, camera: CarCamera? = null) {
         val previousBearing = follow?.second
         follow = Triple(point, bearingDeg ?: previousBearing, profile)
+        this.camera = camera
         overview = null
         applyCamera(durationMs = FOLLOW_ANIMATION_MS)
     }
@@ -159,7 +198,8 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         overview?.let { pts -> if (pts.isNotEmpty()) h.fit(pts, OVERVIEW_MARGIN_PX); return }
         val (point, bearing, profile) = follow ?: return
         val heading = if (profile.headingUp) bearing ?: 0.0 else 0.0
-        h.follow(point, profile.zoom + zoomOffset, heading, profile.tilt, profile.anchorY, durationMs)
+        val c = camera
+        h.follow(point, (c?.zoom ?: profile.zoom) + zoomOffset, heading, c?.tilt ?: profile.tilt, c?.anchorY ?: profile.anchorY, durationMs)
     }
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
@@ -173,8 +213,10 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         h.bottomStartReservePx = CarHudView.bottomStartHeightPx(view.context)
         visible?.let { h.setVisibleArea(it); view.setArea(it) }
         view.update(hudModel)
-        // Écran de voiture : lu d'un coup d'œil. Ni points d'intérêt (icônes « P » à chaque parking), ni sens uniques, ni noms de petites rues.
-        h.controller.applyDetail(MapDetail.REDUCED)
+        // Écran de voiture : tracés et repères plus épais ; détail selon la vitesse ([setSpeed]).
+        h.controller.setOverlayScale(OVERLAY_SCALE)
+        applyPalette(h.controller)
+        h.controller.applyDetail(detail)
         h.controller.setAerial(aerial, aerialNight)
         if (styleUrl.isNotEmpty()) h.controller.setStyle(styleUrl)
         h.controller.setRoutes(routes, activeRouteId)
@@ -233,5 +275,6 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
         const val OVERVIEW_MARGIN_PX = 48
         const val MIN_ZOOM_OFFSET = -5.0
         const val MAX_ZOOM_OFFSET = 3.0
+        const val OVERLAY_SCALE = 1.5f
     }
 }

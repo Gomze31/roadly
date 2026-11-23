@@ -1,11 +1,17 @@
 package fr.roadly.core.data.update
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Job
+import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.common.update.ApkSigners
 import fr.roadly.core.common.update.AppUpdates
 import fr.roadly.core.common.update.AppVersion
 import fr.roadly.core.common.update.AvailableUpdate
 import fr.roadly.core.common.update.GitHubRelease
 import fr.roadly.core.common.update.ReleaseAsset
+import fr.roadly.core.common.update.SignerCheck
+import fr.roadly.core.common.update.SignerVerdict
 import fr.roadly.core.common.update.UpdateDecision
 import fr.roadly.core.common.update.UpdateManifest
 import kotlinx.coroutines.CancellationException
@@ -45,8 +51,24 @@ interface UpdateSettings {
 interface ApkInstaller {
     /** « Installer des applications inconnues » accordé à Roadly. */
     fun canInstall(): Boolean
-    /** Lance la session ; le résultat arrive par [AppUpdateController.onInstallResult]. */
-    suspend fun install(file: File): Outcome<Unit>
+    /**
+     * Lance la session ; le résultat arrive par [AppUpdateController.onInstallResult]. Les octets remis à Android doivent avoir
+     * l'empreinte [expectedSha256] (calculée pendant leur copie dans la session), sinon rien n'est installé : [CONTENT_CHANGED].
+     */
+    suspend fun install(file: File, expectedSha256: String): Outcome<Unit>
+
+    companion object {
+        /** Le fichier n'est plus celui qui a été vérifié après le téléchargement. */
+        val CONTENT_CHANGED: AppError = AppError.Parse("empreinte de l'APK différente à l'installation")
+    }
+}
+
+/** Certificats de signature, lus par Android ; null = illisibles. */
+interface ApkSignatureReader {
+    /** Application installée. */
+    fun installed(): ApkSigners?
+    /** Fichier APK téléchargé. */
+    fun archive(file: File): ApkSigners?
 }
 
 sealed interface UpdateState {
@@ -60,18 +82,26 @@ sealed interface UpdateState {
     /** Autorisation « sources inconnues » à accorder dans les réglages Android avant d'installer. */
     data class NeedsPermission(val update: AvailableUpdate, val file: File) : UpdateState
     data class Installing(val update: AvailableUpdate) : UpdateState
+    /**
+     * [update] est signée avec une autre clé que l'application installée : Android la refuserait à chaque tentative. Il faut
+     * désinstaller puis réinstaller Roadly, donc exporter ses données avant. Rien n'a été remis à l'installateur.
+     */
+    data class ReinstallRequired(val update: AvailableUpdate) : UpdateState
     data class Failed(val message: String, val update: AvailableUpdate? = null) : UpdateState
 }
 
 /**
  * Mise à jour de Roadly depuis les releases GitHub : dernière release → `update.json` → comparaison du
- * `versionCode` → téléchargement de l'APK → vérification SHA-256 → installation (confirmation Android).
- * Android refuse lui-même un APK signé avec une autre clé que l'application installée.
+ * `versionCode` → téléchargement de l'APK → vérification SHA-256 → comparaison du certificat de signature avec celui de
+ * l'application installée → installation (confirmation Android). Android refuse lui-même un APK signé avec une autre clé :
+ * la comparaison préalable évite de proposer sans fin une mise à jour vouée à l'échec et dit quoi faire
+ * ([UpdateState.ReinstallRequired]).
  */
 class AppUpdateController(
     private val source: ReleaseSource,
     private val settings: UpdateSettings,
     private val installer: ApkInstaller,
+    private val signatures: ApkSignatureReader,
     private val current: AppVersion,
     private val deviceSdk: Int,
     private val downloadDir: File,
@@ -85,6 +115,13 @@ class AppUpdateController(
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
     private val mutex = Mutex()
+    /** Version dont l'APK s'est révélé signé avec une autre clé : ce processus ne la présente plus comme installable. */
+    @Volatile private var otherKeyVersionCode: Int? = null
+    /** Tâche du téléchargement en cours, pour [cancelDownload]. */
+    @Volatile private var downloadJob: Job? = null
+
+    /** Annule le téléchargement en cours ; sans effet sinon. L'état revient à « disponible » et le fichier partiel est supprimé. */
+    fun cancelDownload() { downloadJob?.cancel() }
 
     /**
      * Vérification automatique à chaque retour au premier plan : si activée, si la dernière date de plus de 30 min, et jamais
@@ -134,7 +171,8 @@ class AppUpdateController(
             }
         }
         return when (val d = AppUpdates.decide(release, manifest, current, deviceSdk)) {
-            is UpdateDecision.Available -> UpdateState.Available(d.update)
+            is UpdateDecision.Available ->
+                if (d.update.manifest.versionCode == otherKeyVersionCode) UpdateState.ReinstallRequired(d.update) else UpdateState.Available(d.update)
             UpdateDecision.UpToDate -> UpdateState.UpToDate(nowMs())
             is UpdateDecision.Incompatible -> UpdateState.Incompatible(d.manifest)
             is UpdateDecision.Malformed -> UpdateState.Failed(d.reason)
@@ -143,7 +181,24 @@ class AppUpdateController(
 
     /** Télécharge l'APK de [update], vérifie son empreinte, puis enchaîne sur l'installation. */
     suspend fun downloadAndInstall(update: AvailableUpdate) {
+        try {
+            download(update)
+        } catch (e: CancellationException) {
+            // Annulation (bouton, écran quitté) : jamais d'état « téléchargement » sans téléchargement, ni de fichier partiel.
+            if (_state.value is UpdateState.Downloading) {
+                downloadDir.listFiles()?.forEach { it.delete() }
+                _state.value = UpdateState.Available(update)
+            }
+            throw e
+        } finally {
+            downloadJob = null
+        }
+        if (_state.value is UpdateState.ReadyToInstall) install()
+    }
+
+    private suspend fun download(update: AvailableUpdate) {
         mutex.withLock {
+            downloadJob = currentCoroutineContext()[Job]
             downloadDir.mkdirs()
             downloadDir.listFiles()?.forEach { it.delete() }
             val dest = File(downloadDir, "roadly-${update.manifest.versionCode}.apk")
@@ -159,9 +214,20 @@ class AppUpdateController(
                 _state.value = UpdateState.Failed("Fichier corrompu (empreinte SHA-256 différente) : réessayez", update)
                 return
             }
+            // Signature comparée avant toute installation. Illisible : Android tranchera (sauf clé épinglée, voir SignerCheck).
+            val verdict = try {
+                SignerCheck.verdict(signatures.installed(), signatures.archive(file))
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { SignerVerdict.UNKNOWN }
+            if (!SignerCheck.mayInstall(verdict)) {
+                file.delete()
+                // Plus proposée automatiquement (comme « Plus tard ») ; une version suivante, peut-être signée autrement, le sera.
+                otherKeyVersionCode = update.manifest.versionCode
+                settings.setSkippedVersionCode(update.manifest.versionCode)
+                _state.value = UpdateState.ReinstallRequired(update)
+                return
+            }
             _state.value = UpdateState.ReadyToInstall(update, file)
         }
-        install()
     }
 
     /** Installe l'APK prêt ; demande d'abord l'autorisation « sources inconnues » si nécessaire. */
@@ -173,9 +239,14 @@ class AppUpdateController(
         }
         if (!installer.canInstall()) { _state.value = UpdateState.NeedsPermission(update, file); return }
         _state.value = UpdateState.Installing(update)
-        when (val r = installer.install(file)) {
+        when (val r = installer.install(file, update.manifest.sha256)) {
             is Outcome.Success -> Unit
-            is Outcome.Failure -> _state.value = UpdateState.Failed("Installation impossible : ${r.error}", update)
+            is Outcome.Failure -> if (r.error == ApkInstaller.CONTENT_CHANGED) {
+                file.delete()
+                _state.value = UpdateState.Failed("Fichier modifié depuis sa vérification : rien n'a été installé, réessayez", update)
+            } else {
+                _state.value = UpdateState.Failed("Installation impossible : ${r.error}", update)
+            }
         }
     }
 
@@ -199,6 +270,8 @@ class AppUpdateController(
 /** Messages d'erreur GitHub compréhensibles. */
 object GitHubErrors {
     fun message(e: fr.roadly.core.common.AppError, hasToken: Boolean): String = when {
+        e == GitHubReleaseSource.UNTRUSTED_HOST -> "Adresse de téléchargement refusée : seuls les serveurs GitHub sont acceptés"
+        e == GitHubReleaseSource.TOO_LARGE -> "Fichier trop volumineux pour une mise à jour de Roadly : rien n'a été téléchargé"
         e is fr.roadly.core.common.AppError.Http && e.code == 404 ->
             if (hasToken) "Aucune release publiée, ou le jeton n'a pas accès à ce dépôt" else "Aucune release trouvée : dépôt privé ? Ajoutez un jeton GitHub (lecture seule)"
         e is fr.roadly.core.common.AppError.Http && e.code == 401 -> "Jeton GitHub refusé (expiré ou invalide)"

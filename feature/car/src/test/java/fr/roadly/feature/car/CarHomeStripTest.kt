@@ -13,8 +13,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /** Le bandeau de l'accueil (recherche + plan / photos aériennes) doit être accepté par les deux gabarits d'accueil Android Auto. */
+// SDK 34 comme les autres tests du module : les contraintes des gabarits ne dépendent pas du niveau Android, et Robolectric 4.18.1
+// ne charge pas son image SDK 35 quand le chemin du dépôt Maven local contient une espace (voir RELEASE-CHECKLIST, « The one failing test »).
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [34])
 class CarHomeStripTest {
     @Test fun `home strip has search and the aerial toggle, accepted by both home templates`() {
         var toggled = 0

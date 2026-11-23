@@ -33,6 +33,26 @@ interface FavoriteDao {
         clearWork()
         upsert(entity.copy(isWork = true, isHome = existing?.isHome ?: false))
     }
+
+    /** Tous les favoris, du plus ancien au plus récent (export). */
+    @Query("SELECT * FROM favorite_places ORDER BY createdAt, id") suspend fun all(): List<FavoritePlaceEntity>
+    @Query("SELECT id FROM favorite_places WHERE isHome = 1 LIMIT 1") suspend fun homeId(): String?
+    @Query("SELECT id FROM favorite_places WHERE isWork = 1 LIMIT 1") suspend fun workId(): String?
+
+    /**
+     * Import d'une sauvegarde : chaque favori est ajouté, ou remplace celui de même identifiant ; aucun n'est supprimé. Le
+     * domicile et le travail déjà définis sur l'appareil sont conservés : ceux de la sauvegarde ne s'appliquent que s'il n'y en a pas.
+     */
+    @Transaction
+    suspend fun importAll(rows: List<FavoritePlaceEntity>) {
+        var home = homeId()
+        var work = workId()
+        rows.forEach { row ->
+            if (home == null && row.isHome) home = row.id
+            if (work == null && row.isWork) work = row.id
+            upsert(row.copy(isHome = home == row.id, isWork = work == row.id))
+        }
+    }
 }
 
 @Dao
@@ -92,14 +112,35 @@ interface VigilanceZoneDao {
     suspend fun replaceAll(rows: List<VigilanceZoneEntity>) { clear(); rows.chunked(500).forEach { insertAll(it) } }
 }
 
+/** Toutes les colonnes de `trips` sauf le tracé, rendu vide. À tenir à jour avec [TripEntity] (vérifié par `TripSummaryQueryTest`). */
+const val TRIP_SUMMARY_SQL = "SELECT id, startedAt, endedAt, destinationName, distanceM, durationS, maxSpeedKmh, costEur, arrived, '' AS pointsCsv, " +
+    "travelMode, ascentM, descentM, energyModelWh, batteryStartPct, batteryEndPct, scooterProfileId FROM trips ORDER BY startedAt DESC"
+
 @Dao
 interface TripDao {
-    @Query("SELECT * FROM trips ORDER BY startedAt DESC") fun observeAll(): Flow<List<TripEntity>>
+    /**
+     * Liste des trajets **sans leur tracé** (`pointsCsv` vide) : listes et statistiques n'ont besoin que des totaux. Charger chaque
+     * tracé complet ralentissait ces écrans à mesure que l'historique grandissait, et un très long trajet pouvait dépasser la
+     * taille maximale d'une ligne lue (2 Mo). Le tracé se lit à la demande avec [byId].
+     */
+    @Query(TRIP_SUMMARY_SQL) fun observeSummaries(): Flow<List<TripEntity>>
     @Query("SELECT * FROM trips WHERE id = :id") suspend fun byId(id: Long): TripEntity?
     @Insert suspend fun insert(trip: TripEntity): Long
     @Query("DELETE FROM trips WHERE id = :id") suspend fun delete(id: Long)
     @Query("DELETE FROM trips") suspend fun clear()
     @Query("UPDATE trips SET batteryEndPct = :pct WHERE id = :id") suspend fun setBatteryEnd(id: Long, pct: Int?)
+    @Query("SELECT COUNT(*) FROM trips WHERE startedAt = :startedAt AND endedAt = :endedAt") suspend fun countAt(startedAt: Long, endedAt: Long): Int
+
+    /**
+     * Import d'une sauvegarde : un trajet déjà présent (mêmes instants de départ et d'arrivée) n'est pas dupliqué, aucun n'est
+     * supprimé ni modifié. Renvoie le nombre de trajets ajoutés.
+     */
+    @Transaction
+    suspend fun importAll(rows: List<TripEntity>): Int {
+        var added = 0
+        rows.forEach { row -> if (countAt(row.startedAt, row.endedAt) == 0) { insert(row.copy(id = 0)); added++ } }
+        return added
+    }
 }
 
 @Dao

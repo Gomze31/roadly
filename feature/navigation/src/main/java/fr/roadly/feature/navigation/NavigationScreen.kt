@@ -257,7 +257,8 @@ private fun NavigationContent(
         val junction = state.junction?.takeUnless { junctionUnsupported }
         val junctionScene = rememberJunctionScene(route, junction, map, junctionPalette, junctionDetail)
         val junctionFps = if (powerSave.value) MapRendering.MAX_FPS_POWER_SAVE else MapRendering.MAX_FPS
-        val junctionSlot: (@Composable (Modifier) -> Unit)? = if (junction != null && junctionScene != null && junctionPanelVisible(junction, junctionScene)) {
+        // Mode rond-point visible : son schéma tient la place de la vue 3D (une seule représentation à la fois).
+        val junctionSlot: (@Composable (Modifier) -> Unit)? = if (!roundaboutModeVisible(full) && junction != null && junctionScene != null && junctionPanelVisible(junction, junctionScene)) {
             { m -> JunctionPanel(junctionScene, junction, state.junctionUi, junctionFps, m, onUnsupported = { junctionUnsupported = true }) }
         } else null
         if (state.styleUrl.isNotEmpty()) {
@@ -375,7 +376,7 @@ internal fun PortraitOverlay(
             assistantPanel()
             // Pastilles d'état au-dessus du compteur, jamais à côté : la rangée 2D/3D + Nord de la colonne d'actions est à sa hauteur.
             Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
-                if (state.gpsLost) GpsLostPill()
+                if (state.gpsLost) GpsLostPill() else if (gpsUncertainVisible(state)) GpsUncertainPill()
                 StatusPills(state, onZoneClick = vm::askHideZone)
             }
             BottomBlock(state, vm, onChangeDestination, speed = { SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh) })
@@ -439,7 +440,7 @@ internal fun LandscapeOverlay(
                 if (!landscapePanelFits(columnDp, stackDp, blockDp)) vm.collapseBottomPanel()
             }
             Column(Modifier.align(Alignment.TopStart).onSizeChanged { stackPx = it.height }, verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
-                BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview)
+                BannerStack(state, bannerExpanded, onOpenPreview = vm::openManeuverPreview, roundaboutDiagramSize = 92.dp)
                 if (state.rerouting) ReroutingPill()
                 ScooterExtras(state, vm)
             }
@@ -457,7 +458,7 @@ internal fun LandscapeOverlay(
             RoundIconButton(
                 if (bannerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 stringResource(if (bannerExpanded) R.string.nav_collapse_banner else R.string.nav_expand_banner),
-                onClick = onToggleBanner, size = 44.dp,
+                onClick = onToggleBanner, size = BANNER_TOGGLE_SIZE,
             )
             ReportButton(onReport)
             RoundIconButton(
@@ -476,7 +477,7 @@ internal fun LandscapeOverlay(
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs),
             horizontalAlignment = Alignment.End,
         ) {
-            if (state.gpsLost) GpsLostPill()
+            if (state.gpsLost) GpsLostPill() else if (gpsUncertainVisible(state)) GpsUncertainPill()
             StatusPills(state, onZoneClick = vm::askHideZone)
             Row(verticalAlignment = Alignment.Bottom) {
                 CameraModeButtons(vm)
@@ -549,7 +550,8 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
  */
 internal fun horizonVisible(state: NavigationUiState, landscape: Boolean, panelExpanded: Boolean = false): Boolean {
     val hasItems = state.upcoming.isNotEmpty() || state.hazards.isNotEmpty() || state.communityAhead.isNotEmpty()
-    return hasItems && bannerSign(state) == null && !(landscape && (state.showLanes || panelExpanded))
+    // Position inconnue ou en recalcul : le ruban afficherait des distances exactes que l'on ne connaît plus.
+    return hasItems && !positionUncertain(state) && secondaryInfoVisible(state) && bannerSign(state) == null && !(landscape && (state.showLanes || panelExpanded))
 }
 
 /** Horizon : manœuvres et arrivée (Valhalla), virages (géométrie) et zones de vigilance (base officielle) ; pas de trafic (⛔ source). */
@@ -612,6 +614,8 @@ private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}) 
             modifier = Modifier.clip(RoadlyShapes.Chip).clickable(onClickLabel = stringResource(R.string.nav_zone_false_alarm), onClick = onZoneClick),
         )
     }
+    // Situation complexe : seules les zones de danger restent, le reste attend la fin de la manœuvre.
+    if (!secondaryInfoVisible(state)) return
     // 1.0 : limitation à venir sur le tracé (profil OSM via Valhalla), jamais devinée.
     state.nextLimit?.let { next ->
         GlassPanel(contentPadding = 8.dp, shape = RoadlyShapes.Chip) {
@@ -665,6 +669,19 @@ private fun GpsLostPill() {
             Icon(Icons.Default.GpsOff, contentDescription = null, tint = c.danger, modifier = Modifier.width(20.dp))
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.nav_gps_lost), style = MaterialTheme.typography.labelLarge, color = c.danger)
+        }
+    }
+}
+
+/** Position douteuse (précision dégradée plusieurs positions de suite) : le guidage continue, sans affirmer au mètre près. */
+@Composable
+private fun GpsUncertainPill() {
+    val c = LocalRoadlyColors.current
+    GlassPanel(contentPadding = 10.dp, shape = RoadlyShapes.Chip) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.GpsOff, contentDescription = null, tint = c.warning, modifier = Modifier.width(20.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.nav_gps_uncertain), style = MaterialTheme.typography.labelLarge, color = c.warning)
         }
     }
 }
@@ -902,8 +919,8 @@ internal fun closesGuidanceSheet(phase: NavigationPhase): Boolean =
 internal fun closesPreviewOnIndexChange(prev: Int?, next: Int?, sheet: GuidanceSheet): Boolean =
     sheet == GuidanceSheet.MANEUVER_PREVIEW && prev != null && next != null && prev != next
 
-/** Taille du bouton « replier le bandeau » des overlays (`size = 44.dp`) : l'attribution se place dessous en portrait, à sa gauche en paysage. */
-private val BANNER_TOGGLE_SIZE = 44.dp
+/** Taille du bouton « replier le bandeau » des overlays (48 dp, cible tactile minimale) : l'attribution se place dessous en portrait, à sa gauche en paysage. */
+private val BANNER_TOGGLE_SIZE = 48.dp
 
 /** Paysage : délai sans changement de taille avant de vérifier que le panneau déplié tient (fin des animations du panneau et de l'Horizon). */
 private const val PANEL_SETTLE_MS = 400L

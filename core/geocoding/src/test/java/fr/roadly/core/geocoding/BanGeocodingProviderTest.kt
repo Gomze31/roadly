@@ -10,6 +10,10 @@ import fr.roadly.core.model.GeoPoint
 import fr.roadly.core.model.PlaceKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
+import fr.roadly.core.data.network.RequestGate
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -22,6 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BanGeocodingProviderTest {
     private val server = MockWebServer()
     private lateinit var provider: BanGeocodingProvider
@@ -75,6 +80,48 @@ class BanGeocodingProviderTest {
     @Test fun `empty features gives empty list not error`() = runTest {
         server.enqueue(MockResponse().setBody("""{"type":"FeatureCollection","features":[]}"""))
         assertEquals(emptyList<Any>(), (provider.search("zzzz", null) as Outcome.Success).value)
+    }
+
+    // ── Débit (VAL-4) : une requête par seconde, retrait après un 429 ; serveur local, temps virtuel ──
+
+    private fun TestScope.gated(): BanGeocodingProvider {
+        val dispatchers = object : DispatcherProvider {
+            override val io = Dispatchers.Unconfined; override val default = Dispatchers.Unconfined; override val main = Dispatchers.Unconfined
+        }
+        val config = object : ProviderConfigRepository {
+            override val config = flowOf(ProviderConfig.DEFAULT.copy(banBaseUrl = server.url("/").toString().trimEnd('/')))
+            override suspend fun override(config: ProviderConfig) = Unit
+            override suspend fun reset() = Unit
+        }
+        val gate = RequestGate({ testScheduler.currentTime }, BanGeocodingProvider.MIN_INTERVAL_MS, BanGeocodingProvider.BACKOFF_MS, BanGeocodingProvider.BACKOFF_MAX_MS)
+        return BanGeocodingProvider(ApiClient(OkHttpClient(), dispatchers), config, Json { ignoreUnknownKeys = true }, gate)
+    }
+    private val empty = """{"type":"FeatureCollection","features":[]}"""
+
+    @Test fun `two requests are one second apart, search and reverse alike`() = runTest {
+        repeat(3) { server.enqueue(MockResponse().setBody(empty)) }
+        val ban = gated()
+        ban.search("a", null)
+        assertEquals(0L, testScheduler.currentTime)
+        ban.search("ab", null)
+        assertEquals(BanGeocodingProvider.MIN_INTERVAL_MS, testScheduler.currentTime)
+        ban.reverse(GeoPoint(48.0, 2.0))
+        assertEquals(2 * BanGeocodingProvider.MIN_INTERVAL_MS, testScheduler.currentTime)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test fun `a 429 costs one request and nothing is sent until the back-off ends`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(429))
+        server.enqueue(MockResponse().setBody(empty))
+        val ban = gated()
+        assertEquals(Outcome.Failure(AppError.RateLimited), ban.search("a", null))
+        assertEquals("le client HTTP ne refait pas ses deux essais (3 requêtes avant)", 1, server.requestCount)
+        advanceTimeBy(2_000)
+        assertEquals(Outcome.Failure(AppError.RateLimited), ban.search("ab", null))
+        assertEquals(1, server.requestCount)
+        advanceTimeBy(BanGeocodingProvider.BACKOFF_MS)
+        assertTrue(ban.search("abc", null) is Outcome.Success)
+        assertEquals(2, server.requestCount)
     }
 
     @Test fun `malformed base url returns failure not exception`() = runTest {

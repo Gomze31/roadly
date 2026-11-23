@@ -15,6 +15,8 @@ android {
     testOptions { unitTests { isIncludeAndroidResources = true } }
     // Vue 3D de carrefour : le test de bout en bout réutilise les itinéraires Valhalla réels enregistrés dans core:navigation.
     sourceSets["test"].resources.srcDir("../../core/navigation/src/test/resources")
+    // Captures JVM des composants de guidage (Robolectric + Roborazzi) : ressources Android nécessaires au rendu Compose.
+    testOptions { unitTests { isIncludeAndroidResources = true; all { it.systemProperty("roborazzi.test.record", "true"); it.systemProperty("roborazzi.output.dir", layout.buildDirectory.dir("outputs/roborazzi").get().asFile.path) } } }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
@@ -37,11 +39,14 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.turbine)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.compose.ui.test.junit4)
     // Compose tire espresso-core 3.5.0, qui plante sur Android 16+ (InputManager.getInstance retiré) : même parade que core:designsystem.
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.androidx.test.runner)
     debugImplementation(libs.compose.ui.test.manifest)
-    testImplementation(libs.robolectric)
     testImplementation(libs.compose.ui.test.junit4)
 }

@@ -4,6 +4,14 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import fr.roadly.core.navigation.BackgroundIssue
+import fr.roadly.core.navigation.BackgroundReadiness
+import fr.roadly.core.location.LocationIssue
+import fr.roadly.core.location.LocationReadiness
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,6 +80,26 @@ fun RoadlyNavHost(
     val nav = rememberNavController()
     val context = LocalContext.current
     val backStackEntry by nav.currentBackStackEntryAsState()
+    // Avant un guidage : réglages du téléphone qui peuvent le couper écran éteint (notifications refusées, batterie optimisée),
+    // signalés une fois par lancement de l'application. L'avertissement ne bloque rien.
+    var backgroundWarned by rememberSaveable { mutableStateOf(false) }
+    var pendingStart by remember { mutableStateOf<Pair<List<BackgroundIssue>, () -> Unit>?>(null) }
+    // Position : localisation coupée ou position approximative seulement. Relu au retour au premier plan (retour des réglages) et
+    // à chaque bascule de l'interrupteur ; le bandeau de l'accueil et le refus de démarrer disparaissent d'eux-mêmes.
+    var locationIssue by remember { mutableStateOf(LocationReadiness.read(context)) }
+    var locationBlocked by remember { mutableStateOf<LocationIssue?>(null) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { locationIssue = LocationReadiness.read(context) }
+    LaunchedEffect(Unit) { LocationReadiness.changes(context).collect { locationIssue = it } }
+    val guardedStart: (() -> Unit) -> Unit = { block ->
+        val position = LocationReadiness.read(context)
+        locationIssue = position
+        if (StartChecks.blocksGuidance(position)) {
+            locationBlocked = position
+        } else withNotificationPermission {
+            val issues = if (backgroundWarned) emptyList() else BackgroundReadiness.read(context)
+            if (issues.isEmpty()) block() else { backgroundWarned = true; pendingStart = issues to block }
+        }
+    }
     Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = HomeRoute) {
         homeScreen(
@@ -87,7 +115,7 @@ fun RoadlyNavHost(
             assistantButton = { VoiceCommandButton() },
             assistantPanel = { VoiceReplyOverlay(Modifier.fillMaxWidth()) },
             // API 33+ : notification du service demandée comme pour le guidage ; un refus masque seulement la notification.
-            onFreeDrive = { withNotificationPermission { nav.navigate(FreeDriveRoute) { launchSingleTop = true } } },
+            onFreeDrive = { guardedStart { nav.navigate(FreeDriveRoute) { launchSingleTop = true } } },
             // Dictée depuis la barre de recherche de l'accueil : recherche pré-remplie.
             onSearchText = { text -> nav.navigate(SearchRoute(query = text)) },
         )
@@ -114,7 +142,7 @@ fun RoadlyNavHost(
             onOpenSettings = { nav.navigate(SettingsRoute(section = SettingsPage.VEHICLE.name)) },
             onStartNavigation = { begin ->
                 // API 33+ : POST_NOTIFICATIONS demandée avant de démarrer le service (spec §2) ; refus = notification masquée seulement.
-                withNotificationPermission {
+                guardedStart {
                     if (begin()) nav.navigate(NavigationRoute) { popUpTo(HomeRoute); launchSingleTop = true }
                 }
             },
@@ -142,6 +170,7 @@ fun RoadlyNavHost(
     }
     // Accueil du premier lancement, posé sur la carte de l'écran d'accueil (jamais par-dessus un guidage ouvert par la notification).
     if (backStackEntry?.destination?.hasRoute(HomeRoute::class) == true) {
+        locationIssue?.let { LocationIssueBanner(it, Modifier.align(androidx.compose.ui.Alignment.Center)) }
         OnboardingScreen(
             onRequestLocationPermission = onRequestLocationPermission,
             onOpenAppSettings = onOpenAppSettings,
@@ -149,6 +178,14 @@ fun RoadlyNavHost(
             onOpenProfile = { nav.navigate(ProfileRoute) { launchSingleTop = true } },
         )
     }
+    }
+    locationBlocked?.let { issue -> LocationIssueDialog(issue, onDismiss = { locationBlocked = null }) }
+    // Voix française absente : dit une fois par lancement, quand le moteur l'a constaté (au départ du guidage).
+    val voiceAvailable by launch.voiceAvailable.collectAsStateWithLifecycle()
+    var voiceWarned by rememberSaveable { mutableStateOf(false) }
+    if (StartChecks.voiceNoticeDue(voiceAvailable, voiceWarned)) VoiceUnavailableDialog(onDismiss = { voiceWarned = true })
+    pendingStart?.let { (issues, block) ->
+        BackgroundWarningDialog(issues, onStart = { pendingStart = null; block() }, onDismiss = { pendingStart = null })
     }
     // Mise à jour disponible (release GitHub) : proposée au lancement ; le suivi détaillé est dans Réglages › Mises à jour.
     LifecycleEventEffect(Lifecycle.Event.ON_START) { launch.onForeground() }

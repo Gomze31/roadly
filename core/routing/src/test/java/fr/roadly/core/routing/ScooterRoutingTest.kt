@@ -27,7 +27,15 @@ import fr.roadly.core.scooter.regulation.LegalStatus
 import fr.roadly.core.scooter.segment.EdgeAttributes
 import fr.roadly.core.scooter.segment.WayCategory
 import fr.roadly.core.scooter.valhalla.TraceAttributesResult
+import fr.roadly.core.data.network.OverpassGate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.RecordedRequest
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -141,6 +149,73 @@ class ScooterRoutingTest {
         val a = (ValhallaScooterRouteAnalyzer(api, config, json).analyze(route, ScooterRouteRequest(g2, ScooterRoutePreferences()), withOsmTags = true) as Outcome.Success).value
         assertFalse(a.osmTagsAvailable)
         assertEquals(LegalStatus.UNVERIFIED, a.segments.single().legal.status)
+    }
+
+    // ── Porte Overpass (VAL-3) : serveur local, aucune requête vers un serveur public ──
+
+    private val traceBody = """{"edges":[{"length":0.3,"use":"cycleway","road_class":"residential","surface":"paved_smooth","way_id":11},{"length":0.2,"use":"road","road_class":"residential","speed_limit":30,"way_id":12}],"admins":[{"country_code":"FR"}]}"""
+    private val tagsBody = """{"elements":[{"type":"way","id":11,"tags":{"highway":"cycleway","lit":"yes"}},{"type":"way","id":12,"tags":{"highway":"residential","maxspeed":"30"}}]}"""
+    private fun scooterRoute(id: String) = Route(id, RouteCosting.FASTEST, 500.0, 100.0, listOf(origin, GeoPoint(48.8590, 2.3500), dest), emptyList(), false, "valhalla")
+    private val scooterRequest = ScooterRouteRequest(g2, ScooterRoutePreferences())
+
+    /** Répond aux deux services et compte les requêtes Overpass ; [overpass] donne la réponse d'Overpass. */
+    private fun serve(overpass: () -> MockResponse): AtomicInteger {
+        val overpassRequests = AtomicInteger()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                if (request.path == "/interpreter") { overpassRequests.incrementAndGet(); overpass() } else MockResponse().setBody(traceBody)
+        }
+        return overpassRequests
+    }
+
+    @Test fun `the variants of one search, analysed together, cost one overpass request for the ways they share`() = runTest {
+        val overpassRequests = serve { MockResponse().setBody(tagsBody).setBodyDelay(150, TimeUnit.MILLISECONDS) }
+        val analyzer = ValhallaScooterRouteAnalyzer(api, config, json, OverpassGate({ System.nanoTime() / 1_000_000L }, minIntervalMs = 0L))
+        val analyses = withContext(Dispatchers.Default) {
+            (1..3).map { i -> async { analyzer.analyze(scooterRoute("variante-$i"), scooterRequest, withOsmTags = true) } }.awaitAll()
+        }
+        assertTrue(analyses.all { it is Outcome.Success && it.value.osmTagsAvailable })
+        assertEquals("requêtes Overpass pour trois variantes sur les mêmes voies (3 avant)", 1, overpassRequests.get())
+        assertEquals(listOf(WayCategory.CYCLE_TRACK, WayCategory.SHARED_ROAD), (analyses.first() as Outcome.Success).value.segments.map { it.category })
+    }
+
+    @Test fun `a 429 from overpass costs one request, the analysis is kept without tags, and nothing is sent during the back-off`() = runTest {
+        val overpassRequests = serve { MockResponse().setResponseCode(429) }
+        var now = 0L
+        val analyzer = ValhallaScooterRouteAnalyzer(api, config, json, OverpassGate({ now }, minIntervalMs = 0L))
+        val first = (analyzer.analyze(scooterRoute("a"), scooterRequest, withOsmTags = true) as Outcome.Success).value
+        assertFalse(first.osmTagsAvailable)
+        assertEquals("un 429 n'est pas retenté par le client HTTP (3 requêtes avant)", 1, overpassRequests.get())
+        // Nouvelle recherche pendant le retrait : l'analyse aboutit toujours, sans tags, et Overpass n'est pas sollicité.
+        now += 30_000
+        val second = (analyzer.analyze(scooterRoute("b"), scooterRequest, withOsmTags = true) as Outcome.Success).value
+        assertFalse(second.osmTagsAvailable)
+        assertEquals(LegalStatus.UNVERIFIED, second.segments[1].legal.status)
+        assertEquals(1, overpassRequests.get())
+        // Retrait écoulé, serveur rétabli : les tags reviennent.
+        now += OverpassGate.BACKOFF_MS
+        serve { MockResponse().setBody(tagsBody) }
+        assertTrue((analyzer.analyze(scooterRoute("c"), scooterRequest, withOsmTags = true) as Outcome.Success).value.osmTagsAvailable)
+    }
+
+    @Test fun `ways already known are served from memory without any request`() = runTest {
+        val overpassRequests = serve { MockResponse().setBody(tagsBody) }
+        val analyzer = ValhallaScooterRouteAnalyzer(api, config, json, OverpassGate({ 0L }, minIntervalMs = 0L))
+        repeat(3) { assertTrue((analyzer.analyze(scooterRoute("r$it"), scooterRequest, withOsmTags = true) as Outcome.Success).value.osmTagsAvailable) }
+        assertEquals(1, overpassRequests.get())
+    }
+
+    @Test fun `places around a point - a 504 is not retried and the next search waits for the end of the back-off`() = runTest {
+        val overpassRequests = serve { MockResponse().setResponseCode(504) }
+        var now = 0L
+        val pois = OverpassScooterPoiProvider(api, config, json, OverpassGate({ now }, minIntervalMs = 0L))
+        val kind = fr.roadly.core.scooter.osm.ScooterPoiKind.entries.first()
+        assertEquals(504, ((pois.around(kind, origin, 500) as Outcome.Failure).error as AppError.ProviderUnavailable).httpCode)
+        assertEquals(Outcome.Failure(AppError.RateLimited), pois.around(kind, origin, 500))
+        assertEquals(1, overpassRequests.get())
+        now += OverpassGate.BACKOFF_MS
+        serve { MockResponse().setBody("""{"elements":[]}""") }
+        assertEquals(Outcome.Success(emptyList<fr.roadly.core.scooter.osm.ScooterPoi>()), pois.around(kind, origin, 500))
     }
 
     // ── Cas d'usage (routage et analyse simulés) ──

@@ -12,12 +12,19 @@ enum class SpeechPriority { URGENT, NORMAL, LOW }
 enum class VoiceChannel { GUIDANCE, ASSISTANT }
 
 /** Synthèse vocale du guidage ; aucune voix serveur (spec §2). */
+private val ALWAYS_AVAILABLE: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(true)
+
 interface SpeechService {
     /**
      * Vrai tant qu'une annonce est en cours ou en file, tous canaux confondus (focus audio tenu) : observé par l'assistant pour lui céder la
      * parole. Même nom et même sens que sur `feat/roadly-ai`.
      */
     val speaking: StateFlow<Boolean>
+    /**
+     * Faux quand aucune voix française n'est utilisable (moteur de synthèse absent, langue non installée) : les annonces sont alors
+     * perdues en silence, l'interface doit le dire. Redevient vrai à la libération du moteur (nouvel essai au guidage suivant).
+     */
+    val voiceAvailable: StateFlow<Boolean> get() = ALWAYS_AVAILABLE
     /** [flush] = interrompt ce qui est en cours ; sinon mise en file. */
     fun speak(text: String, flush: Boolean = false)
     /**

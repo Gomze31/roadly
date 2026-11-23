@@ -1,5 +1,7 @@
 package fr.roadly.core.navigation
 
+import fr.roadly.core.data.repository.MobilityPreferencesRepository
+import fr.roadly.core.model.TravelMode
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
 import fr.roadly.core.data.repository.UserPreferencesRepository
@@ -7,7 +9,6 @@ import fr.roadly.core.data.repository.VehicleProfileRepository
 import fr.roadly.core.location.LocationRepository
 import fr.roadly.core.model.Place
 import fr.roadly.core.model.Route
-import fr.roadly.core.model.RouteCosting
 import fr.roadly.core.model.RoutePreferences
 import fr.roadly.core.model.RouteRequest
 import fr.roadly.core.model.VehicleProfile
@@ -26,6 +27,9 @@ data class GuidanceStop(val place: Place, val alongM: Double) { val id: String g
 /** Résultat d'un changement de préférences pendant un guidage ; les deux sont nuls hors guidage. */
 data class PreferenceChange(val before: RouteOption?, val after: RouteOption?)
 
+/** Détail de l'échec rendu quand un itinéraire automobile est demandé en mode trottinette ou vélo. */
+const val LIGHT_VEHICLE_REFUSED = "light_vehicle_mode"
+
 /**
  * Actions de guidage partagées par l'UI et l'assistant : démarrer vers un lieu, arrêts (≤ 10), alternatives,
  * préférences, recalcul. Garde la liste des arrêts de la course (la session ne connaît que le tracé).
@@ -39,8 +43,19 @@ class GuidanceActions @Inject constructor(
     private val prefs: UserPreferencesRepository,
     private val vehicles: VehicleProfileRepository,
     private val clock: NavigationClock,
+    /** Mode de déplacement (null dans les tests existants : voiture). */
+    private val mobility: MobilityPreferencesRepository? = null,
 ) {
-    private var stops: List<GuidanceStop> = emptyList()
+    @Volatile private var stops: List<GuidanceStop> = emptyList()
+    /** Tracé sur lequel les abscisses de [stops] ont été mesurées ; un recalcul automatique en change sans passer par [start]. */
+    @Volatile private var stopsRouteId: String? = null
+
+    init {
+        session.rerouteWaypoints = { remainingStops().map { it.place.point } }
+    }
+
+    /** Derniers arrêts encore dus, tels que rendus par [remainingStops] : ceux qu'un recalcul automatique doit garder. */
+    @Volatile private var carried: List<GuidanceStop> = emptyList()
 
     /** Nom de la destination de la course en cours, si connu. */
     var destinationName: String? = null
@@ -51,7 +66,13 @@ class GuidanceActions @Inject constructor(
     /** Arrêts encore devant soi, dans l'ordre du tracé. */
     fun remainingStops(): List<GuidanceStop> {
         val g = guiding ?: return emptyList()
-        return stops.filter { it.alongM > g.progress.distanceAlongM + PASSED_MARGIN_M }.sortedBy { it.alongM }
+        if (stopsRouteId != null && g.route.id != stopsRouteId) {
+            // Recalcul automatique : les arrêts encore dus (ceux que la session vient de demander) sont replacés sur le nouveau tracé.
+            val geo = RouteGeometry(g.route.geometry)
+            stops = carried.map { GuidanceStop(it.place, geo.project(it.place.point)?.alongM ?: Double.MAX_VALUE) }
+            stopsRouteId = g.route.id
+        }
+        return stops.filter { it.alongM > g.progress.distanceAlongM + PASSED_MARGIN_M }.sortedBy { it.alongM }.also { carried = it }
     }
 
     /** [scooter] non nul = guidage trottinette (voir [NavigationSession.start]). */
@@ -65,6 +86,8 @@ class GuidanceActions @Inject constructor(
     ) {
         val geo = RouteGeometry(option.route.geometry)
         this.stops = stops.take(StopOrdering.MAX_STOPS).map { GuidanceStop(it, geo.project(it.point)?.alongM ?: Double.MAX_VALUE) }
+        stopsRouteId = option.route.id
+        carried = this.stops
         if (destinationName != null) this.destinationName = destinationName
         session.start(option, preferences, vehicle, scooter, destinationName)
     }
@@ -75,12 +98,16 @@ class GuidanceActions @Inject constructor(
 
     /** Itinéraire le plus rapide depuis la position (projetée si guidage, sinon dernier fix) vers [destination]. */
     suspend fun startTo(destination: Place): Outcome<RouteOption> {
+        // Trottinette ou vélo : ce raccourci (voix, Android Auto) calcule un itinéraire automobile, voies rapides comprises.
+        // Il est refusé ; l'itinéraire adapté se calcule depuis l'écran des itinéraires.
+        if (lightVehicleMode()) return Outcome.Failure(AppError.Unknown(LIGHT_VEHICLE_REFUSED))
         val origin = guiding?.progress?.snapped ?: location.lastKnown?.point ?: return Outcome.Failure(AppError.PermissionDenied)
         val p = prefs.routePreferences.first()
         val v = vehicles.profile.first()
-        return when (val r = alternatives(origin, destination.point, v, clock.nowMs(), p)) {
+        // Seul le plus rapide sert ici : une requête `/route`, pas les trois variantes de l'écran de choix.
+        return when (val r = alternatives.fastest(origin, destination.point, v, clock.nowMs(), p)) {
             is Outcome.Success -> {
-                val best = r.value.firstOrNull { it.route.costing == RouteCosting.FASTEST } ?: r.value.first()
+                val best = r.value
                 start(best, p, v, emptyList(), destination.name)
                 Outcome.Success(best)
             }
@@ -129,8 +156,14 @@ class GuidanceActions @Inject constructor(
         }
     }
 
+    /** Vrai si le mode de déplacement choisi est la trottinette ou le vélo (itinéraires automobiles interdits). */
+    suspend fun lightVehicleMode(): Boolean =
+        mobility?.travelMode?.first().let { it == TravelMode.ELECTRIC_SCOOTER || it == TravelMode.BICYCLE }
+
     fun stop() {
         stops = emptyList()
+        carried = emptyList()
+        stopsRouteId = null
         destinationName = null
         session.stop()
     }

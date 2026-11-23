@@ -3,6 +3,11 @@
     <string name="app_name_car" translatable="false">Roadly</string>
     <string name="car_search">Rechercher</string>
     <string name="car_search_hint">Adresse, lieu, ville</string>
+    <string name="car_search_hint_home">Adresse du domicile</string>
+    <string name="car_search_hint_work">Adresse du travail</string>
+    <string name="car_place_unset">À définir : touchez pour choisir l\'adresse</string>
+    <string name="car_home_saved">Domicile enregistré</string>
+    <string name="car_work_saved">Travail enregistré</string>
     <string name="car_home">Domicile</string>
     <string name="car_work">Travail</string>
     <string name="car_favorite">Favori</string>

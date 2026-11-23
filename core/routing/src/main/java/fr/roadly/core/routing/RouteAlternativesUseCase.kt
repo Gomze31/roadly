@@ -38,6 +38,10 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         if (preferences.avoidTolls) listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST)
         else listOf(RouteCosting.FASTEST, RouteCosting.SHORTEST, RouteCosting.NO_TOLL)
 
+    /** Échec qui vaut pour toutes les variantes : pas de réseau, délai dépassé, serveur indisponible ou qui demande d'attendre. */
+    private fun serverDown(e: AppError?): Boolean =
+        e == AppError.Network || e == AppError.Timeout || e == AppError.RateLimited || e is AppError.ProviderUnavailable
+
     suspend operator fun invoke(
         origin: GeoPoint,
         destination: GeoPoint,
@@ -45,11 +49,47 @@ class RouteAlternativesUseCase @Inject constructor(private val routing: RoutingP
         departAtEpochMs: Long,
         preferences: RoutePreferences = RoutePreferences(),
         waypoints: List<GeoPoint> = emptyList(),
+    ): Outcome<List<RouteOption>> = compute(order(preferences), origin, destination, vehicle, departAtEpochMs, preferences, waypoints)
+
+    /**
+     * Démarrage direct (voix, Android Auto, « y aller ») : seul l'itinéraire le plus rapide sert, il est donc le seul demandé.
+     * Une requête `/route` au lieu de trois (deux quand les péages sont évités). L'écran de choix garde [invoke].
+     */
+    suspend fun fastest(
+        origin: GeoPoint,
+        destination: GeoPoint,
+        vehicle: VehicleProfile?,
+        departAtEpochMs: Long,
+        preferences: RoutePreferences = RoutePreferences(),
+        waypoints: List<GeoPoint> = emptyList(),
+    ): Outcome<RouteOption> = when (val r = compute(listOf(RouteCosting.FASTEST), origin, destination, vehicle, departAtEpochMs, preferences, waypoints)) {
+        is Outcome.Success -> Outcome.Success(r.value.first())
+        is Outcome.Failure -> r
+    }
+
+    private suspend fun compute(
+        costings: List<RouteCosting>,
+        origin: GeoPoint,
+        destination: GeoPoint,
+        vehicle: VehicleProfile?,
+        departAtEpochMs: Long,
+        preferences: RoutePreferences,
+        waypoints: List<GeoPoint>,
     ): Outcome<List<RouteOption>> {
         val results = coroutineScope {
-            order(preferences).map { c ->
+            costings.map { c ->
                 async { c to safely { routing.route(RouteRequest(origin, destination, waypoints = waypoints, costing = c, vehicle = vehicle, departAtEpochMs = departAtEpochMs, preferences = preferences)) } }
-            }.map { it.await() }
+            }.let { pending ->
+                // Serveur injoignable ou muet : inutile d'attendre les variantes suivantes, chacune irait jusqu'à son propre délai
+                // (3 × 15 s sur l'instance publique). Elles sont annulées (celle qui venait de prendre le créneau du limiteur l'est aussitôt partie) ; le résultat est rendu sans attendre.
+                val done = ArrayList<Pair<RouteCosting, Outcome<List<Route>>>>(pending.size)
+                for (job in pending) {
+                    val r = job.await()
+                    done += r
+                    if (serverDown((r.second as? Outcome.Failure)?.error)) { pending.forEach { it.cancel() }; break }
+                }
+                done
+            }
         }
         val routes = results.mapNotNull { (c, r) -> (r as? Outcome.Success)?.value?.firstOrNull()?.copy(costing = c) }
             .distinctBy { it.geometry }

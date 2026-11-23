@@ -14,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import fr.roadly.core.common.AppError
 import fr.roadly.core.common.Outcome
+import fr.roadly.core.common.update.AppUpdates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -29,7 +30,7 @@ import javax.inject.Singleton
 class PackageApkInstaller @Inject constructor(@ApplicationContext private val context: Context) : ApkInstaller {
     override fun canInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
 
-    override suspend fun install(file: File): Outcome<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun install(file: File, expectedSha256: String): Outcome<Unit> = withContext(Dispatchers.IO) {
         try {
             val installer = context.packageManager.packageInstaller
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -38,9 +39,15 @@ class PackageApkInstaller @Inject constructor(@ApplicationContext private val co
             }
             val sessionId = installer.createSession(params)
             installer.openSession(sessionId).use { session ->
-                session.openWrite("roadly.apk", 0, file.length()).use { out ->
-                    file.inputStream().use { it.copyTo(out) }
+                // SEC-7 : l'empreinte est calculée sur les octets copiés dans la session, c'est-à-dire sur ce qu'Android installera.
+                val copied = session.openWrite("roadly.apk", 0, file.length()).use { out ->
+                    val hash = file.inputStream().use { AppUpdates.copyHashing(it, out) }
                     session.fsync(out)
+                    hash
+                }
+                if (!copied.equals(expectedSha256, ignoreCase = true)) {
+                    session.abandon()
+                    return@withContext Outcome.Failure(ApkInstaller.CONTENT_CHANGED)
                 }
                 val intent = Intent(context, UpdateInstallReceiver::class.java).putExtra(UpdateInstallReceiver.EXTRA_FILE, file.absolutePath)
                 // FLAG_MUTABLE : le système ajoute le statut de l'installation dans l'intent (explicite vers notre récepteur).

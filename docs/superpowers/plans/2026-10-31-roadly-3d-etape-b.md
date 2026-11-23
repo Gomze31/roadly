@@ -12,7 +12,7 @@
 
 ## Contraintes globales
 
-- Travailler uniquement dans le worktree `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d`, branche `feat/roadly-3d`, base `b1841c9`.
+- Travailler uniquement dans le worktree `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d`, branche `feat/roadly-3d`, base `b1841c9`.
 - Lancer Gradle avec l'outil PowerShell, toujours avec `--offline`. Exemple : `.\gradlew.bat :core:navigation:testDebugUnitTest --offline -q --tests "*X*"`. `:core:common` et `:core:model` sont des modules JVM : on les teste avec `:core:common:test` et `:core:model:test`.
 - Écrire en français les KDoc, commentaires, chaînes, messages de commit et noms de tests descriptifs. KDoc d'une ligne, dans le style du fichier.
 - Placer chaque seuil numérique dans `GuidanceConstants` (`core/navigation`), avec sa KDoc.
@@ -1513,7 +1513,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 - [ ] **Étape 1 : télécharger la réponse réelle (Bash).**
 
 ```bash
-cd "/c/Users/Forza PC/Documents/Yannis/Projet Yannis/GPS-roadly-3d"
+cd "/c/Users/<nom avec espace>/Documents/<projet>/GPS-roadly-3d"
 curl -s -m 60 -G "https://valhalla1.openstreetmap.de/route" \
   --data-urlencode 'json={"locations":[{"lat":43.6300,"lon":1.4100},{"lat":43.5540,"lon":1.5000}],"costing":"auto","units":"kilometers","language":"fr-FR"}' \
   -o core/routing/src/test/resources/fixtures/valhalla_motorway.json
@@ -3634,8 +3634,8 @@ Aucun fichier de `core/routing`, `core/model`, `RouteTracker`, `AnnouncementPoli
 - Les blocs `old` des tâches 3, 6, 7, 8 et 9 dans `RouteTracker`, `NavigationSession` et `AnnouncementPolicy` reprennent le texte laissé par les tâches précédentes : `progressAt(…, next)` de la tâche 1, `announce()` de la tâche 7, bloc de recalcul complété aux tâches 6 et 8.
 
 ### Fichiers critiques pour l'implémentation
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\RouteTracker.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\NavigationSession.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\AnnouncementPolicy.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\routing\src\main\java\fr\roadly\core\routing\ValhallaRoutingProvider.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationUiState.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\RouteTracker.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\NavigationSession.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\navigation\src\main\java\fr\roadly\core\navigation\AnnouncementPolicy.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\routing\src\main\java\fr\roadly\core\routing\ValhallaRoutingProvider.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationUiState.kt`

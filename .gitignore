@@ -11,3 +11,13 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+
+# Journaux et captures des essais sur appareil : locaux, jamais publiés.
+validation/
+
+# Clés, certificats et configuration locale : jamais dans le dépôt.
+*.p12
+*.pfx
+*.pem
+.env
+.env.*

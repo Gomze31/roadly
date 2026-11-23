@@ -237,6 +237,7 @@ class HomeViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         assertTrue("nouvel itinéraire depuis la position actuelle, pas le tracé enregistré", requests.isNotEmpty() && requests.all { it.origin == GeoPoint(48.85, 2.35) && it.destination == saved.destination })
+        assertEquals("la reprise ne demande que l'itinéraire le plus rapide (3 requêtes avant, VAL-2)", 1, requests.size)
         assertEquals(TestRoutes.straight().id, (s.state.value as NavigationState.Guiding).route.id)
         assertEquals("Capitole", prefs.last.value!!.destinationName)
     }

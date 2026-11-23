@@ -48,7 +48,18 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build()
-    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK).setAudioAttributes(attributes).build()
+    /**
+     * Focus perdu pendant une annonce (appel entrant, autre application qui prend la parole) : l'énoncé en cours est coupé.
+     * Une simple atténuation demandée par le système (`CAN_DUCK`) ne coupe rien.
+     */
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+            Log.d(TAG, "Focus audio perdu : annonce coupée")
+            synchronized(lock) { engine }?.stop()
+        }
+    }
+    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(attributes).setOnAudioFocusChangeListener(focusListener).build()
     private val main = Handler(Looper.getMainLooper())
     private val lock = Any()
     /** Annonces en attente, par canal (moteur pas prêt, occupé, ou assistant dans son délai de reprise). */
@@ -71,11 +82,15 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
      * (moteur déjà libéré) est ignoré : il ne peut ni rendre le service indisponible ni déclarer prêt un moteur encore en création.
      */
     private var engineGeneration = 0L
+    /** Le moteur préféré n'a pas de voix française sur ce téléphone : le moteur par défaut est utilisé jusqu'à la fin du processus. */
+    @Volatile private var defaultEngineOnly = false
     @Volatile private var ready = false
     @Volatile private var unavailable = false
     @Volatile private var volume = 1f
     private val _speaking = MutableStateFlow(false)
     override val speaking: StateFlow<Boolean> = _speaking.asStateFlow()
+    private val _voiceAvailable = MutableStateFlow(true)
+    override val voiceAvailable: StateFlow<Boolean> = _voiceAvailable.asStateFlow()
     /** Relance programmée : fin du délai de reprise avant un message de l'assistant. */
     private val drainTask = Runnable { drain() }
     /** Libération différée forcée : l'assistant n'a pas fini en [VoiceArbiter.RELEASE_DEFER_MAX_MS]. */
@@ -138,7 +153,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
     private fun isSilenced(channel: VoiceChannel): Boolean = volume == 0f || synchronized(lock) { channel in mutedChannels }
 
     override fun beep() {
-        if (isSilenced(VoiceChannel.GUIDANCE)) return
+        if (isSilenced(VoiceChannel.GUIDANCE) || SpeechFocus.inCall(audio.mode)) return
         try {
             val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
             tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 250)
@@ -197,6 +212,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
             releasePending = false
             ready = false
             unavailable = false
+            _voiceAvailable.value = true
             engineGeneration++
             engine.also { engine = null }
         }
@@ -205,7 +221,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
 
     /** Crée le moteur au premier usage ; `null` si l'initialisation a déjà échoué de façon synchrone. */
     private fun ensureEngine(): TextToSpeech? = synchronized(lock) {
-        engine ?: (++engineGeneration).let { gen -> TextToSpeech(ctx) { status -> onInit(status, gen) } }.let {
+        engine ?: (++engineGeneration).let { gen -> TextToSpeech(ctx, { status -> onInit(status, gen) }, preferredEngine()) }.let {
             if (unavailable) {
                 it.shutdown()
                 null
@@ -218,17 +234,67 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         }
     }
 
+    /**
+     * Moteur de synthèse : celui de Google s'il est installé (voix françaises neuronales embarquées), sinon celui par défaut du
+     * téléphone (`null`). Constat en voiture : voix robotique — le moteur par défaut du constructeur était utilisé tel quel.
+     */
+    private fun preferredEngine(): String? = if (defaultEngineOnly) null else try {
+        ctx.packageManager.getPackageInfo(GOOGLE_TTS, 0)
+        GOOGLE_TTS
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * Voix française la plus naturelle du moteur ([VoiceRanking]) : la meilleure qualité parmi les voix embarquées. Les voix en
+     * ligne sont écartées : une consigne de guidage ne doit dépendre ni du délai ni de la couverture du réseau.
+     */
+    private fun selectBestVoice(tts: TextToSpeech) {
+        try {
+            val voices = tts.voices ?: return
+            val candidates = voices.map {
+                VoiceCandidate(
+                    name = it.name, localeTag = it.locale.toLanguageTag(), quality = it.quality, latency = it.latency,
+                    network = it.isNetworkConnectionRequired,
+                    installed = it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true,
+                )
+            }
+            val best = VoiceRanking.best(candidates, networkAvailable = false) ?: return
+            val voice = voices.firstOrNull { it.name == best.name } ?: return
+            if (tts.setVoice(voice) == TextToSpeech.SUCCESS) Log.d(TAG, "Voix : ${voice.name} (qualité ${voice.quality}, ${candidates.size} proposées)")
+        } catch (e: RuntimeException) {
+            // Moteur qui ne liste pas ses voix : la voix par défaut de la langue reste en place.
+            Log.w(TAG, "Choix de la voix impossible", e)
+        }
+    }
+
     /** Rappel d'initialisation du moteur de génération [gen] ; ignoré si ce moteur n'est plus le moteur courant (libéré ou remplacé). */
     private fun onInit(status: Int, gen: Long) {
         // Certains moteurs rappellent onInit(ERROR) de façon synchrone dans le constructeur (engine encore null, même génération).
         val tts = synchronized(lock) { if (gen != engineGeneration) return; engine }
         val lang = if (status == TextToSpeech.SUCCESS && tts != null) tts.setLanguage(Locale.FRANCE) else TextToSpeech.LANG_NOT_SUPPORTED
         if (tts == null || lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
+            val retry = synchronized(lock) {
+                // Moteur préféré sans voix française (données non téléchargées) : second essai avec le moteur par défaut du
+                // téléphone, annonces en attente conservées. Jamais de régression vers le silence à cause de la préférence.
+                if (gen == engineGeneration && tts != null && !defaultEngineOnly && preferredEngine() != null) {
+                    defaultEngineOnly = true
+                    engine = null
+                    true
+                } else false
+            }
+            if (retry) {
+                Log.w(TAG, "Moteur préféré sans voix française (statut $status, langue $lang) : moteur par défaut")
+                tts?.shutdown()
+                ensureEngine()
+                return
+            }
             synchronized(lock) {
                 // Libéré pendant setLanguage : ce moteur est déjà arrêté, le service reste disponible pour le suivant.
                 if (gen != engineGeneration) return
                 Log.w(TAG, "Voix française indisponible (statut $status, langue $lang)")
                 unavailable = true
+                _voiceAvailable.value = false
                 queue.clear()
                 engine = null
                 refreshSpeaking()
@@ -236,6 +302,7 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
             tts?.shutdown()
             return
         }
+        selectBestVoice(tts)
         // Annonces mises en file avant que le moteur soit prêt : la première encore valable part, les suivantes via finished().
         val first = synchronized(lock) {
             if (gen != engineGeneration) return
@@ -290,10 +357,40 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         }
         if (!current || isSilenced(s.channel)) { finished(s.id); return }
         // Redemandé à chaque énoncé (sans effet s'il est déjà tenu) : le démarrage qui l'aurait demandé a pu être jeté comme périmé.
-        audio.requestAudioFocus(focusRequest)
+        val focus = audio.requestAudioFocus(focusRequest)
+        // Appel téléphonique ou focus refusé : l'annonce est abandonnée, pas retardée (dite après l'appel, elle serait fausse).
+        // Le guidage reprend seul à l'annonce suivante.
+        if (focus != AudioManager.AUDIOFOCUS_REQUEST_GRANTED || SpeechFocus.inCall(audio.mode)) {
+            Log.d(TAG, "Non dit (appel en cours ou focus refusé) : ${s.channel} ${s.priority}")
+            finished(s.id)
+            return
+        }
         Log.d(TAG, "Dit : ${s.channel} ${s.priority}")
         val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume) }
-        if (tts.speak(s.text, if (s.flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, s.id) != TextToSpeech.SUCCESS) finished(s.id)
+        // Écritures de panneau (« A61 », « Av. du Gal Leclerc », « Henri IV ») réécrites comme on les dit.
+        if (tts.speak(SpeechText.normalize(s.text), if (s.flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, params, s.id) != TextToSpeech.SUCCESS) {
+            dropEngine(tts)
+            finished(s.id)
+        }
+    }
+
+    /**
+     * Le moteur refuse un énoncé : son service est mort ou déconnecté (processus du moteur tué en cours de trajet). Il est abandonné
+     * et l'annonce suivante en crée un neuf ; sans cela, chaque annonce échouait en silence jusqu'à la fin du guidage.
+     */
+    private fun dropEngine(tts: TextToSpeech) {
+        synchronized(lock) {
+            if (engine !== tts) return
+            Log.w(TAG, "Moteur vocal en erreur : recréé à la prochaine annonce")
+            ready = false
+            engineGeneration++
+            engine = null
+        }
+        try {
+            tts.shutdown()
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Arrêt du moteur en erreur impossible", e)
+        }
     }
 
     /** Délai de garde de [s] : 3 s + 100 ms par caractère, puis l'énoncé est réputé fini (appelé sous [lock]). */
@@ -357,5 +454,8 @@ class AndroidSpeechService @Inject constructor(@param:ApplicationContext private
         }
     }
 
-    private companion object { const val TAG = "RoadlySpeech" }
+    private companion object {
+        const val TAG = "RoadlySpeech"
+        const val GOOGLE_TTS = "com.google.android.tts"
+    }
 }

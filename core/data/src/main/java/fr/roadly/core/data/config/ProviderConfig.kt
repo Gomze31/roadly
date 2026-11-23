@@ -13,12 +13,19 @@ data class ProviderConfig(
 ) {
     companion object {
         const val OVERPASS_DEFAULT = "https://overpass-api.de/api"
+        /**
+         * Géocodage de la Base Adresse Nationale sur la Géoplateforme de l'IGN (`/search/` et `/reverse/`, mêmes réponses).
+         * Vérifié le 2026-11-22 : documenté par l'IGN, gratuit, sans clé, 50 requêtes par seconde et par adresse IP.
+         */
+        const val BAN_DEFAULT = "https://data.geopf.fr/geocodage"
+        /** Ancienne adresse de la BAN, annoncée hors service depuis fin janvier 2026 : une valeur enregistrée égale est lue comme le défaut. */
+        const val BAN_LEGACY = "https://api-adresse.data.gouv.fr"
         /** Schéma des styles embarqués (assets de `core/map`), lu par MapLibre (`Style.Builder().fromUri`). */
         const val ASSET_SCHEME = "asset://"
 
         /** C2 : styles Roadly embarqués ; une URL http(s) de style externe reste possible (Réglages → Fournisseurs). */
         val DEFAULT = ProviderConfig(
-            banBaseUrl = "https://api-adresse.data.gouv.fr",
+            banBaseUrl = BAN_DEFAULT,
             photonBaseUrl = "https://photon.komoot.io",
             valhallaBaseUrl = "https://valhalla1.openstreetmap.de",
             mapStyleLightUrl = "asset://styles/roadly-light.json",

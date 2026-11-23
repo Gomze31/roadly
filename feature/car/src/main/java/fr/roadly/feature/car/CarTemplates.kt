@@ -33,6 +33,24 @@ internal data class CarCapabilities(
     val alerts: Boolean,
 )
 
+/**
+ * Style de carte de l'écran de la voiture : les styles embarqués du téléphone, trop discrets en plein jour sur un écran de
+ * tableau de bord, sont remplacés par leur variante contrastée (`tools/car-styles.mjs`). Un style choisi par l'utilisateur
+ * (autre adresse) est gardé tel quel.
+ */
+internal object CarStyles {
+    private const val PHONE_LIGHT = "asset://styles/roadly-light.json"
+    private const val PHONE_DARK = "asset://styles/roadly-dark.json"
+    const val CAR_LIGHT = "asset://styles/roadly-car-light.json"
+    const val CAR_DARK = "asset://styles/roadly-car-dark.json"
+
+    fun forCar(url: String): String = when (url) {
+        PHONE_LIGHT -> CAR_LIGHT
+        PHONE_DARK -> CAR_DARK
+        else -> url
+    }
+}
+
 internal object CarTemplates {
     /** Valeur de `androidx.car.app.minCarApiLevel` dans le manifeste : tous les hôtes Android Auto. */
     const val MIN_CAR_API_LEVEL = 1

@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.ZoomIn
@@ -73,7 +75,19 @@ internal fun NavigationGroup(s: NavigationSettings, vm: SettingsViewModel) {
             subtitle = stringResource(R.string.settings_nav_then_subtitle), icon = Icons.Default.TurnRight,
         )
         val powers = PowerSaveMode.entries.associateWith { it.label() }
-        ChoiceRow(stringResource(R.string.settings_nav_power), stringResource(R.string.settings_nav_power_subtitle), Icons.Default.BatterySaver, PowerSaveMode.entries, s.powerSaveMode, powers, vm::setPowerSaveMode, last = true)
+        // Outil de test (guidage qui roule tout seul, ou rejeu de replay.gpx) : versions débogables seulement, jamais chez un conducteur.
+        val testTools = fr.roadly.core.navigation.DriveSimulationGate.allowed(androidx.compose.ui.platform.LocalContext.current.applicationInfo.flags)
+        ChoiceRow(stringResource(R.string.settings_nav_power), stringResource(R.string.settings_nav_power_subtitle), Icons.Default.BatterySaver, PowerSaveMode.entries, s.powerSaveMode, powers, vm::setPowerSaveMode, last = !testTools)
+        if (testTools) {
+        val simulate = vm.simulateDrive.collectAsStateWithLifecycle()
+        ToggleRow(
+            stringResource(R.string.settings_simulate), checked = simulate.value, onCheckedChange = vm::setSimulateDrive,
+            subtitle = stringResource(R.string.settings_simulate_subtitle), icon = Icons.Default.Science,
+        )
+        val simulationSpeed = vm.simulationSpeed.collectAsStateWithLifecycle()
+        val speeds = listOf(1, 2, 4).associateWith { stringResource(R.string.settings_simulate_speed_value, it) }
+        ChoiceRow(stringResource(R.string.settings_simulate_speed), stringResource(R.string.settings_simulate_speed_subtitle), Icons.Default.Speed, listOf(1, 2, 4), simulationSpeed.value, speeds, vm::setSimulationSpeed, last = true)
+        }
     }
 }
 

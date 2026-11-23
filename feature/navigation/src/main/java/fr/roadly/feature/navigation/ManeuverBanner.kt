@@ -8,6 +8,14 @@ import androidx.compose.material.icons.filled.Traffic
 import androidx.compose.foundation.layout.size
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,15 +68,36 @@ fun ManeuverBanner(
     onClick: (() -> Unit)? = null,
     roundabout: RoundaboutInfo? = null,
     signShownBelow: Boolean = false,
+    /** 0..1 : avancement de la préparation de la manœuvre ; > 0 dessine une barre qui se remplit jusqu'au point de manœuvre. */
+    urgency: Float = 0f,
+    /** Position inconnue ou en recalcul : la distance est le dernier chiffre connu, elle est montrée estompée plutôt qu'affirmée. */
+    distanceUncertain: Boolean = false,
 ) {
     val c = LocalRoadlyColors.current
     val street = bannerStreet(banner, roundabout)
+    // La barre glisse entre deux positions (1 Hz) ; lue au dessin seulement.
+    val fill by animateFloatAsState(urgency.coerceIn(0f, 1f), tween(900, easing = LinearEasing), label = "bannerUrgency")
+    val track = c.textSecondary.copy(alpha = 0.22f)
+    val bar = c.routeActive
     GlassPanel(
-        modifier.testTag(BANNER_TAG).defaultMinSize(minHeight = RoadlySpacing.touchTargetDriving), contentPadding = 12.dp, onClick = onClick,
+        modifier.testTag(BANNER_TAG).defaultMinSize(minHeight = RoadlySpacing.touchTargetDriving)
+            .drawWithContent {
+                drawContent()
+                if (fill > 0.001f) {
+                    val h = 4.dp.toPx()
+                    val inset = 14.dp.toPx()
+                    val y = size.height - h - 5.dp.toPx()
+                    val w = size.width - 2 * inset
+                    drawRoundRect(track, Offset(inset, y), Size(w, h), CornerRadius(h / 2))
+                    drawRoundRect(bar, Offset(inset, y), Size(w * fill, h), CornerRadius(h / 2))
+                }
+            },
+        contentPadding = 12.dp, onClick = onClick,
         onClickLabel = stringResource(R.string.nav_preview_title), role = Role.Button,
     ) {
         val s = LocalUiScale.current
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
+        // Barre d'urgence dessinée au bas du panneau : le contenu lui laisse sa place.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp).padding(bottom = if (urgency > 0f) 8.dp else 0.dp)) {
             // Pictogramme posé sur le panneau, en couleur de marque (référence visuelle), sans tuile.
             Box(Modifier.size(58.dp * s), contentAlignment = Alignment.Center) {
                 if (roundabout != null) {
@@ -80,7 +109,7 @@ fun ManeuverBanner(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(banner.distanceText, style = NavDigits.copy(fontSize = 34.sp * s, lineHeight = 38.sp * s, textAlign = TextAlign.Start), color = c.brand, maxLines = 1)
+                    Text(banner.distanceText, style = NavDigits.copy(fontSize = 34.sp * s, lineHeight = 38.sp * s, textAlign = TextAlign.Start), color = if (distanceUncertain) c.textSecondary.copy(alpha = 0.6f) else c.brand, maxLines = 1)
                     // Repère « au feu » (feu OSM au point de manœuvre), comme les directions par repère de Google Maps.
                     if (banner.atTrafficLight) {
                         Spacer(Modifier.width(10.dp))

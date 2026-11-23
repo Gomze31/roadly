@@ -32,6 +32,8 @@ internal class CarHudView(context: Context) : View(context) {
     private val limitText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BLACK; textSize = 20 * sp; typeface = display; textAlign = Paint.Align.CENTER }
     private val speedText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 28 * sp; typeface = display; textAlign = Paint.Align.CENTER }
     private val unitText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = MUTED; textSize = 12 * sp; typeface = display; textAlign = Paint.Align.CENTER }
+    private val smallRing = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = LIMIT_RED }
+    private val smallLimitText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BLACK; textSize = 16 * sp; typeface = display; textAlign = Paint.Align.CENTER }
     private val rect = RectF()
 
     fun update(model: CarHudModel) {
@@ -50,11 +52,30 @@ internal class CarHudView(context: Context) : View(context) {
         val a = area ?: SurfaceArea(0, 0, width, height)
         if (a.width <= 0 || a.height <= 0) return
         val margin = MARGIN_DP * dp
-        model.zone?.let { drawZone(canvas, it, a, margin) }
+        val zoneBottom = model.zone?.let { drawZone(canvas, it, a, margin) }
+        // Signal perdu : dit en haut de la zone libre, sous la pastille de zone s'il y en a une (la vitesse, elle, disparaît).
+        if (model.gpsLost) drawGpsLost(canvas, a, (zoneBottom ?: a.top.toFloat()) + margin)
         drawSpeed(canvas, a, margin)
+        model.roadName?.let { drawRoadName(canvas, it, a, margin) }
     }
 
-    private fun drawZone(canvas: Canvas, zone: CarZoneModel, a: SurfaceArea, margin: Float) {
+    /** Pastille « Signal GPS perdu », centrée, dont le haut est à [top]. */
+    private fun drawGpsLost(canvas: Canvas, a: SurfaceArea, top: Float) {
+        val padH = 16 * dp
+        val text = android.text.TextUtils.ellipsize(
+            context.getString(R.string.car_gps_lost), android.text.TextPaint(title), (a.width - 2 * MARGIN_DP * dp - 2 * padH).coerceAtLeast(0f), android.text.TextUtils.TruncateAt.END,
+        ).toString()
+        val w = title.measureText(text) + 2 * padH
+        val h = title.textSize + 18 * dp
+        val left = a.centerX - w / 2
+        rect.set(left, top, left + w, top + h)
+        fill.color = GPS_LOST
+        canvas.drawRoundRect(rect, h / 2, h / 2, fill)
+        canvas.drawText(text, left + padH, rect.centerY() - (title.ascent() + title.descent()) / 2, title)
+    }
+
+    /** Dessine la pastille de zone et rend l'ordonnée de son bord bas. */
+    private fun drawZone(canvas: Canvas, zone: CarZoneModel, a: SurfaceArea, margin: Float): Float {
         val res = context.resources
         val head = res.getString(R.string.car_zone_title)
         val parts = buildList {
@@ -77,6 +98,7 @@ internal class CarHudView(context: Context) : View(context) {
         val baseTitle = top + padV - title.ascent()
         canvas.drawText(head, left + padH, baseTitle, title)
         canvas.drawText(sub, left + padH, baseTitle + title.descent() + gap - detail.ascent(), detail)
+        return top + h
     }
 
     /**
@@ -110,10 +132,49 @@ internal class CarHudView(context: Context) : View(context) {
             canvas.drawCircle(sx, sy, sign / 2 - ring.strokeWidth / 2, ring)
             canvas.drawText(limit.toString(), sx, sy - (limitText.ascent() + limitText.descent()) / 2, limitText)
         }
+        // Prochaine limitation : à droite de la bulle et de son panneau.
+        drawNextLimit(canvas, left + bubble * (0.5f + SIGN_OFFSET / 2) + sign / 2 + 10 * dp, bottom)
+    }
+
+    /** Prochaine limitation différente : petit panneau et distance, à droite de la vitesse (« 70 · 300 m »). */
+    private fun drawNextLimit(canvas: Canvas, left: Float, bottom: Float) {
+        val kmh = model.nextLimitKmh ?: return
+        val meters = model.nextLimitDistanceM ?: return
+        val size = NEXT_LIMIT_SIZE_DP * dp
+        val label = Formatters.maneuverDistance(meters.toDouble())
+        val w = size + 8 * dp + detail.measureText(label) + 14 * dp
+        rect.set(left, bottom - size - 8 * dp, left + w, bottom)
+        fill.color = PANEL
+        canvas.drawRoundRect(rect, rect.height() / 2, rect.height() / 2, fill)
+        val cx = left + 4 * dp + size / 2
+        val cy = rect.centerY()
+        fill.color = WHITE
+        canvas.drawCircle(cx, cy, size / 2, fill)
+        smallRing.strokeWidth = 4 * dp
+        canvas.drawCircle(cx, cy, size / 2 - smallRing.strokeWidth / 2, smallRing)
+        canvas.drawText(kmh.toString(), cx, cy - (smallLimitText.ascent() + smallLimitText.descent()) / 2, smallLimitText)
+        canvas.drawText(label, cx + size / 2 + 8 * dp, cy - (detail.ascent() + detail.descent()) / 2, detail)
+    }
+
+    /** Conduite libre : nom de la voie suivie, en bas au centre de la zone libre. */
+    private fun drawRoadName(canvas: Canvas, name: String, a: SurfaceArea, margin: Float) {
+        val padH = 18 * dp
+        val maxW = a.width * 0.5f
+        val text = android.text.TextUtils.ellipsize(name, android.text.TextPaint(title), maxW - 2 * padH, android.text.TextUtils.TruncateAt.END).toString()
+        val w = title.measureText(text) + 2 * padH
+        val h = title.textSize + 18 * dp
+        val left = a.centerX - w / 2
+        val top = a.bottom - margin - h
+        rect.set(left, top, left + w, top + h)
+        fill.color = ROAD_PILL
+        canvas.drawRoundRect(rect, h / 2, h / 2, fill)
+        canvas.drawText(text, left + padH, rect.centerY() - (title.ascent() + title.descent()) / 2, title)
     }
 
     companion object {
         private const val MARGIN_DP = 12
+        private const val NEXT_LIMIT_SIZE_DP = 36
+        const val ROAD_PILL = 0xF22B1A66.toInt()
         /** Diamètre de la bulle de vitesse et du panneau de limitation (dp). */
         private const val BUBBLE_DP = 76
         private const val SIGN_DP = 46
@@ -135,5 +196,7 @@ internal class CarHudView(context: Context) : View(context) {
         const val OVER_RED = 0xFFFF5252.toInt()
         const val ZONE_INSIDE = 0xF2C62828.toInt()
         const val ZONE_AHEAD = 0xF2B45309.toInt()
+        /** Pastille « Signal GPS perdu » : gris sombre, distinct des pastilles de zone de danger. */
+        const val GPS_LOST = 0xF23A3F4B.toInt()
     }
 }

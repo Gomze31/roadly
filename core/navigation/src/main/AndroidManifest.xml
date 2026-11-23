@@ -3,6 +3,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Synthèse vocale : visibilité des moteurs installés (Android 11+), pour préférer le moteur Google et ses voix naturelles. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
     <application>
         <service
             android:name=".NavigationService"

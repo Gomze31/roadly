@@ -1,0 +1,42 @@
+name: Proposer une idée
+description: Une fonction ou une amélioration
+labels: [idée]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Règle du projet : **aucune fonction fictive**. Une fonction n'existe que si elle repose sur une source réelle.
+        Une idée a d'autant plus de chances d'aboutir qu'elle dit d'où viendraient ses données.
+  - type: textarea
+    id: need
+    attributes:
+      label: Le besoin
+      description: La situation, au volant ou avant de partir, où quelque chose manque.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: La proposition
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Source des données
+      description: Quel service ou quel jeu de données ouvert la rendrait possible ? Sa licence, ses limites d'usage, si vous les connaissez.
+    validations:
+      required: false
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Données de l'utilisateur
+      description: Cette fonction enverrait-elle une position ou une autre donnée à un service ? Lequel ?
+    validations:
+      required: false
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: Je peux proposer une pull request.

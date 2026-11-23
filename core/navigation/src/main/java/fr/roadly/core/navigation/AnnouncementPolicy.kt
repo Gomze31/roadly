@@ -58,12 +58,16 @@ object AnnouncementPolicy {
         scooter: Boolean = false,
         textOverride: ((Int, Tier, Double) -> String?)? = null,
         sincePreviousManeuverMs: Long? = null,
+        /** Sortie de rond-point au décompte fiable ([RoundaboutVoice.exitGate]) : true = « sortez » maintenant, false = attendre ; null = règle de distance. */
+        roundaboutExitGate: Boolean? = null,
     ): Announcement? {
         val k = progress.nextManeuverIndex
         val m = maneuvers.getOrNull(k) ?: return null
         val d = progress.distanceToNextManeuverM
         val c = SpeedClass.of(speedKmh, scooter)
         val tier = when {
+            roundaboutExitGate == true -> Tier.NOW
+            roundaboutExitGate == false -> return null
             d < (c.nowM ?: nowThresholdM(speedKmh)) -> Tier.NOW
             d <= c.nearM -> Tier.NEAR
             d <= c.farM -> Tier.FAR
@@ -95,6 +99,10 @@ object AnnouncementPolicy {
 /** Phrases prononcées composées par la logique JVM (exception assumée à la règle « strings en ressources »). */
 internal object SpokenPhrases {
     const val REROUTING = "Recalcul de l'itinéraire."
+    /** Le serveur d'itinéraires ne répond pas : dit une fois par écart, les essais continuent en silence. */
+    const val REROUTE_FAILED = "Recalcul impossible pour le moment. Nouvel essai en cours."
+    /** Plus de position depuis 10 s : dit une fois par coupure (écran éteint, le badge ne se voit pas). */
+    const val GPS_LOST = "Signal GPS perdu."
 
     /** Entrée en zone de vigilance : jamais de position exacte, seulement la zone et sa limitation si connue. */
     fun vigilanceZone(limitKmh: Int?): String =

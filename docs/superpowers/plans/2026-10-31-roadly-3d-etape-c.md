@@ -22,7 +22,7 @@
 ## Contraintes globales
 
 **Environnement et commandes**
-- Travailler uniquement dans le worktree `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d`, branche `feat/roadly-3d`, base `c4d05ef`.
+- Travailler uniquement dans le worktree `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d`, branche `feat/roadly-3d`, base `c4d05ef`.
 - Lancer Gradle avec l'outil PowerShell, toujours avec `--offline`. Les tâches utilisées sont :
   - `.\gradlew.bat :core:map:testDebugUnitTest --offline -q` ;
   - `:feature:navigation:testDebugUnitTest` ;
@@ -2705,9 +2705,9 @@ Résultat attendu : SUCCÈS ; le nombre affiché vaut au moins 374 plus les test
 - [ ] **Étape 2 : mesure de référence, build `c4d05ef` (avant).**
 
 ```powershell
-$base = "C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-perf-base"
+$base = "C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-perf-base"
 git worktree add $base c4d05ef
-Copy-Item "C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\local.properties" $base
+Copy-Item "C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\local.properties" $base
 & "$base\gradlew.bat" -p $base :app:assembleDebug --offline -q
 adb -s (numéro de série retiré) install -r "$base\app\build\outputs\apk\debug\app-debug.apk"
 ```
@@ -2762,7 +2762,7 @@ Noter la moyenne des valeurs « carte N i/s » affichées pendant les 120 s.
 
 Supprimer le worktree temporaire :
 ```powershell
-git worktree remove --force "C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-perf-base"
+git worktree remove --force "C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-perf-base"
 ```
 
 - [ ] **Étape 4 : vérifications C1 sur appareil (build courant).**
@@ -2968,8 +2968,8 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 - `powerSave` est un `State<Boolean>` dès la tâche 4 ; il est lu par `.value` à la tâche 7, ligne de `RoadlyMap`.
 
 ### Fichiers critiques pour l'implémentation
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\map\src\main\java\fr\roadly\core\map\MapController.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\map\src\main\java\fr\roadly\core\map\GuidanceCameraPolicy.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationViewModel.kt`
-- `C:\Users\Forza PC\Documents\Yannis\Projet Yannis\GPS-roadly-3d\core\data\src\main\java\fr\roadly\core\data\config\ProviderConfig.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\map\src\main\java\fr\roadly\core\map\MapController.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\map\src\main\java\fr\roadly\core\map\GuidanceCameraPolicy.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationScreen.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\feature\navigation\src\main\java\fr\roadly\feature\navigation\NavigationViewModel.kt`
+- `C:\Users\<nom avec espace>\Documents\<projet>\GPS-roadly-3d\core\data\src\main\java\fr\roadly\core\data\config\ProviderConfig.kt`

@@ -54,4 +54,78 @@ class AppUpdatesTest {
         // SHA-256("abc") de la FIPS 180-2.
         assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", AppUpdates.sha256("abc".byteInputStream()))
     }
+
+    @Test fun copyHashingHashesExactlyTheCopiedBytes() {
+        val bytes = ByteArray(200_000) { (it % 251).toByte() }
+        val out = java.io.ByteArrayOutputStream()
+        val hash = AppUpdates.copyHashing(bytes.inputStream(), out)
+        assertTrue(bytes.contentEquals(out.toByteArray()))
+        assertEquals(AppUpdates.sha256(bytes.inputStream()), hash)
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", AppUpdates.copyHashing("abc".byteInputStream(), java.io.ByteArrayOutputStream()))
+    }
+}
+
+class SignerCheckTest {
+    private val debugKey = ApkSigners.digest("certificat de debug".toByteArray())
+    private val releaseKey = ApkSigners.digest("certificat de publication".toByteArray())
+    private val otherKey = ApkSigners.digest("autre certificat".toByteArray())
+
+    @Test fun digestIsSha256HexOfTheCertificateBytes() {
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", ApkSigners.digest("abc".toByteArray()))
+        assertEquals(ApkSigners(setOf(debugKey), setOf(otherKey)), ApkSigners.of(listOf("certificat de debug".toByteArray()), listOf("autre certificat".toByteArray())))
+    }
+
+    @Test fun sameKeyIsAccepted() {
+        assertEquals(SignerVerdict.SAME, SignerCheck.verdict(ApkSigners(setOf(releaseKey)), ApkSigners(setOf(releaseKey))))
+        assertEquals(SignerVerdict.SAME, SignerCheck.verdict(ApkSigners(setOf(releaseKey.uppercase())), ApkSigners(setOf(releaseKey))))
+    }
+
+    @Test fun anotherKeyIsRefused() {
+        // Cas du téléphone signé en debug à qui l'on propose une version signée avec la clé de publication.
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey)), ApkSigners(setOf(releaseKey))))
+        // L'ancienneté joue dans un seul sens : un APK signé avec une ancienne clé de l'application installée n'est pas une mise à jour.
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(releaseKey), past = setOf(debugKey)), ApkSigners(setOf(debugKey))))
+    }
+
+    @Test fun declaredKeyRotationIsAccepted() {
+        assertEquals(SignerVerdict.SAME, SignerCheck.verdict(ApkSigners(setOf(debugKey)), ApkSigners(setOf(releaseKey), past = setOf(debugKey))))
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey)), ApkSigners(setOf(releaseKey), past = setOf(otherKey))))
+    }
+
+    @Test fun multipleSignersMustAllMatch() {
+        assertEquals(SignerVerdict.SAME, SignerCheck.verdict(ApkSigners(setOf(debugKey, otherKey)), ApkSigners(setOf(otherKey, debugKey))))
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey, otherKey)), ApkSigners(setOf(debugKey))))
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey)), ApkSigners(setOf(debugKey, otherKey))))
+        // Pas de rotation avec plusieurs signataires.
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey, otherKey)), ApkSigners(setOf(releaseKey), past = setOf(debugKey, otherKey))))
+    }
+
+    @Test fun unreadableCertificatesGiveNoVerdict() {
+        assertEquals(SignerVerdict.UNKNOWN, SignerCheck.verdict(null, ApkSigners(setOf(releaseKey))))
+        assertEquals(SignerVerdict.UNKNOWN, SignerCheck.verdict(ApkSigners(setOf(releaseKey)), null))
+        assertEquals(SignerVerdict.UNKNOWN, SignerCheck.verdict(ApkSigners(setOf(releaseKey)), ApkSigners(emptySet())))
+        assertEquals(SignerVerdict.UNKNOWN, SignerCheck.verdict(ApkSigners(emptySet()), ApkSigners(setOf(releaseKey))))
+    }
+
+    @Test fun noKeyIsPinnedYet() {
+        // Décision de clé en attente : la liste épinglée doit rester vide tant qu'elle n'est pas prise.
+        assertTrue(SignerCheck.PINNED_SIGNERS.isEmpty())
+    }
+
+    @Test fun pinnedKeysRestrictWhatMayBeInstalled() {
+        val pins = setOf(releaseKey.uppercase())
+        assertEquals(SignerVerdict.SAME, SignerCheck.verdict(ApkSigners(setOf(releaseKey)), ApkSigners(setOf(releaseKey)), pins))
+        // Même clé que l'application installée, mais pas celle épinglée : refusé.
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey)), ApkSigners(setOf(debugKey)), pins))
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(null, ApkSigners(setOf(debugKey)), pins))
+        assertEquals(SignerVerdict.UNKNOWN, SignerCheck.verdict(ApkSigners(setOf(releaseKey)), null, pins))
+    }
+
+    @Test fun unreadableSignatureIsLeftToAndroidOnlyWithoutPinnedKeys() {
+        assertTrue(SignerCheck.mayInstall(SignerVerdict.SAME))
+        assertTrue(!SignerCheck.mayInstall(SignerVerdict.DIFFERENT))
+        assertTrue(SignerCheck.mayInstall(SignerVerdict.UNKNOWN, pinned = emptySet()))
+        assertTrue(!SignerCheck.mayInstall(SignerVerdict.UNKNOWN, pinned = setOf(releaseKey)))
+        assertTrue(!SignerCheck.mayInstall(SignerVerdict.DIFFERENT, pinned = emptySet()))
+    }
 }
