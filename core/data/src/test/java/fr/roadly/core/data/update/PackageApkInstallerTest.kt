@@ -149,7 +149,7 @@ class PackageApkInstallerTest {
     private fun installingController(): Pair<AppUpdateController, File> = runBlocking {
         shadowOf(app.packageManager).setCanRequestPackageInstalls(true)
         val dir = tmp.newFolder()
-        val controller = AppUpdateController(OneReleaseSource(bytes), FakeUpdateSettings(), PackageApkInstaller(app), FakeSignatures(), AppVersion(100, "0.1.0"), 36, dir)
+        val controller = AppUpdateController(OneReleaseSource(bytes), FakeUpdateSettings(), PackageApkInstaller(app), FakeSignatures(), AppVersion(100, "0.1.0"), 36, dir, pinnedSigners = emptySet())
         UpdateTestApplication.controller = controller
         controller.downloadAndInstall((controller.check() as UpdateState.Available).update)
         assertTrue(controller.state.value.toString(), controller.state.value is UpdateState.Installing)
@@ -197,7 +197,7 @@ class PackageApkInstallerTest {
     @Test fun `file replaced between verification and installation is refused by the real installer`() = runBlocking {
         shadowOf(app.packageManager).setCanRequestPackageInstalls(false)
         val dir = tmp.newFolder()
-        val controller = AppUpdateController(OneReleaseSource(bytes), FakeUpdateSettings(), PackageApkInstaller(app), FakeSignatures(), AppVersion(100, "0.1.0"), 36, dir)
+        val controller = AppUpdateController(OneReleaseSource(bytes), FakeUpdateSettings(), PackageApkInstaller(app), FakeSignatures(), AppVersion(100, "0.1.0"), 36, dir, pinnedSigners = emptySet())
         controller.downloadAndInstall((controller.check() as UpdateState.Available).update)
         assertTrue(controller.state.value is UpdateState.NeedsPermission)
         val file = dir.listFiles()!!.single()

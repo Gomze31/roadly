@@ -67,7 +67,7 @@ class UpdateInstallReceiverTest {
     /** Contrôleur amené dans l'état « installation en cours », comme au moment où Android rend son verdict. */
     @Before fun setUp() = runBlocking {
         val dir = tmp.newFolder()
-        controller = AppUpdateController(OneReleaseSource("contenu de l'apk".toByteArray()), FakeUpdateSettings(), FakeInstaller(), FakeSignatures(), AppVersion(100, "0.1.0"), 36, dir)
+        controller = AppUpdateController(OneReleaseSource("contenu de l'apk".toByteArray()), FakeUpdateSettings(), FakeInstaller(), FakeSignatures(), AppVersion(100, "0.1.0"), 36, dir, pinnedSigners = emptySet())
         UpdateTestApplication.controller = controller
         update = (controller.check() as UpdateState.Available).update
         controller.downloadAndInstall(update)
@@ -150,7 +150,7 @@ class UpdateInstallReceiverTest {
     }
 
     @Test fun `status received while nothing is installing does not invent an update`() {
-        UpdateTestApplication.controller = AppUpdateController(OneReleaseSource(ByteArray(1)), FakeUpdateSettings(), FakeInstaller(), FakeSignatures(), AppVersion(100, "0.1.0"), 36, tmp.newFolder())
+        UpdateTestApplication.controller = AppUpdateController(OneReleaseSource(ByteArray(1)), FakeUpdateSettings(), FakeInstaller(), FakeSignatures(), AppVersion(100, "0.1.0"), 36, tmp.newFolder(), pinnedSigners = emptySet())
             .also { controller = it }
         deliver(PackageInstaller.STATUS_FAILURE_ABORTED) { putExtra(UpdateInstallReceiver.EXTRA_FILE, apk.absolutePath) }
         assertEquals(UpdateState.Idle, controller.state.value)

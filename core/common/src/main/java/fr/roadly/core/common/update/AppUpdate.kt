@@ -143,12 +143,16 @@ enum class SignerVerdict {
 
 /** Comparaison des signatures avant l'installation d'une mise à jour. */
 object SignerCheck {
+    /** Certificat de publication officiel (docs/SIGNATURE.md), créé le 2026-11-23. */
+    const val OFFICIAL_SIGNER = "fd785ce163d39cf00ab361b3e5c2bd4b9b49b8d074a91df59d9156b7e0f27834"
+
     /**
-     * Empreintes SHA-256 des certificats autorisés à signer une mise à jour. **Vide = aucune clé épinglée** : seule l'identité
-     * avec la clé de l'application installée est exigée. Le choix de la clé de publication est à venir ; l'épingler se fera
-     * ici, et nulle part ailleurs.
+     * Empreintes SHA-256 des certificats autorisés à signer une mise à jour. Une mise à jour signée par toute autre clé est
+     * refusée avant d'être remise à Android, même si l'application installée porte cette autre clé. Un APK dont le
+     * certificat est illisible sur l'appareil est laissé à Android (voir [mayInstall]). Un changement de clé passe par ici, et nulle part ailleurs : la nouvelle
+     * empreinte s'ajoute à cette liste dans une version encore signée par l'ancienne.
      */
-    val PINNED_SIGNERS: Set<String> = emptySet()
+    val PINNED_SIGNERS: Set<String> = setOf(OFFICIAL_SIGNER)
 
     fun verdict(installed: ApkSigners?, candidate: ApkSigners?, pinned: Set<String> = PINNED_SIGNERS): SignerVerdict {
         val pins = pinned.map { it.lowercase() }.toSet()
@@ -163,10 +167,14 @@ object SignerCheck {
         return if (rotated) SignerVerdict.SAME else SignerVerdict.DIFFERENT
     }
 
-    /** Faut-il remettre l'APK à l'installateur ? Signature illisible : oui sans clé épinglée (Android tranche), non sinon. */
+    /**
+     * Faut-il remettre l'APK à l'installateur ? Signature illisible : oui, Android tranche. Android refuse lui-même toute
+     * mise à jour signée par une autre clé que celle de l'application installée ; refuser ici un certificat que l'appareil ne
+     * sait pas lire n'ajouterait aucune sécurité et bloquerait toutes les mises à jour sur cet appareil.
+     */
     fun mayInstall(verdict: SignerVerdict, pinned: Set<String> = PINNED_SIGNERS): Boolean = when (verdict) {
         SignerVerdict.SAME -> true
         SignerVerdict.DIFFERENT -> false
-        SignerVerdict.UNKNOWN -> pinned.isEmpty()
+        SignerVerdict.UNKNOWN -> true
     }
 }

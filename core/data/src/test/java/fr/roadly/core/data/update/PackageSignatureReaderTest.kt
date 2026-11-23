@@ -125,17 +125,17 @@ class PackageSignatureReaderTest {
 
     @Test fun `same key read on both sides may be installed`() {
         install(signing(listOf(keyA)))
-        assertEquals(SignerVerdict.SAME, SignerCheck.verdict(reader.installed(), reader.archive(archive(signing(listOf(keyA))))))
+        assertEquals(SignerVerdict.SAME, SignerCheck.verdict(reader.installed(), reader.archive(archive(signing(listOf(keyA)))), emptySet()))
     }
 
     @Test fun `another key read from the archive is a different signer`() {
         install(signing(listOf(keyA)))
-        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(reader.installed(), reader.archive(archive(signing(listOf(keyB))))))
+        assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(reader.installed(), reader.archive(archive(signing(listOf(keyB)))), emptySet()))
     }
 
     @Test fun `archive that declares a rotation from the installed key may be installed`() {
         install(signing(listOf(keyA)))
-        val verdict = SignerCheck.verdict(reader.installed(), reader.archive(archive(signing(listOf(keyB), history = listOf(keyA, keyB)))))
-        assertEquals(true, SignerCheck.mayInstall(verdict))
+        val verdict = SignerCheck.verdict(reader.installed(), reader.archive(archive(signing(listOf(keyB), history = listOf(keyA, keyB)))), emptySet())
+        assertEquals(true, SignerCheck.mayInstall(verdict, emptySet()))
     }
 }

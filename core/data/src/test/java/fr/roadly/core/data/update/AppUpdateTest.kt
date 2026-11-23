@@ -1,5 +1,6 @@
 package fr.roadly.core.data.update
 
+import fr.roadly.core.common.update.SignerCheck
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.CompletableDeferred
@@ -85,7 +86,8 @@ class AppUpdateControllerTest {
     private fun controller(
         source: ReleaseSource, settings: UpdateSettings = FakeUpdateSettings(), installer: ApkInstaller = FakeInstaller(), version: Int = 100, now: Long = 1_000_000_000L,
         signatures: ApkSignatureReader = FakeSignatures(),
-    ) = AppUpdateController(source, settings, installer, signatures, AppVersion(version, "0.1.0"), 36, tmp.newFolder(), { now })
+        pinned: Set<String> = emptySet(),
+    ) = AppUpdateController(source, settings, installer, signatures, AppVersion(version, "0.1.0"), 36, tmp.newFolder(), { now }, pinned)
 
     // --- Téléchargement annulé ou interrompu ---
 
@@ -204,6 +206,50 @@ class AppUpdateControllerTest {
             assertEquals(1, installer.installed.size)
             assertTrue(c.state.value is UpdateState.Installing)
         }
+    }
+
+    // --- Clé de publication épinglée ---
+
+    @Test fun pinnedKeyOfficialUpdateIsInstalled() = runTest {
+        val official = ApkSigners(setOf(SignerCheck.OFFICIAL_SIGNER))
+        val installer = FakeInstaller()
+        val c = controller(FakeSource(), installer = installer, signatures = FakeSignatures(installed = official, archive = official), pinned = SignerCheck.PINNED_SIGNERS)
+        c.downloadAndInstall((c.check() as UpdateState.Available).update)
+        assertEquals(1, installer.installed.size)
+        assertTrue(c.state.value is UpdateState.Installing)
+    }
+
+    @Test fun pinnedKeyRefusesAnUpdateSignedByAnotherKeyEvenIfTheInstalledAppHasThatKey() = runTest {
+        // Clé de debug des deux côtés : Android accepterait ; l'application, elle, n'accepte que la clé officielle.
+        val debug = ApkSigners(setOf("7611a323b2f1b159e445174dd57a19c87a42b7d0648de7398e7935de3aa3c9c2"))
+        val installer = FakeInstaller()
+        val c = controller(FakeSource(), installer = installer, signatures = FakeSignatures(installed = debug, archive = debug), pinned = SignerCheck.PINNED_SIGNERS)
+        val update = (c.check() as UpdateState.Available).update
+        c.downloadAndInstall(update)
+        assertEquals(UpdateState.ReinstallRequired(update), c.state.value)
+        assertTrue(installer.installed.isEmpty())
+        assertTrue(tmp.root.walk().none { it.name.endsWith(".apk") })
+    }
+
+    @Test fun pinnedKeyLeavesAnApkWhoseSignatureCannotBeReadToAndroid() = runTest {
+        // Lecture impossible sur l'appareil : pas de blocage définitif des mises à jour ; Android vérifie la clé à l'installation.
+        val official = ApkSigners(setOf(SignerCheck.OFFICIAL_SIGNER))
+        for (signatures in listOf(FakeSignatures(installed = official, archive = null), FakeSignatures(failing = true))) {
+            val installer = FakeInstaller()
+            val c = controller(FakeSource(), installer = installer, signatures = signatures, pinned = SignerCheck.PINNED_SIGNERS)
+            c.downloadAndInstall((c.check() as UpdateState.Available).update)
+            assertEquals(1, installer.installed.size)
+            assertTrue(c.state.value is UpdateState.Installing)
+        }
+    }
+
+    @Test fun productionControllerIsPinnedToTheOfficialKey() = runTest {
+        // Constructeur sans liste explicite, comme en production (UpdateModule) : la clé de test « clé-a » est refusée.
+        val installer = FakeInstaller()
+        val c = AppUpdateController(FakeSource(), FakeUpdateSettings(), installer, FakeSignatures(), AppVersion(100, "0.1.0"), 36, tmp.newFolder())
+        c.downloadAndInstall((c.check() as UpdateState.Available).update)
+        assertTrue(installer.installed.isEmpty())
+        assertTrue(c.state.value is UpdateState.ReinstallRequired)
     }
 
     @Test fun corruptedDownloadIsRejectedBeforeAnySignatureCheck() = runTest {
