@@ -240,3 +240,10 @@ CI on GitHub, first execution ever of `ci.yml` (commit `b37926b`): both runs gre
 - VERIFIED independently on the downloaded release files: `SHA256SUMS.txt` matches, APK SHA-256 equals `update.json`, `apksigner verify --min-sdk-version 29 --print-certs` gives the declared certificate, package `fr.roadly` versionCode 243.
 
 Phase F status now: clean checkout builds (done), CI passes (done), release APK signed and verified (done), published through GitHub Releases (done). Still NOT done: Roadly detecting and downloading this release on a phone, and the real installation with data preservation on the HONOR. The phone carries a debug-signed build: it will be offered 0.1.243, download it, and must refuse it as "signed with another key" until it is migrated (`docs/MIGRATION-HONOR.md`). The signer is not pinned yet.
+
+## 2026-11-23, automatic publication and first in-app update
+
+- Owner chose fully automatic publication: required reviewer removed from the environment `release`, review requirement removed on `main`, auto-merge enabled. `v0.1.245` was signed and published with no manual step.
+- Owner reports that the phone, reinstalled with the official `v0.1.243`, updated to `0.1.245` from inside the app. NOT observed by the assistant (no phone connected); data preservation after the update not confirmed in writing.
+- This success does not prove that the APK certificate can be read on the device: 0.1.243 was not pinned and installs in both cases. The assistant first said the opposite; corrected.
+- Pinning (pull request #12) changed accordingly: a readable APK signed by another key is refused; an APK whose certificate cannot be read is left to Android, which enforces the signer on every update. A hard refusal would add no security and could block every update on a device where the read fails.

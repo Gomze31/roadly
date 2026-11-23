@@ -124,9 +124,9 @@ class SignerCheckTest {
         assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey)), ApkSigners(setOf(debugKey))))
         // Version officielle proposée à une application signée en debug : clé différente de celle installée.
         assertEquals(SignerVerdict.DIFFERENT, SignerCheck.verdict(ApkSigners(setOf(debugKey)), official))
-        // Certificat illisible : refusé, et non plus laissé à Android.
-        assertTrue(!SignerCheck.mayInstall(SignerCheck.verdict(official, null)))
-        assertTrue(!SignerCheck.mayInstall(SignerVerdict.UNKNOWN))
+        // Certificat illisible sur l'appareil : laissé à Android, qui refuse lui-même toute autre clé que celle installée.
+        assertEquals(SignerVerdict.UNKNOWN, SignerCheck.verdict(official, null))
+        assertTrue(SignerCheck.mayInstall(SignerVerdict.UNKNOWN))
     }
 
     @Test fun pinnedKeysRestrictWhatMayBeInstalled() {
@@ -142,7 +142,7 @@ class SignerCheckTest {
         assertTrue(SignerCheck.mayInstall(SignerVerdict.SAME))
         assertTrue(!SignerCheck.mayInstall(SignerVerdict.DIFFERENT))
         assertTrue(SignerCheck.mayInstall(SignerVerdict.UNKNOWN, pinned = emptySet()))
-        assertTrue(!SignerCheck.mayInstall(SignerVerdict.UNKNOWN, pinned = setOf(releaseKey)))
+        assertTrue(SignerCheck.mayInstall(SignerVerdict.UNKNOWN, pinned = setOf(releaseKey)))
         assertTrue(!SignerCheck.mayInstall(SignerVerdict.DIFFERENT, pinned = emptySet()))
     }
 }

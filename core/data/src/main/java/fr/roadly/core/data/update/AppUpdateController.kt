@@ -216,7 +216,7 @@ class AppUpdateController(
                 _state.value = UpdateState.Failed("Fichier corrompu (empreinte SHA-256 différente) : réessayez", update)
                 return
             }
-            // Signature comparée avant toute installation, à la clé installée et à la clé épinglée. Illisible : refusé (clé épinglée).
+            // Signature comparée avant toute installation, à la clé installée et à la clé épinglée. Illisible : Android tranche.
             val verdict = try {
                 SignerCheck.verdict(signatures.installed(), signatures.archive(file), pinnedSigners)
             } catch (e: CancellationException) { throw e } catch (e: Exception) { SignerVerdict.UNKNOWN }

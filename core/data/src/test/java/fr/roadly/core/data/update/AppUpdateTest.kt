@@ -231,14 +231,15 @@ class AppUpdateControllerTest {
         assertTrue(tmp.root.walk().none { it.name.endsWith(".apk") })
     }
 
-    @Test fun pinnedKeyRefusesAnApkWhoseSignatureCannotBeRead() = runTest {
+    @Test fun pinnedKeyLeavesAnApkWhoseSignatureCannotBeReadToAndroid() = runTest {
+        // Lecture impossible sur l'appareil : pas de blocage définitif des mises à jour ; Android vérifie la clé à l'installation.
         val official = ApkSigners(setOf(SignerCheck.OFFICIAL_SIGNER))
         for (signatures in listOf(FakeSignatures(installed = official, archive = null), FakeSignatures(failing = true))) {
             val installer = FakeInstaller()
             val c = controller(FakeSource(), installer = installer, signatures = signatures, pinned = SignerCheck.PINNED_SIGNERS)
             c.downloadAndInstall((c.check() as UpdateState.Available).update)
-            assertTrue(installer.installed.isEmpty())
-            assertTrue(c.state.value is UpdateState.ReinstallRequired)
+            assertEquals(1, installer.installed.size)
+            assertTrue(c.state.value is UpdateState.Installing)
         }
     }
 
