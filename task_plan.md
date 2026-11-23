@@ -230,3 +230,13 @@ Not done, and why:
 - History rewrite: owner chose to leave it.
 
 CI on GitHub, first execution ever of `ci.yml` (commit `b37926b`): both runs green, `push` 45127409993 and `pull_request` 45127441542 (tests, unsigned release build, licence check, forbidden files). `release.yml` has still never run in its new form.
+
+## 2026-11-23, first official release
+
+- Owner created the release key (certificate `CN=Gomez Yannis, O=Synxio, L=Toulouse, C=FR`, SHA-256 `fd785ce1...f27834`), set the four secrets in the environment `release`; `ROADLY_SIGNER_SHA256` set.
+- Pull requests #8, #9, #10 merged into `main` (#8 by the assistant with the owner's approval, #9 and #10 by the owner).
+- Two release runs failed at the `sign` job without publishing anything: the script expected `Signer #1 certificate ...`, apksigner 37 on GitHub prints `V3.0 Signer: certificate ...` (local build-tools are 36). First fix was a guess and was wrong; second fix reads only the end of the line and was checked against the real log lines.
+- Run 45140311861: build, sign (after the owner's approval), publish all green. Release `v0.1.243` published with `roadly-0.1.243.apk`, `update.json`, `SHA256SUMS.txt`.
+- VERIFIED independently on the downloaded release files: `SHA256SUMS.txt` matches, APK SHA-256 equals `update.json`, `apksigner verify --min-sdk-version 29 --print-certs` gives the declared certificate, package `fr.roadly` versionCode 243.
+
+Phase F status now: clean checkout builds (done), CI passes (done), release APK signed and verified (done), published through GitHub Releases (done). Still NOT done: Roadly detecting and downloading this release on a phone, and the real installation with data preservation on the HONOR. The phone carries a debug-signed build: it will be offered 0.1.243, download it, and must refuse it as "signed with another key" until it is migrated (`docs/MIGRATION-HONOR.md`). The signer is not pinned yet.
