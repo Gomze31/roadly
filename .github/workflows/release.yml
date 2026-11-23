@@ -199,13 +199,15 @@ jobs:
           # Vérification complète de l'APK signé, pour la plus ancienne version d'Android prise en charge (échec = arrêt).
           "$BUILD_TOOLS/apksigner" verify --min-sdk-version 29 "$APK"
           CERTS=$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")
-          echo "$CERTS" | grep -E 'Signer #1 certificate (DN|SHA-256)'
-          if [ "$(echo "$CERTS" | grep -c 'certificate SHA-256 digest')" != "1" ]; then
-            echo "::error::Un seul signataire est attendu."
+          # Le préfixe des lignes dépend de la version d'apksigner (« Signer #1 … » ou « Signer (minSdkVersion=…, …) … ») :
+          # seule la fin de ligne est lue. Les certificats sont publics : la sortie complète est journalisée.
+          echo "$CERTS"
+          DN=$(echo "$CERTS" | sed -n 's/^Signer .*certificate DN: //p' | sort -u)
+          SIGNER=$(echo "$CERTS" | sed -n 's/^Signer .*certificate SHA-256 digest: //p' | tr 'A-F' 'a-f' | sort -u)
+          if [ "$(echo "$SIGNER" | grep -c .)" != "1" ]; then
+            echo "::error::Un seul certificat de signature est attendu ; trouvé : $(echo "$SIGNER" | grep -c .)."
             exit 1
           fi
-          DN=$(echo "$CERTS" | sed -n 's/^Signer #1 certificate DN: //p')
-          SIGNER=$(echo "$CERTS" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr 'A-F' 'a-f')
           # Jamais de version publiée avec une clé de développement : son mot de passe est public (« android »).
           case "$DN" in
             *"CN=Android Debug"*)
