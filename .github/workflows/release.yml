@@ -199,11 +199,11 @@ jobs:
           # Vérification complète de l'APK signé, pour la plus ancienne version d'Android prise en charge (échec = arrêt).
           "$BUILD_TOOLS/apksigner" verify --min-sdk-version 29 "$APK"
           CERTS=$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")
-          # Le préfixe des lignes dépend de la version d'apksigner (« Signer #1 … » ou « Signer (minSdkVersion=…, …) … ») :
+          # Le préfixe des lignes dépend de la version d'apksigner (« Signer #1 … », « V3.0 Signer: … » avec build-tools 37) :
           # seule la fin de ligne est lue. Les certificats sont publics : la sortie complète est journalisée.
           echo "$CERTS"
-          DN=$(echo "$CERTS" | sed -n 's/^Signer .*certificate DN: //p' | sort -u)
-          SIGNER=$(echo "$CERTS" | sed -n 's/^Signer .*certificate SHA-256 digest: //p' | tr 'A-F' 'a-f' | sort -u)
+          DN=$(echo "$CERTS" | sed -n 's/^.*certificate DN: //p' | sort -u)
+          SIGNER=$(echo "$CERTS" | sed -n 's/^.*certificate SHA-256 digest: //p' | tr 'A-F' 'a-f' | sort -u)
           if [ "$(echo "$SIGNER" | grep -c .)" != "1" ]; then
             echo "::error::Un seul certificat de signature est attendu ; trouvé : $(echo "$SIGNER" | grep -c .)."
             exit 1
