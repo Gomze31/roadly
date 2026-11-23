@@ -101,6 +101,8 @@ exposées ; il n'a ni fork ni étoile. Aucune réécriture n'a été faite.
 
 Posés le 2026-11-23 avec l'accord du propriétaire, et relus par l'API GitHub : environnement `release` (propriétaire relecteur, limité à `main` et aux tags `v*`), protection de `main` (*pull request*, revue des propriétaires de code, contrôle `check`, pas de *force push* ; les administrateurs peuvent passer outre), *secret scanning* et *push protection*, signalement privé des failles, alertes Dependabot, jeton des workflows en lecture seule, approbation des *pull requests* de nouveaux contributeurs.
 
+Modifié le même jour à la demande du propriétaire (publication entièrement automatique) : le relecteur obligatoire de l'environnement `release` et la relecture obligatoire sur `main` ont été retirés, la fusion automatique est activée. Détail et conditions de retour en arrière : [`SIGNATURE.md`](SIGNATURE.md), étape 3.
+
 Restent à faire, par le propriétaire : déplacer les quatre secrets de signature du dépôt vers l'environnement `release` (leur valeur n'est pas lisible), déclarer `ROADLY_SIGNER_SHA256`, protéger les tags `v*` (non fait : une règle de création bloquerait aussi le workflow qui crée le tag).
 
 | Réglage | Valeur | But |
