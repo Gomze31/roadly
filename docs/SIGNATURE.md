@@ -94,8 +94,12 @@ La tâche `sign` échoue, et rien n'est publié, si :
 - la variable `ROADLY_SIGNER_SHA256` est absente ;
 - le certificat n'est pas celui de `ROADLY_SIGNER_SHA256`.
 
-Vérifié en local le 2026-11-23 : signature et vérification passent, et la clé de debug est refusée. Les autres refus et
-l'exécution sur GitHub n'ont pas été essayés.
+Vérifié en local le 2026-11-23 : signature et vérification passent, et la clé de debug est refusée. Exécuté sur GitHub le
+même jour : `v0.1.243` signée et publiée. Les autres refus (variable absente, certificat différent, secret manquant) n'ont
+pas été essayés.
+
+Deux exécutions ont d'abord échoué sans rien publier : `apksigner` 37 (GitHub) écrit `V3.0 Signer: certificate …` et non
+`Signer #1 certificate …` comme la version 36 du poste de développement. Le script ne lit plus que la fin de ligne.
 
 ## 5. Épingler la clé dans l'application
 
@@ -122,8 +126,12 @@ jour.
 | Déclarée dans la variable GitHub `ROADLY_SIGNER_SHA256` | oui, le 2026-11-23 |
 
 Clé créée par le propriétaire le 2026-11-23. Les versions publiées avant (jusqu'à `v0.1.210`) portent la clé de debug
-`7611a323…c9c2` et ne sont pas des versions officielles au sens de ce document. Aucune version n'a encore été signée avec
-la clé officielle.
+`7611a323…c9c2` et ne sont pas des versions officielles au sens de ce document.
+
+Première version officielle : **`v0.1.243`**, publiée le 2026-11-23 par le workflow après approbation du propriétaire. Contrôle
+indépendant le même jour, sur les fichiers téléchargés de la release : `sha256sum -c SHA256SUMS.txt` conforme, SHA-256 de
+l'APK identique à `update.json`, `apksigner verify --print-certs` : `CN=Gomez Yannis, O=Synxio, L=Toulouse, C=FR`, empreinte
+ci-dessus, paquet `fr.roadly`, `versionCode` 243.
 
 ## Vérifier un APK téléchargé
 
