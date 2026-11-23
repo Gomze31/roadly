@@ -80,8 +80,17 @@ Encodage du fichier de clé (PowerShell, résultat dans le presse-papiers) :
 Supprimer ensuite les quatre secrets du même nom au niveau du dépôt s'ils existent : seuls ceux de l'environnement
 doivent rester, sinon la protection de l'environnement ne protège rien.
 
-Effet : la tâche `sign` de `.github/workflows/release.yml` attend l'approbation du propriétaire à chaque publication. Une
-*pull request* fusionnée ne devient jamais une version officielle sans cette approbation.
+**Réglage en vigueur depuis le 2026-11-23, choix du propriétaire : publication entièrement automatique.** Le relecteur
+obligatoire de l'environnement `release` et la relecture obligatoire sur `main` ont été retirés. Une *pull request* dont la
+CI est verte peut se fusionner seule (*auto-merge*), et toute fusion de code dans `main` est signée et publiée sans
+intervention. Première version publiée ainsi : `v0.1.245`.
+
+Ce qui protège encore : seul le propriétaire a un droit d'écriture sur le dépôt ; `main` exige une *pull request* et le
+contrôle `check` ; l'environnement n'accepte que `main` et les tags `v*` ; le workflow refuse une clé de debug et tout
+certificat autre que `ROADLY_SIGNER_SHA256`.
+
+**À revoir avant de donner un droit d'écriture à quiconque** : cette personne pourrait publier une version officielle.
+Remettre alors le relecteur obligatoire sur l'environnement `release` (tableau ci-dessus) et la relecture sur `main`.
 
 ## 4. Ce que vérifie le workflow
 
