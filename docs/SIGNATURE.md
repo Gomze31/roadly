@@ -80,8 +80,17 @@ Encodage du fichier de clé (PowerShell, résultat dans le presse-papiers) :
 Supprimer ensuite les quatre secrets du même nom au niveau du dépôt s'ils existent : seuls ceux de l'environnement
 doivent rester, sinon la protection de l'environnement ne protège rien.
 
-Effet : la tâche `sign` de `.github/workflows/release.yml` attend l'approbation du propriétaire à chaque publication. Une
-*pull request* fusionnée ne devient jamais une version officielle sans cette approbation.
+**Réglage en vigueur depuis le 2026-11-23, choix du propriétaire : publication entièrement automatique.** Le relecteur
+obligatoire de l'environnement `release` et la relecture obligatoire sur `main` ont été retirés. Une *pull request* dont la
+CI est verte peut se fusionner seule (*auto-merge*), et toute fusion de code dans `main` est signée et publiée sans
+intervention. Première version publiée ainsi : `v0.1.245`.
+
+Ce qui protège encore : seul le propriétaire a un droit d'écriture sur le dépôt ; `main` exige une *pull request* et le
+contrôle `check` ; l'environnement n'accepte que `main` et les tags `v*` ; le workflow refuse une clé de debug et tout
+certificat autre que `ROADLY_SIGNER_SHA256`.
+
+**À revoir avant de donner un droit d'écriture à quiconque** : cette personne pourrait publier une version officielle.
+Remettre alors le relecteur obligatoire sur l'environnement `release` (tableau ci-dessus) et la relecture sur `main`.
 
 ## 4. Ce que vérifie le workflow
 
@@ -94,8 +103,12 @@ La tâche `sign` échoue, et rien n'est publié, si :
 - la variable `ROADLY_SIGNER_SHA256` est absente ;
 - le certificat n'est pas celui de `ROADLY_SIGNER_SHA256`.
 
-Vérifié en local le 2026-11-23 : signature et vérification passent, et la clé de debug est refusée. Les autres refus et
-l'exécution sur GitHub n'ont pas été essayés.
+Vérifié en local le 2026-11-23 : signature et vérification passent, et la clé de debug est refusée. Exécuté sur GitHub le
+même jour : `v0.1.243` signée et publiée. Les autres refus (variable absente, certificat différent, secret manquant) n'ont
+pas été essayés.
+
+Deux exécutions ont d'abord échoué sans rien publier : `apksigner` 37 (GitHub) écrit `V3.0 Signer: certificate …` et non
+`Signer #1 certificate …` comme la version 36 du poste de développement. Le script ne lit plus que la fin de ligne.
 
 ## 5. Clé épinglée dans l'application
 
@@ -125,8 +138,12 @@ laisser se diffuser, puis signer avec la nouvelle (rotation `apksigner`).
 | Déclarée dans la variable GitHub `ROADLY_SIGNER_SHA256` | oui, le 2026-11-23 |
 
 Clé créée par le propriétaire le 2026-11-23. Les versions publiées avant (jusqu'à `v0.1.210`) portent la clé de debug
-`7611a323…c9c2` et ne sont pas des versions officielles au sens de ce document. Aucune version n'a encore été signée avec
-la clé officielle.
+`7611a323…c9c2` et ne sont pas des versions officielles au sens de ce document.
+
+Première version officielle : **`v0.1.243`**, publiée le 2026-11-23 par le workflow après approbation du propriétaire. Contrôle
+indépendant le même jour, sur les fichiers téléchargés de la release : `sha256sum -c SHA256SUMS.txt` conforme, SHA-256 de
+l'APK identique à `update.json`, `apksigner verify --print-certs` : `CN=Gomez Yannis, O=Synxio, L=Toulouse, C=FR`, empreinte
+ci-dessus, paquet `fr.roadly`, `versionCode` 243.
 
 ## Vérifier un APK téléchargé
 
