@@ -205,3 +205,28 @@ Consequence to know: once this branch reaches `main`, a push to `main` no longer
 - `ApiClient.postForm(retryRateLimited = false)` for speed bumps: a 429 costs 1 request instead of 3, asserted in `RequestBudgetTest`.
 - `SpeedBumps.kt`: bumps kept per packet of ways; a route only gets bumps from packets containing one of its ways; new test in `RequestBudgetTest`.
 - These three tests were written together with the fixes; they were not observed failing first.
+
+## 2026-11-23, after the owner's "fait tout" (answers given through three explicit questions)
+
+Found first: the repository `Gomze31/roadly` is already PUBLIC (GitHub API), licence shown GPL-3.0, releases public up to `v0.1.210`. The earlier statement "repository private" in this plan and in the docs was wrong (taken from old notes, not re-checked); docs corrected.
+
+Owner decisions: Apache 2.0 confirmed; history left as is; four GitHub actions approved.
+
+| Action | Result |
+|---|---|
+| Push `integration/phase5` | done (`b37926b` and later) |
+| Pull request to `main` | Gomze31/roadly#8, opened, NOT merged |
+| CI on GitHub | see the last line of this section |
+| Published certificate | `roadly-0.1.210.apk`: `CN=Android Debug`, SHA-256 `7611a323...c9c2` = the PC debug key = the phone's certificate. The repository secrets therefore hold the debug key |
+| Repository settings | environment `release` (owner as required reviewer, `main` and `v*` only), `main` protected (PR, code-owner review, check `check`, no force push, admins may bypass), secret scanning + push protection, private vulnerability reporting, Dependabot alerts, read-only workflow token, approval for first-time contributors. All re-read through the API |
+
+Not done, and why:
+
+- Merge of the pull request: it would stop releases (debug key now refused) until the release key exists.
+- Release key: creating it needs passwords only the owner must choose and keep. Commands in `docs/SIGNATURE.md`.
+- Moving the four secrets into the environment, `ROADLY_SIGNER_SHA256`: need the key.
+- Tag protection: a creation rule would also block the workflow that creates the tag.
+- Phone migration, pinning: need the key; no phone connected.
+- History rewrite: owner chose to leave it.
+
+CI on GitHub, first execution ever of `ci.yml` (commit `b37926b`): both runs green, `push` 45127409993 and `pull_request` 45127441542 (tests, unsigned release build, licence check, forbidden files). `release.yml` has still never run in its new form.

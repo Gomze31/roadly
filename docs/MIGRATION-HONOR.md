@@ -9,6 +9,7 @@ propriétaire : la désinstallation efface les données de l'application.
 |---|---|---|
 | Le téléphone porte `fr.roadly` signé `CN=Android Debug`, empreinte `7611a323…c9c2` | `ROADLY-1.0/RELEASE-CHECKLIST.md` | relevé antérieur, **à reconfirmer** (étape 1) |
 | Cette empreinte est celle de `%USERPROFILE%\.android\debug.keystore` du PC | `ROADLY-1.0/DECISIONS.md` §3.1, commande `keytool` du 2026-11-22 | vérifié sur le PC |
+| Les releases publiées jusqu'à `v0.1.210` portent ce même certificat de debug | `apksigner` sur l'APK de la release, 2026-11-23 | vérifié |
 | La clé de publication n'existe pas encore | [`SIGNATURE.md`](SIGNATURE.md) | à créer par le propriétaire |
 | Android refuse une mise à jour signée par une autre clé | règle de la plateforme | certain |
 | La sauvegarde Android est désactivée (`allowBackup="false"`) | `app/src/main/AndroidManifest.xml` | vérifié |

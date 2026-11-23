@@ -99,7 +99,9 @@ exposées ; il n'a ni fork ni étoile. Aucune réécriture n'a été faite.
 
 ## 3. Réglages GitHub à poser avant l'ouverture
 
-Aucun n'est fait : ils demandent les droits du propriétaire.
+Posés le 2026-11-23 avec l'accord du propriétaire, et relus par l'API GitHub : environnement `release` (propriétaire relecteur, limité à `main` et aux tags `v*`), protection de `main` (*pull request*, revue des propriétaires de code, contrôle `check`, pas de *force push* ; les administrateurs peuvent passer outre), *secret scanning* et *push protection*, signalement privé des failles, alertes Dependabot, jeton des workflows en lecture seule, approbation des *pull requests* de nouveaux contributeurs.
+
+Restent à faire, par le propriétaire : déplacer les quatre secrets de signature du dépôt vers l'environnement `release` (leur valeur n'est pas lisible), déclarer `ROADLY_SIGNER_SHA256`, protéger les tags `v*` (non fait : une règle de création bloquerait aussi le workflow qui crée le tag).
 
 | Réglage | Valeur | But |
 |---|---|---|
@@ -182,3 +184,14 @@ une application diffusée (`ROADLY-1.0/DECISIONS.md`, section 2).
 7. Réglages GitHub (section 3).
 8. Migration du téléphone ([`MIGRATION-HONOR.md`](MIGRATION-HONOR.md)).
 9. Épinglage de la clé dans l'application, puis ouverture du dépôt.
+
+## 9. Constats du 2026-11-23 sur le dépôt public
+
+| Constat | Preuve |
+|---|---|
+| Les releases publiées sont signées avec la clé de debug du PC | `apksigner verify --print-certs` sur `roadly-0.1.210.apk` téléchargé de la release : `CN=Android Debug`, SHA-256 `7611a323b2f1b159e445174dd57a19c87a42b7d0648de7398e7935de3aa3c9c2` |
+| Le fichier publié est conforme à son `update.json` | SHA-256 recalculé identique |
+| Les secrets de signature du dépôt contiennent donc la clé de debug | déduit du constat précédent |
+| Le téléphone (même certificat) peut aujourd'hui se mettre à jour en place depuis les releases | même clé |
+
+Conséquence : fusionner la *pull request* de cette branche dans `main` arrête les publications (la clé de debug est désormais refusée) jusqu'à la création de la clé de publication. À partir de là, le téléphone doit être migré ([`MIGRATION-HONOR.md`](MIGRATION-HONOR.md)). Tant que la *pull request* n'est pas fusionnée, rien ne change pour le téléphone.
