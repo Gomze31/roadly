@@ -137,6 +137,17 @@
     </plurals>
     <string name="nav_side_right">Serrez à droite</string>
     <string name="nav_side_left">Serrez à gauche</string>
+    <string name="call_button">Appeler un proche</string>
+    <string name="call_overline">Téléphone</string>
+    <string name="call_title">Appeler un proche</string>
+    <string name="call_body">Roadly ouvre le téléphone avec le numéro composé : c\'est lui qui passe l\'appel, et le guidage continue dans sa petite fenêtre. Utilisez un kit mains libres.</string>
+    <string name="call_empty">Aucun proche pour l\'instant. Ajoutez-en jusqu\'à quatre, à l\'arrêt : ils restent sur ce téléphone.</string>
+    <string name="call_add">Ajouter depuis mes contacts</string>
+    <string name="call_full">%1$d proches au plus : retirez-en un pour en ajouter un autre.</string>
+    <string name="call_remove">Retirer %1$s</string>
+    <string name="call_pick_failed">Ce contact n\'a pas de numéro utilisable.</string>
+    <string name="call_no_dialer">Aucune application de téléphone sur cet appareil.</string>
+    <string name="call_no_contacts_app">Aucune application de contacts sur cet appareil.</string>
     <string name="nav_share_eta_title">Envoyer mon heure d\'arrivée</string>
     <string name="nav_share_eta">J\'arrive à %1$s (dans %2$s). Envoyé depuis Roadly.</string>
     <string name="nav_share_eta_to">J\'arrive à %1$s à %2$s (dans %3$s). Envoyé depuis Roadly.</string>
