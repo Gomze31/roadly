@@ -128,7 +128,7 @@ private fun FreeDriveContent(isDark: Boolean, onExit: () -> Unit, vm: FreeDriveV
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
     // Conduite libre en voiture : même curseur que le guidage.
-    LaunchedEffect(map) { map.setUserVehicleIcon(car = true) }
+    LaunchedEffect(map) { map.setUserVehicleIcon(car = true); map.setPlacesVisible(false) }
     KeepScreenOn()
     BackHandler { vm.stop() }
     LaunchedEffect(isDark) { vm.setDarkTheme(isDark) }
