@@ -259,11 +259,22 @@ class NavigationFullScreenScreenshotTest {
     @Test fun vigilance_night() = shot("vigilance_night", true, vigilanceActive())
     @Test fun vigilance_day() = shot("vigilance_day", false, vigilanceActive())
     /**
-     * Base du montage des images du README (`docs/images`) : le même écran sur fond noir puis blanc. La différence des deux
-     * rendus donne la transparence exacte des panneaux et de leurs ombres, que l'outil pose ensuite sur un rendu de carte.
+     * Base du montage des images du README (`docs/images`, outil `tools/readme-images`) : le même écran sur fond noir puis blanc.
+     * La différence des deux rendus donne la transparence exacte des panneaux et de leurs ombres, que l'outil pose ensuite sur un
+     * rendu de carte.
      */
-    @Test fun vigilance_night_montage_black() = shot("vigilance_night_montage_black", true, vigilanceActive(), montage = Color.Black)
-    @Test fun vigilance_night_montage_white() = shot("vigilance_night_montage_white", true, vigilanceActive(), montage = Color.White)
+    /** Un seul `setContent` par test : chaque fond a le sien. [white] choisit le fond blanc, sinon noir. */
+    private fun montage(name: String, dark: Boolean, state: NavigationUiState, white: Boolean) =
+        shot("${name}_montage_${if (white) "white" else "black"}", dark, state, montage = if (white) Color.White else Color.Black)
+
+    @Test fun vigilance_night_montage_black() = montage("vigilance_night", true, vigilanceActive(), white = false)
+    @Test fun vigilance_night_montage_white() = montage("vigilance_night", true, vigilanceActive(), white = true)
+    @Test fun motorway_exit_night_montage_black() = montage("motorway_exit_night", true, motorwayExit(), white = false)
+    @Test fun motorway_exit_night_montage_white() = montage("motorway_exit_night", true, motorwayExit(), white = true)
+    @Test fun roundabout_inside_night_montage_black() = montage("roundabout_inside_night", true, roundaboutInside(), white = false)
+    @Test fun roundabout_inside_night_montage_white() = montage("roundabout_inside_night", true, roundaboutInside(), white = true)
+    @Test fun cruise_day_montage_black() = montage("cruise_day", false, cruise(), white = false)
+    @Test fun cruise_day_montage_white() = montage("cruise_day", false, cruise(), white = true)
 
     // ---- Paysage, nuit : les trois situations les plus chargées ----
 

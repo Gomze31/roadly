@@ -1,5 +1,6 @@
 // Montage d'illustration : overlay Roadly (rendu de test sur aplat uni) posé sur un rendu MapLibre GL JS du style Roadly.
-// node montage.js <style.json> <overlay.png> <cléHex | overlay-sur-blanc.png> <sortie.png> <lon> <lat> <mode: nav|plan|carte>
+// node montage.js <style.json> <overlay.png> <cléHex | overlay-sur-blanc.png> <sortie.png> <lon> <lat> <mode: nav|navzone|plan|carte>
+// nav : tracé et voiture ; navzone : en plus, une zone de danger en cours sur le tracé ; plan : tracé vu de dessus ; carte : carte seule.
 // Avec un second rendu sur fond blanc (le premier étant sur fond noir), la transparence est calculée par différence.
 const path = require('path');
 const fs = require('fs');
@@ -14,7 +15,7 @@ const car = fs.readFileSync(path.join(__dirname, "car.svg"), "utf8");
 const dark = /dark/.test(style);
 
 const page = `<link rel=stylesheet href=/gl.css><body style="margin:0"><div id=m style="width:100vw;height:100vh"></div><script src=/gl.js></script><script>
-const mode=${JSON.stringify(mode)},dark=${dark};
+const zone=${JSON.stringify(mode)}==='navzone',mode=zone?'nav':${JSON.stringify(mode)},dark=${dark};
 const map=new maplibregl.Map({container:'m',style:'/style.json',center:[${lon},${lat}],zoom:14.5,attributionControl:false,fadeDuration:0,preserveDrawingBuffer:true});
 const idle=()=>new Promise(r=>map.once('idle',r));
 const brg=(a,b)=>{const t=Math.PI/180,y=Math.sin((b[0]-a[0])*t)*Math.cos(b[1]*t),x=Math.cos(a[1]*t)*Math.sin(b[1]*t)-Math.sin(a[1]*t)*Math.cos(b[1]*t)*Math.cos((b[0]-a[0])*t);return Math.atan2(y,x)/t};
@@ -35,7 +36,7 @@ const brg=(a,b)=>{const t=Math.PI/180,y=Math.sin((b[0]-a[0])*t)*Math.cos(b[1]*t)
     line('r0',ahead,dark?'#050814':'#FFFFFF',mode==='nav'?20:11);
     line('r1',ahead,dark?'#4D9BFF':'#2F7BF6',mode==='nav'?13:7);
     if(mode==='nav'){
-      line('z0',ahead.slice(0,cut),'#FFFFFF',20);line('z1',ahead.slice(0,cut),'#FF4D4F',14);
+      if(zone){line('z0',ahead.slice(0,cut),'#FFFFFF',20);line('z1',ahead.slice(0,cut),'#FF4D4F',14);}
       const img=new Image(88,132);img.src='data:image/svg+xml;base64,'+btoa(${JSON.stringify(car)});await img.decode();map.addImage('roadly-car',img,{pixelRatio:2});
       map.addSource('u',{type:'geojson',data:{type:'Feature',geometry:{type:'Point',coordinates:ahead[0]}}});
       map.addLayer({id:'u',type:'symbol',source:'u',layout:{'icon-image':'roadly-car','icon-allow-overlap':true,'icon-size':1.25}});

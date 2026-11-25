@@ -1,6 +1,6 @@
 # Roadly 1.0 - postponed decisions: options and recommendations
 
-Date: 2026-11-22. Scope: the four decision areas listed as postponed in `task_plan.md` (AA-1, VAL-1, release signing key,
+Date: 2026-11-22. Scope: the four decision areas listed as postponed in `docs/suivi/task_plan.md` (AA-1, VAL-1, release signing key,
 REL-5). This is a recommendation document. Nothing was implemented, built, installed, signed, committed or pushed to produce it.
 
 Not legal advice. Sections 1 and 4 quote licence and policy texts and give an engineering reading of them. A decision with

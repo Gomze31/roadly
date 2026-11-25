@@ -1,6 +1,6 @@
 # Roadly 1.0 — audit, stratégie et feuille de route
 
-Rédigé le 2026-11-05 sur `main` (commit de départ `9e61f9b`). Ce document fait suite à `SILLAXE_PARITY.md` (parité Sillaxe, lots 1 à 13) et fixe le cap de la version 1.0. Les statuts détaillés restent dans `FEATURES.md`.
+Rédigé le 2026-11-05 sur `main` (commit de départ `9e61f9b`). Ce document fait suite à `docs/suivi/SILLAXE_PARITY.md` (parité Sillaxe, lots 1 à 13) et fixe le cap de la version 1.0. Les statuts détaillés restent dans `FEATURES.md`.
 
 ## 1. Audit
 

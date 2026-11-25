@@ -120,7 +120,7 @@ Un push sur `main` publie une release : ne pousser qu'après la passe sur télé
 7 fichiers.
 
 - `M` `README.md`
-- `M` `SILLAXE_PARITY.md`
+- `M` `docs/suivi/SILLAXE_PARITY.md`
 - `M` `docs/API-PROVIDERS.md`
 - `??` `docs/BENCHMARK-GPS.md`
 - `??` `docs/GUIDAGE-INTELLIGENT.md`
