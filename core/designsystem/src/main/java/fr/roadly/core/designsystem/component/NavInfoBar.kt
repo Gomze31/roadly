@@ -63,10 +63,10 @@ private fun NavInfoBarSample() {
     )
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 380)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 380)
 @Composable
 private fun NavInfoBarNightPreview() { RoadlyTheme(darkTheme = true) { NavInfoBarSample() } }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8, widthDp = 380)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA, widthDp = 380)
 @Composable
 private fun NavInfoBarDayPreview() { RoadlyTheme(darkTheme = false) { NavInfoBarSample() } }

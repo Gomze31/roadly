@@ -275,9 +275,9 @@ internal class CarGuidanceScreen(
     }
 
     private companion object {
-        /** Fond des cartes de manœuvre : violet très sombre de l'app (interface sombre de jour comme de nuit). */
-        const val CARD_DAY = 0xFF1C1024.toInt()
-        const val CARD_NIGHT = 0xFF1C1024.toInt()
+        /** Fond des cartes de manœuvre : bleu nuit de l'app (interface sombre de jour comme de nuit). */
+        const val CARD_DAY = 0xFF0E1326.toInt()
+        const val CARD_NIGHT = 0xFF0E1326.toInt()
         const val SNAPPED_ACCURACY_M = 5f
         const val MIN_STEP_SPEED_MPS = 5.0
         const val HOME_SAME_DESTINATION_M = 150.0

@@ -182,7 +182,7 @@ class NavigationPremiumUiTest {
         rule.waitForIdle()
         assertTrue(vm.bottomPanelExpanded.value)
         rule.onNode(hasText("Trajet complet").and(hasClickAction())).assertIsDisplayed().assertHeightIsAtLeast(56.dp)
-        rule.onNode(hasText("Itinéraires").and(hasClickAction())).assertIsDisplayed().assertHeightIsAtLeast(56.dp)
+        rule.onNode(hasText("Envoyer mon heure d'arrivée").and(hasClickAction())).assertIsDisplayed().assertHeightIsAtLeast(56.dp)
         assertEquals("la poignée ne change pas de feuille", GuidanceSheet.NONE, vm.guidanceSheet.value)
         val expanded = vm.bottomPanelFraction.value!!
         assertTrue("déplié ($expanded) > replié ($collapsed)", expanded > collapsed)

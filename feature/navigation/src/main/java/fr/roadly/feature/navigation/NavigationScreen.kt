@@ -155,7 +155,7 @@ fun NavigationScreen(
     // Interface : même clair / sombre que l'app (sombre en permanence sauf choix « Clair ») ; la carte suit [isDark].
     val uiDark = LocalRoadlyColors.current.isDark
     val tint = LocalRoadlyColors.current.brand
-    val cockpit = CockpitTint.entries.firstOrNull { (if (uiDark) it.night else it.day).first == tint } ?: CockpitTint.MAGENTA
+    val cockpit = CockpitTint.entries.firstOrNull { (if (uiDark) it.night else it.day).first == tint } ?: CockpitTint.AZUR
     RoadlyTheme(darkTheme = uiDark, drivingMode = true, tint = cockpit) {
         NavigationContent(isDark, onExit, onChangeDestination, onAddStop, vm, assistantButton, assistantPanel)
     }
@@ -208,6 +208,8 @@ private fun NavigationContent(
         map.setBuildings3d(buildings3d.value && cameraMode.value == CameraMode3D.FOLLOW_3D && !powerSave.value, buildingsColor.toHex())
     }
     LaunchedEffect(c.brand) { map.setArrowColor("#FFFFFF", c.brand.toHex()) }
+    // En voiture, le curseur est une voiture vue de dessus ; la trottinette garde la flèche.
+    LaunchedEffect(map) { map.setUserVehicleIcon(car = !vm.scooterMode) }
     val approach = state.approach
     LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
         if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
@@ -516,7 +518,11 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
                 Row(Modifier.fillMaxWidth().padding(bottom = RoadlySpacing.s), verticalAlignment = Alignment.Bottom) {
                     speed?.let { it(); Spacer(Modifier.width(RoadlySpacing.s)) }
                     AnimatedVisibility(horizonVisible(state, landscape, expanded), modifier = Modifier.weight(1f)) {
-                        HorizonStrip(items = horizonItems(state), title = stringResource(R.string.nav_horizon_title))
+                        HorizonStrip(
+                            items = horizonItems(state), title = stringResource(R.string.nav_horizon_title),
+                            // Zone de danger en cours de traversée (Radar Intelligence) : le ruban le dit en tête, en rouge.
+                            alert = if (state.radar?.inside == true) stringResource(R.string.nav_vigilance_active) else null,
+                        )
                     }
                 }
                 recenterIn?.let { RecenterCountdownPill(it, onCancel = vm::cancelAutoRecenter) }

@@ -140,7 +140,7 @@ interface UserPreferencesRepository {
     /** E2 : économie d'énergie du guidage (AUTO = économiseur d'Android). */
     val powerSaveMode: Flow<PowerSaveMode>
     suspend fun setPowerSaveMode(value: PowerSaveMode)
-    /** Teinte du cockpit (nom de `CockpitTint`) ; null = violet par défaut. */
+    /** Teinte du cockpit (nom de `CockpitTint`) ; null = azur par défaut. */
     val cockpitTint: Flow<String?>
     suspend fun setCockpitTint(name: String?)
     /** B6 : course en cours, mémorisée au démarrage du guidage ; null après un arrêt ou une arrivée. */

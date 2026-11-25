@@ -220,6 +220,17 @@ class NavigationFullScreenScreenshotTest {
         nextLimit = NextLimitUi(50, "300 m"),
     )
 
+    /** Zone de danger en cours de traversée, sortie numérotée lointaine : pastille de sortie, ruban « Vigilance active ». */
+    private fun vigilanceActive() = guiding(
+        BannerUi(ManeuverType.EXIT_RIGHT, "8,9 km", "Prenez la sortie 7 à droite vers Viry-Châtillon.", "Viry-Châtillon · Fleury-Mérogis", "7", null),
+        GuidanceSituation(GuidanceMode.CRUISE, GuidanceDensity.MINIMAL),
+        speed = 91.0, limit = 110,
+    ).copy(
+        etaClock = "20:23", remainingDuration = "51 min", remainingDistance = "15 km",
+        remainingDurationSplit = SplitValue("51", "min"), remainingDistanceSplit = SplitValue("15", "km"),
+        radar = RadarUi(inside = true, distance = "1,4 km", limitKmh = 110, confidence = 90),
+    )
+
     private fun arrived() = NavigationUiState(phase = NavigationPhase.ARRIVED)
 
     // ---- Portrait, nuit et jour ----
@@ -242,6 +253,8 @@ class NavigationFullScreenScreenshotTest {
     @Test fun overspeed_day() = shot("overspeed_day", false, overspeed())
     @Test fun arrived_night() = shot("arrived_night", true, arrived())
     @Test fun arrived_day() = shot("arrived_day", false, arrived())
+    @Test fun vigilance_night() = shot("vigilance_night", true, vigilanceActive())
+    @Test fun vigilance_day() = shot("vigilance_day", false, vigilanceActive())
 
     // ---- Paysage, nuit : les trois situations les plus chargées ----
 

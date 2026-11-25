@@ -65,10 +65,10 @@ private fun TagsSamples() {
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun TagsNightPreview() { RoadlyTheme(darkTheme = true) { TagsSamples() } }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun TagsDayPreview() { RoadlyTheme(darkTheme = false) { TagsSamples() } }

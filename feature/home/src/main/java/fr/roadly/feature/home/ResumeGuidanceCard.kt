@@ -62,13 +62,13 @@ internal fun ResumeGuidanceCard(card: ResumeCardUi, canResume: Boolean, onResume
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun ResumeGuidanceCardNightPreview() {
     RoadlyTheme(darkTheme = true) { GlassPanel { ResumeGuidanceCard(ResumeCardUi("Capitole"), canResume = true, onResume = {}, onDismiss = {}) } }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun ResumeGuidanceCardDayPreview() {
     RoadlyTheme(darkTheme = false) { GlassPanel { ResumeGuidanceCard(ResumeCardUi("Capitole", ResumePhase.FAILED), canResume = true, onResume = {}, onDismiss = {}) } }

@@ -107,6 +107,6 @@ internal class CarFreeDriveScreen(
     }
 
     private companion object {
-        const val CARD = 0xFF1C1024.toInt()
+        const val CARD = 0xFF0E1326.toInt()
     }
 }

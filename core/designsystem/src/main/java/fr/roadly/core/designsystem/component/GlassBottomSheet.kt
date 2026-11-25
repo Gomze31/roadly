@@ -37,7 +37,7 @@ fun GlassBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier, conte
     )
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun GlassBottomSheetNightPreview() {
     RoadlyTheme(darkTheme = true) {
@@ -45,7 +45,7 @@ private fun GlassBottomSheetNightPreview() {
     }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun GlassBottomSheetDayPreview() {
     RoadlyTheme(darkTheme = false) {

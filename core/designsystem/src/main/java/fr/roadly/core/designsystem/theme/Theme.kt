@@ -18,11 +18,11 @@ const val DRIVING_TEXT_SCALE = 1.15f
 fun RoadlyTheme(
     darkTheme: Boolean,
     drivingMode: Boolean = false,
-    tint: CockpitTint = CockpitTint.MAGENTA,
+    tint: CockpitTint = CockpitTint.AZUR,
     content: @Composable () -> Unit,
 ) {
     val base = if (darkTheme) RoadlyColors.Night else RoadlyColors.Day
-    val colors = if (tint == CockpitTint.MAGENTA) base else base.withTint(tint)
+    val colors = if (tint == CockpitTint.AZUR) base else base.withTint(tint)
     val material: ColorScheme = if (darkTheme) {
         darkColorScheme(
             primary = colors.brand, onPrimary = colors.onBrand,

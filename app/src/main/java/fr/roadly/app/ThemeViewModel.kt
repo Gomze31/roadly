@@ -38,7 +38,7 @@ object ThemeResolver {
 class ThemeViewModel @Inject constructor(prefs: UserPreferencesRepository) : ViewModel() {
     val themeMode: StateFlow<ThemeMode> = prefs.themeMode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.AUTO_SOLAR)
     /** Teinte du cockpit choisie dans Réglages → Personnalisation. */
-    val tint: StateFlow<CockpitTint> = prefs.cockpitTint.map { name -> CockpitTint.entries.firstOrNull { it.name == name } ?: CockpitTint.MAGENTA }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CockpitTint.MAGENTA)
+    val tint: StateFlow<CockpitTint> = prefs.cockpitTint.map { name -> CockpitTint.entries.firstOrNull { it.name == name } ?: CockpitTint.AZUR }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CockpitTint.AZUR)
 
     /** Fond de carte en photos aériennes IGN (Réglages, bouton de l'accueil). */
     val mapAerial: StateFlow<Boolean> = prefs.mapAerial.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

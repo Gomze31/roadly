@@ -691,11 +691,11 @@ private fun TintGroup(current: String?, onSelect: (String?) -> Unit) {
         Row(Modifier.padding(start = RoadlySpacing.m, end = RoadlySpacing.m, bottom = RoadlySpacing.m), horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
             CockpitTint.entries.forEach { t ->
                 val color = if (c.isDark) t.night.second else t.day.first
-                val selected = (current ?: CockpitTint.MAGENTA.name) == t.name
+                val selected = (current ?: CockpitTint.AZUR.name) == t.name
                 Box(
                     Modifier.size(44.dp).clip(RoadlyShapes.Pill).background(color)
                         .border(if (selected) 3.dp else 0.dp, if (selected) c.textPrimary else androidx.compose.ui.graphics.Color.Transparent, RoadlyShapes.Pill)
-                        .clickable(role = Role.RadioButton) { onSelect(if (t == CockpitTint.MAGENTA) null else t.name) },
+                        .clickable(role = Role.RadioButton) { onSelect(if (t == CockpitTint.AZUR) null else t.name) },
                     contentAlignment = Alignment.Center,
                 ) { if (selected) Icon(Icons.Default.Check, contentDescription = t.name, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp)) }
             }

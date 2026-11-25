@@ -33,6 +33,7 @@
     <string name="nav_horizon_bump">ralentisseur</string>
     <string name="nav_horizon_zone_limit">zone · %1$d</string>
     <string name="nav_zone_active">Zone de danger</string>
+    <string name="nav_vigilance_active">Vigilance active</string>
     <string name="nav_danger_in">dans %1$s</string>
     <string name="nav_danger_remaining">encore %1$s</string>
     <string name="nav_rain">Pluie</string>

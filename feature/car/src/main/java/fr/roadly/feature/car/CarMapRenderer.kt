@@ -148,13 +148,15 @@ internal class CarMapRenderer(private val carContext: CarContext) : SurfaceCallb
     }
 
     private fun applyPalette(c: MapController) {
+        // Écran de voiture : le curseur est la voiture, de jour comme de nuit.
+        c.setUserVehicleIcon(car = true)
         if (night) {
-            c.setRouteColors(active = "#B794FF", inactive = "#6B6880", casing = "#0E0B14")
-            c.setArrowColor(body = "#FFFFFF", casing = "#2B1A66")
+            c.setRouteColors(active = "#4D9BFF", inactive = "#55627F", casing = "#070A18")
+            c.setArrowColor(body = "#FFFFFF", casing = "#14357A")
             c.setBuildings3d(true, "#2A2E3C")
         } else {
-            c.setRouteColors(active = "#6D3DF5", inactive = "#9A97AE", casing = "#FFFFFF")
-            c.setArrowColor(body = "#FFFFFF", casing = "#3A1FA8")
+            c.setRouteColors(active = "#2F7BF6", inactive = "#B3BACB", casing = "#FFFFFF")
+            c.setArrowColor(body = "#FFFFFF", casing = "#1F63E0")
             c.setBuildings3d(true, "#C5C9D6")
         }
     }

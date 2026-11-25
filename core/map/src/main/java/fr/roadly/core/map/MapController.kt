@@ -92,17 +92,18 @@ class MapController(internal val context: Context) {
     private var lastTraversedTail: String = TraversedFeatureBuilder.EMPTY
     private val traversed = TraversedLine()
     // Valeurs par défaut = palette de l'app (Android Auto n'appelle pas setRouteColors).
-    private var routeColorActive = "#D08CFF"
-    private var routeColorInactive = "#6A5A78"
-    private var routeColorCasing = "#140A1A"
+    private var routeColorActive = "#4D9BFF"
+    private var routeColorInactive = "#55627F"
+    private var routeColorCasing = "#050814"
+    private var userIconRes = R.drawable.ic_user_arrow
     private var arrowColorBody = "#FFFFFF"
-    private var arrowColorCasing = "#F03CDC"
+    private var arrowColorCasing = "#3A84F7"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
     private var lastDanger: String = DangerZoneFeatures.EMPTY
     private var overlayScale = 1f
     private var lastZfe: String = ZfeFeatures.EMPTY
     private var buildings3d = false
-    private var buildingsColor = "#2A2236"
+    private var buildingsColor = "#2A3A68"
     /** Photos aériennes IGN sous les routes et les étiquettes ([AerialImagery]) ; [aerialNight] = assombries. */
     private var aerial = false
     private var aerialNight = false
@@ -225,7 +226,7 @@ class MapController(internal val context: Context) {
 
     private fun installLayers(style: Style) {
         val s = overlayScale
-        style.addImage(MapIds.IMG_ARROW, drawableToBitmap(R.drawable.ic_user_arrow))
+        style.addImage(MapIds.IMG_ARROW, drawableToBitmap(userIconRes))
         style.addImage(MapIds.IMG_PIN, drawableToBitmap(R.drawable.ic_place_pin))
         style.addImage(MapIds.IMG_REPORT, drawableToBitmap(R.drawable.ic_report))
         style.addImage(MapIds.IMG_ARROW_HEAD, drawableToBitmap(R.drawable.ic_arrow_head))
@@ -529,6 +530,17 @@ class MapController(internal val context: Context) {
         if (geoJson == lastZfe) return
         lastZfe = geoJson
         if (styleReady) map?.style?.getSourceAs<GeoJsonSource>(MapIds.SRC_ZFE)?.setGeoJson(geoJson)
+    }
+
+    /**
+     * Curseur de position : voiture vue de dessus ([car], guidage automobile) ou flèche dans son disque (défaut : accueil,
+     * trottinette). L'image garde le même identifiant : le calque du curseur n'est ni retiré ni rajouté.
+     */
+    fun setUserVehicleIcon(car: Boolean) {
+        val res = if (car) R.drawable.ic_user_car else R.drawable.ic_user_arrow
+        if (res == userIconRes) return
+        userIconRes = res
+        if (styleReady) map?.style?.addImage(MapIds.IMG_ARROW, drawableToBitmap(res))
     }
 
     /** Couleurs CSS de la flèche : trait et liseré propres, contrastés quel que soit le thème du fond de carte. */

@@ -54,13 +54,13 @@ fun RoadlyScreen(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     Column(modifier.fillMaxSize().background(c.background).statusBarsPadding()) { content() }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 380)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 380)
 @Composable
 private fun TopBarNightPreview() {
     RoadlyTheme(darkTheme = true) { RoadlyTopBar("Place du Châtelet", onBack = {}, overline = "Roadly Replay") }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8, widthDp = 380)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA, widthDp = 380)
 @Composable
 private fun TopBarDayPreview() {
     RoadlyTheme(darkTheme = false) { RoadlyTopBar("Réglages", onBack = {}) }

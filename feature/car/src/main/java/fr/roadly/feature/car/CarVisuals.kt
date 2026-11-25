@@ -60,10 +60,10 @@ internal object CarVisuals {
     private const val LANE_W = 84
     private const val MAX_LANES = 7
 
-    private const val PANEL = 0xFF1E1B2E.toInt()
-    private const val ROAD = 0xFF4A4660.toInt()
-    private const val ROAD_EDGE = 0xFF2C2940.toInt()
-    private const val PATH = 0xFFB794FF.toInt()
+    private const val PANEL = 0xFF12182E.toInt()
+    private const val ROAD = 0xFF46506A.toInt()
+    private const val ROAD_EDGE = 0xFF262E45.toInt()
+    private const val PATH = 0xFF4D9BFF.toInt()
     private const val WHITE = 0xFFFFFFFF.toInt()
     private const val DIM = 0x59FFFFFF
     private const val VALID = 0xB3FFFFFF.toInt()

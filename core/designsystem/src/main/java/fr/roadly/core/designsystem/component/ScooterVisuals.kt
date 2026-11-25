@@ -115,7 +115,7 @@ fun TravelModeSelector(selected: TravelMode, onSelect: (TravelMode) -> Unit, mod
 @Composable
 fun WayCategoryBadge(category: WayCategory, modifier: Modifier = Modifier, size: Int = 28) {
     Box(modifier.size(size.dp).clip(CircleShape).background(category.color()), contentAlignment = Alignment.Center) {
-        Icon(category.icon(), contentDescription = category.label, tint = Color(0xFF0E0B14), modifier = Modifier.size((size * 0.6f).dp))
+        Icon(category.icon(), contentDescription = category.label, tint = Color(0xFF070A18), modifier = Modifier.size((size * 0.6f).dp))
     }
 }
 
