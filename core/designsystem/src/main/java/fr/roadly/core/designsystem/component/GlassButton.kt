@@ -41,7 +41,7 @@ import fr.roadly.core.designsystem.theme.brandGradient
 import fr.roadly.core.designsystem.theme.softShadow
 
 /**
- * Styles : [Primary] = orange d'appel à l'action ; [Brand] = dégradé violet (« Rouler », navigation) ;
+ * Styles : [Primary] = orange d'appel à l'action ; [Brand] = dégradé bleu (« Rouler », navigation) ;
  * [Secondary] = verre ; [Danger] = rouge doux ; [Ghost] = texte seul.
  */
 enum class GlassButtonStyle { Primary, Brand, Secondary, Danger, Ghost }
@@ -181,13 +181,13 @@ private fun GlassButtonSamples() {
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun GlassButtonNightPreview() {
     RoadlyTheme(darkTheme = true) { GlassButtonSamples() }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun GlassButtonDayPreview() {
     RoadlyTheme(darkTheme = false) { GlassButtonSamples() }

@@ -57,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import fr.roadly.core.designsystem.component.GlassButton
 import fr.roadly.core.designsystem.component.GlassButtonStyle
@@ -84,12 +85,13 @@ private val HANDLE_BAND_HEIGHT = 24.dp
 
 /**
  * D5 : panneau du bas du guidage.
- * - Replié : poignée, heure d'arrivée, temps et distance restants, voix (Recentrer à sa place quand la carte a été déplacée :
- *   trois boutons de 56 dp ne tiennent pas sur ~433 dp) et Arrêter (rouge).
+ * - Replié : poignée, heure d'arrivée, temps et distance restants, « Itinéraires » (Recentrer à sa place quand la carte a été
+ *   déplacée : trois boutons de 56 dp ne tiennent pas sur ~433 dp) et Arrêter (rouge).
  * - Toucher la ligne ETA ouvre le trajet complet ([onTripDetails], spec D5).
- * - Déplié (toucher la poignée, ou glisser le panneau vers le haut ; vers le bas pour replier) : destination, « Trajet complet », « Itinéraires ».
+ * - Déplié (toucher la poignée, ou glisser le panneau vers le haut ; vers le bas pour replier) : destination, « Trajet complet »,
+ *   « Envoyer mon arrivée » (partage Android), stations sur le trajet, voix et changement de destination.
  * - [compact] (paysage, passe appareil) : la partie dépliée tient sur une rangée d'environ 64 dp — destination tronquée, puis
- *   « Trajet complet » et « Itinéraires » en boutons ronds de 56 dp, libellés en descriptions.
+ *   « Trajet complet » et « Envoyer mon arrivée » en boutons ronds de 56 dp, libellés en descriptions.
  * L'Horizon reste au-dessus, hors du panneau.
  */
 @Composable
@@ -114,6 +116,7 @@ fun NavigationBottomPanel(
     var drag by remember { mutableFloatStateOf(0f) }
     val dragState = rememberDraggableState { delta -> drag += delta }
     val toggleLabel = stringResource(if (expanded) R.string.nav_panel_collapse else R.string.nav_panel_expand)
+    val shareEta = rememberShareEta(state, destinationName)
     GlassPanel(
         modifier.fillMaxWidth().draggable(dragState, Orientation.Vertical, onDragStopped = {
             if ((drag < -threshold && !expanded) || (drag > threshold && expanded)) onToggleExpanded()
@@ -152,14 +155,14 @@ fun NavigationBottomPanel(
                     if (!state.following) {
                         RoundIconButton(Icons.Default.Navigation, stringResource(R.string.nav_recenter), onClick = onRecenter, style = RoundButtonStyle.Brand)
                     } else {
-                        // Envoyer son heure d'arrivée (partage Android : SMS, messagerie…).
-                        ShareEtaButton(state, destinationName)
+                        // Autres itinéraires, à portée de pouce à côté d'Arrêter (référence visuelle).
+                        OutlinedRoundButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = onAlternatives)
                     }
                     RoundIconButton(Icons.Default.Close, stringResource(R.string.nav_stop), onClick = onStop, style = RoundButtonStyle.Danger, size = 52.dp)
                 }
             }
             AnimatedVisibility(expanded && compact) {
-                CompactExpandedRow(destinationName, onTripDetails, onAlternatives)
+                CompactExpandedRow(destinationName, onTripDetails, shareEta)
             }
             AnimatedVisibility(expanded && !compact) {
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
@@ -176,7 +179,8 @@ fun NavigationBottomPanel(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                         GlassButton(stringResource(R.string.nav_trip_details), onClick = onTripDetails, icon = Icons.AutoMirrored.Filled.List, style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f))
-                        GlassButton(stringResource(R.string.nav_alternatives), onClick = onAlternatives, icon = Icons.Default.AltRoute, style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f))
+                        // Envoyer son heure d'arrivée (partage Android : SMS, messagerie…).
+                        GlassButton(stringResource(R.string.nav_share_eta_title), onClick = shareEta, icon = Icons.AutoMirrored.Filled.Send, style = GlassButtonStyle.Secondary, modifier = Modifier.weight(1f))
                     }
                     // Stations les moins chères sur le trajet (prix officiels).
                     if (onFuelAhead != null) GlassButton(
@@ -218,27 +222,33 @@ private fun BarDivider() {
     Box(Modifier.padding(horizontal = 8.dp).width(1.dp).height(38.dp).background(c.glassBorder))
 }
 
-/** Bouton « envoyer mon heure d'arrivée » : texte prêt à partager (heure, durée, destination). */
+/** Partage de l'heure d'arrivée : texte prêt à envoyer (heure, durée, destination) remis au sélecteur d'Android. */
 @Composable
-private fun ShareEtaButton(state: NavigationUiState, destinationName: String?) {
-    val c = LocalRoadlyColors.current
+private fun rememberShareEta(state: NavigationUiState, destinationName: String?): () -> Unit {
     val context = LocalContext.current
     val text = if (destinationName != null) stringResource(R.string.nav_share_eta_to, destinationName, state.etaClock, state.remainingDuration)
         else stringResource(R.string.nav_share_eta, state.etaClock, state.remainingDuration)
     val title = stringResource(R.string.nav_share_eta_title)
-    Box(
-        Modifier.size(48.dp).clip(RoadlyShapes.Pill).background(c.brand.copy(alpha = 0.16f)).border(1.5.dp, c.brand.copy(alpha = 0.6f), RoadlyShapes.Pill)
-            .clickable(role = Role.Button, onClickLabel = title) {
-                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-                context.startActivity(Intent.createChooser(send, title))
-            },
-        contentAlignment = Alignment.Center,
-    ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = title, tint = c.brand, modifier = Modifier.size(22.dp).rotate(-30f)) }
+    return {
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+        context.startActivity(Intent.createChooser(send, title))
+    }
 }
 
-/** Paysage : partie dépliée sur une rangée (destination tronquée, « Trajet complet », « Itinéraires »), 56 dp + 8 dp de marge. */
+/** Bouton rond secondaire de la barre : fond teinté et liseré de marque, pour ne pas concurrencer « Arrêter ». */
 @Composable
-private fun CompactExpandedRow(destinationName: String?, onTripDetails: () -> Unit, onAlternatives: () -> Unit) {
+private fun OutlinedRoundButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    val c = LocalRoadlyColors.current
+    Box(
+        Modifier.size(48.dp).clip(RoadlyShapes.Pill).background(c.brand.copy(alpha = 0.16f)).border(1.5.dp, c.brand.copy(alpha = 0.6f), RoadlyShapes.Pill)
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, contentDescription = description, tint = c.brandBright, modifier = Modifier.size(24.dp)) }
+}
+
+/** Paysage : partie dépliée sur une rangée (destination tronquée, « Trajet complet », « Envoyer mon arrivée »), 56 dp + 8 dp de marge. */
+@Composable
+private fun CompactExpandedRow(destinationName: String?, onTripDetails: () -> Unit, onShareEta: () -> Unit) {
     val c = LocalRoadlyColors.current
     Row(Modifier.fillMaxWidth().padding(start = RoadlySpacing.m, end = RoadlySpacing.sm, bottom = RoadlySpacing.s), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -251,7 +261,7 @@ private fun CompactExpandedRow(destinationName: String?, onTripDetails: () -> Un
         Spacer(Modifier.width(RoadlySpacing.s))
         RoundIconButton(Icons.AutoMirrored.Filled.List, stringResource(R.string.nav_trip_details), onClick = onTripDetails)
         Spacer(Modifier.width(RoadlySpacing.s))
-        RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = onAlternatives)
+        RoundIconButton(Icons.AutoMirrored.Filled.Send, stringResource(R.string.nav_share_eta_title), onClick = onShareEta)
     }
 }
 
@@ -260,7 +270,7 @@ private val samplePanel = NavigationUiState(
     remainingDurationSplit = SplitValue("19", "min"), remainingDistanceSplit = SplitValue("4,6", "km"),
 )
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 440)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 440)
 @Composable
 private fun BottomPanelNightPreview() {
     RoadlyTheme(darkTheme = true, drivingMode = true) {
@@ -268,7 +278,7 @@ private fun BottomPanelNightPreview() {
     }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8, widthDp = 440)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA, widthDp = 440)
 @Composable
 private fun BottomPanelDayPreview() {
     RoadlyTheme(darkTheme = false, drivingMode = true) {

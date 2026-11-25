@@ -108,6 +108,8 @@ fun HorizonKind.color(): Color {
 /**
  * Ruban « Horizon » : la route à venir sur une échelle logarithmique (0 → 5 km), événements posés dessus,
  * barre de densité sous le ruban quand une source trafic existe. Sans trafic, [density] = null et le ruban reste neutre.
+ * [alert] (ex. « Vigilance active », pendant la traversée d'une zone de danger) prend l'en-tête et passe le rail au rouge :
+ * c'est l'état de la route sous les roues, il prime sur le prochain événement.
  */
 @Composable
 fun HorizonStrip(
@@ -116,9 +118,11 @@ fun HorizonStrip(
     modifier: Modifier = Modifier,
     density: HorizonDensity? = null,
     rangeLabel: String = "5 km",
+    alert: String? = null,
 ) {
     val c = LocalRoadlyColors.current
-    val description = if (items.isEmpty()) title else "$title : " + items.joinToString(", ") { it.contentDescription }
+    val events = if (items.isEmpty()) title else "$title : " + items.joinToString(", ") { it.contentDescription }
+    val description = if (alert != null) "$alert. $events" else events
     GlassPanel(modifier.fillMaxWidth().semantics { contentDescription = description }, shape = RoadlyShapes.Panel, contentPadding = 0.dp) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             // En-tête : pouls (titre lu par TalkBack) à gauche ; à droite, le prochain événement notable (hors manœuvres) en couleur.
@@ -126,7 +130,13 @@ fun HorizonStrip(
                 Icon(Icons.Default.MonitorHeart, contentDescription = null, tint = c.brand, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.weight(1f))
                 val headline = items.firstOrNull { it.kind != HorizonKind.MANEUVER && it.kind != HorizonKind.ARRIVAL } ?: items.firstOrNull()
-                if (headline != null) {
+                if (alert != null) {
+                    Box(Modifier.size(10.dp).background(c.accent, RoadlyShapes.Pill))
+                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = c.danger, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(alert.uppercase(), style = Overline.copy(fontSize = 14.sp, letterSpacing = 0.8.sp), color = c.danger, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else if (headline != null) {
                     val col = headline.kind.color()
                     Box(Modifier.size(10.dp).background(col, RoadlyShapes.Pill))
                     Spacer(Modifier.width(8.dp))
@@ -140,13 +150,17 @@ fun HorizonStrip(
             Spacer(Modifier.height(6.dp))
             BoxWithConstraints(Modifier.fillMaxWidth().height(40.dp)) {
                 val trackW = maxWidth - 24.dp
-                val rail = c.textTertiary.copy(alpha = 0.45f)
-                // Rail fin et graduations (1/3, 2/3) ; densité en segments colorés si connue.
-                Box(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 9.dp).width(trackW).height(4.dp).background(rail, RoundedCornerShape(2.dp)))
-                listOf(1f / 3f, 2f / 3f).forEach { f ->
-                    Box(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 4.dp).offset(x = trackW * f).width(2.dp).height(14.dp).background(rail, RoundedCornerShape(1.dp)))
+                val rail = if (alert != null) c.danger else c.textTertiary.copy(alpha = 0.45f)
+                // Rail fin et graduations (1/3, 2/3) ; densité en segments colorés si connue. En alerte, le rail s'épaissit et rougeoie.
+                val railH = if (alert != null) 6.dp else 4.dp
+                if (alert != null) {
+                    Box(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 5.dp).width(trackW).height(14.dp).background(c.danger.copy(alpha = 0.22f), RoundedCornerShape(7.dp)))
                 }
-                if (density != null && density.segments.isNotEmpty()) {
+                Box(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 11.dp - railH / 2).width(trackW).height(railH).background(rail, RoundedCornerShape(railH / 2)))
+                listOf(1f / 3f, 2f / 3f).forEach { f ->
+                    Box(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 4.dp).offset(x = trackW * f).width(2.dp).height(14.dp).background(if (alert != null) c.textPrimary.copy(alpha = 0.7f) else rail, RoundedCornerShape(1.dp)))
+                }
+                if (alert == null && density != null && density.segments.isNotEmpty()) {
                     Row(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 9.dp).width(trackW).height(4.dp)) {
                         density.segments.forEach { d ->
                             val col = when {
@@ -190,10 +204,10 @@ private fun HorizonSample() {
     )
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 380)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 380)
 @Composable
 private fun HorizonNightPreview() { RoadlyTheme(darkTheme = true) { HorizonSample() } }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8, widthDp = 380)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA, widthDp = 380)
 @Composable
 private fun HorizonDayPreview() { RoadlyTheme(darkTheme = false) { HorizonSample() } }

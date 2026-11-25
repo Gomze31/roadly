@@ -115,16 +115,19 @@ class NavigationFullScreenScreenshotTest {
     }
 
     /** Overlay réel posé sur un aplat neutre (pas une carte) ; [landscape] choisit l'overlay, comme `NavigationContent`. */
-    private fun shot(name: String, dark: Boolean, state: NavigationUiState, landscape: Boolean = false) {
+    private fun shot(name: String, dark: Boolean, state: NavigationUiState, landscape: Boolean = false, montage: Color? = null) {
         val vm = viewModel()
         compose.setContent {
             RoadlyTheme(darkTheme = dark, drivingMode = true) {
-                Box(Modifier.fillMaxSize().background(if (dark) Color(0xFF2A3140) else Color(0xFFD9DDE3))) {
+                Box(Modifier.fillMaxSize().background(montage ?: if (dark) Color(0xFF2A3140) else Color(0xFFD9DDE3))) {
                     val line = if (dark) Color(0xFF596274) else Color(0xFFA9B0BC)
-                    Canvas(Modifier.fillMaxSize()) {
-                        drawLine(line, Offset(size.width * 0.5f, size.height), Offset(size.width * 0.5f, size.height * 0.45f), strokeWidth = 14.dp.toPx(), cap = StrokeCap.Round)
+                    // [montage] : aplat uni, sans trait ni étiquette, que l'outil d'images du README remplace par un rendu de carte.
+                    if (montage == null) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawLine(line, Offset(size.width * 0.5f, size.height), Offset(size.width * 0.5f, size.height * 0.45f), strokeWidth = 14.dp.toPx(), cap = StrokeCap.Round)
+                        }
+                        Text("fond de test (pas une carte)", Modifier.align(BiasAlignment(0.2f, -0.3f)), color = line, fontSize = 12.sp)
                     }
-                    Text("fond de test (pas une carte)", Modifier.align(BiasAlignment(0.2f, -0.3f)), color = line, fontSize = 12.sp)
                     if (landscape) {
                         LandscapeOverlay(state, true, {}, {}, {}, vm, {}, {})
                     } else {
@@ -220,6 +223,17 @@ class NavigationFullScreenScreenshotTest {
         nextLimit = NextLimitUi(50, "300 m"),
     )
 
+    /** Zone de danger en cours de traversée, sortie numérotée lointaine : pastille de sortie, ruban « Vigilance active ». */
+    private fun vigilanceActive() = guiding(
+        BannerUi(ManeuverType.EXIT_RIGHT, "8,9 km", "Prenez la sortie 7 à droite vers Viry-Châtillon.", "Viry-Châtillon · Fleury-Mérogis", "7", null),
+        GuidanceSituation(GuidanceMode.CRUISE, GuidanceDensity.MINIMAL),
+        speed = 91.0, limit = 110,
+    ).copy(
+        etaClock = "20:23", remainingDuration = "51 min", remainingDistance = "15 km",
+        remainingDurationSplit = SplitValue("51", "min"), remainingDistanceSplit = SplitValue("15", "km"),
+        radar = RadarUi(inside = true, distance = "1,4 km", limitKmh = 110, confidence = 90),
+    )
+
     private fun arrived() = NavigationUiState(phase = NavigationPhase.ARRIVED)
 
     // ---- Portrait, nuit et jour ----
@@ -242,6 +256,25 @@ class NavigationFullScreenScreenshotTest {
     @Test fun overspeed_day() = shot("overspeed_day", false, overspeed())
     @Test fun arrived_night() = shot("arrived_night", true, arrived())
     @Test fun arrived_day() = shot("arrived_day", false, arrived())
+    @Test fun vigilance_night() = shot("vigilance_night", true, vigilanceActive())
+    @Test fun vigilance_day() = shot("vigilance_day", false, vigilanceActive())
+    /**
+     * Base du montage des images du README (`docs/images`, outil `tools/readme-images`) : le même écran sur fond noir puis blanc.
+     * La différence des deux rendus donne la transparence exacte des panneaux et de leurs ombres, que l'outil pose ensuite sur un
+     * rendu de carte.
+     */
+    /** Un seul `setContent` par test : chaque fond a le sien. [white] choisit le fond blanc, sinon noir. */
+    private fun montage(name: String, dark: Boolean, state: NavigationUiState, white: Boolean) =
+        shot("${name}_montage_${if (white) "white" else "black"}", dark, state, montage = if (white) Color.White else Color.Black)
+
+    @Test fun vigilance_night_montage_black() = montage("vigilance_night", true, vigilanceActive(), white = false)
+    @Test fun vigilance_night_montage_white() = montage("vigilance_night", true, vigilanceActive(), white = true)
+    @Test fun motorway_exit_night_montage_black() = montage("motorway_exit_night", true, motorwayExit(), white = false)
+    @Test fun motorway_exit_night_montage_white() = montage("motorway_exit_night", true, motorwayExit(), white = true)
+    @Test fun roundabout_inside_night_montage_black() = montage("roundabout_inside_night", true, roundaboutInside(), white = false)
+    @Test fun roundabout_inside_night_montage_white() = montage("roundabout_inside_night", true, roundaboutInside(), white = true)
+    @Test fun cruise_day_montage_black() = montage("cruise_day", false, cruise(), white = false)
+    @Test fun cruise_day_montage_white() = montage("cruise_day", false, cruise(), white = true)
 
     // ---- Paysage, nuit : les trois situations les plus chargées ----
 

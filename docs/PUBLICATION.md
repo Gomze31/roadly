@@ -79,8 +79,8 @@ Limites : une recherche par motifs ne prouve pas l'absence. Les images n'ont pas
 | `docs/captures/` (59 images, 27 Mo) et `docs/images/` | captures d'écran de cartes : vérifier qu'aucune ne montre un domicile, un trajet habituel ou une notification personnelle. Aucune capture ne doit être publiée sans cet examen |
 | `core/navigation/src/test/resources/fixtures/junction_*_trace.json` | tracés de test nommés d'après des lieux réels : vérifier qu'ils ne décrivent pas un trajet personnel |
 | `docs/superpowers/` | plans de travail internes, très volumineux, sans intérêt pour un lecteur extérieur : à retirer du dépôt public |
-| `SILLAXE_PARITY.md`, `docs/BENCHMARK-SILLAXE.md`, `docs/SILLAXE-ANALYSE.md`, `docs/COMPARATIF.md`, `docs/BENCHMARK-GPS.md` | analyses de produits concurrents nommés : à relire ou à retirer avant publication |
-| `docs/PROTOCOLE-TERRAIN-HONOR.md`, `docs/VALIDATION-TELEPHONE.md`, `task_plan.md` | documents de travail internes |
+| `docs/suivi/SILLAXE_PARITY.md`, `docs/BENCHMARK-SILLAXE.md`, `docs/SILLAXE-ANALYSE.md`, `docs/COMPARATIF.md`, `docs/BENCHMARK-GPS.md` | analyses de produits concurrents nommés : à relire ou à retirer avant publication |
+| `docs/PROTOCOLE-TERRAIN-HONOR.md`, `docs/VALIDATION-TELEPHONE.md`, `docs/suivi/task_plan.md` | documents de travail internes |
 | `backend/` | schéma du service communautaire : sans secret trouvé, à relire |
 
 ### L'historique
@@ -167,7 +167,7 @@ une application diffusée (`ROADLY-1.0/DECISIONS.md`, section 2).
 
 | Étape | État |
 |---|---|
-| Compilation depuis une copie propre du dépôt | voir `task_plan.md` |
+| Compilation depuis une copie propre du dépôt | voir `docs/suivi/task_plan.md` |
 | CI verte sur GitHub | jamais exécutée (rien n'est poussé) |
 | APK signé par la clé de publication et vérifié | impossible sans la clé ; chemin de signature essayé en local avec la clé de debug, refusée comme prévu |
 | APK publié dans une release | non fait |

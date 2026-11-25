@@ -112,10 +112,10 @@ private val sampleLanes = listOf(
     Lane(setOf(LaneDirection.RIGHT), valid = true, active = true),
 )
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun LaneGuidanceNightPreview() { RoadlyTheme(darkTheme = true, drivingMode = true) { LaneGuidanceView(sampleLanes, emphasized = true) } }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun LaneGuidanceDayPreview() { RoadlyTheme(darkTheme = false, drivingMode = true) { LaneGuidanceView(sampleLanes, emphasized = false) } }

@@ -123,13 +123,13 @@ internal fun signOverline(type: ManeuverType, isNext: Boolean): Int = when (type
 
 private val signLanes = listOf(Lane(setOf(LaneDirection.STRAIGHT), valid = false), Lane(setOf(LaneDirection.SLIGHT_RIGHT), valid = true, active = true))
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 420)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 420)
 @Composable
 private fun ExitSignNightPreview() {
     RoadlyTheme(darkTheme = true, drivingMode = true) { ExitSignPanel(ManeuverType.EXIT_RIGHT, "31b", "Toulouse-Centre · Blagnac", "A62", signLanes, "450 m", isNext = true) }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8, widthDp = 420)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA, widthDp = 420)
 @Composable
 private fun ExitSignDayPreview() {
     RoadlyTheme(darkTheme = false, drivingMode = true) { ExitSignPanel(ManeuverType.EXIT_RIGHT, "19", "Balma", null, emptyList(), "1,2 km", isNext = false) }

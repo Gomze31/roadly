@@ -8,7 +8,8 @@
   1. calques routiers amont remplacés par une pile Roadly (tunnels, rues, liseré des ponts, routes principales, autoroutes) ;
   2. tunnels en pointillé à 60 %, ponts avec un liseré plus sombre ; 3. bretelles (ramp = 1) à 75 % de leur classe ;
   4. noms de rues espacés (400) et 1 px plus petits dès le zoom 15 ; points d'intérêt majeurs dès le zoom 14, autres dès 16 ;
-  5. eau et parcs teintés vers la palette Roadly ; 6. bâtiments conservés (extrusion ajoutée à l'exécution par MapController) ;
+  5. eau et parcs teintés vers la palette Roadly ; style sombre : fond « nuit bleue » ($nightBase) et calque des prairies
+     et cultures (roadly_landcover_fields) ; 6. bâtiments conservés (extrusion ajoutée à l'exécution par MapController) ;
   7. pile routière insérée à la place de highway_minor (au-dessus des chemins et des jetées) ; calques symboles regroupés
      au-dessus de tous les calques à plat (ordre relatif conservé), car MapController ancre l'extrusion des bâtiments
      sous le premier calque symbole.
@@ -26,14 +27,55 @@ New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null
 # ── Palettes Roadly (couleurs CSS du style) ──
 $palettes = @{
     dark  = [ordered]@{
-        motorway = '#4A4560'; trunk = '#403B55'; primary = '#36324A'; secondary = '#2F2B40'; tertiary = '#2F2B40'; minor = '#28243A'
-        casing = '#15121F'; bridgeCasing = '#0B0912'; tunnel = '#28243A'; water = '#1B2436'; park = '#1F2A24'
-        poiText = '#A8A2BC'; poiHalo = '#0E0B14'
+        motorway = '#6478AE'; trunk = '#566999'; primary = '#485A8C'; secondary = '#3D4D7C'; tertiary = '#3D4D7C'; minor = '#33436F'
+        casing = '#0A1228'; bridgeCasing = '#060B1A'; tunnel = '#33436F'; water = '#17389A'; park = '#1F5540'
+        poiText = '#9AA8C8'; poiHalo = '#0A1228'; fields = '#183F30'
     }
     light = [ordered]@{
-        motorway = '#B8B1CC'; trunk = '#C4BED6'; primary = '#D2CDE0'; secondary = '#E0DCEA'; tertiary = '#E0DCEA'; minor = '#E6E4EA'
-        casing = '#C9C5D2'; bridgeCasing = '#9C97A8'; tunnel = '#D8D5DF'; water = '#C7D3DD'; park = '#DDE6DA'
-        poiText = '#5A5470'; poiHalo = '#FFFFFF'
+        motorway = '#AAB6D2'; trunk = '#B8C2DA'; primary = '#C8D0E2'; secondary = '#D9DEEA'; tertiary = '#D9DEEA'; minor = '#E4E7EE'
+        casing = '#C3C9D6'; bridgeCasing = '#959DB0'; tunnel = '#D3D8E2'; water = '#BFD4EC'; park = '#D6E8D4'
+        poiText = '#55607A'; poiHalo = '#FFFFFF'
+    }
+}
+
+# ── Fond « nuit bleue » du style sombre : calque amont → propriétés de peinture remplacées (terre bleu nuit, bois verts,
+#    bâtiments et voies ferrées bleutés, noms clairs). Le style clair garde le fond amont. ──
+$nightPlaceText = [ordered]@{ 'text-color' = '#C7D3EE'; 'text-halo-color' = '#0A1228' }
+$nightBase = [ordered]@{
+    'background'               = [ordered]@{ 'background-color' = '#101C3C' }
+    'landcover_ice_shelf'      = [ordered]@{ 'fill-color' = '#1A2748' }
+    'landcover_glacier'        = [ordered]@{ 'fill-color' = '#1A2748' }
+    'landuse_residential'      = [ordered]@{ 'fill-color' = '#18254C' }
+    'landcover_wood'           = [ordered]@{ 'fill-color' = '#18452F' }
+    'waterway'                 = [ordered]@{ 'line-color' = '#17389A' }
+    'building'                 = [ordered]@{ 'fill-color' = '#1A2750'; 'fill-outline-color' = '#2A3B6E' }
+    'aeroway-taxiway'          = [ordered]@{ 'line-color' = '#26355C' }
+    'aeroway-runway-casing'    = [ordered]@{ 'line-color' = '#0A1228' }
+    'aeroway-area'             = [ordered]@{ 'fill-color' = '#14213F' }
+    'aeroway-runway'           = [ordered]@{ 'line-color' = '#2E3F6B' }
+    'road_area_pier'           = [ordered]@{ 'fill-color' = '#101C3C' }
+    'road_pier'                = [ordered]@{ 'line-color' = '#101C3C' }
+    'highway_path'             = [ordered]@{ 'line-color' = '#2A3A66' }
+    'railway_transit'          = [ordered]@{ 'line-color' = '#2E3F6B' }
+    'railway_transit_dashline' = [ordered]@{ 'line-color' = '#101C3C' }
+    'railway_minor'            = [ordered]@{ 'line-color' = '#2E3F6B' }
+    'railway_minor_dashline'   = [ordered]@{ 'line-color' = '#101C3C' }
+    'railway'                  = [ordered]@{ 'line-color' = '#2E3F6B' }
+    'railway_dashline'         = [ordered]@{ 'line-color' = '#101C3C' }
+    'boundary_state'           = [ordered]@{ 'line-color' = '#3A4B78' }
+    'boundary_country_z0-4'    = [ordered]@{ 'line-color' = '#465A8C' }
+    'boundary_country_z5-'     = [ordered]@{ 'line-color' = '#465A8C' }
+    'water_name'               = [ordered]@{ 'text-color' = '#7FA2EE'; 'text-halo-color' = '#0C2260' }
+    'highway_name_other'       = [ordered]@{ 'text-color' = '#A9B8DC'; 'text-halo-color' = '#0A1228' }
+    'highway_name_motorway'    = [ordered]@{ 'text-color' = '#C7D3EE' }
+}
+
+# Prairies et cultures des tuiles (landcover : grass, farmland), en vert sombre : la campagne se détache de la ville.
+function New-FieldsLayer($p) {
+    return [ordered]@{
+        id = 'roadly_landcover_fields'; type = 'fill'; source = 'openmaptiles'; 'source-layer' = 'landcover'; minzoom = 9
+        filter = @('all', @('match', @('geometry-type'), @('MultiPolygon', 'Polygon'), $true, $false), @('match', @('get', 'class'), @('grass', 'farmland'), $true, $false))
+        paint = [ordered]@{ 'fill-color' = $p.fields; 'fill-opacity' = @('interpolate', @('linear'), @('zoom'), 9, 0, 11, 0.85) }
     }
 }
 
@@ -146,6 +188,15 @@ foreach ($v in $variants) {
         if (-not $poiAdded -and $l.'source-layer' -eq 'place') { foreach ($r in (New-PoiLayers $p)) { [void]$out.Add($r) }; $poiAdded = $true }
         if ($l.type -eq 'fill' -and $l.'source-layer' -eq 'water') { $l.paint.'fill-color' = $p.water }
         if ($l.type -eq 'fill' -and ($l.'source-layer' -eq 'park' -or $l.id -eq 'landuse_park')) { $l.paint.'fill-color' = $p.park }
+        if ($v.key -eq 'dark') {
+            $paintOverride = $nightBase[$l.id]
+            if ($null -eq $paintOverride -and $l.id -like 'place_*') { $paintOverride = $nightPlaceText }
+            if ($null -ne $paintOverride) {
+                foreach ($k in $paintOverride.Keys) { $l.paint | Add-Member -Force -NotePropertyName $k -NotePropertyValue $paintOverride[$k] }
+            }
+            # Le motif amont des bois masquerait leur couleur : aplat vert.
+            if ($l.id -eq 'landcover_wood') { $l.paint.PSObject.Properties.Remove('fill-pattern') }
+        }
         if ($l.id -eq 'highway_major_subtle') { $l.paint.'line-color' = $p.primary }
         if ($l.id -eq 'highway_motorway_subtle') { $l.paint.'line-color' = $p.motorway }
         if ($l.type -eq 'symbol' -and $l.'source-layer' -eq 'transportation_name' -and $l.id -match 'name') {
@@ -160,6 +211,7 @@ foreach ($v in $variants) {
             }
         }
         [void]$out.Add($l)
+        if ($l.id -eq 'landcover_wood' -and $null -ne $p.fields) { [void]$out.Add((New-FieldsLayer $p)) }
     }
     if ($removed -lt 5 -or -not $roadsAdded -or -not $poiAdded) {
         throw "Style amont $($v.upstream) inattendu : $removed calques routiers retirés, points d'intérêt ajoutés : $poiAdded"

@@ -9,12 +9,16 @@ import androidx.compose.ui.graphics.luminance
 private const val ON_BRAND_WHITE_MAX_LUMINANCE = 0.30f
 
 /** Texte sombre sur les teintes claires du cockpit (ambre, menthe…) : même encre que le texte principal du jour. */
-private val ON_BRAND_DARK = Color(0xFF14101C)
+private val ON_BRAND_DARK = Color(0xFF0E1428)
+
+/** Texte posé sur le magenta de nuit (teinte au choix) : le blanc n'y tient pas le contraste. */
+private val ON_MAGENTA_NIGHT = Color(0xFF1B0820)
 
 /**
- * Palette Roadly (identité propre, inspirée de l'organisation d'un cockpit GPS premium) :
- * - [brand] : violet de marque (tracé, sélection, boutons de navigation, tuiles d'icônes) ;
- * - [accent] : orange chaud réservé aux appels à l'action (démarrer, essayer, confirmer) ;
+ * Palette Roadly, « nuit bleue » : des panneaux bleu nuit posés sur la carte, un bleu vif pour tout ce qui guide.
+ * - [brand] : bleu de marque (tracé, distance de manœuvre, sélection, boutons de navigation, tuiles d'icônes) ;
+ * - [accent] : ambre réservé aux appels à l'action et au signalement (démarrer, essayer, confirmer) ;
+ * - [danger] : rouge franc (arrêter, vigilance active) ;
  * - [surface] : panneau opaque (listes, réglages, feuilles) ; [glass] : panneau translucide posé sur la carte.
  */
 @Immutable
@@ -61,16 +65,19 @@ data class RoadlyColorScheme(
     /** Teinte du cockpit (personnalisation) : remplace la couleur de marque et ses dérivés. */
     fun withTint(tint: CockpitTint): RoadlyColorScheme {
         val (b, bright) = if (isDark) tint.night else tint.day
-        // Texte clair sur les teintes autres que le magenta par défaut (le magenta de nuit porte un texte foncé).
-        return copy(brand = b, brandBright = bright, routeActive = bright, onBrand = if (tint == CockpitTint.MAGENTA) onBrand else Color.White)
+        // Texte clair sur toutes les teintes, sauf le magenta de nuit, trop lumineux pour du blanc.
+        return copy(brand = b, brandBright = bright, routeActive = bright, onBrand = if (tint == CockpitTint.MAGENTA && isDark) ON_MAGENTA_NIGHT else Color.White)
     }
 }
 
-/** Teintes de cockpit proposées (L10 : personnalisation). La première est la teinte par défaut. */
+/**
+ * Teintes de cockpit proposées (L10 : personnalisation). [AZUR] est la teinte par défaut : c'est celle des palettes
+ * [RoadlyColors.Night] et [RoadlyColors.Day], et le réglage ne l'enregistre pas (clé absente).
+ */
 enum class CockpitTint(val night: Pair<Color, Color>, val day: Pair<Color, Color>) {
-    MAGENTA(Color(0xFFF03CDC) to Color(0xFFFF79EE), Color(0xFFD01FC0) to Color(0xFFF03CDC)),
+    AZUR(Color(0xFF3A84F7) to Color(0xFF73AEFF), Color(0xFF1F63E0) to Color(0xFF3A84F7)),
     VIOLET(Color(0xFF8B5CF6) to Color(0xFFB794FF), Color(0xFF6D3FE0) to Color(0xFF8B5CF6)),
-    OCEAN(Color(0xFF2F9BFF) to Color(0xFF6DC1FF), Color(0xFF1E6FD9) to Color(0xFF2F9BFF)),
+    MAGENTA(Color(0xFFF03CDC) to Color(0xFFFF79EE), Color(0xFFD01FC0) to Color(0xFFF03CDC)),
     MINT(Color(0xFF22C58B) to Color(0xFF5EE3B0), Color(0xFF13A070) to Color(0xFF22C58B)),
     CORAL(Color(0xFFFF5C7A) to Color(0xFFFF8FA3), Color(0xFFE04366) to Color(0xFFFF5C7A)),
     AMBER(Color(0xFFF5A524) to Color(0xFFFFC65C), Color(0xFFD98B00) to Color(0xFFF5A524)),
@@ -78,50 +85,50 @@ enum class CockpitTint(val night: Pair<Color, Color>, val day: Pair<Color, Color
 
 object RoadlyColors {
     val Night = RoadlyColorScheme(
-        background = Color(0xFF140A1A),
-        surface = Color(0xFF1C1024),
-        surfaceElevated = Color(0xFF2A1733),
-        glass = Color(0xF21E1027),
-        glassBorder = Color(0x3DB04FC0),
-        glassHighlight = Color(0x14FF7AF0),
-        textPrimary = Color(0xFFFAF5FC),
-        textSecondary = Color(0xFFB4A8BE),
-        textTertiary = Color(0xFF85778F),
-        brand = Color(0xFFF03CDC),
-        brandBright = Color(0xFFFF79EE),
-        onBrand = Color(0xFF1B0820),
+        background = Color(0xFF070A18),
+        surface = Color(0xFF0E1326),
+        surfaceElevated = Color(0xFF182040),
+        glass = Color(0xF20F142B),
+        glassBorder = Color(0x385F86D6),
+        glassHighlight = Color(0x147FB2FF),
+        textPrimary = Color(0xFFF5F8FF),
+        textSecondary = Color(0xFFA9B4CC),
+        textTertiary = Color(0xFF7C88A3),
+        brand = Color(0xFF3A84F7),
+        brandBright = Color(0xFF73AEFF),
+        onBrand = Color(0xFFFFFFFF),
         accent = Color(0xFFF5A524),
         onAccent = Color(0xFF1A1200),
-        routeActive = Color(0xFFD08CFF),
-        routeInactive = Color(0xFF6A5A78),
-        routeCasing = Color(0xFF140A1A),
-        buildings3d = Color(0xFF2E2238),
-        danger = Color(0xFFFF4D6D),
+        routeActive = Color(0xFF4D9BFF),
+        routeInactive = Color(0xFF55627F),
+        routeCasing = Color(0xFF050814),
+        buildings3d = Color(0xFF2A3A68),
+        danger = Color(0xFFFF4B4B),
         warning = Color(0xFFFFC43D),
         success = Color(0xFF34D399),
-        speedRing = Color(0xFFE0263C),
+        speedRing = Color(0xFFE0262E),
         isDark = true,
     )
     val Day = RoadlyColorScheme(
-        background = Color(0xFFF5F3F8),
+        background = Color(0xFFF3F5FA),
         surface = Color(0xFFFFFFFF),
         surfaceElevated = Color(0xFFFFFFFF),
         glass = Color(0xE6FFFFFF),
-        glassBorder = Color(0x1A1A1030),
+        glassBorder = Color(0x1A101A30),
         glassHighlight = Color(0x80FFFFFF),
-        textPrimary = Color(0xFF14101C),
-        textSecondary = Color(0xFF5E5870),
-        textTertiary = Color(0xFF938CA3),
-        brand = Color(0xFFD01FC0),
-        brandBright = Color(0xFFF03CDC),
+        textPrimary = Color(0xFF0E1428),
+        textSecondary = Color(0xFF55607A),
+        textTertiary = Color(0xFF8892A8),
+        brand = Color(0xFF1F63E0),
+        brandBright = Color(0xFF3A84F7),
         onBrand = Color(0xFFFFFFFF),
         accent = Color(0xFFE08A00),
         onAccent = Color(0xFFFFFFFF),
-        routeActive = Color(0xFFB45CF0),
-        routeInactive = Color(0xFFB9B3C8),
+        routeActive = Color(0xFF2F7BF6),
+        routeInactive = Color(0xFFB3BACB),
         routeCasing = Color(0xFFFFFFFF),
-        buildings3d = Color(0xFFD9D4E3),
-        danger = Color(0xFFE0304F),
+        buildings3d = Color(0xFFD5DAE6),
+        danger = Color(0xFFE0303A),
         // Ambre foncé : texte et icônes sur fond clair (contraste 5,1:1 sur blanc ; 0xFFD99A00 ne donnait que 2,4:1).
         warning = Color(0xFF9A6200),
         success = Color(0xFF13A070),

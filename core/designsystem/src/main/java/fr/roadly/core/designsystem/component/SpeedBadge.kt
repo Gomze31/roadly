@@ -86,13 +86,13 @@ fun SpeedLimitSign(limitKmh: Int?, modifier: Modifier = Modifier, size: androidx
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun SpeedBadgeNightPreview() {
     RoadlyTheme(darkTheme = true) { SpeedBadge(speedKmh = 93.0, limitKmh = 80) }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun SpeedBadgeDayPreview() {
     RoadlyTheme(darkTheme = false) { SpeedBadge(speedKmh = 72.0, limitKmh = null) }

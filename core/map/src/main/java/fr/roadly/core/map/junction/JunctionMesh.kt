@@ -27,16 +27,16 @@ data class JunctionPalette(
 ) {
     companion object {
         val NIGHT = JunctionPalette(
-            skyTop = 0xFF07060C.toInt(), skyHorizon = 0xFF1E1830.toInt(), ground = 0xFF15121D.toInt(), groundGrid = 0xFF231E30.toInt(),
-            motorway = 0xFF3A3646.toInt(), road = 0xFF34303F.toInt(), minorRoad = 0xFF2C2936.toInt(), marking = 0xFFE9E6F2.toInt(),
-            barrier = 0xFF8A8598.toInt(), deck = 0xFF4A4558.toInt(), grass = 0xFF1C2A22.toInt(), building = 0xFF2A2236.toInt(),
-            path = 0xFFB794FF.toInt(), pathGlow = 0xFF8B5CF6.toInt(), laneActive = 0xFFB794FF.toInt(), fog = 0xFF1E1830.toInt(), night = true,
+            skyTop = 0xFF04060F.toInt(), skyHorizon = 0xFF141C36.toInt(), ground = 0xFF0C1122.toInt(), groundGrid = 0xFF18203A.toInt(),
+            motorway = 0xFF38425A.toInt(), road = 0xFF323B52.toInt(), minorRoad = 0xFF2A3247.toInt(), marking = 0xFFE6ECF8.toInt(),
+            barrier = 0xFF8490A8.toInt(), deck = 0xFF46506A.toInt(), grass = 0xFF1C2A22.toInt(), building = 0xFF27314F.toInt(),
+            path = 0xFF4D9BFF.toInt(), pathGlow = 0xFF3A84F7.toInt(), laneActive = 0xFF4D9BFF.toInt(), fog = 0xFF141C36.toInt(), night = true,
         )
         val DAY = JunctionPalette(
             skyTop = 0xFF8FB8E8.toInt(), skyHorizon = 0xFFE6EEF7.toInt(), ground = 0xFFDDE3D6.toInt(), groundGrid = 0xFFCDD5C4.toInt(),
             motorway = 0xFF6E7380.toInt(), road = 0xFF7C808B.toInt(), minorRoad = 0xFF8E929C.toInt(), marking = 0xFFFFFFFF.toInt(),
-            barrier = 0xFFB9BCC4.toInt(), deck = 0xFF9EA2AB.toInt(), grass = 0xFF9DBB86.toInt(), building = 0xFFE4DFEA.toInt(),
-            path = 0xFF7C3AED.toInt(), pathGlow = 0xFF8B5CF6.toInt(), laneActive = 0xFF7C3AED.toInt(), fog = 0xFFE6EEF7.toInt(), night = false,
+            barrier = 0xFFB9BCC4.toInt(), deck = 0xFF9EA2AB.toInt(), grass = 0xFF9DBB86.toInt(), building = 0xFFDDE3EE.toInt(),
+            path = 0xFF1F63E0.toInt(), pathGlow = 0xFF3A84F7.toInt(), laneActive = 0xFF1F63E0.toInt(), fog = 0xFFE6EEF7.toInt(), night = false,
         )
     }
 }

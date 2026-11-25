@@ -1,6 +1,6 @@
 # Design system Roadly (LOT 1)
 
-Module : `core:designsystem`. Objectif : une interface de cockpit GPS premium (sombre / clair / automatique), panneaux flottants sur la carte, écrans pleine page en cartes opaques, typographie Inter, identité violet (marque) + orange (appel à l'action). Aucun composant Android « brut » dans les écrans : tout passe par ces composants.
+Module : `core:designsystem`. Objectif : une interface de cockpit GPS premium (sombre / clair / automatique), panneaux flottants sur la carte, écrans pleine page en cartes opaques, typographie Inter, identité « nuit bleue » : panneaux bleu nuit, bleu vif de marque, ambre pour l'appel à l'action, rouge franc pour arrêter et pour la vigilance. Aucun composant Android « brut » dans les écrans : tout passe par ces composants.
 
 ## Tokens
 
@@ -12,14 +12,14 @@ Module : `core:designsystem`. Objectif : une interface de cockpit GPS premium (s
 | `surface`, `surfaceElevated` | cartes opaques (listes, réglages), feuilles modales |
 | `glass`, `glassBorder`, `glassHighlight` | panneaux translucides posés sur la carte |
 | `textPrimary`, `textSecondary`, `textTertiary` | texte principal, secondaire, légendes en capitales |
-| `brand`, `brandBright`, `onBrand`, `brandSoft` | violet de marque : tracé, sélection, boutons ronds de navigation, tuiles d'icônes |
-| `accent`, `onAccent`, `accentSoft` | orange : appels à l'action (Démarrer, Essayer, Valider), surtitres |
+| `brand`, `brandBright`, `onBrand`, `brandSoft` | bleu de marque : tracé, sélection, boutons ronds de navigation, tuiles d'icônes |
+| `accent`, `onAccent`, `accentSoft` | ambre : appels à l'action (Démarrer, Essayer, Valider), surtitres |
 | `routeActive`, `routeInactive`, `routeCasing` | couleurs du tracé MapLibre (halo + trait, alternatives, liseré) |
 | `buildings3d` | façades des bâtiments en 3D pendant le guidage |
 | `danger`, `dangerSoft`, `warning`, `success` | arrêter / erreurs, vigilance / ralentissements, services / en ligne |
 | `speedRing` | bord rouge du panneau de limitation |
 
-Teintes du cockpit : `CockpitTint` (VIOLET par défaut, OCEAN, MINT, CORAL, AMBER) → `RoadlyTheme(tint = …)` remplace `brand`, `brandBright`, `routeActive`.
+Teintes du cockpit : `CockpitTint` (AZUR par défaut, VIOLET, MAGENTA, MINT, CORAL, AMBER) → `RoadlyTheme(tint = …)` remplace `brand`, `brandBright`, `routeActive`.
 
 Typographie (`MaterialTheme.typography`, Inter) : `displayMedium` (durée d'itinéraire en grand), `titleLarge/Medium/Small`, `bodyLarge/Medium/Small`, `labelLarge/Medium/Small`. Styles dédiés : `NavDigits` (vitesse/distance), `Overline` (capitales espacées), `StatValue` (valeurs tabulaires). Mode conduite : `RoadlyTheme(drivingMode = true)` → ×1,3 et cibles 56 dp (`LocalDrivingMode`).
 
@@ -42,7 +42,7 @@ Effets (`theme/Effects.kt`) : `Modifier.softShadow(shape, color)`, `brandGradien
 |---|---|
 | `GlassPanel` | panneau translucide sur la carte (ombre douce, reflet, bord) |
 | `SurfaceCard` | carte opaque pour les écrans de liste |
-| `GlassButton(style = Primary / Brand / Secondary / Danger / Ghost)` | boutons ; `Brand` = dégradé violet (« Rouler ») ; `Primary` = orange |
+| `GlassButton(style = Primary / Brand / Secondary / Danger / Ghost)` | boutons ; `Brand` = dégradé bleu (« Rouler ») ; `Primary` = ambre |
 | `GlassIconButton` | bouton carré verre (barre du haut) ; `badge` = point orange |
 | `RoundIconButton(style = Brand / Danger / Glass / Accent)` | bouton rond plein (recentrer, arrêter, replier) |
 | `GlassChip(selected, compact, trailing)` | puces de filtre / option |
@@ -51,7 +51,7 @@ Effets (`theme/Effects.kt`) : `Modifier.softShadow(shape, color)`, `brandGradien
 | `StatTile(value, label)` | valeur + légende en capitales ; `StatRow(label, value)` |
 | `SpeedBadge(speed, limit, tolerance)` + `SpeedLimitSign(limit)` | compteur et panneau de limitation |
 | `NavInfoBar(eta, minutes, km, showRecenter, onRecenter, onStop)` | barre d'information du guidage |
-| `HorizonStrip(items, title, density)` | ruban « la route à venir », échelle log 0–5 km (`HorizonItem`, `HorizonKind`, `HorizonScale`) |
+| `HorizonStrip(items, title, density, alert)` | ruban « la route à venir », échelle log 0–5 km (`HorizonItem`, `HorizonKind`, `HorizonScale`) ; `alert` (« Vigilance active », zone de danger traversée) prend l'en-tête et passe le rail au rouge |
 | `SettingsGroup(title)`, `ListRow`, `ToggleRow`, `RowDivider`, `SegmentedControl`, `roadlySwitchColors()` | écrans de réglages et listes |
 | `RoadlyTopBar(title, onBack, overline, actions)`, `RoadlyScreen` | barre de titre et fond des écrans pleine page |
 | `RouteHeadline`, `RouteOptionRow`, `RouteCard` | panneau « Votre choix » et alternatives |

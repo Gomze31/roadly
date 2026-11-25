@@ -135,10 +135,10 @@ internal fun ThenRow(then: ThenUi, modifier: Modifier = Modifier) {
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun ThenRowNightPreview() { RoadlyTheme(darkTheme = true, drivingMode = true) { ThenRow(ThenUi(ManeuverType.TURN_RIGHT, "Rue Louis Plana")) } }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun ThenRowDayPreview() { RoadlyTheme(darkTheme = false, drivingMode = true) { ThenRow(ThenUi(ManeuverType.ROUNDABOUT_EXIT, "Rue Médiane")) } }

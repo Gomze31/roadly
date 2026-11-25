@@ -37,6 +37,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import fr.roadly.core.designsystem.component.GlassPanel
 import fr.roadly.core.designsystem.component.IconTile
 import fr.roadly.core.designsystem.component.IconTileStyle
@@ -48,6 +52,9 @@ import fr.roadly.core.designsystem.theme.RoadlySpacing
 import fr.roadly.core.designsystem.theme.RoadlyTheme
 import fr.roadly.core.model.ManeuverType
 import fr.roadly.core.navigation.RoundaboutInfo
+
+/** Encre du numéro de sortie sur sa pastille blanche (nuit) ; fond de la pastille inversée (jour). */
+private val EXIT_BADGE_INK = Color(0xFF0E1428)
 
 /** Étiquette du bandeau pour les tests instrumentés. */
 internal const val BANNER_TAG = "maneuver_banner"
@@ -110,6 +117,18 @@ fun ManeuverBanner(
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(banner.distanceText, style = NavDigits.copy(fontSize = 34.sp * s, lineHeight = 38.sp * s, textAlign = TextAlign.Start), color = if (distanceUncertain) c.textSecondary.copy(alpha = 0.6f) else c.brand, maxLines = 1)
+                    // Numéro de sortie en pastille de panneau, à côté de la distance (référence visuelle) ; lu « Sortie 7 » par TalkBack.
+                    val exitBadge = banner.exitNumber?.takeUnless { signShownBelow }
+                    if (exitBadge != null) {
+                        val exitDescription = stringResource(R.string.nav_exit_number, exitBadge)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            exitBadge, style = NavDigits.copy(fontSize = 20.sp * s, lineHeight = 24.sp * s), color = if (c.isDark) EXIT_BADGE_INK else Color.White, maxLines = 1,
+                            // Blanche sur les panneaux de nuit ; de jour le panneau est déjà blanc, la pastille s'inverse.
+                            modifier = Modifier.background(if (c.isDark) Color.White else EXIT_BADGE_INK, RoundedCornerShape(8.dp)).padding(horizontal = 9.dp, vertical = 2.dp)
+                                .semantics { contentDescription = exitDescription },
+                        )
+                    }
                     // Repère « au feu » (feu OSM au point de manœuvre), comme les directions par repère de Google Maps.
                     if (banner.atTrafficLight) {
                         Spacer(Modifier.width(10.dp))
@@ -123,7 +142,8 @@ fun ManeuverBanner(
                         }
                     }
                 }
-                // Ligne principale : « 2e sortie · rue » (ou « Sortie 12 · rue »), en gras ; l'instruction complète si rien d'autre.
+                // Ligne principale : « 2e sortie · rue » (la sortie numérotée est en pastille près de la distance), en gras ;
+                // l'instruction complète si rien d'autre.
                 val exit = if (signShownBelow) null else exitLabel(banner)
                 val mainLine = listOfNotNull(exit, street).joinToString(" · ").ifEmpty { null }
                 if (mainLine != null) {
@@ -148,10 +168,10 @@ fun ManeuverBanner(
 
 @Composable
 private fun exitLabel(b: BannerUi): String? {
-    val exit = b.exitNumber
     val roundabout = b.roundaboutExit
     return when {
-        exit != null -> stringResource(R.string.nav_exit_number, exit)
+        // Sortie numérotée : montrée en pastille à côté de la distance, pas répétée ici.
+        b.exitNumber != null -> null
         roundabout == 1 -> stringResource(R.string.nav_roundabout_exit_first)
         roundabout != null -> stringResource(R.string.nav_roundabout_exit_n, roundabout)
         else -> null
@@ -160,13 +180,13 @@ private fun exitLabel(b: BannerUi): String? {
 
 private val sampleBanner = BannerUi(ManeuverType.ROUNDABOUT_ENTER, "150 m", "Au rond-point, prenez la 2e sortie.", "Avenue des Champs-Élysées", null, 2)
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 420)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 420)
 @Composable
 private fun ManeuverBannerNightPreview() {
     RoadlyTheme(darkTheme = true, drivingMode = true) { ManeuverBanner(sampleBanner, onClick = {}, roundabout = previewRoundabout(180.0, 2, "Avenue des Champs-Élysées")) }
 }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8, widthDp = 420)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA, widthDp = 420)
 @Composable
 private fun ManeuverBannerDayPreview() {
     RoadlyTheme(darkTheme = false, drivingMode = true) { ManeuverBanner(sampleBanner.copy(type = ManeuverType.TURN_RIGHT, roundaboutExit = null), onClick = {}) }

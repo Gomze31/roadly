@@ -265,25 +265,25 @@ internal fun previewRoundaboutLive(exits: Int, passed: Int, phase: RoundaboutPha
     }
 }
 
-@Preview(name = "Approche, 3e sortie — Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 380)
+@Preview(name = "Approche, 3e sortie — Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 380)
 @Composable
 private fun RoundaboutModeApproachPreview() {
     RoadlyTheme(darkTheme = true, drivingMode = true) { RoundaboutModePanel(previewRoundaboutLive(3, 0, RoundaboutPhase.APPROACH), distanceText = "120 m") }
 }
 
-@Preview(name = "Dans l'anneau, 1 passée sur 3 — Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 380)
+@Preview(name = "Dans l'anneau, 1 passée sur 3 — Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 380)
 @Composable
 private fun RoundaboutModeInsidePreview() {
     RoadlyTheme(darkTheme = true, drivingMode = true) { RoundaboutModePanel(previewRoundaboutLive(4, 1, RoundaboutPhase.INSIDE)) }
 }
 
-@Preview(name = "Prochaine sortie — Jour", showBackground = true, backgroundColor = 0xFFF5F3F8, widthDp = 380)
+@Preview(name = "Prochaine sortie — Jour", showBackground = true, backgroundColor = 0xFFF3F5FA, widthDp = 380)
 @Composable
 private fun RoundaboutModeNextExitPreview() {
     RoadlyTheme(darkTheme = false, drivingMode = true) { RoundaboutModePanel(previewRoundaboutLive(3, 2, RoundaboutPhase.INSIDE, street = "D 916")) }
 }
 
-@Preview(name = "Sortie prise / sans décompte — Nuit", showBackground = true, backgroundColor = 0xFF0E0B14, widthDp = 380)
+@Preview(name = "Sortie prise / sans décompte — Nuit", showBackground = true, backgroundColor = 0xFF070A18, widthDp = 380)
 @Composable
 private fun RoundaboutModeExitedPreview() {
     RoadlyTheme(darkTheme = true, drivingMode = true) {

@@ -9,10 +9,14 @@
 Guidage vocal, route à venir, zones de vigilance, ZFE, coût du trajet, Android Auto.<br>
 Données publiques et ouvertes. Aucun compte obligatoire. Aucun traqueur.
 
-[![Dernière version](https://img.shields.io/github/v/release/Gomze31/roadly?label=t%C3%A9l%C3%A9charger&color=F03CDC&style=for-the-badge)](https://github.com/Gomze31/roadly/releases/latest)
-[![Licence Apache 2.0](https://img.shields.io/badge/licence-Apache--2.0-8B5CF6?style=for-the-badge)](LICENSE)
+[![Dernière version](https://img.shields.io/github/v/release/Gomze31/roadly?label=t%C3%A9l%C3%A9charger&color=3A84F7&style=for-the-badge)](https://github.com/Gomze31/roadly/releases/latest)
+[![Licence Apache 2.0](https://img.shields.io/badge/licence-Apache--2.0-1F63E0?style=for-the-badge)](LICENSE)
 [![Android 10+](https://img.shields.io/badge/Android-10%2B-2BC48A?style=for-the-badge&logo=android&logoColor=white)](#installer)
 [![Android Auto](https://img.shields.io/badge/Android%20Auto-oui-F5A524?style=for-the-badge)](#android-auto)
+
+[![CI](https://github.com/Gomze31/roadly/actions/workflows/ci.yml/badge.svg)](https://github.com/Gomze31/roadly/actions/workflows/ci.yml)
+
+[Captures](#captures) · [Fonctions](#ce-que-roadly-sait-faire) · [Installer](#installer) · [Compiler](#compiler) · [Documentation](#documentation) · [Contribuer](#contribuer)
 
 </div>
 
@@ -24,8 +28,8 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 
 - 🔒 **Vos trajets restent chez vous.** Favoris, historique et véhicule sont stockés sur le téléphone. Pas de compte obligatoire, pas de publicité, aucun outil d'analyse.
 - 🗺️ **Des sources ouvertes et vérifiables.** OpenStreetMap, Base Adresse Nationale, données publiques de l'État pour les zones de vigilance, les ZFE et le prix des carburants. Roadly n'invente rien : sans donnée, l'écran le dit.
-- 🚗 **Pensé pour la conduite.** Gros chiffres, interface sombre lisible de jour comme de nuit, annonces vocales à la bonne distance, Android Auto.
-- 💜 **Ouvert.** Code sous licence Apache 2.0 : vous pouvez le lire, le compiler, l'améliorer. Une seule bibliothèque n'est pas libre : celle de Google pour la position ([détail](THIRD_PARTY_LICENSES.md)).
+- 🚗 **Pensé pour la conduite.** Gros chiffres, panneaux bleu nuit lisibles de jour comme de nuit, annonces vocales à la bonne distance, Android Auto.
+- 💙 **Ouvert.** Code sous licence Apache 2.0 : vous pouvez le lire, le compiler, l'améliorer. Une seule bibliothèque n'est pas libre : celle de Google pour la position ([détail](THIRD_PARTY_LICENSES.md)).
 
 ## Ce que Roadly sait faire
 
@@ -39,12 +43,50 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 <tr>
 <td align="center"><b>Accueil</b><br><sub>Départ planifié, stations, parkings, boussole</sub></td>
 <td align="center"><b>Choix Roadly</b><br><sub>3 itinéraires, écart de durée, ZFE</sub></td>
-<td align="center"><b>Guidage</b><br><sub>Bandeau, limitation, Horizon</sub></td>
+<td align="center"><b>Guidage</b><br><sub>Bandeau, limitation, Horizon, vigilance</sub></td>
 <td align="center"><b>Votre route</b><br><sub>Péages, autoroutes, tunnels, ferries</sub></td>
 </tr>
 </table>
 
-<sub>Rendus de l'interface générés pendant le développement ; sur le téléphone, la carte est rendue par MapLibre à partir des tuiles OpenStreetMap.</sub>
+## Captures
+
+### Le guidage, de nuit comme de jour
+
+<table>
+<tr>
+<td width="25%"><img src="docs/images/captures/guidage-vigilance.png" alt="Guidage de nuit : sortie 7 dans 8,9 km, zone de danger en cours, ruban Vigilance active"></td>
+<td width="25%"><img src="docs/images/captures/guidage-sortie.png" alt="Sortie d'autoroute : panneau de direction, schéma de bifurcation, Serrez à droite"></td>
+<td width="25%"><img src="docs/images/captures/guidage-rond-point.png" alt="Rond-point : schéma avec la sortie à prendre et les sorties à passer"></td>
+<td width="25%"><img src="docs/images/captures/guidage-jour.png" alt="Guidage de jour : prochaine manœuvre, vitesse, limitation et Horizon"></td>
+</tr>
+<tr>
+<td align="center"><b>Vigilance active</b><br><sub>Zone de danger en rouge sur le tracé et dans l'Horizon</sub></td>
+<td align="center"><b>Sortie d'autoroute</b><br><sub>Panneau, bifurcation, « Serrez à droite »</sub></td>
+<td align="center"><b>Rond-point</b><br><sub>Sortie à prendre, sorties à passer</sub></td>
+<td align="center"><b>De jour</b><br><sub>La même interface sur la carte claire</sub></td>
+</tr>
+</table>
+
+### Premier lancement
+
+<table>
+<tr>
+<td width="25%"><img src="docs/images/captures/bienvenue.png" alt="Bienvenue sur Roadly"></td>
+<td width="25%"><img src="docs/images/captures/alertes.png" alt="Voix et alertes"></td>
+<td width="25%"><img src="docs/images/captures/vehicule.png" alt="Votre véhicule"></td>
+<td width="25%"><img src="docs/images/screen-onboarding.png" alt="Votre route"></td>
+</tr>
+<tr>
+<td align="center"><b>Bienvenue</b><br><sub>Ce que fait Roadly, sans compte</sub></td>
+<td align="center"><b>Voix et alertes</b><br><sub>Chaque annonce se règle</sub></td>
+<td align="center"><b>Votre véhicule</b><br><sub>Énergie, consommation, Crit'Air</sub></td>
+<td align="center"><b>Votre route</b><br><sub>Péages, autoroutes, tunnels, ferries</sub></td>
+</tr>
+</table>
+
+<sub>Ces images sont des montages d'illustration, pas des captures de téléphone : l'interface est celle de l'application, rendue pendant les tests, posée sur un rendu des cartes Roadly avec les tuiles OpenStreetMap. Comment les refaire : [`tools/readme-images`](tools/readme-images/README.md).</sub>
+
+## Fonctions en détail
 
 ### 🧭 Guidage
 - Guidage vocal en français, annonces calées sur votre vitesse, « puis… » quand deux manœuvres s'enchaînent.
@@ -55,6 +97,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - **Repères « au feu »** : « Au feu, tournez à droite… » quand le carrefour a des feux (OpenStreetMap), avec un badge sur le bandeau.
 - **Virages serrés et ralentisseurs annoncés** (« Attention, virage serré à gauche », « Attention, ralentisseurs »), d'après OpenStreetMap ; désactivables dans les réglages.
 - **Péage annoncé** à l'approche (« Péage dans 1 kilomètre, préparez votre moyen de paiement »), feux tricolores dans l'Horizon.
+- **Alertes de zones de danger coupées ou rétablies d'un geste** pendant le guidage ; « Vigilance active » dans l'Horizon pendant la traversée d'une zone.
 - Recalcul immédiat hors itinéraire, extrapolation dans les tunnels, carte 3D avec bâtiments.
 - **Vue photos aériennes (IGN)** : la carte réaliste, avec les vraies photos de l'IGN sous les routes et le tracé, assombries la nuit ; un bouton sur l'accueil, sans clé ni compte.
 
@@ -150,6 +193,19 @@ Prérequis : JDK 17+, SDK Android 36, un `local.properties` contenant `sdk.dir=�
 
 Votre compilation est signée par votre propre clé : Android ne l'installera pas par-dessus une version officielle, et inversement.
 
+## Documentation
+
+| Pour… | Lisez |
+|---|---|
+| Savoir ce qui marche, et jusqu'où | [`FEATURES.md`](FEATURES.md), [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+| Comprendre le code | [`ARCHITECTURE.md`](ARCHITECTURE.md), [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md), [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md) |
+| Changer de serveur de cartes ou d'itinéraires | [`docs/API-PROVIDERS.md`](docs/API-PROVIDERS.md), [`docs/SERVICES.md`](docs/SERVICES.md) |
+| Héberger le service communautaire | [`docs/BACKEND.md`](docs/BACKEND.md) |
+| Utiliser Android Auto | [`docs/ANDROID-AUTO.md`](docs/ANDROID-AUTO.md) |
+| Vérifier une version ou une mise à jour | [`docs/SIGNATURE.md`](docs/SIGNATURE.md), [`docs/UPDATES.md`](docs/UPDATES.md) |
+| Savoir ce qui sort du téléphone | [`PRIVACY.md`](PRIVACY.md), [`SECURITY.md`](SECURITY.md) |
+| Suivre l'historique du développement | [`docs/suivi/`](docs/suivi) |
+
 ## Sous le capot
 
 | | |
@@ -208,5 +264,5 @@ Le code de Roadly est distribué sous **[licence Apache 2.0](LICENSE)**. Vous po
 - La licence ne couvre ni le nom « Roadly » ni son logo : une version modifiée et redistribuée change de nom, d'icône et d'identifiant d'application.
 
 <div align="center">
-<sub>Fait avec 💜 pour tous ceux qui aiment conduire sans être suivis.</sub>
+<sub>Fait avec 💙 pour tous ceux qui aiment conduire sans être suivis.</sub>
 </div>

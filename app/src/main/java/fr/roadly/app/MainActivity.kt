@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
             val tint by themeVm.tint.collectAsStateWithLifecycle()
             val p = location.lastKnown?.point
             val isDark = ThemeResolver.isDark(mode, isSystemInDarkTheme(), p?.lat, p?.lon, now)
-            // Interface sombre en permanence (panneaux violets sur carte claire, comme la référence) ; la carte, elle, suit jour / nuit.
+            // Interface sombre en permanence (panneaux bleu nuit sur carte claire, comme la référence) ; la carte, elle, suit jour / nuit.
             // Seul le choix explicite « Clair » rend l'interface claire.
             val pip by inPip.collectAsStateWithLifecycle()
             val aerial by themeVm.mapAerial.collectAsStateWithLifecycle()

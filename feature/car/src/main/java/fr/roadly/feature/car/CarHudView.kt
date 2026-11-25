@@ -188,10 +188,10 @@ internal class CarHudView(context: Context) : View(context) {
 
         private const val WHITE = 0xFFFFFFFF.toInt()
         const val BLACK = 0xFF111111.toInt()
-        const val MUTED = 0xFFB4A8BE.toInt()
-        /** Mêmes teintes que l'app : violet très sombre, liseré violet discret. */
-        const val PANEL = 0xF21C1024.toInt()
-        const val PANEL_BORDER = 0x66B04FC0
+        const val MUTED = 0xFFA9B4CC.toInt()
+        /** Mêmes teintes que l'app : bleu nuit, liseré bleu discret. */
+        const val PANEL = 0xF20F142B.toInt()
+        const val PANEL_BORDER = 0x665F86D6
         const val LIMIT_RED = 0xFFE0263C.toInt()
         const val OVER_RED = 0xFFFF5252.toInt()
         const val ZONE_INSIDE = 0xF2C62828.toInt()

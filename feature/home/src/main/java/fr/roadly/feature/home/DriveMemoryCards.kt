@@ -110,7 +110,7 @@ internal fun ParkedVehicleRow(vehicle: ParkedVehicle, from: GeoPoint?, nowMs: Lo
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun DriveMemoryNightPreview() {
     RoadlyTheme(darkTheme = true) {

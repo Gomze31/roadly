@@ -75,7 +75,7 @@ private fun ReliabilityBars(r: Reliability) {
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun DangerZonePillPreview() {
     RoadlyTheme(darkTheme = true, drivingMode = true) {

@@ -116,7 +116,7 @@ fun FreeDriveScreen(isDark: Boolean, onExit: () -> Unit, vm: FreeDriveViewModel 
     // Interface : même clair / sombre que l'app (sombre en permanence sauf choix « Clair ») ; la carte suit [isDark].
     val uiDark = LocalRoadlyColors.current.isDark
     val tint = LocalRoadlyColors.current.brand
-    val cockpit = CockpitTint.entries.firstOrNull { (if (uiDark) it.night else it.day).first == tint } ?: CockpitTint.MAGENTA
+    val cockpit = CockpitTint.entries.firstOrNull { (if (uiDark) it.night else it.day).first == tint } ?: CockpitTint.AZUR
     RoadlyTheme(darkTheme = uiDark, drivingMode = true, tint = cockpit) { FreeDriveContent(isDark, onExit, vm) }
 }
 
@@ -127,6 +127,8 @@ private fun FreeDriveContent(isDark: Boolean, onExit: () -> Unit, vm: FreeDriveV
     val tolerance by vm.toleranceKmh.collectAsStateWithLifecycle()
     val c = LocalRoadlyColors.current
     val map = rememberMapController()
+    // Conduite libre en voiture : même curseur que le guidage.
+    LaunchedEffect(map) { map.setUserVehicleIcon(car = true) }
     KeepScreenOn()
     BackHandler { vm.stop() }
     LaunchedEffect(isDark) { vm.setDarkTheme(isDark) }

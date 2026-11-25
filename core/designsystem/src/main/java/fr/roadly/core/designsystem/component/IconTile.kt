@@ -69,10 +69,10 @@ private fun IconTileSamples() {
     }
 }
 
-@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF0E0B14)
+@Preview(name = "Nuit", showBackground = true, backgroundColor = 0xFF070A18)
 @Composable
 private fun IconTileNightPreview() { RoadlyTheme(darkTheme = true) { IconTileSamples() } }
 
-@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF5F3F8)
+@Preview(name = "Jour", showBackground = true, backgroundColor = 0xFFF3F5FA)
 @Composable
 private fun IconTileDayPreview() { RoadlyTheme(darkTheme = false) { IconTileSamples() } }
