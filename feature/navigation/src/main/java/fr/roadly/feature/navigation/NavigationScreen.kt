@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.RemoveModerator
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.GpsOff
@@ -328,6 +329,9 @@ internal fun PortraitOverlay(
                 junction = junction?.let { slot -> { slot(Modifier.fillMaxWidth().height(junctionHeight)) } },
             )
             Row(verticalAlignment = Alignment.Top) {
+                // Alertes de zones de danger, à gauche sous le bandeau (référence visuelle) : coupées ou rétablies d'un geste.
+                VigilanceButton(vm)
+                Spacer(Modifier.width(RoadlySpacing.s))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.s)) {
                     if (state.rerouting) ReroutingPill()
                     ScooterExtras(state, vm)
@@ -651,6 +655,18 @@ private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}) 
             }
         }
     }
+}
+
+/** Bouton des alertes de zones de danger : rouge quand elles sont actives, estompé et barré quand elles sont coupées. */
+@Composable
+private fun VigilanceButton(vm: NavigationViewModel) {
+    val c = LocalRoadlyColors.current
+    val enabled by vm.vigilanceEnabled.collectAsStateWithLifecycle()
+    RoundIconButton(
+        if (enabled) Icons.Default.Shield else Icons.Default.RemoveModerator,
+        stringResource(if (enabled) R.string.nav_vigilance_on else R.string.nav_vigilance_off),
+        onClick = vm::toggleVigilance, size = 52.dp, iconTint = if (enabled) c.danger else c.textTertiary,
+    )
 }
 
 @Composable

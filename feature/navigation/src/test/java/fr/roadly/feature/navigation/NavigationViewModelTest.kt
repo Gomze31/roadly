@@ -48,6 +48,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -252,6 +253,18 @@ class NavigationViewModelTest {
             assertEquals(10, approach.maneuverShapeIndex)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test fun `the vigilance button switches the danger zone alerts setting off and back on`() = runTest {
+        val vm = NavigationViewModel(session(), prefs, config)
+        runCurrent()
+        val initial = vm.vigilanceEnabled.value
+        vm.toggleVigilance(); runCurrent()
+        assertEquals(!initial, prefs.vigilanceEnabled.first())
+        assertEquals(!initial, vm.vigilanceEnabled.value)
+        vm.toggleVigilance(); runCurrent()
+        assertEquals(initial, prefs.vigilanceEnabled.first())
+        assertEquals(initial, vm.vigilanceEnabled.value)
     }
 
     @Test fun `mute toggles the session and stop ends in IDLE`() = runTest {

@@ -115,16 +115,19 @@ class NavigationFullScreenScreenshotTest {
     }
 
     /** Overlay réel posé sur un aplat neutre (pas une carte) ; [landscape] choisit l'overlay, comme `NavigationContent`. */
-    private fun shot(name: String, dark: Boolean, state: NavigationUiState, landscape: Boolean = false) {
+    private fun shot(name: String, dark: Boolean, state: NavigationUiState, landscape: Boolean = false, montage: Color? = null) {
         val vm = viewModel()
         compose.setContent {
             RoadlyTheme(darkTheme = dark, drivingMode = true) {
-                Box(Modifier.fillMaxSize().background(if (dark) Color(0xFF2A3140) else Color(0xFFD9DDE3))) {
+                Box(Modifier.fillMaxSize().background(montage ?: if (dark) Color(0xFF2A3140) else Color(0xFFD9DDE3))) {
                     val line = if (dark) Color(0xFF596274) else Color(0xFFA9B0BC)
-                    Canvas(Modifier.fillMaxSize()) {
-                        drawLine(line, Offset(size.width * 0.5f, size.height), Offset(size.width * 0.5f, size.height * 0.45f), strokeWidth = 14.dp.toPx(), cap = StrokeCap.Round)
+                    // [montage] : aplat uni, sans trait ni étiquette, que l'outil d'images du README remplace par un rendu de carte.
+                    if (montage == null) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawLine(line, Offset(size.width * 0.5f, size.height), Offset(size.width * 0.5f, size.height * 0.45f), strokeWidth = 14.dp.toPx(), cap = StrokeCap.Round)
+                        }
+                        Text("fond de test (pas une carte)", Modifier.align(BiasAlignment(0.2f, -0.3f)), color = line, fontSize = 12.sp)
                     }
-                    Text("fond de test (pas une carte)", Modifier.align(BiasAlignment(0.2f, -0.3f)), color = line, fontSize = 12.sp)
                     if (landscape) {
                         LandscapeOverlay(state, true, {}, {}, {}, vm, {}, {})
                     } else {
@@ -255,6 +258,12 @@ class NavigationFullScreenScreenshotTest {
     @Test fun arrived_day() = shot("arrived_day", false, arrived())
     @Test fun vigilance_night() = shot("vigilance_night", true, vigilanceActive())
     @Test fun vigilance_day() = shot("vigilance_day", false, vigilanceActive())
+    /**
+     * Base du montage des images du README (`docs/images`) : le même écran sur fond noir puis blanc. La différence des deux
+     * rendus donne la transparence exacte des panneaux et de leurs ombres, que l'outil pose ensuite sur un rendu de carte.
+     */
+    @Test fun vigilance_night_montage_black() = shot("vigilance_night_montage_black", true, vigilanceActive(), montage = Color.Black)
+    @Test fun vigilance_night_montage_white() = shot("vigilance_night_montage_white", true, vigilanceActive(), montage = Color.White)
 
     // ---- Paysage, nuit : les trois situations les plus chargées ----
 

@@ -79,7 +79,7 @@ sealed interface AlternativesUi {
 @HiltViewModel
 class NavigationViewModel @Inject constructor(
     private val session: NavigationSession,
-    prefs: UserPreferencesRepository,
+    private val prefs: UserPreferencesRepository,
     config: ProviderConfigRepository,
     private val guidance: GuidanceActions,
     private val community: CommunityRepository,
@@ -321,6 +321,18 @@ class NavigationViewModel @Inject constructor(
 
     fun setDarkTheme(dark: Boolean) { isDark.value = dark }
     fun toggleMute() = session.setMuted(!session.muted.value)
+
+    /**
+     * Alertes de zones de danger (réglage « vigilance » des réglages) : le bouton du guidage les coupe et les rétablit d'un geste.
+     * La session suit le réglage : coupées, les zones ne sont plus ni annoncées ni dessinées.
+     */
+    val vigilanceEnabled: StateFlow<Boolean> = prefs.vigilanceEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, GuidanceDefaults.VIGILANCE_ENABLED)
+
+    fun toggleVigilance() {
+        val next = !vigilanceEnabled.value
+        // Écriture impossible (stockage plein) : le réglage reste tel quel, le bouton aussi.
+        viewModelScope.launch { runCatching { prefs.setVigilanceEnabled(next) } }
+    }
     fun stop() = guidance.stop()
     fun retry() = session.retry()
 
