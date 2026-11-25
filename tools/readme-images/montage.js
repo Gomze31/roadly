@@ -39,7 +39,7 @@ const brg=(a,b)=>{const t=Math.PI/180,y=Math.sin((b[0]-a[0])*t)*Math.cos(b[1]*t)
       if(zone){line('z0',ahead.slice(0,cut),'#FFFFFF',20);line('z1',ahead.slice(0,cut),'#FF4D4F',14);}
       const img=new Image(88,132);img.src='data:image/svg+xml;base64,'+btoa(${JSON.stringify(car)});await img.decode();map.addImage('roadly-car',img,{pixelRatio:2});
       map.addSource('u',{type:'geojson',data:{type:'Feature',geometry:{type:'Point',coordinates:ahead[0]}}});
-      map.addLayer({id:'u',type:'symbol',source:'u',layout:{'icon-image':'roadly-car','icon-allow-overlap':true,'icon-size':1.25}});
+      map.addLayer({id:'u',type:'symbol',source:'u',layout:{'icon-image':'roadly-car','icon-allow-overlap':true,'icon-size':1.25,'icon-rotation-alignment':'map','icon-pitch-alignment':'viewport','icon-rotate':brg(ahead[0],ahead[1])}});
       map.jumpTo({center:ahead[0],bearing:brg(ahead[0],ahead[1]),pitch:60,zoom:16.6,padding:{top:innerHeight*0.24,bottom:0,left:0,right:0}});
       for(const id of ['roadly_poi_major','roadly_poi_other'])map.setLayoutProperty(id,'visibility','none');
     } else {

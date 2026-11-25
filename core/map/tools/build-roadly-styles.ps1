@@ -88,7 +88,8 @@ $majorClasses    = @('trunk', 'primary', 'secondary', 'tertiary')
 $minorClasses    = @('minor', 'service', 'track')
 $bridgeClasses   = @('motorway', 'trunk', 'primary', 'secondary', 'tertiary')
 $allClasses      = @('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service', 'track')
-$poiMajorClasses = @('hospital', 'fuel', 'parking', 'railway')
+# Les parkings n'en sont pas : en ville, leurs pictogrammes couvraient la carte (ils restent en texte dès le zoom 16).
+$poiMajorClasses = @('hospital', 'fuel', 'railway')
 # Bretelles (ramp = 1) : 75 % de la largeur de leur classe.
 $ramp         = @('case', @('==', @('get', 'ramp'), 1), 0.75, 1)
 # Routes principales : voie rapide > nationale > départementale > locale.
@@ -145,7 +146,7 @@ function New-RoadLayers($p) {
     return , $layers
 }
 
-# Points d'intérêt des tuiles (source-layer poi) : hôpitaux, carburant, parkings et gares dès le zoom 14 (icônes du sprite ofm), le reste dès 16.
+# Points d'intérêt des tuiles (source-layer poi) : hôpitaux, carburant et gares dès le zoom 14 (icônes du sprite ofm), le reste dès 16.
 function New-PoiLayers($p) {
     $text = @('coalesce', @('get', 'name:fr'), @('get', 'name'))
     $font = @('Noto Sans Regular')

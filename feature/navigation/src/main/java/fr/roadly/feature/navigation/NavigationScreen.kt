@@ -211,6 +211,8 @@ private fun NavigationContent(
     LaunchedEffect(c.brand) { map.setArrowColor("#FFFFFF", c.brand.toHex()) }
     // En voiture, le curseur est une voiture vue de dessus ; la trottinette garde la flèche.
     LaunchedEffect(map) { map.setUserVehicleIcon(car = !vm.scooterMode) }
+    // En guidage, la carte ne garde que la route : commerces et lieux masqués.
+    LaunchedEffect(map) { map.setPlacesVisible(false) }
     val approach = state.approach
     LaunchedEffect(route?.id, approach?.maneuverShapeIndex) {
         if (route != null && approach != null) map.setManeuverArrow(ManeuverArrowBuilder.build(route.geometry, approach.maneuverShapeIndex)) else map.clearManeuverArrow()
@@ -359,9 +361,10 @@ internal fun PortraitOverlay(
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
-            assistantButton()
-            // Voix, changer de destination et itinéraires sont dans le panneau du bas déplié (référence : seul « Signaler » ici).
-            for (button in buttons.filter { it == ActionButton.REPORT || it == ActionButton.CAMERA }) when (button) {
+            // Panneau replié : seul « Signaler » reste sur la carte (référence visuelle). Le panneau déplié fait apparaître ici
+            // l'assistant vocal et 2D/3D + Nord, à côté de ses propres actions (voix, destination, itinéraires).
+            if (panelExpanded) assistantButton()
+            for (button in buttons.filter { it == ActionButton.REPORT || (it == ActionButton.CAMERA && panelExpanded) }) when (button) {
                 ActionButton.REPORT -> ReportButton(onReport)
                 ActionButton.VOICE -> RoundIconButton(
                     if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
@@ -383,7 +386,7 @@ internal fun PortraitOverlay(
             // Pastilles d'état au-dessus du compteur, jamais à côté : la rangée 2D/3D + Nord de la colonne d'actions est à sa hauteur.
             Column(verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs), horizontalAlignment = Alignment.Start) {
                 if (state.gpsLost) GpsLostPill() else if (gpsUncertainVisible(state)) GpsUncertainPill()
-                StatusPills(state, onZoneClick = vm::askHideZone)
+                StatusPills(state, onZoneClick = vm::askHideZone, zoneAheadInHorizon = horizonVisible(state, landscape = false, panelExpanded = panelExpanded))
             }
             BottomBlock(state, vm, onChangeDestination, speed = { SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh) })
         }
@@ -567,7 +570,8 @@ internal fun horizonVisible(state: NavigationUiState, landscape: Boolean, panelE
 /** Horizon : manœuvres et arrivée (Valhalla), virages (géométrie) et zones de vigilance (base officielle) ; pas de trafic (⛔ source). */
 @Composable
 private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
-    val maneuvers = state.upcoming.map { u ->
+    // Les deux prochaines manœuvres seulement : au-delà, les épingles s'empilent au bout du ruban sans rien dire d'utile.
+    val maneuvers = state.upcoming.take(HORIZON_MANEUVERS).map { u ->
         val kind = if (u.type == ManeuverType.ARRIVE) HorizonKind.ARRIVAL else HorizonKind.MANEUVER
         val what = u.street ?: stringResource(R.string.nav_horizon_maneuver)
         HorizonItem(kind, u.distanceM, "${u.distanceText} · $what", "$what dans ${u.distanceText}")
@@ -608,15 +612,19 @@ private fun horizonItems(state: NavigationUiState): List<HorizonItem> {
     return (maneuvers + hazards + community).sortedBy { it.distanceM }
 }
 
+/** Manœuvres montrées dans l'Horizon. */
+private const val HORIZON_MANEUVERS = 2
+
 /** Portée des feux tricolores dans l'Horizon (m). */
 private const val TRAFFIC_LIGHT_HORIZON_M = 1_000.0
 
 /** Zone de danger (Radar Intelligence), prochaine limitation, péage en flux libre et pluie, au-dessus du compteur. */
 @Composable
-private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}) {
+private fun StatusPills(state: NavigationUiState, onZoneClick: () -> Unit = {}, zoneAheadInHorizon: Boolean = false) {
     val c = LocalRoadlyColors.current
     // Radar Intelligence : zone de danger en cours (reste à parcourir) ou prochaine (compte à rebours), fiabilité des données.
-    state.radar?.let { r ->
+    // Zone encore devant soi et ruban Horizon affiché ([zoneAheadInHorizon]) : le ruban la montre déjà, la pastille attend l'entrée.
+    state.radar?.takeUnless { !it.inside && zoneAheadInHorizon }?.let { r ->
         DangerZonePill(
             stringResource(R.string.nav_zone_active),
             stringResource(if (r.inside) R.string.nav_danger_remaining else R.string.nav_danger_in, r.distance),

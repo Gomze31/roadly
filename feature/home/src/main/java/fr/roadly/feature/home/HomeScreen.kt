@@ -183,7 +183,8 @@ fun HomeScreen(
     var showRouteOptions by rememberSaveable { mutableStateOf(false) }
     var showDeparture by rememberSaveable { mutableStateOf(false) }
     /** Chevron : replie la carte « Départ » et les boutons latéraux pour dégager la carte. */
-    var collapsed by rememberSaveable { mutableStateOf(false) }
+    // Replié par défaut : la carte, la recherche et l'essentiel ; le chevron déplie les outils (carburant, parkings, réglages…).
+    var collapsed by rememberSaveable { mutableStateOf(true) }
     val departurePlan by vm.departurePlan.collectAsStateWithLifecycle()
     val routePreferences by vm.routePreferences.collectAsStateWithLifecycle()
     val listen = rememberVoiceInput(stringResource(R.string.home_voice_prompt), onText = onSearchText)

@@ -27,7 +27,7 @@ node tools/readme-images/montage.js core/map/src/main/assets/styles/roadly-light
 node tools/readme-images/hero.js /chemin/sortie core/designsystem/src/main/res/font /chemin/sortie/hero.png
 ```
 
-Les captures de `docs/images/captures/` se font de la même façon, avec les autres rendus `*_montage_black` / `_white`
+Les captures de `docs/images/galerie/` se font de la même façon, avec les autres rendus `*_montage_black` / `_white`
 (`motorway_exit_night`, `roundabout_inside_night`, `cruise_day`) et le mode `nav` ; `navzone` ajoute une zone de danger en
 cours sur le tracé. `node tools/readme-images/reduire.js 720 <fichiers>` ramène ensuite les images à 720 px de large.
 

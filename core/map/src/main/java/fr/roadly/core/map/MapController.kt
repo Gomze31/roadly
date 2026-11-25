@@ -57,6 +57,7 @@ import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
+import org.maplibre.android.style.layers.PropertyFactory.iconPitchAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineBlur
@@ -96,6 +97,7 @@ class MapController(internal val context: Context) {
     private var routeColorInactive = "#55627F"
     private var routeColorCasing = "#050814"
     private var userIconRes = R.drawable.ic_user_arrow
+    private var placesVisible = true
     private var arrowColorBody = "#FFFFFF"
     private var arrowColorCasing = "#3A84F7"
     private var lastArrow: String = ManeuverArrowBuilder.EMPTY
@@ -308,6 +310,8 @@ class MapController(internal val context: Context) {
         ))
         style.addLayer(SymbolLayer(MapIds.LYR_USER, MapIds.SRC_USER).withProperties(
             iconImage(MapIds.IMG_ARROW), iconRotate(get("bearing")), iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP), iconAllowOverlap(true), iconSize(s),
+            // Dressé face à l'écran : couché sur la carte inclinée du guidage, le curseur était écrasé de moitié.
+            iconPitchAlignment(Property.ICON_PITCH_ALIGNMENT_VIEWPORT),
         ))
     }
 
@@ -568,6 +572,16 @@ class MapController(internal val context: Context) {
         if (styleReady) map?.style?.let { applyDetailTo(it) }
     }
 
+    /**
+     * Commerces et lieux des tuiles (noms et pictogrammes) : masqués pendant la conduite, où ils couvrent la route sans rien
+     * apporter. Les noms de rues et de communes restent ; le niveau de détail ([applyDetail]) s'applique par-dessus.
+     */
+    fun setPlacesVisible(visible: Boolean) {
+        if (visible == placesVisible) return
+        placesVisible = visible
+        if (styleReady) map?.style?.let { applyDetailTo(it) }
+    }
+
     private fun applyDetailTo(style: Style) {
         val reduced = detail == MapDetail.REDUCED
         for (layer in style.layers) {
@@ -576,7 +590,8 @@ class MapController(internal val context: Context) {
                 // Flèches de sens unique (symboles du calque des routes) : bruit visuel en vue réduite (écran de voiture).
                 MapIds.STYLE_LYR_POI, MapIds.STYLE_LYR_TRANSPORTATION -> {
                     val base = baseVisibility.getOrPut(layer.id) { layer.visibility.value ?: Property.VISIBLE }
-                    layer.setProperties(visibility(if (reduced) Property.NONE else base))
+                    val hidden = reduced || (!placesVisible && layer.sourceLayer == MapIds.STYLE_LYR_POI)
+                    layer.setProperties(visibility(if (hidden) Property.NONE else base))
                 }
                 MapIds.STYLE_LYR_TRANSPORTATION_NAME -> {
                     if (layer.id !in baseNameFilters) baseNameFilters[layer.id] = layer.filter

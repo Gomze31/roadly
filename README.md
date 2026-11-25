@@ -54,10 +54,10 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 
 <table>
 <tr>
-<td width="25%"><img src="docs/images/captures/guidage-vigilance.png" alt="Guidage de nuit : sortie 7 dans 8,9 km, zone de danger en cours, ruban Vigilance active"></td>
-<td width="25%"><img src="docs/images/captures/guidage-sortie.png" alt="Sortie d'autoroute : panneau de direction, schéma de bifurcation, Serrez à droite"></td>
-<td width="25%"><img src="docs/images/captures/guidage-rond-point.png" alt="Rond-point : schéma avec la sortie à prendre et les sorties à passer"></td>
-<td width="25%"><img src="docs/images/captures/guidage-jour.png" alt="Guidage de jour : prochaine manœuvre, vitesse, limitation et Horizon"></td>
+<td width="25%"><img src="docs/images/galerie/guidage-vigilance.png" alt="Guidage de nuit : sortie 7 dans 8,9 km, zone de danger en cours, ruban Vigilance active"></td>
+<td width="25%"><img src="docs/images/galerie/guidage-sortie.png" alt="Sortie d'autoroute : panneau de direction, schéma de bifurcation, Serrez à droite"></td>
+<td width="25%"><img src="docs/images/galerie/guidage-rond-point.png" alt="Rond-point : schéma avec la sortie à prendre et les sorties à passer"></td>
+<td width="25%"><img src="docs/images/galerie/guidage-jour.png" alt="Guidage de jour : prochaine manœuvre, vitesse, limitation et Horizon"></td>
 </tr>
 <tr>
 <td align="center"><b>Vigilance active</b><br><sub>Zone de danger en rouge sur le tracé et dans l'Horizon</sub></td>
@@ -71,9 +71,9 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 
 <table>
 <tr>
-<td width="25%"><img src="docs/images/captures/bienvenue.png" alt="Bienvenue sur Roadly"></td>
-<td width="25%"><img src="docs/images/captures/alertes.png" alt="Voix et alertes"></td>
-<td width="25%"><img src="docs/images/captures/vehicule.png" alt="Votre véhicule"></td>
+<td width="25%"><img src="docs/images/galerie/bienvenue.png" alt="Bienvenue sur Roadly"></td>
+<td width="25%"><img src="docs/images/galerie/alertes.png" alt="Voix et alertes"></td>
+<td width="25%"><img src="docs/images/galerie/vehicule.png" alt="Votre véhicule"></td>
 <td width="25%"><img src="docs/images/screen-onboarding.png" alt="Votre route"></td>
 </tr>
 <tr>
