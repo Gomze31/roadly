@@ -42,6 +42,7 @@ abstract class RepositoryModule {
     @Binds abstract fun entitlements(impl: DefaultEntitlementsRepository): EntitlementsRepository
     @Binds abstract fun driveMemory(impl: DataStoreDriveMemoryRepository): DriveMemoryRepository
     @Binds abstract fun radarSettings(impl: DataStoreRadarSettingsRepository): RadarSettingsRepository
+    @Binds abstract fun callContacts(impl: DataStoreCallContactsRepository): CallContactsRepository
     @Binds abstract fun zfe(impl: fr.roadly.core.data.zfe.ZfeRepository): fr.roadly.core.data.zfe.ZfeSource
     @Binds abstract fun traffic(impl: fr.roadly.core.data.traffic.TrafficRepository): fr.roadly.core.data.traffic.TrafficSource
 }

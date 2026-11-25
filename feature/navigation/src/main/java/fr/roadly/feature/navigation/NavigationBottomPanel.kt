@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Navigation
@@ -110,6 +111,8 @@ fun NavigationBottomPanel(
     onChangeDestination: (() -> Unit)? = null,
     onFuelAhead: (() -> Unit)? = null,
     fuelAheadElectric: Boolean = false,
+    /** Ouvre la feuille « Appeler un proche » ; null = bouton absent (aperçus, tests). */
+    onCall: (() -> Unit)? = null,
 ) {
     val c = LocalRoadlyColors.current
     val threshold = with(LocalDensity.current) { DRAG_THRESHOLD.toPx() }
@@ -162,7 +165,7 @@ fun NavigationBottomPanel(
                 }
             }
             AnimatedVisibility(expanded && compact) {
-                CompactExpandedRow(destinationName, onTripDetails, shareEta)
+                CompactExpandedRow(destinationName, onTripDetails, shareEta, onCall)
             }
             AnimatedVisibility(expanded && !compact) {
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm)) {
@@ -186,6 +189,11 @@ fun NavigationBottomPanel(
                     if (onFuelAhead != null) GlassButton(
                         stringResource(if (fuelAheadElectric) R.string.chargers_ahead_title else R.string.fuel_ahead_title), onClick = onFuelAhead,
                         icon = if (fuelAheadElectric) Icons.Default.EvStation else Icons.Default.LocalGasStation,
+                        style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth(),
+                    )
+                    // Appeler un proche : le téléphone passe l'appel, le guidage reste dans sa petite fenêtre.
+                    if (onCall != null) GlassButton(
+                        stringResource(R.string.call_button), onClick = onCall, icon = Icons.Default.Call,
                         style = GlassButtonStyle.Secondary, modifier = Modifier.fillMaxWidth(),
                     )
                     // Voix et changement de destination (déplacés de la colonne d'actions).
@@ -248,7 +256,7 @@ private fun OutlinedRoundButton(icon: ImageVector, description: String, onClick:
 
 /** Paysage : partie dépliée sur une rangée (destination tronquée, « Trajet complet », « Envoyer mon arrivée »), 56 dp + 8 dp de marge. */
 @Composable
-private fun CompactExpandedRow(destinationName: String?, onTripDetails: () -> Unit, onShareEta: () -> Unit) {
+private fun CompactExpandedRow(destinationName: String?, onTripDetails: () -> Unit, onShareEta: () -> Unit, onCall: (() -> Unit)? = null) {
     val c = LocalRoadlyColors.current
     Row(Modifier.fillMaxWidth().padding(start = RoadlySpacing.m, end = RoadlySpacing.sm, bottom = RoadlySpacing.s), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -262,6 +270,10 @@ private fun CompactExpandedRow(destinationName: String?, onTripDetails: () -> Un
         RoundIconButton(Icons.AutoMirrored.Filled.List, stringResource(R.string.nav_trip_details), onClick = onTripDetails)
         Spacer(Modifier.width(RoadlySpacing.s))
         RoundIconButton(Icons.AutoMirrored.Filled.Send, stringResource(R.string.nav_share_eta_title), onClick = onShareEta)
+        if (onCall != null) {
+            Spacer(Modifier.width(RoadlySpacing.s))
+            RoundIconButton(Icons.Default.Call, stringResource(R.string.call_button), onClick = onCall)
+        }
     }
 }
 

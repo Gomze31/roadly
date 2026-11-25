@@ -107,6 +107,7 @@ La plupart des GPS gratuits se paient avec vos trajets. Roadly fait l'inverse : 
 - **Incidents officiels Bison Futé** sur votre trajet (accident, bouchon et sa longueur, véhicule en panne, route fermée, travaux), dans le sens où vous roulez : pastille « Incident détecté », Horizon, carte, Android Auto. Les **routes fermées sont contournées automatiquement**, au calcul comme au recalcul.
 - **Image dans l'image** : quittez l'app, la prochaine manœuvre reste visible dans une petite fenêtre.
 - Envoyez votre heure d'arrivée en un geste.
+- **Appeler un proche** depuis le guidage : jusqu'à quatre proches choisis dans vos contacts ; le téléphone passe l'appel, le guidage continue dans sa petite fenêtre. Sans serveur, sans compte, sans accès à votre carnet d'adresses.
 
 ### 🛣️ Itinéraires
 - **Voiture électrique** : batterie estimée à l'arrivée selon votre consommation et la vitesse de chaque tronçon ; sous 10 %, Roadly propose les **bornes rapides du trajet** (base nationale IRVE : puissance, prises, tarif, points hors service).

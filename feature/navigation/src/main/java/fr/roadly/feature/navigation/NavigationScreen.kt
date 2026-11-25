@@ -528,6 +528,7 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
             val expanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
             val destination by vm.destinationName.collectAsStateWithLifecycle()
             val recenterIn by vm.recenterInSeconds.collectAsStateWithLifecycle()
+            var showCall by rememberSaveable { mutableStateOf(false) }
             // Retour système panneau déplié : le replier, pas arrêter le guidage (composé après le `BackHandler` de l'écran → prioritaire).
             BackHandler(enabled = expanded) { vm.collapseBottomPanel() }
             // Orientation lue ici (même critère largeur > hauteur que `NavigationContent`) : signatures et corps des overlays inchangés.
@@ -554,7 +555,9 @@ private fun BottomBlock(state: NavigationUiState, vm: NavigationViewModel, onCha
                     // Pas en trottinette : les stations-service ne la concernent pas.
                     onFuelAhead = if (vm.fuelAheadAvailable && !vm.scooterMode) vm::loadFuelAhead else null,
                     fuelAheadElectric = vm.isElectric.collectAsStateWithLifecycle().value,
+                    onCall = { showCall = true },
                 )
+                if (showCall) CallSheet(onDismiss = { showCall = false })
             }
         }
         NavigationPhase.ARRIVED -> Box(measured) {

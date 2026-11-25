@@ -19,6 +19,7 @@ tiers peut se comporter autrement.
 | Trajets et leur tracé | base locale | exportables ; un trajet en cours est aussi sauvegardé dans un fichier local pour survivre à un arrêt de l'application |
 | Véhicule, fiches trottinette, réglages | base et préférences locales | |
 | Dernière destination guidée | préférences locales | sert à proposer « Reprendre le guidage » |
+| Proches à appeler (nom et numéro, quatre au plus) | préférences locales | ceux que vous choisissez vous-même ; jamais envoyés, Roadly ne passe pas l'appel |
 | Jeton GitHub (facultatif, dépôt privé) | chiffré par le Keystore Android | envoyé seulement à `api.github.com` |
 
 La sauvegarde Android et le transfert d'appareil à appareil sont désactivés pour Roadly : ces données ne partent ni vers
@@ -63,8 +64,10 @@ Photon, Overpass), et chaque fonction optionnelle (photos aériennes, ralentisse
 
 Roadly ne demande pas la position « en arrière-plan » : hors guidage ou conduite libre, il ne lit pas votre position.
 Il n'a pas l'autorisation du micro : la recherche et les commandes vocales ouvrent la reconnaissance vocale du téléphone,
-qui traite la voix selon ses propres réglages et rend seulement le texte. Il n'accède ni aux contacts, ni aux fichiers hors
-de ceux que vous choisissez pour une sauvegarde.
+qui traite la voix selon ses propres réglages et rend seulement le texte. Il n'a pas l'autorisation de lire vos contacts :
+pour « Appeler un proche », le sélecteur de contacts d'Android lui remet la seule fiche que vous choisissez. Il n'a pas non
+plus celle d'appeler : il ouvre le téléphone avec le numéro composé, et c'est vous qui lancez l'appel. Il n'accède pas aux
+fichiers hors de ceux que vous choisissez pour une sauvegarde.
 
 ## Composant de Google
 
