@@ -413,7 +413,10 @@ private fun ScooterActions(vm: NavigationViewModel) {
     RoundIconButton(Icons.Default.EvStation, "Recharge", onClick = { vm.searchPois(ScooterPoiKind.CHARGING) })
 }
 
-/** Paysage : colonne gauche (bandeau, voies, Horizon, barre d'information) sur ~45 % ; compteur et actions à droite. */
+/**
+ * Paysage : colonne gauche (bandeau, voies, Horizon, barre d'information) sur ~45 % ; compteur et actions à droite.
+ * Panneau du bas replié : replier, alertes de zones et signaler seulement ; déplié : voix, recherche, assistant, 2D/3D + Nord.
+ */
 @Composable
 internal fun LandscapeOverlay(
     state: NavigationUiState,
@@ -463,20 +466,26 @@ internal fun LandscapeOverlay(
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.sm),
             horizontalAlignment = Alignment.End,
         ) {
-            assistantButton()
+            // Comme en portrait : panneau du bas replié, la carte ne garde que l'essentiel (replier, alertes de zones, signaler).
+            // Le panneau déplié fait apparaître la voix, la recherche et l'assistant, à la place des alertes de zones : la colonne
+            // n'a pas la hauteur pour tout. « Itinéraires » est dans la barre du bas.
+            val panelExpanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
             RoundIconButton(
                 if (bannerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 stringResource(if (bannerExpanded) R.string.nav_collapse_banner else R.string.nav_expand_banner),
                 onClick = onToggleBanner, size = BANNER_TOGGLE_SIZE,
             )
+            if (!panelExpanded) VigilanceButton(vm)
             ReportButton(onReport)
-            RoundIconButton(
-                if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute),
-                onClick = vm::toggleMute,
-            )
-            RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
-            if (state.phase == NavigationPhase.GUIDING) RoundIconButton(Icons.Default.AltRoute, stringResource(R.string.nav_alternatives), onClick = vm::loadAlternatives)
+            if (panelExpanded) {
+                assistantButton()
+                RoundIconButton(
+                    if (state.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                    stringResource(if (state.muted) R.string.nav_unmute else R.string.nav_mute),
+                    onClick = vm::toggleMute,
+                )
+                RoundIconButton(Icons.Default.Search, stringResource(R.string.nav_change_destination), onClick = onChangeDestination)
+            }
             if (state.scooter != null) ScooterActions(vm)
         }
         // Compteur à droite, décalé pour ne pas chevaucher la colonne d'actions (56 dp + marges). La rangée ne garde que 2D/3D + Nord
@@ -486,11 +495,15 @@ internal fun LandscapeOverlay(
             verticalArrangement = Arrangement.spacedBy(RoadlySpacing.xs),
             horizontalAlignment = Alignment.End,
         ) {
+            val panelExpanded by vm.bottomPanelExpanded.collectAsStateWithLifecycle()
             if (state.gpsLost) GpsLostPill() else if (gpsUncertainVisible(state)) GpsUncertainPill()
-            StatusPills(state, onZoneClick = vm::askHideZone)
+            StatusPills(state, onZoneClick = vm::askHideZone, zoneAheadInHorizon = horizonVisible(state, landscape = true, panelExpanded = panelExpanded))
             Row(verticalAlignment = Alignment.Bottom) {
-                CameraModeButtons(vm)
-                Spacer(Modifier.width(RoadlySpacing.s))
+                // 2D/3D + Nord : avec le panneau déplié seulement, comme en portrait.
+                if (panelExpanded) {
+                    CameraModeButtons(vm)
+                    Spacer(Modifier.width(RoadlySpacing.s))
+                }
                 SpeedBadge(state.speedKmh, state.speedLimitKmh, toleranceKmh = state.toleranceKmh)
             }
         }
